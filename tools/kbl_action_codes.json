@@ -1,0 +1,324 @@
+{
+  "gameActionCodeList": [
+    {
+      "key": "001",
+      "value": "게임시작",
+      "valueEn": "Game start"
+    },
+    {
+      "key": "002",
+      "value": "게임중단",
+      "valueEn": "Game suspended"
+    },
+    {
+      "key": "003",
+      "value": "작전시간",
+      "valueEn": "Timeout"
+    },
+    {
+      "key": "009",
+      "value": "게임종료",
+      "valueEn": "Game end"
+    },
+    {
+      "key": "010",
+      "value": "시간설정",
+      "valueEn": "Time setting"
+    },
+    {
+      "key": "101",
+      "value": "교체(IN)",
+      "valueEn": "(IN)"
+    },
+    {
+      "key": "102",
+      "value": "교체(OUT)",
+      "valueEn": "(OUT)"
+    },
+    {
+      "key": "201",
+      "value": "2점슛성공",
+      "valueEn": "2P"
+    },
+    {
+      "key": "202",
+      "value": "2점슛시도",
+      "valueEn": "2PA"
+    },
+    {
+      "key": "203",
+      "value": "자유투성공",
+      "valueEn": "FT"
+    },
+    {
+      "key": "204",
+      "value": "자유투시도",
+      "valueEn": "FTA"
+    },
+    {
+      "key": "205",
+      "value": "3점슛성공",
+      "valueEn": "3Ps"
+    },
+    {
+      "key": "206",
+      "value": "3점슛시도",
+      "valueEn": "3PA"
+    },
+    {
+      "key": "207",
+      "value": "덩크슛성공",
+      "valueEn": "DK"
+    },
+    {
+      "key": "208",
+      "value": "덩크슛시도",
+      "valueEn": "DKA"
+    },
+    {
+      "key": "209",
+      "value": "공격리바운드",
+      "valueEn": "OR"
+    },
+    {
+      "key": "210",
+      "value": "수비리바운드",
+      "valueEn": "DR"
+    },
+    {
+      "key": "211",
+      "value": "어시스트",
+      "valueEn": "Ast"
+    },
+    {
+      "key": "212",
+      "value": "스틸",
+      "valueEn": "Stl"
+    },
+    {
+      "key": "213",
+      "value": "블록",
+      "valueEn": "BS"
+    },
+    {
+      "key": "214",
+      "value": "턴오버",
+      "valueEn": "TO"
+    },
+    {
+      "key": "215",
+      "value": "파울자유투",
+      "valueEn": "Foul FT"
+    },
+    {
+      "key": "216",
+      "value": "파울",
+      "valueEn": "Foul"
+    },
+    {
+      "key": "217",
+      "value": "팀속공",
+      "valueEn": "TFB"
+    },
+    {
+      "key": "218",
+      "value": "팀리바운드",
+      "valueEn": "TRB"
+    },
+    {
+      "key": "219",
+      "value": "Illegal",
+      "valueEn": "Illegal"
+    },
+    {
+      "key": "221",
+      "value": "굿디펜스",
+      "valueEn": "GD"
+    },
+    {
+      "key": "223",
+      "value": "팀턴오버",
+      "valueEn": "TTO"
+    },
+    {
+      "key": "224",
+      "value": "기타파울",
+      "valueEn": "Other fouls"
+    },
+    {
+      "key": "225",
+      "value": "팀파울",
+      "valueEn": "Team foul"
+    },
+    {
+      "key": "226",
+      "value": "스크린 어시스트",
+      "valueEn": "Screen Assists"
+    },
+    {
+      "key": "227",
+      "value": "디플렉션",
+      "valueEn": "Deflection"
+    },
+    {
+      "key": "228",
+      "value": "비디오판독",
+      "valueEn": "Video Review"
+    },
+    {
+      "key": "229",
+      "value": "코치챌린지",
+      "valueEn": "Coach’s Challenge"
+    }
+  ],
+  "gameFoulCodeList": [
+    {
+      "key": "EBF",
+      "value": "엘보우 파울",
+      "valueEn": "Elbow foul"
+    },
+    {
+      "key": "FRF",
+      "value": "U파울",
+      "valueEn": "U foul"
+    },
+    {
+      "key": "FTF",
+      "value": "파이팅 파울",
+      "valueEn": "Fighting foul"
+    },
+    {
+      "key": "PCF",
+      "value": "펀칭 파울",
+      "valueEn": "Punching foul"
+    },
+    {
+      "key": "PNF",
+      "value": "퍼스널 파울",
+      "valueEn": "Personal foul"
+    },
+    {
+      "key": "TCF",
+      "value": "테크니컬 파울",
+      "valueEn": "Technical foul"
+    },
+    {
+      "key": "XXX",
+      "value": "",
+      "valueEn": ""
+    }
+  ],
+  "gameChangeCodeList": [
+    {
+      "key": "00_0",
+      "value": "",
+      "valueEn": ""
+    },
+    {
+      "key": "101_0",
+      "value": "",
+      "valueEn": ""
+    },
+    {
+      "key": "104_0",
+      "value": "",
+      "valueEn": ""
+    },
+    {
+      "key": "106_0",
+      "value": "",
+      "valueEn": ""
+    },
+    {
+      "key": "106_1",
+      "value": "5반칙",
+      "valueEn": "5 fouls"
+    },
+    {
+      "key": "106_2",
+      "value": "디스퀄리파잉",
+      "valueEn": "Disqualifying"
+    },
+    {
+      "key": "106_3",
+      "value": "기타 퇴장",
+      "valueEn": "Other ejections"
+    }
+  ],
+  "quaterList": [
+    {
+      "key": "Q1",
+      "value": "1Q"
+    },
+    {
+      "key": "Q2",
+      "value": "2Q"
+    },
+    {
+      "key": "Q3",
+      "value": "3Q"
+    },
+    {
+      "key": "Q4",
+      "value": "4Q"
+    },
+    {
+      "key": "EQ1",
+      "value": "E1Q"
+    },
+    {
+      "key": "EQ2",
+      "value": "E2Q"
+    },
+    {
+      "key": "EQ3",
+      "value": "E3Q"
+    },
+    {
+      "key": "EQ4",
+      "value": "E4Q"
+    }
+  ],
+  "newSeasonCategory": [
+    {
+      "key": "R",
+      "value": "정규시즌",
+      "valueEn": "Regular season"
+    },
+    {
+      "key": "PO",
+      "value": "플레이오프",
+      "valueEn": "Playoff"
+    },
+    {
+      "key": "AS",
+      "value": "올스타게임",
+      "valueEn": "All star game"
+    },
+    {
+      "key": "CU",
+      "value": "컵대회",
+      "valueEn": "KBL Cup"
+    },
+    {
+      "key": "D1",
+      "value": "D리그",
+      "valueEn": "D League"
+    },
+    {
+      "key": "ES",
+      "value": "동아시아 슈퍼리그",
+      "valueEn": "East Asia Super League"
+    },
+    {
+      "key": "OM",
+      "value": "OPEN MATCH DAY",
+      "valueEn": "OPEN MATCH DAY"
+    },
+    {
+      "key": "EASL",
+      "value": "EASL",
+      "valueEn": "EASL"
+    }
+  ]
+}

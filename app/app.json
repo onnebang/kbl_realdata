@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "KBL 실시간 알림",
+    "slug": "kbl-live-alerts",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "kr.kbl.livealerts"
+    },
+    "android": {
+      "package": "kr.kbl.livealerts",
+      "permissions": ["NOTIFICATIONS"]
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#1A1A1A"
+        }
+      ]
+    ]
+  }
+}

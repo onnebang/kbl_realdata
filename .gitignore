@@ -1,0 +1,9 @@
+node_modules/
+raw/
+.expo/
+dist/
+*.log
+__pycache__/
+*.pyc
+preview_tmp/
+reports/
