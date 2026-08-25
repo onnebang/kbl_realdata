@@ -46,7 +46,12 @@ def build_xy(rows):
         sd, rem = r["scoreDiff"], r["remainingSec"]
         net = r["netrtgDiff"] if r["netrtgDiff"] is not None else 0.0
         syn = r["synergyDiff"] if r["synergyDiff"] is not None else 0.0
-        X.append([sd, rem, scaled_score_diff(sd, rem), net, syn])
+        # 2026-08-25 확장(사용자 요청) - "남은 포제션 수"(24초 가정 대신 실측 17.0초/포제션)와
+        # "최근 5분/15분 활약"(모멘텀). build_live_winprob_data.py 주석 참고.
+        poss_est = r.get("remainingPossessionsEst", rem / 17.0)
+        m5 = r.get("netMarginLast5Min", 0.0)
+        m15 = r.get("netMarginLast15Min", 0.0)
+        X.append([sd, rem, scaled_score_diff(sd, rem), net, syn, poss_est, m5, m15])
         y.append(r["homeWon"])
     return np.array(X, dtype=float), np.array(y, dtype=int)
 

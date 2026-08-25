@@ -22,14 +22,31 @@
 **경기 전 팀전력**: pregame_training_table.json에 이미 있는 netrtg차/시너지차를 그대로 붙임 -
 새 모델을 또 학습시키는 게 아니라 이미 검증된 피처를 재사용. pregame 테이블에 없는 경기(직전
 경기 3경기 미만 워밍업 구간)는 라이브 데이터에서도 제외.
+
+2026-08-25 확장(사용자 요청): "시간이 촉박해도 양팀 다 공격권이 몇 번은 더 온다" +
+"최근 5~15분 활약"을 반영하는 피처 3개 추가.
+- `remainingPossessionsEst` - 24초(NBA 샷클락)를 그대로 가정하지 않고, 실제 KBL 800경기
+  표본에서 team-record.json의 `poss`(팀별 포제션 수, 이미 계산돼 있는 값)와 그 경기 실제
+  총 경과시간을 대조해서 "평균 포제션(양팀 합산) 길이"를 직접 재봤음 - 평균 17.0초/포제션
+  (중앙값도 17.0초, p10~p90이 15.6~18.4초로 편차도 작아서 안정적인 상수로 써도 될 만함).
+  남은시간을 이 상수로 나누면 "앞으로 양팀 합쳐서 몇 번의 공수 교대가 더 있을지"가 나옴.
+- `netMarginLast5Min`/`netMarginLast15Min` - 그 스냅샷 시점 기준 직전 5분/15분 동안의
+  (홈 득점 - 원정 득점) 순마진. 새 데이터 수집 없이 이미 순서대로 훑고 있는 이벤트 스트림에서
+  덱(deque)으로 슬라이딩 윈도우만 유지하면 됨.
 """
 import json
 import os
+from collections import deque
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 GAMES_DIR = os.path.join(BASE, "..", "raw", "games")
 ANALYSIS_DIR = os.path.join(BASE, "..", "raw", "analysis")
 OUT_PATH = os.path.join(ANALYSIS_DIR, "live_winprob_snapshots.json")
+
+# tools/analyze_avg_possession_length.py(1회성 분석, 800경기 표본)로 직접 잰 실측값.
+AVG_COMBINED_POSSESSION_SEC = 17.0
+MOMENTUM_SHORT_SEC = 300   # 5분
+MOMENTUM_LONG_SEC = 900    # 15분
 
 QUARTER_ORDER = ["Q1", "Q2", "Q3", "Q4", "X1", "X2", "X3", "X4", "EQ1", "EQ2", "EQ3", "EQ4"]
 QUARTER_LEN_SEC = {"Q1": 600, "Q2": 600, "Q3": 600, "Q4": 600}  # 그 외(연장)는 기본 300
@@ -79,20 +96,33 @@ def build_game_snapshots(gmkey, ctx, home_tcode):
 
     snapshots = []
     home_score, away_score = 0, 0
+    recent_scores = deque()  # (elapsed, isHome, pts) - MOMENTUM_LONG_SEC 슬라이딩 윈도우
     for evt in events:
         code = evt.get("a")
-        if code in SCORE_CODES and evt.get("t") == home_tcode:
+        is_home_scoring = evt.get("t") == home_tcode
+        if code in SCORE_CODES and is_home_scoring:
             home_score += SCORE_CODES[code]
         elif code in SCORE_CODES:
             away_score += SCORE_CODES[code]
 
         elapsed = cumulative_elapsed(evt["q"], evt["m"], evt["s"])
         remaining = total_elapsed - elapsed
+
+        if code in SCORE_CODES:
+            recent_scores.append((elapsed, is_home_scoring, SCORE_CODES[code]))
+        while recent_scores and elapsed - recent_scores[0][0] > MOMENTUM_LONG_SEC:
+            recent_scores.popleft()
+        margin5 = sum(pts if h else -pts for t, h, pts in recent_scores if elapsed - t <= MOMENTUM_SHORT_SEC)
+        margin15 = sum(pts if h else -pts for t, h, pts in recent_scores)
+
         snapshots.append({
             "elapsedSec": elapsed,
             "remainingSec": remaining,
             "quarter": evt["q"],
             "scoreDiff": home_score - away_score,
+            "remainingPossessionsEst": remaining / AVG_COMBINED_POSSESSION_SEC,
+            "netMarginLast5Min": margin5,
+            "netMarginLast15Min": margin15,
             "netrtgDiff": ctx["netrtgDiff"],
             "synergyDiff": ctx["synergyDiff"],
             "homeWon": ctx["homeWon"],

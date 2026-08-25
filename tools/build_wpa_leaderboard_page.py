@@ -14,24 +14,26 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 ANALYSIS_DIR = os.path.join(BASE, "..", "raw", "analysis")
 SEASON_PATH = os.path.join(ANALYSIS_DIR, "wpa_season_leaderboard.json")
 
+TEMPLATE_PATH = os.path.join(BASE, "..", "web", "wpa_leaderboard_template.html")
+FONT_PATH = os.path.join(BASE, "..", "web", "pretendard_fontface.txt")
 SCRATCHPAD = r"C:\Users\mwon0\AppData\Local\Temp\claude\C--Users-mwon0-Downloads-files\2f574caf-9d2a-4b1f-846d-80d187e30234\scratchpad"
-TEMPLATE_PATH = os.path.join(SCRATCHPAD, "wpa_leaderboard_template.html")
-FONT_PATH = os.path.join(SCRATCHPAD, "pretendard_fontface.txt")
 OUT_PATH = os.path.join(SCRATCHPAD, "wpa_leaderboard.html")
 
+# 2026-08-25: 다른 곳(build_live_replay_demo.py)과 따로 관리되던 사본이었는데 팀컬러가 낡은
+# 근사값이었음(모비스 파랑 등, 실제로는 빨강) - 그쪽에서 검색으로 재확인한 값과 동일하게 정정.
 TEAM_META = {
-    "06": {"abbr": "KT", "color": "#D6001C", "name": "수원 KT"},
-    "10": {"abbr": "MOB", "color": "#0077C8", "name": "울산 현대모비스"},
-    "16": {"abbr": "DB", "color": "#0B3D91", "name": "원주 DB"},
-    "30": {"abbr": "GOY", "color": "#1B1F3B", "name": "고양 오리온스"},
+    "06": {"abbr": "KT", "color": "#1A1A1A", "name": "수원 KT"},
+    "10": {"abbr": "MOB", "color": "#A6192E", "name": "울산 현대모비스"},
+    "16": {"abbr": "DB", "color": "#1C8A43", "name": "원주 DB"},
+    "30": {"abbr": "GOY", "color": "#1E2749", "name": "고양 오리온스"},
     "35": {"abbr": "SAM", "color": "#1428A0", "name": "서울 삼성"},
-    "55": {"abbr": "SK", "color": "#EA0029", "name": "서울 SK"},
-    "60": {"abbr": "KCC", "color": "#F58220", "name": "전주 KCC"},
-    "64": {"abbr": "GAS", "color": "#009944", "name": "대구 한국가스공사"},
+    "55": {"abbr": "SK", "color": "#E4002B", "name": "서울 SK"},
+    "60": {"abbr": "KCC", "color": "#0C2340", "name": "전주 KCC"},
+    "64": {"abbr": "GAS", "color": "#0072CE", "name": "대구 한국가스공사"},
     "65": {"abbr": "EL", "color": "#0060AF", "name": "인천 전자랜드"},
-    "66": {"abbr": "SONO", "color": "#C8102E", "name": "고양 소노"},
-    "70": {"abbr": "KGC", "color": "#BE0000", "name": "안양 정관장"},
-    "50": {"abbr": "LG", "color": "#A50034", "name": "창원 LG"},
+    "66": {"abbr": "SONO", "color": "#3FA9F5", "name": "고양 소노"},
+    "70": {"abbr": "KGC", "color": "#C8102E", "name": "안양 정관장"},
+    "50": {"abbr": "LG", "color": "#8E1B3D", "name": "창원 LG"},
     "73": {"abbr": "CRT", "color": "#FF6B00", "name": "고양 캐롯"},
 }
 

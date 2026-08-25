@@ -10,9 +10,9 @@ ANALYSIS_DIR = os.path.join(BASE, "..", "raw", "analysis")
 FORM_PATH = os.path.join(ANALYSIS_DIR, "form_index_2025-2026.json")
 DEMO_PATH = os.path.join(ANALYSIS_DIR, "live_replay_demo.json")
 
+TEMPLATE_PATH = os.path.join(BASE, "..", "web", "form_index_template.html")
+FONT_PATH = os.path.join(BASE, "..", "web", "pretendard_fontface.txt")
 SCRATCHPAD = r"C:\Users\mwon0\AppData\Local\Temp\claude\C--Users-mwon0-Downloads-files\2f574caf-9d2a-4b1f-846d-80d187e30234\scratchpad"
-TEMPLATE_PATH = os.path.join(SCRATCHPAD, "form_index_template.html")
-FONT_PATH = os.path.join(SCRATCHPAD, "pretendard_fontface.txt")
 OUT_PATH = os.path.join(SCRATCHPAD, "form_index.html")
 
 

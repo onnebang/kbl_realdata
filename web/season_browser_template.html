@@ -1,0 +1,355 @@
+<title>KBL 2025-26 시즌 브라우저</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+__FONT_BLOCK__
+<style>
+  :root {
+    --bg: #f4f5f8; --surface: #ffffff; --surface-soft: #eceef3;
+    --ink: #14161c; --ink-soft: #5b5f6e; --ink-faint: #9297a880;
+    --home: #d9640a; --home-soft: #d9640a1a;
+    --away: #1f6fd6; --away-soft: #1f6fd61a;
+    --gold: #9a6b00; --gold-soft: #9a6b0022;
+    --line-rgb: 20,22,28;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1115; --surface: #1a1d24; --surface-soft: #23272f;
+      --ink: #f2f3f7; --ink-soft: #9297a8; --ink-faint: #6a6f7f90;
+      --home: #ff8a3d; --home-soft: #ff8a3d26;
+      --away: #3ea6ff; --away-soft: #3ea6ff26;
+      --gold: #ffd166; --gold-soft: #ffd16626;
+      --line-rgb: 242,243,247;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1115; --surface: #1a1d24; --surface-soft: #23272f;
+    --ink: #f2f3f7; --ink-soft: #9297a8; --ink-faint: #6a6f7f90;
+    --home: #ff8a3d; --home-soft: #ff8a3d26;
+    --away: #3ea6ff; --away-soft: #3ea6ff26;
+    --gold: #ffd166; --gold-soft: #ffd16626;
+    --line-rgb: 242,243,247;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); }
+  .root { font-family: 'Pretendard', system-ui, -apple-system, sans-serif; color: var(--ink);
+    background: var(--bg); min-height: 100%; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 28px 18px 80px; }
+
+  .header-row { margin-bottom: 18px; }
+  .title { font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 30px; line-height: 1.1; }
+  .subtitle { font-size: 13px; color: var(--ink-soft); margin-top: 6px; }
+
+  .filters { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+  .filters input, .filters select { font-family: 'Pretendard', sans-serif; font-size: 13px;
+    color: var(--ink); background: var(--surface); border: 1px solid rgba(var(--line-rgb),0.16);
+    border-radius: 9px; padding: 9px 12px; }
+  .filters input { flex: 1; min-width: 140px; }
+
+  .panel { background: var(--surface); border: 1px solid rgba(var(--line-rgb),0.12); border-radius: 14px;
+    overflow: hidden; }
+  .game-row { display: grid; grid-template-columns: 78px 1fr auto; align-items: center; gap: 10px;
+    padding: 10px 14px; border-bottom: 1px solid rgba(var(--line-rgb),0.08); cursor: pointer;
+    font-size: 13px; }
+  .game-row:last-child { border-bottom: none; }
+  .game-row:hover { background: var(--surface-soft); }
+  .gr-date { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; color: var(--ink-faint); }
+  .gr-cat { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: 8.5px;
+    color: var(--gold); background: var(--gold-soft); border-radius: 4px; padding: 1px 4px; margin-top: 2px; }
+  .gr-matchup { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .gr-team { display: flex; align-items: center; gap: 5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gr-badge { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; font-family: "IBM Plex Mono", monospace; font-size: 7px; font-weight: 800; color: #fff; }
+  .gr-badge.has-logo { background: var(--surface-soft) !important; padding: 2px; }
+  .gr-badge.has-logo img { width: 100%; height: 100%; object-fit: contain; }
+  .gr-vs { color: var(--ink-faint); font-size: 11px; }
+  .gr-score { font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 16px;
+    text-align: right; white-space: nowrap; }
+  .gr-score .win { color: var(--home); }
+  .gr-empty { padding: 30px; text-align: center; color: var(--ink-faint); font-size: 13px; }
+
+  .count-line { font-size: 12px; color: var(--ink-faint); margin-bottom: 8px; }
+
+  /* 박스스코어 모달 */
+  .bs-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: none;
+    align-items: flex-start; justify-content: center; z-index: 50; padding: 20px 12px; overflow-y: auto; }
+  .bs-overlay.show { display: flex; }
+  .bs-box { background: var(--surface); border-radius: 14px; padding: 20px; max-width: 640px; width: 100%;
+    border: 1px solid rgba(var(--line-rgb),0.15); margin-top: 20px; margin-bottom: 20px; }
+  .bs-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+  .bs-close { background: none; border: none; color: var(--ink-faint); font-size: 22px; cursor: pointer; line-height: 1; }
+  .bs-close:hover { color: var(--ink); }
+  .bs-score-row { display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 4px; }
+  .bs-team-col { text-align: center; }
+  .bs-badge { width: 44px; height: 44px; border-radius: 50%; margin: 0 auto 6px; display: flex;
+    align-items: center; justify-content: center; font-family: "Big Shoulders Display", sans-serif;
+    font-weight: 800; font-size: 12px; color: #fff; }
+  .bs-badge.has-logo { background: var(--surface-soft) !important; padding: 4px; }
+  .bs-badge.has-logo img { width: 100%; height: 100%; object-fit: contain; }
+  .bs-team-name { font-size: 12.5px; font-weight: 700; }
+  .bs-score { font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 40px; line-height: 1; }
+  .bs-sep { font-family: "Big Shoulders Display", sans-serif; font-size: 24px; color: var(--ink-faint); }
+  .bs-meta { text-align: center; font-size: 11.5px; color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; margin-bottom: 16px; }
+
+  table.bs-quarter { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px; }
+  table.bs-quarter th, table.bs-quarter td { padding: 6px 8px; text-align: center; font-variant-numeric: tabular-nums; }
+  table.bs-quarter th { font-family: "IBM Plex Mono", monospace; font-size: 9.5px; color: var(--ink-faint);
+    text-transform: uppercase; border-bottom: 1px solid rgba(var(--line-rgb),0.12); }
+  table.bs-quarter td.tname { text-align: left; font-weight: 700; }
+  table.bs-quarter tr.home td.tname { color: var(--home); }
+  table.bs-quarter tr.away td.tname { color: var(--away); }
+  table.bs-quarter td.total { font-weight: 800; border-left: 1px solid rgba(var(--line-rgb),0.12); }
+
+  .bs-section-title { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); margin: 18px 0 8px; }
+  .ts-row { margin-bottom: 12px; }
+  .ts-nums { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .ts-nums .ts-home { color: var(--home); font-weight: 700; }
+  .ts-nums .ts-away { color: var(--away); font-weight: 700; }
+  .ts-nums .ts-label { color: var(--ink-soft); font-weight: 600; }
+  .ts-bar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; background: var(--surface-soft); }
+  .ts-bar-fill.home { background: var(--home); margin-left: auto; }
+  .ts-bar-fill.away { background: var(--away); }
+
+  .table-scroll { overflow-x: auto; }
+  table.bs-players { width: 100%; border-collapse: collapse; font-size: 11px; min-width: 480px; }
+  table.bs-players th { font-family: "IBM Plex Mono", monospace; font-size: 9px; color: var(--ink-faint);
+    text-transform: uppercase; text-align: right; padding: 5px 6px; border-bottom: 1px solid rgba(var(--line-rgb),0.14); white-space: nowrap; }
+  table.bs-players th:first-child { text-align: left; }
+  table.bs-players td { padding: 5px 6px; text-align: right; border-bottom: 1px solid rgba(var(--line-rgb),0.06);
+    font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.bs-players td:first-child { text-align: left; }
+  table.bs-players tr.bench td:first-child { color: var(--ink-faint); }
+  table.bs-players tr.bench-sep td { padding-top: 4px; font-family: "IBM Plex Mono", monospace; font-size: 8.5px;
+    color: var(--ink-faint); text-transform: uppercase; border-bottom: none; }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 20px 12px 60px; }
+    .title { font-size: 24px; }
+    .bs-score { font-size: 30px; }
+  }
+</style>
+
+<div class="root">
+<div class="wrap">
+  <div class="header-row">
+    <div class="title">2025-26 시즌 브라우저</div>
+    <div class="subtitle">정규시즌 270경기 + 플레이오프 13경기 - 전체 박스스코어. 문자중계 재생/승률그래프는 없고 최종 기록만.</div>
+  </div>
+
+  <div class="filters">
+    <input type="text" id="searchInput" placeholder="팀 이름으로 검색 (예: KT, 서울SK)">
+    <select id="categoryFilter">
+      <option value="ALL">전체</option>
+      <option value="정규시즌">정규시즌</option>
+      <option value="플레이오프">플레이오프</option>
+    </select>
+  </div>
+
+  <div class="count-line" id="countLine"></div>
+  <div class="panel"><div id="gameListBody"></div></div>
+</div>
+</div>
+
+<div class="bs-overlay" id="bsOverlay">
+  <div class="bs-box">
+    <div class="bs-head">
+      <div class="bs-meta" id="bsMeta" style="text-align:left;margin-bottom:0"></div>
+      <button class="bs-close" id="bsClose">&times;</button>
+    </div>
+    <div class="bs-score-row">
+      <div class="bs-team-col">
+        <div class="bs-badge" id="bsHomeBadge"></div>
+        <div class="bs-team-name" id="bsHomeName"></div>
+      </div>
+      <div class="bs-score" id="bsHomeScore"></div>
+      <div class="bs-sep">:</div>
+      <div class="bs-score" id="bsAwayScore"></div>
+      <div class="bs-team-col">
+        <div class="bs-badge" id="bsAwayBadge"></div>
+        <div class="bs-team-name" id="bsAwayName"></div>
+      </div>
+    </div>
+    <div class="table-scroll"><table class="bs-quarter" id="bsQuarterTable"></table></div>
+    <div class="bs-section-title">Team Stats</div>
+    <div id="bsTeamStats"></div>
+    <div class="bs-section-title" id="bsHomePlayersTitle"></div>
+    <div class="table-scroll"><table class="bs-players" id="bsHomePlayers"></table></div>
+    <div class="bs-section-title" id="bsAwayPlayersTitle"></div>
+    <div class="table-scroll"><table class="bs-players" id="bsAwayPlayers"></table></div>
+  </div>
+</div>
+
+<script>
+const SEASON = __SEASON_JSON__;
+const TEAM_META = __TEAM_META_JSON__;
+
+const el = {
+  searchInput: document.getElementById('searchInput'),
+  categoryFilter: document.getElementById('categoryFilter'),
+  countLine: document.getElementById('countLine'),
+  gameListBody: document.getElementById('gameListBody'),
+  bsOverlay: document.getElementById('bsOverlay'),
+  bsClose: document.getElementById('bsClose'),
+  bsMeta: document.getElementById('bsMeta'),
+  bsHomeBadge: document.getElementById('bsHomeBadge'),
+  bsAwayBadge: document.getElementById('bsAwayBadge'),
+  bsHomeName: document.getElementById('bsHomeName'),
+  bsAwayName: document.getElementById('bsAwayName'),
+  bsHomeScore: document.getElementById('bsHomeScore'),
+  bsAwayScore: document.getElementById('bsAwayScore'),
+  bsQuarterTable: document.getElementById('bsQuarterTable'),
+  bsTeamStats: document.getElementById('bsTeamStats'),
+  bsHomePlayersTitle: document.getElementById('bsHomePlayersTitle'),
+  bsAwayPlayersTitle: document.getElementById('bsAwayPlayersTitle'),
+  bsHomePlayers: document.getElementById('bsHomePlayers'),
+  bsAwayPlayers: document.getElementById('bsAwayPlayers'),
+};
+
+function teamMeta(tcode) { return TEAM_META[tcode] || { abbr: '?', color: '#5b5f6e', name: tcode, logo: null }; }
+
+function badgeHtml(tcode, cls) {
+  const tm = teamMeta(tcode);
+  if (tm.logo) return `<span class="${cls} has-logo"><img src="${tm.logo}" alt="${tm.abbr}"></span>`;
+  return `<span class="${cls}" style="background:${tm.color}">${tm.abbr}</span>`;
+}
+
+function fillBadge(container, tcode) {
+  const tm = teamMeta(tcode);
+  if (tm.logo) {
+    container.className = container.className.split(' ')[0] + ' has-logo';
+    container.style.background = 'transparent';
+    container.innerHTML = `<img src="${tm.logo}" alt="${tm.abbr}">`;
+  } else {
+    container.className = container.className.split(' ')[0];
+    container.style.background = tm.color;
+    container.innerHTML = '';
+    container.textContent = tm.abbr;
+  }
+}
+
+function fmtDate(d) { return `${d.slice(0,4)}.${d.slice(4,6)}.${d.slice(6,8)}`; }
+
+function renderGameList() {
+  const q = el.searchInput.value.trim();
+  const cat = el.categoryFilter.value;
+  const rows = SEASON.gameList.filter(g => {
+    if (cat !== 'ALL' && g.seasonCategoryName !== cat) return false;
+    if (!q) return true;
+    const h = teamMeta(g.homeTcode), a = teamMeta(g.awayTcode);
+    const hay = [h.name, h.abbr, a.name, a.abbr].join(' ').toLowerCase();
+    return hay.includes(q.toLowerCase());
+  });
+  el.countLine.textContent = `${rows.length}경기`;
+  if (!rows.length) { el.gameListBody.innerHTML = '<div class="gr-empty">해당하는 경기가 없습니다.</div>'; return; }
+  el.gameListBody.innerHTML = rows.map(g => {
+    const h = teamMeta(g.homeTcode), a = teamMeta(g.awayTcode);
+    const hWin = g.finalHome > g.finalAway;
+    const catChip = g.seasonCategoryName === '플레이오프' ? '<span class="gr-cat">PO</span>' : '';
+    return `<div class="game-row" data-gmkey="${g.gmkey}">
+      <div><div class="gr-date">${fmtDate(g.gameDate)}</div>${catChip}</div>
+      <div class="gr-matchup">
+        <span class="gr-team">${badgeHtml(g.homeTcode, 'gr-badge')}${h.name}</span>
+        <span class="gr-vs">vs</span>
+        <span class="gr-team">${badgeHtml(g.awayTcode, 'gr-badge')}${a.name}</span>
+      </div>
+      <div class="gr-score"><span class="${hWin?'win':''}">${g.finalHome}</span> - <span class="${!hWin?'win':''}">${g.finalAway}</span></div>
+    </div>`;
+  }).join('');
+}
+
+el.searchInput.addEventListener('input', renderGameList);
+el.categoryFilter.addEventListener('change', renderGameList);
+
+function pct(m, a) { return a ? Math.round(m / a * 100) : 0; }
+
+function tsBarHtml(label, hVal, aVal, hDisp, aDisp) {
+  const total = hVal + aVal;
+  const hPct = total > 0 ? (hVal / total) * 100 : 50;
+  return `<div class="ts-row">
+    <div class="ts-nums"><span class="ts-home">${hDisp}</span><span class="ts-label">${label}</span><span class="ts-away">${aDisp}</span></div>
+    <div class="ts-bar"><div class="ts-bar-fill home" style="width:${hPct}%"></div><div class="ts-bar-fill away" style="width:${100-hPct}%"></div></div>
+  </div>`;
+}
+
+function playerRowsHtml(players) {
+  const starters = players.filter(p => p.starter);
+  const bench = players.filter(p => !p.starter);
+  const row = p => `<tr class="${p.starter?'':'bench'}">
+    <td>${p.name}${p.backNum?' #'+p.backNum:''}</td>
+    <td>${p.playMin}:${String(p.playSec).padStart(2,'0')}</td>
+    <td>${p.score}</td>
+    <td>${p.rb}</td>
+    <td>${p.ast}</td>
+    <td>${p.stl}</td>
+    <td>${p.bs}</td>
+    <td>${p.to}</td>
+    <td>${p.fg}/${p.fgA}</td>
+    <td>${p.threep}/${p.threepA}</td>
+    <td>${p.ft}/${p.ftA}</td>
+    <td>${p.per != null ? p.per.toFixed(1) : '-'}</td>
+  </tr>`;
+  let html = '<thead><tr><th>선수</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th><th>FG</th><th>3PT</th><th>FT</th><th>PER</th></tr></thead><tbody>';
+  html += starters.map(row).join('');
+  if (bench.length) html += `<tr class="bench-sep"><td colspan="12">BENCH</td></tr>` + bench.map(row).join('');
+  html += '</tbody>';
+  return html;
+}
+
+function openBoxScore(gmkey) {
+  const g = SEASON.games[gmkey];
+  if (!g) return;
+  const h = teamMeta(g.homeTcode), a = teamMeta(g.awayTcode);
+  el.bsMeta.textContent = `${fmtDate(g.gameDate)} · ${g.seasonCategoryName}`;
+  fillBadge(el.bsHomeBadge, g.homeTcode);
+  fillBadge(el.bsAwayBadge, g.awayTcode);
+  el.bsHomeName.textContent = h.name;
+  el.bsAwayName.textContent = a.name;
+  el.bsHomeScore.textContent = g.finalHome;
+  el.bsAwayScore.textContent = g.finalAway;
+  el.bsHomeScore.style.color = g.finalHome > g.finalAway ? 'var(--home)' : 'var(--ink-faint)';
+  el.bsAwayScore.style.color = g.finalAway > g.finalHome ? 'var(--away)' : 'var(--ink-faint)';
+
+  const hq = g.quarters[g.homeTcode], aq = g.quarters[g.awayTcode];
+  const otCount = Math.max(hq.ot.length, aq.ot.length);
+  let qHead = '<tr><th></th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th>';
+  for (let i = 0; i < otCount; i++) qHead += `<th>OT${otCount>1?i+1:''}</th>`;
+  qHead += '<th>계</th></tr>';
+  const qRow = (name, q, ot, tcls) => {
+    let r = `<tr class="${tcls}"><td class="tname">${name}</td>` + q.map(v => `<td>${v ?? '-'}</td>`).join('');
+    for (let i = 0; i < otCount; i++) r += `<td>${ot[i] ?? '-'}</td>`;
+    r += `<td class="total">${q.reduce((s,v)=>s+(v||0),0) + ot.reduce((s,v)=>s+(v||0),0)}</td></tr>`;
+    return r;
+  };
+  el.bsQuarterTable.innerHTML = `<thead>${qHead}</thead><tbody>${qRow(h.abbr, hq.q, hq.ot, 'home')}${qRow(a.abbr, aq.q, aq.ot, 'away')}</tbody>`;
+
+  const ts = g.teamStats;
+  const hs = ts[g.homeTcode], as = ts[g.awayTcode];
+  el.bsTeamStats.innerHTML =
+    tsBarHtml('FG%', pct(hs.fg,hs.fgA), pct(as.fg,as.fgA), `${pct(hs.fg,hs.fgA)}% ${hs.fg}-${hs.fgA}`, `${as.fg}-${as.fgA} ${pct(as.fg,as.fgA)}%`) +
+    tsBarHtml('3PT%', pct(hs.threep,hs.threepA), pct(as.threep,as.threepA), `${pct(hs.threep,hs.threepA)}% ${hs.threep}-${hs.threepA}`, `${as.threep}-${as.threepA} ${pct(as.threep,as.threepA)}%`) +
+    tsBarHtml('FT%', pct(hs.ft,hs.ftA), pct(as.ft,as.ftA), `${pct(hs.ft,hs.ftA)}% ${hs.ft}-${hs.ftA}`, `${as.ft}-${as.ftA} ${pct(as.ft,as.ftA)}%`) +
+    tsBarHtml('리바운드', hs.rb, as.rb, hs.rb, as.rb) +
+    tsBarHtml('어시스트', hs.ast, as.ast, hs.ast, as.ast) +
+    tsBarHtml('스틸', hs.stl, as.stl, hs.stl, as.stl) +
+    tsBarHtml('블록', hs.bs, as.bs, hs.bs, as.bs) +
+    tsBarHtml('턴오버', hs.to, as.to, hs.to, as.to) +
+    tsBarHtml('파울', hs.foul, as.foul, hs.foul, as.foul);
+
+  el.bsHomePlayersTitle.textContent = `${h.name} 박스스코어`;
+  el.bsAwayPlayersTitle.textContent = `${a.name} 박스스코어`;
+  el.bsHomePlayers.innerHTML = playerRowsHtml(g.players.home);
+  el.bsAwayPlayers.innerHTML = playerRowsHtml(g.players.away);
+
+  el.bsOverlay.classList.add('show');
+}
+
+el.gameListBody.addEventListener('click', (e) => {
+  const row = e.target.closest('.game-row');
+  if (row) openBoxScore(row.dataset.gmkey);
+});
+el.bsClose.addEventListener('click', () => el.bsOverlay.classList.remove('show'));
+el.bsOverlay.addEventListener('click', (e) => { if (e.target === el.bsOverlay) el.bsOverlay.classList.remove('show'); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') el.bsOverlay.classList.remove('show'); });
+
+renderGameList();
+</script>
