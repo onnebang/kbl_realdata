@@ -96,7 +96,8 @@
   .court-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .court-col-label { font-size: 11.5px; font-weight: 700; margin-bottom: 6px; }
   .court-col-label.home { color: var(--home); } .court-col-label.away { color: var(--away); }
-  .player-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0; }
+  .player-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+    font-size: 12.5px; padding: 3px 0; }
   .player-row .pname { color: var(--ink); }
   .player-row .prating { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--ink-faint);
     font-variant-numeric: tabular-nums; }
@@ -147,21 +148,22 @@
 
   /* 코트/벤치 선수 행 */
   .player-row.bench { opacity: 0.5; }
-  .player-row .pname { display: flex; align-items: center; gap: 4px; }
+  .player-row .pname { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1 1 auto; }
+  .pname-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .player-row.on-court .pname { font-weight: 600; }
-  .streak-badge { font-size: 10px; }
+  .streak-badge { font-size: 10px; flex-shrink: 0; }
   .player-row.top-performer { background: var(--gold-soft); border-left: 2px solid var(--gold); }
   .player-row.top-performer.bench { opacity: 0.8; }
   .mvp-badge { font-family: "IBM Plex Mono", monospace; font-size: 8.5px; font-weight: 700; color: var(--bg);
-    background: var(--gold); border-radius: 4px; padding: 1px 4px; letter-spacing: 0.03em; }
+    background: var(--gold); border-radius: 4px; padding: 1px 4px; letter-spacing: 0.03em; flex-shrink: 0; }
   .player-row.top-performer .pstat { color: var(--gold); font-weight: 600; }
-  .pstat-col { text-align: right; }
+  .pstat-col { text-align: right; flex-shrink: 0; }
   .pstat { display: block; font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--ink-soft);
     font-variant-numeric: tabular-nums; }
   .prating2 { display: block; font-family: "IBM Plex Mono", monospace; font-size: 9.5px; color: var(--ink-faint); }
   .bench-divider { font-family: "IBM Plex Mono", monospace; font-size: 9px; text-transform: uppercase;
     color: var(--ink-faint); letter-spacing: 0.05em; margin: 8px 0 4px; }
-  .back-num { font-family: "IBM Plex Mono", monospace; color: var(--ink-faint); font-size: 10.5px; margin-right: 3px; }
+  .back-num { font-family: "IBM Plex Mono", monospace; color: var(--ink-faint); font-size: 10.5px; margin-right: 3px; flex-shrink: 0; }
   .player-row { cursor: pointer; border-radius: 6px; transition: background 0.12s ease; }
   .player-row:hover { background: var(--surface-soft); }
   .player-row:focus-visible { outline: 2px solid var(--home); outline-offset: 1px; }
@@ -227,7 +229,17 @@
   .chart-block { margin-bottom: 14px; }
   .chart-block .chart-title { margin-bottom: 4px; }
   svg.trend-chart { width: 100%; height: auto; background: var(--surface-soft); border-radius: 8px; }
-  svg.zone-compare { width: 100%; height: auto; background: var(--surface-soft); border-radius: 8px; }
+  /* 요청: "우리가 만든 코트 느낌으로, 막대바를 양 옆에 둬서 비교" - 코트 위에 막대를 직접
+     얹었던 이전 버전은 존 위치가 다닥다닥 붙어있어(특히 림/근거리) 숫자 라벨이 서로
+     겹치는 문제가 있었음 - 코트는 다른 카드처럼 기울어진(.mini-court-tilt과 동일한 원근
+     처리) 실물 카드로 옆에 두고, 막대는 원래처럼 구역마다 세로로 넉넉히 줄바꿈해서 홈은
+     왼쪽으로 원정은 오른쪽으로 뻗는 다이버징 바 차트로 분리. */
+  .zone-compare-wrap { display: flex; align-items: center; gap: 10px; }
+  .zc-court-tilt { flex: 0 0 40%; perspective: 700px; }
+  .zc-court { width: 100%; height: auto; display: block; border-radius: 6px; overflow: hidden;
+    transform: rotateX(24deg); transform-origin: center bottom; box-shadow: 0 10px 16px -8px rgba(0,0,0,0.32); }
+  svg.zone-compare { flex: 1 1 60%; min-width: 0; width: 100%; height: auto;
+    background: var(--surface-soft); border-radius: 8px; }
   .zone-compare-legend { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px;
     font-family: "IBM Plex Mono", monospace; }
   .zone-compare-legend .zcl-home { color: var(--home); font-weight: 700; }
@@ -638,7 +650,10 @@
       </div>
       <div class="chart-block" style="margin-top:12px">
         <div class="chart-title">구역별 시도·성공 비교 (막대가 길수록 시도 많음)</div>
-        <svg class="zone-compare" id="zoneCompare" viewBox="355 0 375 410"></svg>
+        <div class="zone-compare-wrap">
+          <div class="zc-court-tilt"><svg class="zc-court" id="zcCourt" viewBox="355 27 375 357"></svg></div>
+          <svg class="zone-compare" id="zoneCompare" viewBox="0 0 220 410"></svg>
+        </div>
         <div class="zone-compare-legend">
           <span class="zcl-home">● <span id="zclHomeName">홈</span></span>
           <span class="zcl-away"><span id="zclAwayName">원정</span> ●</span>
@@ -897,6 +912,7 @@ const el = {
   previewCompare: document.getElementById('previewCompare'),
   trendChart: document.getElementById('trendChart'),
   zoneCompare: document.getElementById('zoneCompare'),
+  zcCourt: document.getElementById('zcCourt'),
   zclHomeName: document.getElementById('zclHomeName'),
   zclAwayName: document.getElementById('zclAwayName'),
   matchupsBody: document.getElementById('matchupsBody'),
@@ -1186,8 +1202,11 @@ function playerRowHtml(pcode, box, onCourt, topPcode) {
   const numTxt = p.backNum ? `<span class="back-num">#${p.backNum}</span>` : '';
   const isTop = pcode === topPcode;
   const topBadge = isTop ? '<span class="mvp-badge" title="오늘 최고 활약">MVP</span>' : '';
+  // 요청: "코트위 선수들 UI 레이아웃 문제, 줄바꿈 깔끔하게, 양팀이 서로 통일되도록" - 이름이
+  // 순수 텍스트로 flex 안에 있어서 배지(🔥×N 등)가 붙으면 줄바꿈돼 그 행만 키가 커지고,
+  // 옆 팀 컬럼과 줄이 안 맞았음. 이름만 말줄임 처리해서 모든 행이 항상 한 줄로 고정되게 함.
   return `<div class="player-row ${onCourt ? 'on-court' : 'bench'}${isTop ? ' top-performer' : ''}" data-pcode="${pcode}" tabindex="0" role="button">
-    <span class="pname">${numTxt}${p.name}${streakBadge}${topBadge}</span>
+    <span class="pname">${numTxt}<span class="pname-text">${p.name}</span>${streakBadge}${topBadge}</span>
     <span class="pstat-col"><span class="pstat">${b.pts}점 ${b.fgm}/${b.fga}</span><span class="prating2">온/오프 ${ratingTxt}</span></span>
   </div>`;
 }
@@ -1288,8 +1307,11 @@ function renderTrendChart() {
   let svg = `<line x1="${PAD}" y1="${H/2}" x2="${W-PAD}" y2="${H/2}" stroke="var(--ink-faint)" stroke-width="1" stroke-dasharray="3,3"/>`;
   svg += `<path d="${pathFor(pd.home.recentTrend)}" fill="none" stroke="var(--home)" stroke-width="2"/>`;
   svg += `<path d="${pathFor(pd.away.recentTrend)}" fill="none" stroke="var(--away)" stroke-width="2"/>`;
-  svg += `<text x="${PAD}" y="12" font-size="9" fill="var(--home)" font-family="IBM Plex Mono, monospace">${GAME.homeTname}</text>`;
-  svg += `<text x="${PAD}" y="${H-4}" font-size="9" fill="var(--away)" font-family="IBM Plex Mono, monospace">${GAME.awayTname}</text>`;
+  // 요청: "폰트가 통일되었는지 확인" - 팀명(한글)에 IBM Plex Mono(라틴 전용 모노스페이스)를
+  // 쓰고 있었음 - 한글 글리프가 없어서 브라우저가 조용히 시스템 기본 폰트로 대체돼 다른
+  // 곳과 다르게 보였음. 본문 폰트(Pretendard)로 통일.
+  svg += `<text x="${PAD}" y="12" font-size="9" fill="var(--home)" font-family="Pretendard, sans-serif">${GAME.homeTname}</text>`;
+  svg += `<text x="${PAD}" y="${H-4}" font-size="9" fill="var(--away)" font-family="Pretendard, sans-serif">${GAME.awayTname}</text>`;
   el.trendChart.innerHTML = svg;
 }
 
@@ -1313,41 +1335,50 @@ function teamZoneStats(tcode) {
   return stats;
 }
 
-// 요청 1,2,4: 코트에 실제 라인(자유투/페인트/3점 아치) 추가, 구역별 비교 막대를 코트 옆
-// 별도 리스트가 아니라 그 구역의 실제 코트 위치에 직접 세워서("코트 위에 막대를 세워서 어느
-// 팀이 어느쪽에서 더 많이 시도·성공했는지 비교"), 홈/원정 컬러가 비슷하면(--body.color-clash)
-// 원정 막대에 해치 패턴(#awayHatch)을 입혀서 색이 겹쳐도 구분되게 함.
+// 요청 1: 코트에 실제 라인(자유투/페인트/3점 아치) 추가 - 다른 카드들과 같은 원근(.zc-court-tilt,
+// mini-court-tilt와 동일한 rotateX 처리)으로 옆에 배치해서 "우리가 만든 코트" 느낌 통일.
+function renderZoneCourt() {
+  const HX = HOOP_RIGHT[0], HY = HOOP_RIGHT[1];
+  let svg = `<rect x="${COURT_X[0]}" y="${COURT_Y[0]}" width="${COURT_X[1] - COURT_X[0]}" height="${COURT_Y[1] - COURT_Y[0]}" fill="#d9b98a" stroke="var(--ink-faint)" stroke-width="2"/>`;
+  svg += drawCourtMarkings(HX, COURT_X[1], -1, '#fff', 1.6);
+  svg += drawHoop(HOOP_RIGHT[0], HOOP_RIGHT[1], false);
+  el.zcCourt.innerHTML = svg;
+}
+
+// 요청 2,4: 구역별 비교 막대를 다시 "양 옆으로 벌어지는" 형태로(코트 위 실측 위치에
+// 얹었더니 구역이 다닥다닥 붙어(특히 림/근거리) 라벨이 서로 겹치는 문제가 있었음 - 세로로
+// 넉넉히 줄바꿈해서 구역마다 확실히 분리). 홈/원정 컬러가 비슷하면(body.color-clash) 원정
+// 막대에 해치 패턴(#awayHatch)을 입혀서 색이 겹쳐도 구분되게 함.
+function renderZoneBars(home, away) {
+  const zones = ['rim', 'close', 'midShort', 'midLong', 'three'];
+  const zoneLabels = { rim: '림', close: '근거리', midShort: '중거리', midLong: '롱2', three: '3점' };
+  const maxAtt = Math.max(1, ...zones.map(z => Math.max(home[z].att, away[z].att)));
+  const awayFill = document.body.classList.contains('color-clash') ? 'url(#awayHatch)' : 'var(--away)';
+
+  const W = 220, H = 410, BMID = W / 2, ROWH = H / zones.length, BAR_MAX = BMID - 60;
+  let svg = `<line x1="${BMID}" y1="6" x2="${BMID}" y2="${H - 6}" stroke="var(--ink-faint)" stroke-width="1" opacity="0.25"/>`;
+  zones.forEach((z, i) => {
+    const cy = ROWH * i + ROWH / 2;
+    const hLen = maxAtt ? (home[z].att / maxAtt) * BAR_MAX : 0;
+    const aLen = maxAtt ? (away[z].att / maxAtt) * BAR_MAX : 0;
+    const hPct = home[z].att ? Math.round(home[z].made / home[z].att * 100) : 0;
+    const aPct = away[z].att ? Math.round(away[z].made / away[z].att * 100) : 0;
+    svg += `<rect x="${BMID - hLen}" y="${cy - 9}" width="${hLen}" height="18" fill="var(--home)" opacity="0.85" rx="3"/>`;
+    svg += `<rect x="${BMID}" y="${cy - 9}" width="${aLen}" height="18" fill="${awayFill}" opacity="0.85" rx="3"/>`;
+    svg += `<text x="${BMID}" y="${cy - 14}" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink)" font-family="Pretendard, sans-serif">${zoneLabels[z]}</text>`;
+    svg += `<text x="${BMID - hLen - 5}" y="${cy + 4}" text-anchor="end" font-size="9.5" fill="var(--home)" font-family="IBM Plex Mono, monospace">${home[z].made}/${home[z].att}(${hPct}%)</text>`;
+    svg += `<text x="${BMID + aLen + 5}" y="${cy + 4}" text-anchor="start" font-size="9.5" fill="var(--away)" font-family="IBM Plex Mono, monospace">${away[z].made}/${away[z].att}(${aPct}%)</text>`;
+  });
+  el.zoneCompare.innerHTML = svg;
+}
+
 function renderZoneCompare() {
   el.zclHomeName.textContent = GAME.homeTname;
   el.zclAwayName.textContent = GAME.awayTname;
   const home = teamZoneStats(GAME.homeTcode);
   const away = teamZoneStats(GAME.awayTcode);
-  const zones = ['rim', 'close', 'midShort', 'midLong', 'three'];
-  const zoneLabels = { rim: '림', close: '근거리', midShort: '중거리', midLong: '롱2', three: '3점' };
-  const zoneMidM = { rim: 0.6, close: 2.1, midShort: 4.0, midLong: 5.875, three: 7.6 };
-  const maxAtt = Math.max(1, ...zones.map(z => Math.max(home[z].att, away[z].att)));
-
-  const HX = HOOP_RIGHT[0], HY = HOOP_RIGHT[1];
-  const awayFill = document.body.classList.contains('color-clash') ? 'url(#awayHatch)' : 'var(--away)';
-  let svg = `<rect x="${COURT_X[0]}" y="${COURT_Y[0]}" width="${COURT_X[1] - COURT_X[0]}" height="${COURT_Y[1] - COURT_Y[0]}" fill="#d9b98a" opacity="0.3" stroke="var(--ink-faint)" stroke-width="2"/>`;
-  svg += drawCourtMarkings(HX, COURT_X[1], -1, 'var(--ink-faint)', 1.6);
-  svg += `<circle cx="${HX}" cy="${HY}" r="7" fill="none" stroke="#e8590c" stroke-width="2.4"/>`;
-
-  const BAR_MAX = 62, BAR_W = 8;
-  zones.forEach(z => {
-    const x = HX - zoneMidM[z] / SCALE_M_PER_UNIT;
-    const hLen = maxAtt ? (home[z].att / maxAtt) * BAR_MAX : 0;
-    const aLen = maxAtt ? (away[z].att / maxAtt) * BAR_MAX : 0;
-    const hPct = home[z].att ? Math.round(home[z].made / home[z].att * 100) : 0;
-    const aPct = away[z].att ? Math.round(away[z].made / away[z].att * 100) : 0;
-    svg += `<rect x="${x - BAR_W / 2}" y="${HY - hLen}" width="${BAR_W}" height="${hLen}" fill="var(--home)" rx="2"/>`;
-    svg += `<rect x="${x - BAR_W / 2}" y="${HY}" width="${BAR_W}" height="${aLen}" fill="${awayFill}" rx="2"/>`;
-    svg += `<text x="${x}" y="${HY - hLen - 15}" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--ink)" font-family="Pretendard, sans-serif">${zoneLabels[z]}</text>`;
-    svg += `<text x="${x}" y="${HY - hLen - 5}" text-anchor="middle" font-size="8.5" fill="var(--home)" font-family="IBM Plex Mono, monospace">${home[z].made}/${home[z].att}(${hPct}%)</text>`;
-    svg += `<text x="${x}" y="${HY + aLen + 13}" text-anchor="middle" font-size="8.5" fill="var(--away)" font-family="IBM Plex Mono, monospace">${away[z].made}/${away[z].att}(${aPct}%)</text>`;
-  });
-
-  el.zoneCompare.innerHTML = svg;
+  renderZoneCourt();
+  renderZoneBars(home, away);
   renderZoneDominance(home, away);
 }
 
@@ -2165,7 +2196,7 @@ function drawShotChart(pcode, uptoQuarter) {
     const pct = Math.round(a.made / a.att * 100);
     const [lx, ly] = labelPos[zoneKey];
     svg += `<text x="${lx}" y="${ly}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="${teamColorVar}">${pct}%</text>`;
-    svg += `<text x="${lx}" y="${ly+13}" text-anchor="middle" font-family="IBM Plex Sans KR, sans-serif" font-size="9" fill="var(--ink-faint)">${label} ${a.made}/${a.att}</text>`;
+    svg += `<text x="${lx}" y="${ly+13}" text-anchor="middle" font-family="Pretendard, sans-serif" font-size="9" fill="var(--ink-faint)">${label} ${a.made}/${a.att}</text>`;
   }
 
   el.shotChartSvg.innerHTML = svg;
