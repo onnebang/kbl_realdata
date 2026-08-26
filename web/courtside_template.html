@@ -277,6 +277,11 @@
   .matchup-score2.win { color: var(--away); }
   .matchup-empty { color: var(--ink-faint); font-size: 12.5px; padding: 6px 4px; }
   .matchup-summary { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 6px; text-align: center; }
+  .matchup-header { display: flex; justify-content: space-between; align-items: center;
+    padding: 2px 2px 8px; font-size: 11px; font-weight: 700; border-bottom: 1px solid rgba(var(--line-rgb),0.1); }
+  .matchup-header-team { display: flex; align-items: center; gap: 6px; }
+  .matchup-header-team.home { color: var(--home); }
+  .matchup-header-team.away { color: var(--away); flex-direction: row-reverse; }
 
   /* 리그 순위 */
   .table-scroll { overflow-x: auto; }
@@ -1158,10 +1163,46 @@ function findHotCold(box, pcodeFilter) {
   return { hottest, coldest, topScorer };
 }
 
-function renderHotColdTeam(box, tcode, targetEl, curQ) {
+// 요청: "한 선수의 슈팅 난조 말고도, 팀 전체의 실패도(턴오버 2회, 공격 7회 연속 실패)" -
+// 개별 선수 스트릭(streaks)과 같은 원리를 포제션 단위(segmentPossessions 재사용)로 팀에
+// 적용 - 득점 없이 끝난 포제션(미스/턴오버)이 연속으로 몇 번째인지 팀별로 셈.
+const TEAM_DROUGHT_THRESHOLD = 4;
+function computeTeamDrought(uptoIdx) {
+  const groups = segmentPossessions(timeline.slice(1, uptoIdx + 1));
+  const streak = {}, toCount = {};
+  streak[GAME.homeTcode] = 0; streak[GAME.awayTcode] = 0;
+  toCount[GAME.homeTcode] = 0; toCount[GAME.awayTcode] = 0;
+  for (const g of groups) {
+    if (g.type !== 'group' || (g.team !== GAME.homeTcode && g.team !== GAME.awayTcode)) continue;
+    const rows = g.rows;
+    const veryLast = rows[rows.length - 1];
+    const isAssistLast = veryLast.action === '211';
+    const scoreRow = isAssistLast ? rows[rows.length - 2] : veryLast;
+    const endedInScore = !!scoreRow && SCORING_CODES_JS.has(scoreRow.action);
+    if (endedInScore) {
+      streak[g.team] = 0; toCount[g.team] = 0;
+    } else {
+      streak[g.team]++;
+      if (rows.some(r => r.action === '214' && r.team === g.team)) toCount[g.team]++;
+    }
+  }
+  const home = streak[GAME.homeTcode] >= TEAM_DROUGHT_THRESHOLD
+    ? { streak: streak[GAME.homeTcode], turnovers: toCount[GAME.homeTcode] } : null;
+  const away = streak[GAME.awayTcode] >= TEAM_DROUGHT_THRESHOLD
+    ? { streak: streak[GAME.awayTcode], turnovers: toCount[GAME.awayTcode] } : null;
+  return { [GAME.homeTcode]: home, [GAME.awayTcode]: away };
+}
+
+function renderHotColdTeam(box, tcode, targetEl, curQ, drought) {
   const roster = Object.keys(GAME.players).filter(pc => GAME.players[pc].tcode === tcode);
   const { hottest, coldest, topScorer } = findHotCold(box, roster);
   let html = '';
+  if (drought) {
+    const toNote = drought.turnovers > 0 ? `턴오버 ${drought.turnovers}회 포함, ` : '';
+    html += `<div class="hc-card cold"><div class="hc-label">🥶 팀 전체 침체</div>
+      <div class="hc-name cold">공격 ${drought.streak}회 연속 실패</div>
+      <div class="hc-detail">${toNote}득점 없이 ${drought.streak}포제션 연속</div></div>`;
+  }
   if (hottest) {
     const p = GAME.players[hottest], b = box[hottest];
     const tactical = curQ ? hotPlayerTacticalNote(hottest, curQ === 'PRE' ? null : curQ) : null;
@@ -1393,8 +1434,33 @@ function renderZoneCompare() {
   renderZoneDominance(home, away);
 }
 
-function renderAiSummary() {
+// 요청: "경기 프리뷰인데 결과에 대한 내용이 나와있음 - 경기 전엔 예측+이유만, 경기가
+// 종료되면 예측 적중/실패 이유와 가장 중요했던 장면을 자세히 설명" - loadGame()에서 한 번만
+// 그리던 걸 render(idx)에서 매번 다시 그리도록 바꾸고, 아직 안 끝났으면(idx < N-1) 예측
+// 파트까지만, 끝났으면(idx >= N-1) 결과 해설까지 이어붙임.
+function renderAiSummary(idx) {
   const pd = GAME.pregameDetail;
+  const preObjPct = Math.round(timeline[0].objectiveProb * 100);
+  const preActPct = Math.round(timeline[0].homeProb * 100);
+  const underdog = preActPct < 50 ? GAME.homeTname : GAME.awayTname;
+  const underdogPct = preActPct < 50 ? preActPct : 100 - preActPct;
+  const r = GAME.rarity;
+  const lines = [];
+
+  lines.push(`${GAME.homeTname}(홈)과 ${GAME.awayTname}(원정)의 맞대결.`);
+  if (pd) {
+    const strongName = pd.home.netrtg >= pd.away.netrtg ? GAME.homeTname : GAME.awayTname;
+    lines.push(`직전 10경기 기준 ${strongName} 쪽이 전력상 우위(넷레이팅 ${fmtRating(pd.home.netrtg)} vs ${fmtRating(pd.away.netrtg)}).`);
+  }
+  lines.push(`경기 전 모델 예측: ${GAME.homeTname} 승률 ${preActPct}% (${underdog}이 ${underdogPct}%로 약체 판정).`);
+  lines.push(`이 예측 중 순수 점수차·시간 요인은 ${preObjPct}%(경기 시작 전이라 사실상 팀 실력과 무관한 기본값) - 나머지 ${Math.abs(preActPct - preObjPct)}%p는 두 팀의 직전 전력 차이에서 나온 것.`);
+
+  const isFinal = idx >= N - 1;
+  if (!isFinal) {
+    el.aiSummary.innerHTML = lines.map(l => `<li>${l}</li>`).join('');
+    return;
+  }
+
   const finalBox = computeBoxScore(N - 1);
   const topPcode = gameWideTopPerformer(finalBox, GAME.finalHome, GAME.finalAway);
   const topP = topPcode ? GAME.players[topPcode] : null;
@@ -1402,29 +1468,34 @@ function renderAiSummary() {
   const homeWon = GAME.finalHome > GAME.finalAway;
   const winner = homeWon ? GAME.homeTname : GAME.awayTname, loser = homeWon ? GAME.awayTname : GAME.homeTname;
   const winnerScore = homeWon ? GAME.finalHome : GAME.finalAway, loserScore = homeWon ? GAME.finalAway : GAME.finalHome;
-  const preObjPct = Math.round(timeline[0].objectiveProb * 100);
-  const preActPct = Math.round(timeline[0].homeProb * 100);
-  const underdog = preActPct < 50 ? GAME.homeTname : GAME.awayTname;
-  const underdogPct = preActPct < 50 ? preActPct : 100 - preActPct;
-  const r = GAME.rarity;
-  const lines = [];
-  lines.push(`${GAME.homeTname}(홈)과 ${GAME.awayTname}(원정)의 맞대결.`);
-  if (pd) {
-    const strongName = pd.home.netrtg >= pd.away.netrtg ? GAME.homeTname : GAME.awayTname;
-    lines.push(`직전 10경기 기준 ${strongName} 쪽이 전력상 우위(넷레이팅 ${fmtRating(pd.home.netrtg)} vs ${fmtRating(pd.away.netrtg)}).`);
-  }
-  lines.push(`경기 전 모델 예측: ${GAME.homeTname} 승률 ${preActPct}% (${underdog}이 ${underdogPct}%로 약체 판정).`);
-  lines.push(`실제 최종 마진은 ${Math.abs(GAME.finalHome-GAME.finalAway)}점 - 15시즌 ${r.marginTotalGames}경기 중 ${Math.round((r.marginPercentile||0)*100)}%가 이 정도로 접전이었음.`);
-  const biggest = timeline.reduce((best, row) => Math.abs(row.wpaHome) > Math.abs(best.wpaHome ?? 0) ? row : best, {wpaHome:0});
+  const predictedWinner = preActPct >= 50 ? GAME.homeTname : GAME.awayTname;
+  const predictionCorrect = predictedWinner === winner;
+  const predictedWinnerPct = predictedWinner === GAME.homeTname ? preActPct : 100 - preActPct;
+
+  lines.push(`<b>― 경기 종료 ―</b>`);
+  lines.push(`최종 스코어 ${winner} ${winnerScore} : ${loserScore} ${loser}. 예측은 <b>${predictionCorrect ? '적중' : '빗나감'}</b>` +
+    (predictionCorrect
+      ? ` - 경기 전 ${predictedWinner}${iGa(predictedWinner)} 이길 확률을 ${predictedWinnerPct}%로 더 높게 봤고, 실제로 그대로 됨.`
+      : ` - 경기 전엔 ${predictedWinner}${iGa(predictedWinner)} 더 유력했지만(${predictedWinnerPct}%), 실제로는 ${winner}${iGa(winner)} 이김. 확률 예측은 100% 확신이 아니라 "이 정도 비율로 이런 결과가 나온다"는 뜻이라, 이런 이변도 정상적인 범위임.`));
+  if (topP) lines.push(`이 경기 최고 활약은 ${topP.name} - ${topB.pts}점 ${topB.fgm}/${topB.fga}, ${topB.ast}AST ${topB.oreb + topB.dreb}REB.`);
+
+  const biggest = timeline.reduce((best, row) => Math.abs(row.wpaHome ?? 0) > Math.abs(best.wpaHome ?? 0) ? row : best, { wpaHome: 0 });
   if (biggest.player) {
-    lines.push(`승부의 분수령은 ${biggest.q} ${biggest.m}:${String(biggest.s).padStart(2,'0')} ${biggest.player}의 ${biggest.actionLabel} (승률 ${Math.round(biggest.wpaHome*100)}%p 급변).`);
+    const biggestIdx = timeline.indexOf(biggest);
+    const beforeProb = biggestIdx > 0 ? Math.round(timeline[biggestIdx - 1].homeProb * 100) : 50;
+    const afterProb = Math.round(biggest.homeProb * 100);
+    const beneficiary = biggest.wpaHome > 0 ? GAME.homeTname : GAME.awayTname;
+    const swingPts = Math.round(Math.abs(biggest.wpaHome) * 100);
+    lines.push(`<b>― 코트사이드 분석: 이 경기 가장 중요했던 장면 ―</b>`);
+    lines.push(`${clockStr(biggest)}, ${biggest.homeScore}-${biggest.awayScore} 상황에서 ${biggest.player}의 ${biggest.actionLabel}. ` +
+      `${GAME.homeTname} 승률이 ${beforeProb}%에서 ${afterProb}%로 이 플레이 한 번에 ${swingPts}%p 움직여서, ` +
+      `${beneficiary}${iGa(beneficiary)} 이 순간을 기점으로 승기를 크게 가져감. ` +
+      `15시즌 전체 통산 이 정도 스윙은 ${r.wpaSwingRank}위(표본 ${r.wpaSwingSampleSize}건 중)` +
+      `${r.wpaSwingRank <= 20 ? ' - 역대급으로 드문 순간이었음.' : '.'}`);
   }
-  lines.push(`이 승률 스윙은 15시즌 전체 통산 ${r.wpaSwingRank}위 (표본 ${r.wpaSwingSampleSize}건 중).`);
-  if (topP) lines.push(`이 경기 최고 활약은 ${topP.name} - ${topB.pts}점 ${topB.fgm}/${topB.fga}, ${topB.ast}AST ${topB.oreb+topB.dreb}REB.`);
-  lines.push(`최종 스코어 ${winner} ${winnerScore} : ${loserScore} ${loser}${(underdog===winner) ? ' - 예측을 뒤집은 결과.' : ' - 예측대로 강팀이 승리.'}`);
-  lines.push(`홈팀 기준 승률은 경기 시작 ${preActPct}%에서 최종 ${homeWon ? '100%(승리)' : '0%(패배)'}로 마감.`);
-  lines.push(`객관적 지표(점수차·시간)만 보면 경기 시작 시점 ${preObjPct}%였던 것과 비교하면, 실제 팀 전력 반영분이 ${Math.abs(preActPct-preObjPct)}%p였음.`);
-  el.aiSummary.innerHTML = lines.slice(0, 10).map(l => `<li>${l}</li>`).join('');
+  lines.push(`실제 최종 마진은 ${Math.abs(GAME.finalHome - GAME.finalAway)}점 - 15시즌 ${r.marginTotalGames}경기 중 ${Math.round((r.marginPercentile || 0) * 100)}%가 이 정도로 접전이었음.`);
+
+  el.aiSummary.innerHTML = lines.slice(0, 14).map(l => `<li>${l}</li>`).join('');
 }
 
 // --- 승부처 역전 스토리 생성 (사용자가 손으로 직접 예시를 써준 것 - "누가 부진해졌고, 누구 3점이
@@ -1515,10 +1586,21 @@ function renderComebackStory() {
     parts.push(`벤치에서 나온 ${GAME.players[pc].name} 선수의 ${bits.join('·')}${iGa(bits.join('·'))} 흐름을 더 가져왔고`);
   }
 
-  let bestRun = 0;
+  // 요청: "34분 3초동안 11-0 런을 했다? 말이 이상하다" - 실제 버그였음. durationSec을
+  // "최악의 열세 시점부터 경기 끝까지"(런과 무관한 전체 나머지 시간)로 계산하고 있었음 -
+  // 그 런이 실제로 시작된 지점(직전 리셋 이후 첫 득점)부터 최고치 도달 시점까지로 고침.
+  let bestRun = 0, bestRunIdx = -1;
   for (let i = worstIdx; i < N; i++) {
     const r = homeWon ? timeline[i].runHome : timeline[i].runAway;
-    if (r > bestRun) bestRun = r;
+    if (r > bestRun) { bestRun = r; bestRunIdx = i; }
+  }
+  let runStartIdx = bestRunIdx;
+  if (bestRunIdx !== -1) {
+    const runField = homeWon ? 'runHome' : 'runAway';
+    for (let i = bestRunIdx - 1; i >= worstIdx; i--) {
+      if (timeline[i][runField] === 0) break;  // 리셋 지점(상대 직전 득점) - 런은 그 다음부터
+      runStartIdx = i;
+    }
   }
 
   let capIdx = -1, capWpa = 0.1;
@@ -1531,7 +1613,9 @@ function renderComebackStory() {
     parts.push(`결국 ${clockStr(capRow)}, <b>${capRow.player}</b> 선수의 ${capRow.actionLabel}${iGa(capRow.actionLabel)} 승부에 쐐기를 박았습니다`);
   }
 
-  const durationSec = cumulativeElapsedJs(timeline[N-1].q, timeline[N-1].m, timeline[N-1].s) - cumulativeElapsedJs(worstRow.q, worstRow.m, worstRow.s);
+  const durationSec = bestRunIdx !== -1
+    ? cumulativeElapsedJs(timeline[bestRunIdx].q, timeline[bestRunIdx].m, timeline[bestRunIdx].s) - cumulativeElapsedJs(timeline[runStartIdx].q, timeline[runStartIdx].m, timeline[runStartIdx].s)
+    : 0;
   parts.push(`${fmtDuration(durationSec)} 동안 최대 ${bestRun}-0 런을 만들어내며 ${GAME.finalHome}:${GAME.finalAway}, ${winnerTname}의 역전승으로 마무리됐습니다.`);
 
   el.comebackText.innerHTML = parts.join(', ');
@@ -1543,7 +1627,6 @@ function renderPreviewPanel() {
   renderZoneCompare();
   renderMatchups();
   renderStandings();
-  renderAiSummary();
   renderComebackStory();
 }
 
@@ -1556,6 +1639,12 @@ function renderMatchups() {
     return;
   }
   const summary = `역대 맞대결 ${h2h.meetings}경기 - ${GAME.homeTname} ${h2h.homeWins}승, ${GAME.awayTname} ${h2h.awayWins}승`;
+  // 요청: "어디가 어떤 팀인지 제대로 표시" - 행마다 숫자만 나열돼서, 위 요약 문장 한 줄
+  // 말고는 왼쪽/오른쪽이 어느 팀인지 표시가 없었음 - 배지 헤더 추가.
+  const header = `<div class="matchup-header">
+    <span class="matchup-header-team home">${teamBadgeHtml(GAME.homeTcode, 'team-badge-sm')}${GAME.homeTname}</span>
+    <span class="matchup-header-team away">${GAME.awayTname}${teamBadgeHtml(GAME.awayTcode, 'team-badge-sm')}</span>
+  </div>`;
   const rows = h2h.recentMeetings.slice().reverse().map(m => {
     const homeIsGameHome = m.homeTcode === GAME.homeTcode;
     const leftScore = homeIsGameHome ? m.homeScore : m.awayScore;
@@ -1568,7 +1657,7 @@ function renderMatchups() {
       <span class="matchup-score2 ${!leftWin ? 'win' : ''}">${rightScore}</span>
     </div>`;
   }).join('');
-  el.matchupsBody.innerHTML = `<div class="matchup-summary">${summary}</div>${rows}`;
+  el.matchupsBody.innerHTML = `<div class="matchup-summary">${summary}</div>${header}${rows}`;
 }
 
 // 리그 순위(요청: "리그 테이블 추가") - 이 경기 시점 기준 리크프리 스탠딩, 정규시즌만
@@ -1679,8 +1768,9 @@ function renderCourt(row, idx) {
   el.comboLineHome.innerHTML = comboHtmlFor(row.homeLineup, GAME.homeTname, 20);
   el.comboLineAway.innerHTML = comboHtmlFor(row.awayLineup, GAME.awayTname, 20);
 
-  renderHotColdTeam(box, GAME.homeTcode, el.hotcoldRowHome, row.q);
-  renderHotColdTeam(box, GAME.awayTcode, el.hotcoldRowAway, row.q);
+  const drought = computeTeamDrought(idx);
+  renderHotColdTeam(box, GAME.homeTcode, el.hotcoldRowHome, row.q, drought[GAME.homeTcode]);
+  renderHotColdTeam(box, GAME.awayTcode, el.hotcoldRowAway, row.q, drought[GAME.awayTcode]);
   renderExplain(row);
   renderTimeoutNote(idx);
   renderRightNowStrip(row, box, topPcode);
@@ -2123,13 +2213,11 @@ function render(idx, opts) {
   el.awayProb.textContent = (100 - hp) + '%';
   el.splitHome.style.width = hp + '%';
   el.splitAway.style.width = (100 - hp) + '%';
-  // 요청: "상단에 점수와 함께 승률도 보이게"
+  // 요청: "승률은 양쪽팀 둘다 작성해줘" - 우세팀 한쪽 %만 보이던 걸 양팀 다 표시로 변경.
   if (row.q === 'PRE') {
-    el.miniProb.textContent = '';
+    el.miniProb.innerHTML = '';
   } else {
-    const favIsHome = hp >= 50;
-    el.miniProb.textContent = `${favIsHome ? GAME.homeTname : GAME.awayTname} ${favIsHome ? hp : 100 - hp}%`;
-    el.miniProb.style.color = favIsHome ? 'var(--home)' : 'var(--away)';
+    el.miniProb.innerHTML = `<span style="color:var(--home)">${hp}%</span> · <span style="color:var(--away)">${100 - hp}%</span>`;
   }
   updateChart(idx);
   updateChartNowCard(row);
@@ -2143,6 +2231,7 @@ function render(idx, opts) {
   renderFeedGroups(idx);
   renderGameLeaders(idx);
   renderTeamStats(idx);
+  renderAiSummary(idx);
 }
 
 // --- 선수별 슛차트 모달 (xPTS 골대좌표 재사용: build_xpts_shot_quality.py에서 검증한 값) ---
