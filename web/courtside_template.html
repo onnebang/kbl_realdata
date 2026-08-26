@@ -64,9 +64,12 @@
     color: var(--ink); background: var(--surface); border: 1px solid rgba(var(--line-rgb),0.16);
     border-radius: 10px; padding: 10px 12px; margin-bottom: 16px; cursor: pointer; }
 
-  /* 스코어보드 */
+  /* 스코어보드 - 요청: "점수판과 승률 그래프를 합쳐서 제일 상단에 고정" - sticky로 상단
+     고정, 배경이 불투명해야 아래 콘텐츠가 스크롤돼 지나갈 때 비쳐 보이지 않음. */
   .scoreboard { background: var(--surface); border: 1px solid rgba(var(--line-rgb),0.12); border-radius: 14px;
-    padding: 18px 20px; }
+    padding: 18px 20px; position: sticky; top: 0; z-index: 40; box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    margin: 0 -18px 14px; }
+  @media (max-width: 640px) { .scoreboard { margin: 0 -12px 14px; border-radius: 0; } }
   .sb-top { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
   .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; }
   .live-dot.on { background: var(--live); animation: pulse 1.4s ease-in-out infinite; }
@@ -163,7 +166,11 @@
   .prating2 { display: block; font-family: "IBM Plex Mono", monospace; font-size: 9.5px; color: var(--ink-faint); }
   .bench-divider { font-family: "IBM Plex Mono", monospace; font-size: 9px; text-transform: uppercase;
     color: var(--ink-faint); letter-spacing: 0.05em; margin: 8px 0 4px; }
-  .back-num { font-family: "IBM Plex Mono", monospace; color: var(--ink-faint); font-size: 10.5px; margin-right: 3px; flex-shrink: 0; }
+  /* 요청: "이름 길이와 번호 길이가 달라서 레이아웃이 깨짐" - #1처럼 한 자리 번호와 #23처럼
+     두 자리 번호가 폭이 달라서, 그 뒤에 오는 이름 시작 위치가 행마다 들쭉날쭉했음 - 고정폭
+     +오른쪽 정렬로 번호 폭과 무관하게 이름이 항상 같은 x좌표에서 시작하도록 함. */
+  .back-num { font-family: "IBM Plex Mono", monospace; color: var(--ink-faint); font-size: 10.5px;
+    margin-right: 3px; flex-shrink: 0; display: inline-block; width: 22px; text-align: right; }
   .player-row { cursor: pointer; border-radius: 6px; transition: background 0.12s ease; }
   .player-row:hover { background: var(--surface-soft); }
   .player-row:focus-visible { outline: 2px solid var(--home); outline-offset: 1px; }
@@ -385,29 +392,12 @@
   .feed-wpa.down { color: var(--away); }
   .feed-empty { color: var(--ink-faint); font-size: 13px; padding: 14px 4px; }
 
-  /* 상단 고정 미니 스코어보드 (요청: "점수판은 항상 상단에 틀고정") */
-  .sticky-bar { position: sticky; top: 0; z-index: 40; background: var(--surface);
-    border-bottom: 1px solid rgba(var(--line-rgb),0.14); box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 14px;
-    margin: 0 -18px 14px; }
-  .sb-mini-main { display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; }
-  .sb-mini-team { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; min-width: 0; }
-  .sb-mini-team.away { flex-direction: row-reverse; }
-  .sb-mini-badge { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; display: flex;
-    align-items: center; justify-content: center; font-family: "IBM Plex Mono", monospace; font-size: 8px;
-    font-weight: 800; color: #fff; }
-  .sb-mini-score { font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 18px; }
-  .sb-mini-mid { display: flex; flex-direction: column; align-items: center; gap: 1px; flex-shrink: 0; }
-  .sb-mini-clock { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--ink-faint);
-    white-space: nowrap; }
-  /* 요청: "상단에 점수와 함께 승률도 보이게" */
-  .sb-mini-prob { font-family: "IBM Plex Mono", monospace; font-size: 10px; font-weight: 700; white-space: nowrap; }
-  /* 요청: "주요 알림정도는 간단하게 보이도록" - checkMoment()가 momentBanner와 같이 채움 */
+  /* 요청: "주요 알림정도는 간단하게 보이도록" - checkMoment()가 momentBanner와 같이 채움.
+     이제 스코어보드 자체가 sticky라 이 안에 같이 들어있음(.scoreboard CSS 참고). */
   .sb-mini-alert { font-size: 10.5px; color: var(--ink-soft); text-align: center; max-width: 100%;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0; max-height: 0;
-    transition: opacity 0.2s ease; }
+    margin-top: 4px; transition: opacity 0.2s ease; }
   .sb-mini-alert.show { opacity: 1; max-height: 16px; }
-  @media (max-width: 640px) { .sticky-bar { margin: 0 -12px 14px; } }
 
   /* 문자중계 - "한 공격(포제션)" 단위로 묶어서 보여주기(요청: 리바운드-어시-슛을 한 섹션으로) */
   .poss-group { border-radius: 10px; margin-bottom: 8px; overflow: hidden;
@@ -604,24 +594,6 @@
 <div class="push-stack" id="pushStack" aria-live="polite"></div>
 <div class="wrap">
 
-  <div class="sticky-bar" id="stickyBar">
-    <div class="sb-mini-main">
-      <div class="sb-mini-team home">
-        <span class="sb-mini-badge" id="miniBadgeHome">-</span>
-        <span class="sb-mini-score" id="miniScoreHome">0</span>
-      </div>
-      <div class="sb-mini-mid">
-        <span class="sb-mini-clock" id="miniClock">-</span>
-        <span class="sb-mini-prob" id="miniProb"></span>
-      </div>
-      <div class="sb-mini-team away">
-        <span class="sb-mini-badge" id="miniBadgeAway">-</span>
-        <span class="sb-mini-score" id="miniScoreAway">0</span>
-      </div>
-    </div>
-    <div class="sb-mini-alert" id="miniAlert"></div>
-  </div>
-
   <div class="eyebrow-row">
     <span class="eyebrow">KBL Live Win Probability</span>
     <span class="demo-badge">리플레이 데모 · 실제 과거 경기</span>
@@ -629,7 +601,11 @@
 
   <select class="game-picker" id="gamePicker"></select>
 
-  <div class="scoreboard">
+  <!-- 요청: "점수판과 승률 그래프를 합쳐서 제일 상단에 고정" - 예전엔 점수판(scoreboard)은
+       스크롤하면 사라지고, 승률 막대(prob-section)는 아예 슛차트 밑까지 떨어져 있어서
+       화면 하나에 두 개가 안 붙어있었음 - 승률 퍼센트/막대를 이 카드 안으로 옮기고,
+       카드 전체를 sticky로 상단 고정. -->
+  <div class="scoreboard" id="stickyBar">
     <div class="sb-top">
       <span class="live-dot" id="liveDot"></span>
       <span class="clock" id="clockLabel">경기 시작 전</span>
@@ -650,6 +626,14 @@
     <div class="sb-badges" id="sbBadges"></div>
     <div id="timeoutNote"></div>
     <div class="right-now-strip" id="rightNowStrip"></div>
+
+    <div class="prob-pct-row">
+      <div><span class="prob-pct home" id="homeProbLabel">-</span><span class="prob-pct-label">승리확률</span></div>
+      <div style="text-align:right"><span class="prob-pct away" id="awayProbLabel">-</span><span class="prob-pct-label">승리확률</span></div>
+    </div>
+    <div class="split-bar"><div class="split-home" id="splitHome" style="width:50%"></div><div class="split-away" id="splitAway" style="width:50%"></div></div>
+    <div class="sb-mini-alert" id="miniAlert"></div>
+
     <div class="quarter-table-wrap"><table class="quarter-table" id="quarterTable"></table></div>
   </div>
 
@@ -748,12 +732,6 @@
   </div>
 
   <div class="prob-section">
-    <div class="prob-pct-row">
-      <div><span class="prob-pct home" id="homeProbLabel">-</span><span class="prob-pct-label">승리확률</span></div>
-      <div style="text-align:right"><span class="prob-pct away" id="awayProbLabel">-</span><span class="prob-pct-label">승리확률</span></div>
-    </div>
-    <div class="split-bar"><div class="split-home" id="splitHome" style="width:50%"></div><div class="split-away" id="splitAway" style="width:50%"></div></div>
-
     <div class="explain-panel">
       <div class="explain-title">왜 이 승률인가</div>
       <div class="explain-row">
@@ -954,12 +932,6 @@ const el = {
   flowChartWrap: document.getElementById('flowChartWrap'),
   flowChart: document.getElementById('flowChart'),
   chartNowCard: document.getElementById('chartNowCard'),
-  miniBadgeHome: document.getElementById('miniBadgeHome'),
-  miniBadgeAway: document.getElementById('miniBadgeAway'),
-  miniScoreHome: document.getElementById('miniScoreHome'),
-  miniScoreAway: document.getElementById('miniScoreAway'),
-  miniClock: document.getElementById('miniClock'),
-  miniProb: document.getElementById('miniProb'),
   miniAlert: document.getElementById('miniAlert'),
 };
 
@@ -990,8 +962,6 @@ function applyStaticLabels() {
   document.body.classList.toggle('color-clash', colorDist(GAME.homeColor, GAME.awayColor) < 95);
   fillTeamBadge(el.homeBadge, GAME.homeLogo, GAME.homeColor, GAME.homeAbbr || GAME.homeTname.slice(0, 2));
   fillTeamBadge(el.awayBadge, GAME.awayLogo, GAME.awayColor, GAME.awayAbbr || GAME.awayTname.slice(0, 2));
-  fillTeamBadge(el.miniBadgeHome, GAME.homeLogo, GAME.homeColor, GAME.homeAbbr || GAME.homeTname.slice(0, 2));
-  fillTeamBadge(el.miniBadgeAway, GAME.awayLogo, GAME.awayColor, GAME.awayAbbr || GAME.awayTname.slice(0, 2));
   el.fcLegHome.textContent = `● ${GAME.homeTname}`;
   el.fcLegAway.textContent = `${GAME.awayTname} ●`;
 
@@ -2205,20 +2175,11 @@ function render(idx, opts) {
   el.clockLabel.textContent = fmtClock(row);
   el.homeScore.textContent = row.homeScore;
   el.awayScore.textContent = row.awayScore;
-  el.miniScoreHome.textContent = row.homeScore;
-  el.miniScoreAway.textContent = row.awayScore;
-  el.miniClock.textContent = fmtClock(row);
   const hp = Math.round(row.homeProb * 100);
   el.homeProb.textContent = hp + '%';
   el.awayProb.textContent = (100 - hp) + '%';
   el.splitHome.style.width = hp + '%';
   el.splitAway.style.width = (100 - hp) + '%';
-  // 요청: "승률은 양쪽팀 둘다 작성해줘" - 우세팀 한쪽 %만 보이던 걸 양팀 다 표시로 변경.
-  if (row.q === 'PRE') {
-    el.miniProb.innerHTML = '';
-  } else {
-    el.miniProb.innerHTML = `<span style="color:var(--home)">${hp}%</span> · <span style="color:var(--away)">${100 - hp}%</span>`;
-  }
   updateChart(idx);
   updateChartNowCard(row);
   el.scrubIdx.textContent = `${idx} / ${N - 1}`;
