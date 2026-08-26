@@ -1770,17 +1770,64 @@ function updateChart(idx) {
   wpGuide.setAttribute('x2', last[0]);
 }
 
+// 요청: "식스맨 스파크 지수 - 교체 투입 시점 전후 3분간 팀 넷레이팅 변화량"
+// (ΔNetRtg = NetRtg[t0,t0+3분] - NetRtg[t0-3분,t0]). 기존 온/오프(subMarginNote)는 시즌
+// 누적치라 "이 선수는 평소 잘한다"만 말해주는데, 이건 "지금 이 순간 들어오자마자 팀
+// 페이스/마진이 실제로 바뀌었는가"를 보는 다른 축이라 별도로 추가.
+function elapsedOfRow(row) { return cumulativeElapsedJs(row.q, row.m, row.s); }
+
+function marginRefAt(targetElapsed) {
+  let best = null;
+  for (const row of timeline) {
+    if (row.q === 'PRE') continue;
+    const e = elapsedOfRow(row);
+    if (e <= targetElapsed) best = row; else break;
+  }
+  if (!best) return { margin: 0, elapsed: 0 };
+  return { margin: best.homeScore - best.awayScore, elapsed: elapsedOfRow(best) };
+}
+
+function computeSubSpark(row) {
+  const t0 = elapsedOfRow(row);
+  const lastElapsed = elapsedOfRow(timeline[timeline.length - 1]);
+  if (t0 >= lastElapsed) return null;  // 경기 막판 교체는 "이후 3분"이 없어서 계산 불가
+  const beforeRef = marginRefAt(Math.max(0, t0 - 180));
+  const atSub = marginRefAt(t0);
+  const afterRef = marginRefAt(Math.min(t0 + 180, lastElapsed));
+
+  const beforeDur = atSub.elapsed - beforeRef.elapsed;
+  const afterDur = afterRef.elapsed - atSub.elapsed;
+  if (beforeDur < 30 || afterDur < 30) return null;  // 표본(30초 미만)은 너무 짧아 생략
+
+  const netRtg = (marginChange, durSec) => marginChange / durSec * 2400;
+  const sign = row.team === GAME.homeTcode ? 1 : -1;  // 홈 기준 margin을 이 선수 팀 기준으로
+  const before = sign * netRtg(atSub.margin - beforeRef.margin, beforeDur);
+  const after = sign * netRtg(afterRef.margin - atSub.margin, afterDur);
+  return { delta: after - before };
+}
+
 function subMarginNote(row) {
   if (row.action !== '101' || !row.player || !row.team) return '';  // 교체 IN에만 표시
   const teamPcodes = row.team === GAME.homeTcode ? row.homeLineup : row.awayLineup;
   const pcode = teamPcodes.find(pc => (GAME.players[pc] || {}).name === row.player);
   const onoff = pcode && GAME.onoff[pcode];
-  if (!onoff) return '';
-  const r = onoff.netRatingPer40;
-  const pct = Math.min(100, Math.abs(r) / 20 * 100);  // ±20 넷레이팅을 풀바 기준으로 정규화(시각적 스케일용)
-  const dir = r >= 0 ? 'pos' : 'neg';
-  return `<span class="sub-margin">(온/오프 ${r > 0 ? '+' : ''}${r.toFixed(1)}
-    <span class="sub-margin-bar"><span class="sub-margin-fill ${dir}" style="width:${pct}%"></span></span>)</span>`;
+  let html = '';
+  if (onoff) {
+    const r = onoff.netRatingPer40;
+    const pct = Math.min(100, Math.abs(r) / 20 * 100);  // ±20 넷레이팅을 풀바 기준으로 정규화(시각적 스케일용)
+    const dir = r >= 0 ? 'pos' : 'neg';
+    html += `<span class="sub-margin">(온/오프 ${r > 0 ? '+' : ''}${r.toFixed(1)}
+      <span class="sub-margin-bar"><span class="sub-margin-fill ${dir}" style="width:${pct}%"></span></span>)</span>`;
+  }
+  const spark = computeSubSpark(row);
+  if (spark) {
+    const d = spark.delta;
+    const pct = Math.min(100, Math.abs(d) / 40 * 100);  // 순간 변화라 변동폭이 커서 ±40 기준
+    const dir = d >= 0 ? 'pos' : 'neg';
+    html += ` <span class="sub-margin" title="투입 전후 3분 팀 넷레이팅 변화(식스맨 스파크 지수)">(스파크 ${d > 0 ? '+' : ''}${d.toFixed(1)}
+      <span class="sub-margin-bar"><span class="sub-margin-fill ${dir}" style="width:${pct}%"></span></span>)</span>`;
+  }
+  return html;
 }
 
 function teamDot(team) {
