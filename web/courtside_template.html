@@ -308,6 +308,51 @@
   .matchup-header-team.home { color: var(--home); }
   .matchup-header-team.away { color: var(--away); flex-direction: row-reverse; }
 
+  /* 매치업 배너(요청: "매치업 데이터는 5번 사진 디자인 참고해서") - Showstone 스크린샷의
+     "팀컬러 대각선 블록" 레이아웃 아이디어만 차용, 배색은 코트사이드 팀컬러 그대로. */
+  .matchup-banner { position: relative; display: flex; align-items: stretch; height: 48px;
+    border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
+  .matchup-banner-side { flex: 1; display: flex; align-items: center; gap: 8px; padding: 0 16px;
+    background: var(--mbc); color: #fff; font-weight: 700; font-size: 13px; min-width: 0; }
+  .matchup-banner-side .pname-text, .matchup-banner-name { overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,0.35); }
+  .matchup-banner-side.home { justify-content: flex-start;
+    clip-path: polygon(0 0, 100% 0, 88% 100%, 0 100%); padding-right: 30px; }
+  .matchup-banner-side.away { justify-content: flex-end; margin-left: -14px;
+    clip-path: polygon(12% 0, 100% 0, 100% 100%, 0 100%); padding-left: 30px; }
+  .matchup-banner-side .team-badge-sm { border: 2px solid rgba(255,255,255,0.85); flex-shrink: 0; }
+  .matchup-banner-vs { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    font-family: "Big Shoulders Display", sans-serif; font-size: 13px; color: var(--ink-soft);
+    background: var(--surface); border: 1px solid rgba(var(--line-rgb),0.15); border-radius: 50%;
+    width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; z-index: 2; }
+
+  /* 매치업 시즌스탯 비교 - previewCompare(.pc-home/.pc-away/.pc-win/.pc-label)와 완전히
+     같은 시각 언어 재사용(별도 신규 스타일 최소화). */
+  .matchup-rank { display: block; font-size: 9.5px; font-weight: 400; color: var(--ink-faint);
+    font-family: "IBM Plex Mono", monospace; margin-top: 1px; }
+  .matchup-section-label { font-size: 10.5px; font-weight: 700; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.03em; margin: 14px 0 6px; }
+
+  /* 매치업 일정 패널(요청: Showstone의 "부상자 명단" 자리 - 이 데이터소스엔 부상 데이터가
+     없어서, 대신 실제로 있는 최근결과/다음일정으로 대체) */
+  .matchup-schedule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 4px; }
+  .sched-team-name { font-size: 11.5px; font-weight: 700; margin-bottom: 4px; }
+  .sched-col.home .sched-team-name { color: var(--home); }
+  .sched-col.away .sched-team-name { color: var(--away); }
+  .sched-group-label { font-size: 9.5px; color: var(--ink-faint); text-transform: uppercase;
+    letter-spacing: 0.03em; margin: 6px 0 3px; }
+  .sched-row { display: flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 0;
+    border-bottom: 1px solid rgba(var(--line-rgb),0.06); }
+  .sched-date { color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; font-size: 10px;
+    width: 32px; flex-shrink: 0; }
+  .sched-opp { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .sched-score { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; font-weight: 700;
+    flex-shrink: 0; }
+  .sched-score.win { color: var(--home); }
+  .sched-score.loss { color: var(--ink-faint); }
+  .sched-score.upcoming { color: var(--gold); font-weight: 400; }
+
   /* 리그 순위 */
   .table-scroll { overflow-x: auto; }
   table.standings-table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -746,7 +791,7 @@
         <div id="zoneDominance" class="zone-dominance"></div>
       </div>
       <div class="chart-block" style="margin-top:12px" id="matchupsBlock">
-        <div class="chart-title">맞대결 기록</div>
+        <div class="chart-title">매치업</div>
         <div id="matchupsBody"></div>
       </div>
 
@@ -1697,34 +1742,133 @@ function renderPreviewPanel() {
   renderComebackStory();
 }
 
-// 맞대결 기록(요청: "맞대결 기록 추가") - 최근 5경기, ESPN Matchups 탭처럼 개별 스코어 나열
+// 임의 팀 배지(요청: 매치업 페이지 리디자인 - teamBadgeHtml()은 "이 경기의 홈/원정" 둘 중
+// 하나 기준이라 일정 패널의 과거/다음 상대팀(둘 다 아닐 수 있음)엔 못 씀. renderStandings()가
+// 이미 쓰던 ALL_DATA.teamMeta 조회 패턴을 재사용해 일반화.
+function miniTeamBadge(tcode) {
+  const meta = ALL_DATA.teamMeta || {};
+  const tm = meta[tcode] || { name: tcode, abbr: tcode, color: '#5b5f6e', logo: null };
+  return tm.logo
+    ? `<span class="team-badge-sm has-logo"><img src="${tm.logo}" alt="${tm.abbr}"></span>`
+    : `<span class="team-badge-sm" style="background:${tm.color}">${tm.abbr}</span>`;
+}
+
+// 매치업 시즌스탯 비교 행 - pcRow()와 같은 "더 좋은 쪽 강조" 로직이지만, 순위(N/전체팀수)를
+// 값 아래 작게 같이 보여줌.
+function matchupStatRow(label, hStat, aStat, key, higherIsBetter, fmt) {
+  const hVal = hStat ? hStat[key] : null, aVal = aStat ? aStat[key] : null;
+  const hRank = hStat ? hStat[key + 'Rank'] : null, aRank = aStat ? aStat[key + 'Rank'] : null;
+  const total = (hStat && hStat.totalTeams) || (aStat && aStat.totalTeams) || null;
+  let hCls = 'pc-home', aCls = 'pc-away';
+  if (hVal != null && aVal != null && hVal !== aVal) {
+    const hBetter = higherIsBetter ? hVal > aVal : hVal < aVal;
+    if (hBetter) hCls += ' pc-win'; else aCls += ' pc-win';
+  }
+  const cell = (v, r) => v == null ? '-' :
+    `${fmt(v)}${r != null && total ? `<span class="matchup-rank">${r}/${total}위</span>` : ''}`;
+  return `<tr><td class="${hCls}">${cell(hVal, hRank)}</td><td class="pc-label">${label}</td><td class="${aCls}">${cell(aVal, aRank)}</td></tr>`;
+}
+
+// 일정 한 줄(요청: Showstone의 "부상자 명단" 자리 - 이 데이터소스엔 부상 정보가 없어서
+// 대신 실제로 있는 최근결과/다음일정으로 채움)
+function scheduleRowHtml(g) {
+  const dateStr = `${g.gameDate.slice(4, 6)}.${g.gameDate.slice(6, 8)}`;
+  const oppMeta = (ALL_DATA.teamMeta || {})[g.opponentTcode] || {};
+  // miniTeamBadge()가 로고 없으면 이미 배지 안에 약칭을 텍스트로 그려주므로(예: "KT"),
+  // 옆에 또 약칭을 쓰면 "KT KT"처럼 중복됨 - 풀네임으로.
+  const oppName = oppMeta.name || g.opponentTcode;
+  const vs = g.isHome ? 'vs' : '@';
+  let scoreHtml;
+  if (g.isEnded && g.scoreOwn != null && g.scoreOpp != null) {
+    const won = g.scoreOwn > g.scoreOpp;
+    scoreHtml = `<span class="sched-score ${won ? 'win' : 'loss'}">${won ? 'W' : 'L'} ${g.scoreOwn}-${g.scoreOpp}</span>`;
+  } else {
+    scoreHtml = `<span class="sched-score upcoming">예정</span>`;
+  }
+  return `<div class="sched-row"><span class="sched-date">${dateStr}</span>` +
+    `<span class="sched-opp">${vs} ${miniTeamBadge(g.opponentTcode)}${oppName}</span>${scoreHtml}</div>`;
+}
+
+function scheduleColHtml(teamName, sched, side) {
+  if (!sched || (!sched.recent.length && !sched.upcoming.length)) {
+    return `<div class="sched-team-name">${teamName}</div><div class="matchup-empty">일정 데이터 없음</div>`;
+  }
+  const recentHtml = sched.recent.length
+    ? sched.recent.slice().reverse().map(scheduleRowHtml).join('')
+    : `<div class="matchup-empty" style="padding:3px 0">최근 기록 없음</div>`;
+  const upcomingHtml = sched.upcoming.length
+    ? sched.upcoming.map(scheduleRowHtml).join('')
+    : `<div class="matchup-empty" style="padding:3px 0">다음 일정 없음</div>`;
+  return `<div class="sched-team-name">${teamName}</div>` +
+    `<div class="sched-group-label">최근 결과</div>${recentHtml}` +
+    `<div class="sched-group-label">다음 일정</div>${upcomingHtml}`;
+}
+
+// 매치업(요청 6-2차 "매치업 데이터는 5번 사진 디자인 참고해서 다시 제작") - 팀컬러 배너 +
+// 시즌 스탯 비교(순위 포함) + 일정(부상자 명단 자리 대체) + 기존 역대 맞대결 리스트를
+// 한 카드로 통합.
 function renderMatchups() {
   const pd = GAME.pregameDetail;
-  const h2h = pd && pd.h2h;
-  if (!h2h || !h2h.recentMeetings || !h2h.recentMeetings.length) {
-    el.matchupsBody.innerHTML = `<div class="matchup-empty">이 경기 이전 맞대결 기록 없음(첫 대결 또는 신생팀)</div>`;
-    return;
-  }
-  const summary = `역대 맞대결 ${h2h.meetings}경기 - ${GAME.homeTname} ${h2h.homeWins}승, ${GAME.awayTname} ${h2h.awayWins}승`;
-  // 요청: "어디가 어떤 팀인지 제대로 표시" - 행마다 숫자만 나열돼서, 위 요약 문장 한 줄
-  // 말고는 왼쪽/오른쪽이 어느 팀인지 표시가 없었음 - 배지 헤더 추가.
-  const header = `<div class="matchup-header">
-    <span class="matchup-header-team home">${teamBadgeHtml(GAME.homeTcode, 'team-badge-sm')}${GAME.homeTname}</span>
-    <span class="matchup-header-team away">${GAME.awayTname}${teamBadgeHtml(GAME.awayTcode, 'team-badge-sm')}</span>
+  if (!pd) { el.matchupsBody.innerHTML = `<div class="matchup-empty">매치업 데이터 없음</div>`; return; }
+
+  const banner = `<div class="matchup-banner">
+    <div class="matchup-banner-side home" style="--mbc:${GAME.homeColor}">
+      ${teamBadgeHtml(GAME.homeTcode, 'team-badge-sm')}<span class="matchup-banner-name">${GAME.homeTname}</span>
+    </div>
+    <div class="matchup-banner-vs">VS</div>
+    <div class="matchup-banner-side away" style="--mbc:${GAME.awayColor}">
+      <span class="matchup-banner-name">${GAME.awayTname}</span>${teamBadgeHtml(GAME.awayTcode, 'team-badge-sm')}
+    </div>
   </div>`;
-  const rows = h2h.recentMeetings.slice().reverse().map(m => {
-    const homeIsGameHome = m.homeTcode === GAME.homeTcode;
-    const leftScore = homeIsGameHome ? m.homeScore : m.awayScore;
-    const rightScore = homeIsGameHome ? m.awayScore : m.homeScore;
-    const leftWin = leftScore > rightScore;
-    const dateStr = `${m.gameDate.slice(0,4)}.${m.gameDate.slice(4,6)}.${m.gameDate.slice(6,8)}`;
-    return `<div class="matchup-row">
-      <span class="matchup-score ${leftWin ? 'win' : ''}">${leftScore}</span>
-      <span class="matchup-mid">${dateStr}</span>
-      <span class="matchup-score2 ${!leftWin ? 'win' : ''}">${rightScore}</span>
-    </div>`;
-  }).join('');
-  el.matchupsBody.innerHTML = `<div class="matchup-summary">${summary}</div>${header}${rows}`;
+
+  const h = pd.home.seasonStats, a = pd.away.seasonStats;
+  let compareHtml;
+  if (!h && !a) {
+    compareHtml = `<div class="matchup-empty">시즌 초반이라 표본이 부족함(팀 평균 스탯 비교 불가)</div>`;
+  } else {
+    const num1 = v => v.toFixed(1);
+    compareHtml = `<table class="preview-compare">` +
+      `<colgroup><col class="pc-col-val"><col class="pc-col-label"><col class="pc-col-val"></colgroup>` +
+      `<tr><td class="pc-home">${GAME.homeTname}</td><td class="pc-label">시즌 평균 (${(h||a).gp}경기)</td><td class="pc-away">${GAME.awayTname}</td></tr>` +
+      matchupStatRow('경기당 득점', h, a, 'ppg', true, num1) +
+      matchupStatRow('경기당 실점', h, a, 'oppPpg', false, num1) +
+      matchupStatRow('3점 성공', h, a, 'threePg', true, num1) +
+      matchupStatRow('어시스트', h, a, 'astPg', true, num1) +
+      matchupStatRow('리바운드', h, a, 'rebPg', true, num1) +
+      matchupStatRow('스틸', h, a, 'stlPg', true, num1) +
+      matchupStatRow('블록', h, a, 'blkPg', true, num1) +
+      matchupStatRow('턴오버', h, a, 'tovPg', false, num1) +
+      `</table>`;
+  }
+
+  const scheduleHtml = `<div class="matchup-section-label">최근 결과 · 다음 일정</div>` +
+    `<div class="matchup-schedule-grid">` +
+    `<div class="sched-col home">${scheduleColHtml(GAME.homeTname, pd.home.schedule)}</div>` +
+    `<div class="sched-col away">${scheduleColHtml(GAME.awayTname, pd.away.schedule)}</div>` +
+    `</div>`;
+
+  const h2h = pd.h2h;
+  let h2hHtml = '';
+  if (h2h && h2h.recentMeetings && h2h.recentMeetings.length) {
+    const summary = `역대 맞대결 ${h2h.meetings}경기 - ${GAME.homeTname} ${h2h.homeWins}승, ${GAME.awayTname} ${h2h.awayWins}승`;
+    const rows = h2h.recentMeetings.slice().reverse().map(m => {
+      const homeIsGameHome = m.homeTcode === GAME.homeTcode;
+      const leftScore = homeIsGameHome ? m.homeScore : m.awayScore;
+      const rightScore = homeIsGameHome ? m.awayScore : m.homeScore;
+      const leftWin = leftScore > rightScore;
+      const dateStr = `${m.gameDate.slice(0, 4)}.${m.gameDate.slice(4, 6)}.${m.gameDate.slice(6, 8)}`;
+      return `<div class="matchup-row">
+        <span class="matchup-score ${leftWin ? 'win' : ''}">${leftScore}</span>
+        <span class="matchup-mid">${dateStr}</span>
+        <span class="matchup-score2 ${!leftWin ? 'win' : ''}">${rightScore}</span>
+      </div>`;
+    }).join('');
+    h2hHtml = `<div class="matchup-section-label">역대 맞대결</div><div class="matchup-summary">${summary}</div>${rows}`;
+  } else {
+    h2hHtml = `<div class="matchup-section-label">역대 맞대결</div><div class="matchup-empty">이 경기 이전 맞대결 기록 없음(첫 대결 또는 신생팀)</div>`;
+  }
+
+  el.matchupsBody.innerHTML = banner + compareHtml + scheduleHtml + h2hHtml;
 }
 
 // 리그 순위(요청: "리그 테이블 추가") - 이 경기 시점 기준 리크프리 스탠딩, 정규시즌만

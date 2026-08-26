@@ -26,6 +26,8 @@ from build_live_winprob_data import SCORE_CODES, cumulative_elapsed, load_pregam
 BASE = os.path.dirname(os.path.abspath(__file__))
 GAMES_DIR = os.path.join(BASE, "..", "raw", "games")
 ANALYSIS_DIR = os.path.join(BASE, "..", "raw", "analysis")
+SCHEDULE_DIR = os.path.join(BASE, "..", "raw", "schedule")
+SCHEDULE_FILES = ["list_20100901_20200901.json", "list_20200901_20260819.json"]
 MODEL_PATH = os.path.join(ANALYSIS_DIR, "live_winprob_model.joblib")
 OUT_PATH = os.path.join(ANALYSIS_DIR, "live_replay_demo.json")
 
@@ -140,7 +142,35 @@ def load_shot_chart(gmkey):
     return out
 
 
-def load_pregame_detail(gmkey, pregame_rows_by_gmkey, team_timelines, h2h, starters, combos5, standings, season_name):
+STAT_KEYS_LOWER_BETTER = {"oppPpg", "tovPg"}  # 랭킹 방향 - 실점/턴오버는 낮을수록 좋음
+SEASON_STAT_KEYS = ["ppg", "oppPpg", "threePg", "astPg", "rebPg", "stlPg", "blkPg", "tovPg"]
+
+
+def team_averages_asof(season_name, this_game_date, season_box):
+    """season_box에서 이 날짜 시점 기준(그 경기로 들어가기 전) 리크프리 스냅샷만 골라서
+    팀별로 하나씩 반환 - load_pregame_detail()의 기존 "리그 테이블" 스탠딩 조회와 동일한
+    eligible[-1] 패턴."""
+    out = {}
+    for tcode, snaps in season_box.get(season_name, {}).items():
+        eligible = [s for s in snaps if s["gameDate"] <= this_game_date]
+        if eligible:
+            out[tcode] = eligible[-1]
+    return out
+
+
+def compute_season_ranks(stats_asof):
+    """stat_key별로 표본이 있는(gp>0) 팀들만 순위 매김 - 표본 0인 팀(시즌 첫 경기 전)은
+    순위 계산에서 제외."""
+    ranked = {tc: s for tc, s in stats_asof.items() if s.get("gp", 0) > 0}
+    ranks = defaultdict(dict)
+    for key in SEASON_STAT_KEYS:
+        order = sorted(ranked.items(), key=lambda kv: kv[1][key], reverse=key not in STAT_KEYS_LOWER_BETTER)
+        for i, (tc, _) in enumerate(order):
+            ranks[tc][key] = i + 1
+    return ranks, len(ranked)
+
+
+def load_pregame_detail(gmkey, pregame_rows_by_gmkey, team_timelines, h2h, starters, combos5, standings, season_box, schedule_index, season_name):
     """이 경기의 pregame_training_table.json 행에서 "왜 이 팀이 약체/강체로 평가되는가"를
     설명하는 필드를 골라 임베드 + 직전 10경기 넷레이팅 개별값(트렌드 라인 차트용, 팀-시즌
     타임라인에서 이 경기 이전 최대 10개를 그대로 추출 - 새 계산 아니라 team_timelines 재사용).
@@ -206,11 +236,30 @@ def load_pregame_detail(gmkey, pregame_rows_by_gmkey, team_timelines, h2h, start
         table.append({"tcode": tcode, "wins": w, "losses": l, "pct": round(w / gp, 3) if gp else 0.0})
     table.sort(key=lambda r: -r["pct"])
 
+    # 매치업 페이지용 시즌 평균 + 리그 내 순위(정규시즌만, 리크프리) - team_averages_asof()가
+    # standings와 같은 패턴으로 이 경기 시점 스냅샷을 골라주고, compute_season_ranks()가
+    # 그 시점 전체 팀들 사이에서 순위를 매김.
+    season_box_asof = team_averages_asof(season_name, this_game_date, season_box)
+    season_ranks, ranked_team_count = compute_season_ranks(season_box_asof)
+
+    def season_stats_for(tcode):
+        snap = season_box_asof.get(tcode)
+        if not snap or snap.get("gp", 0) == 0:
+            return None
+        r = season_ranks.get(tcode, {})
+        out = {"gp": snap["gp"], "totalTeams": ranked_team_count}
+        for k in SEASON_STAT_KEYS:
+            out[k] = round(snap[k], 1)
+            out[k + "Rank"] = r.get(k)
+        return out
+
     return {
         "home": {**{k: row["home"].get(f"home_{k}") for k in keys}, "recentTrend": recent_trend(home_tcode),
-                 "startingLineupNetrtg": starting_lineup_netrtg(home_tcode)},
+                 "startingLineupNetrtg": starting_lineup_netrtg(home_tcode), "seasonStats": season_stats_for(home_tcode),
+                 "schedule": team_schedule_around(home_tcode, this_game_date, schedule_index)},
         "away": {**{k: row["away"].get(f"away_{k}") for k in keys}, "recentTrend": recent_trend(away_tcode),
-                 "startingLineupNetrtg": starting_lineup_netrtg(away_tcode)},
+                 "startingLineupNetrtg": starting_lineup_netrtg(away_tcode), "seasonStats": season_stats_for(away_tcode),
+                 "schedule": team_schedule_around(away_tcode, this_game_date, schedule_index)},
         "h2h": h2h_info,
         "standings": table,
         "standingsSeason": season_name,
@@ -227,11 +276,21 @@ def build_team_timelines_for_trend():
     - h2h: frozenset({tcodeA,tcodeB}) -> [(gmkey, gameDate, homeTcode, awayTcode, homeScore,
       awayScore, winnerTcode), ...] 날짜순 - "맞대결 기록"의 개별 경기 리스트용.
     - standings: seasonName -> tcode -> [{gmkey, wins, losses}] 날짜순 - "리그 테이블"용,
-      이 경기 시점 기준 리크프리 스탠딩(그 경기 포함 이전까지 누적)."""
+      이 경기 시점 기준 리크프리 스탠딩(그 경기 포함 이전까지 누적).
+
+    2026-08-27 확장(사용자 요청 - 매치업 페이지에 "PPG/3P/AST/REB/STL/BLK/TOV 비교" 추가):
+    - season_box: seasonName -> tcode -> [{gmkey, gameDate, gp, ppg, oppPpg, threePg, astPg,
+      rebPg, stlPg, blkPg, tovPg}] 날짜순 - standings와 완전히 같은 leak-free 패턴(그
+      경기 "들어가기 전" 누적 평균 스냅샷을 남긴 다음에 이번 경기 스탯을 더함). oppPpg는
+      team-record.json에 있는 애매한 필드(pscore 등)를 쓰지 않고, 같은 경기 상대팀의
+      실제 score 필드를 직접 사용."""
     timelines = defaultdict(list)
     h2h = defaultdict(list)
     standings = defaultdict(lambda: defaultdict(list))
+    season_box = defaultdict(lambda: defaultdict(list))
     season_wl = defaultdict(lambda: defaultdict(lambda: [0, 0]))  # seasonName -> tcode -> [wins, losses]
+    season_sum = defaultdict(lambda: defaultdict(lambda: {
+        "gp": 0, "pts": 0, "opp_pts": 0, "three_m": 0, "ast": 0, "reb": 0, "stl": 0, "blk": 0, "tov": 0}))
     games = []
     for gk in sorted(os.listdir(GAMES_DIR)):
         meta_path = os.path.join(GAMES_DIR, gk, "meta.json")
@@ -267,7 +326,68 @@ def build_team_timelines_for_trend():
                         wl[0] += 1
                     else:
                         wl[1] += 1
-    return timelines, h2h, standings
+
+                for tcode, opp_tcode in ((home_tcode, away_tcode), (away_tcode, home_tcode)):
+                    rec = by_tcode.get(tcode, {})
+                    opp_rec = by_tcode.get(opp_tcode, {})
+                    if rec.get("score") is None or opp_rec.get("score") is None:
+                        continue
+                    s = season_sum[season_name][tcode]
+                    gp = s["gp"]
+                    snap = {"gmkey": gk, "gameDate": gameDate, "gp": gp}
+                    if gp > 0:
+                        snap.update({
+                            "ppg": s["pts"] / gp, "oppPpg": s["opp_pts"] / gp, "threePg": s["three_m"] / gp,
+                            "astPg": s["ast"] / gp, "rebPg": s["reb"] / gp, "stlPg": s["stl"] / gp,
+                            "blkPg": s["blk"] / gp, "tovPg": s["tov"] / gp,
+                        })
+                    season_box[season_name][tcode].append(snap)
+                    s["gp"] += 1
+                    s["pts"] += rec.get("score", 0)
+                    s["opp_pts"] += opp_rec.get("score", 0)
+                    s["three_m"] += rec.get("threep", 0)
+                    s["ast"] += rec.get("ast", 0)
+                    s["reb"] += rec.get("rb", 0)
+                    s["stl"] += rec.get("stl", 0)
+                    s["blk"] += rec.get("bs", 0)
+                    s["tov"] += rec.get("to", 0)
+    return timelines, h2h, standings, season_box
+
+
+def build_schedule_index():
+    """매치업 페이지 "일정" 패널용(요청: Showstone의 부상자 명단 자리를 이 데이터로 대체 -
+    부상 데이터 자체가 이 데이터소스엔 없음). raw/schedule의 두 구간 파일(2010~2020,
+    2020~2026)을 합쳐 한 번만 파싱, tcode -> 날짜순 [{gameDate, opponentTcode, isHome,
+    scoreOwn, scoreOpp, isEnded}]로 캐싱. games/ 디렉토리(실제 치른 경기 상세)와 달리
+    이 일정 파일엔 아직 안 치른 예정 경기(isEnded=0)도 일부 섞여 있음."""
+    by_tcode = defaultdict(list)
+    for fn in SCHEDULE_FILES:
+        path = os.path.join(SCHEDULE_DIR, fn)
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            rows = json.load(f)
+        for r in rows:
+            gameDate, tcodeH, tcodeA = r.get("gameDate"), r.get("tcodeH"), r.get("tcodeA")
+            if not gameDate or not tcodeH or not tcodeA:
+                continue
+            for tcode, opp, is_home in ((tcodeH, tcodeA, True), (tcodeA, tcodeH, False)):
+                by_tcode[tcode].append({
+                    "gameDate": gameDate, "opponentTcode": opp, "isHome": is_home,
+                    "scoreOwn": r.get("scoreH") if is_home else r.get("scoreA"),
+                    "scoreOpp": r.get("scoreA") if is_home else r.get("scoreH"),
+                    "isEnded": r.get("isEnded") == 1,
+                })
+    for tcode in by_tcode:
+        by_tcode[tcode].sort(key=lambda x: x["gameDate"])
+    return by_tcode
+
+
+def team_schedule_around(tcode, this_game_date, schedule_index, n=3):
+    games = schedule_index.get(tcode, [])
+    recent = [g for g in games if g["gameDate"] < this_game_date][-n:]
+    upcoming = [g for g in games if g["gameDate"] > this_game_date][:n]
+    return {"recent": recent, "upcoming": upcoming}
 
 
 def build_historical_reference():
@@ -318,7 +438,7 @@ def historical_rarity(final_home, final_away, biggest_wpa_abs, ref):
     }
 
 
-def build_one_game(gmkey, model, pregame_ctx, pregame_rows_by_gmkey, team_timelines, combo_cache, onoff_cache, hist_ref, h2h, standings):
+def build_one_game(gmkey, model, pregame_ctx, pregame_rows_by_gmkey, team_timelines, combo_cache, onoff_cache, hist_ref, h2h, standings, season_box, schedule_index):
     ctx = pregame_ctx.get(gmkey)
     if ctx is None:
         print(f"  [건너뜀] {gmkey} - pregame_training_table.json에 없음(워밍업 구간 등)", flush=True)
@@ -424,7 +544,7 @@ def build_one_game(gmkey, model, pregame_ctx, pregame_rows_by_gmkey, team_timeli
     rarity = historical_rarity(final_home, final_away, abs(biggest["wpaHome"]), hist_ref)
     shot_chart = load_shot_chart(gmkey)
     pregame_detail = load_pregame_detail(gmkey, pregame_rows_by_gmkey, team_timelines, h2h, starters, combos_by_n[5],
-                                          standings, g.get("seasonName"))
+                                          standings, season_box, schedule_index, g.get("seasonName"))
 
     print(f"  {gmkey}: {home_tname} {final_home}:{final_away} {away_tname} "
           f"(최대스윙 {biggest['wpaHome']:+.3f}, 통산 {rarity['wpaSwingRank']}위)", flush=True)
@@ -466,16 +586,19 @@ def main():
         onoff_cache = {row["pcode"]: {"netRatingPer40": row["netRatingPer40"], "minutes": row["minutes"]} for row in json.load(f)}
 
     print("팀 넷레이팅 타임라인(폼 트렌드용) + 팀간 맞대결 전적 + 시즌 스탠딩 구성 중...", flush=True)
-    team_timelines, h2h, standings = build_team_timelines_for_trend()
+    team_timelines, h2h, standings, season_box = build_team_timelines_for_trend()
 
     print("전체 4207경기 히스토리 참조 캐시(마진분포/WPA랭킹) 구성 중...", flush=True)
     hist_ref = build_historical_reference()
+
+    print("팀별 일정(매치업 페이지 최근결과/다음일정용) 구성 중...", flush=True)
+    schedule_index = build_schedule_index()
 
     print(f"\n{len(DEMO_GMKEYS)}경기 리플레이 데이터 생성...", flush=True)
     games = {}
     game_list = []
     for gmkey in DEMO_GMKEYS:
-        result = build_one_game(gmkey, model, pregame_ctx, pregame_rows_by_gmkey, team_timelines, combo_cache, onoff_cache, hist_ref, h2h, standings)
+        result = build_one_game(gmkey, model, pregame_ctx, pregame_rows_by_gmkey, team_timelines, combo_cache, onoff_cache, hist_ref, h2h, standings, season_box, schedule_index)
         if result is None:
             continue
         games[gmkey] = result
