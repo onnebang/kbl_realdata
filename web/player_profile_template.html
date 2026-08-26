@@ -1,0 +1,475 @@
+<meta charset="utf-8">
+<title>선수 프로필</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+__FONT_BLOCK__
+<style>
+  :root {
+    --bg: #f4f5f8; --surface: #ffffff; --surface-soft: #eceef3;
+    --ink: #14161c; --ink-soft: #5b5f6e; --ink-faint: #9297a880;
+    --home: #d9640a; --home-soft: #d9640a1a;
+    --away: #1f6fd6; --away-soft: #1f6fd61a;
+    --gold: #9a6b00; --gold-soft: #9a6b0022;
+    --hot: #e8590c; --line-rgb: 20,22,28;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1115; --surface: #1a1d24; --surface-soft: #23272f;
+      --ink: #f2f3f7; --ink-soft: #9297a8; --ink-faint: #6a6f7f90;
+      --home: #ff8a3d; --home-soft: #ff8a3d26;
+      --away: #3ea6ff; --away-soft: #3ea6ff26;
+      --gold: #ffd166; --gold-soft: #ffd16626;
+      --hot: #ff8c5a; --line-rgb: 242,243,247;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1115; --surface: #1a1d24; --surface-soft: #23272f;
+    --ink: #f2f3f7; --ink-soft: #9297a8; --ink-faint: #6a6f7f90;
+    --home: #ff8a3d; --home-soft: #ff8a3d26;
+    --away: #3ea6ff; --away-soft: #3ea6ff26;
+    --gold: #ffd166; --gold-soft: #ffd16626;
+    --hot: #ff8c5a; --line-rgb: 242,243,247;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); }
+  .root { font-family: 'Pretendard', system-ui, -apple-system, sans-serif; color: var(--ink);
+    background: var(--bg); min-height: 100%; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 26px 18px 70px; }
+
+  .title { font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 26px; }
+  .subtitle { font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; max-width: 62ch; line-height: 1.6; }
+
+  .search-row { margin-top: 18px; position: relative; max-width: 360px; }
+  .search-row input { width: 100%; font-family: 'Pretendard', sans-serif; font-size: 13px; font-weight: 600;
+    padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(var(--line-rgb),0.16);
+    background: var(--surface); color: var(--ink); }
+  .entity-dropdown { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; max-height: 300px;
+    overflow-y: auto; background: var(--surface); border: 1px solid rgba(var(--line-rgb),0.16);
+    border-radius: 10px; box-shadow: 0 10px 24px rgba(0,0,0,0.16); z-index: 30; display: none; }
+  .entity-dropdown.show { display: block; }
+  .entity-opt { padding: 8px 12px; font-size: 12.5px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  .entity-opt:hover, .entity-opt.active { background: var(--surface-soft); }
+  .entity-opt .eo-team { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: inline-flex;
+    align-items: center; justify-content: center; font-size: 8px; font-weight: 700; color: #fff; overflow: hidden; }
+  .entity-opt .eo-team img { width: 100%; height: 100%; object-fit: contain; }
+  .entity-opt .eo-name { flex: 1; }
+  .entity-opt .eo-gp { color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; font-size: 10.5px; }
+  .empty-note { color: var(--ink-faint); font-size: 12.5px; padding: 30px 10px; text-align: center; }
+
+  #profileBody { display: none; margin-top: 22px; }
+  #profileBody.show { display: block; }
+
+  /* 선수 헤더 */
+  .p-header { display: flex; align-items: center; gap: 16px; background: var(--surface);
+    border: 1px solid rgba(var(--line-rgb),0.12); border-radius: 16px; padding: 18px 20px; }
+  .p-num { width: 56px; height: 56px; border-radius: 14px; background: var(--surface-soft);
+    display: flex; align-items: center; justify-content: center; font-family: "Big Shoulders Display", sans-serif;
+    font-size: 22px; font-weight: 800; color: var(--ink-faint); flex-shrink: 0; }
+  .p-name-block { flex: 1; min-width: 0; }
+  .p-name { font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 22px; line-height: 1.1; }
+  .p-meta { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 12px; color: var(--ink-soft); }
+  .p-team-badge { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center;
+    justify-content: center; font-size: 8.5px; font-weight: 700; color: #fff; overflow: hidden; flex-shrink: 0; }
+  .p-team-badge img { width: 100%; height: 100%; object-fit: contain; }
+  .p-gp { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-faint); flex-shrink: 0; }
+
+  /* 윈도우 토글 */
+  .window-row { display: flex; gap: 6px; margin: 18px 0 4px; }
+  button.wtoggle { font-family: "IBM Plex Mono", monospace; font-weight: 700; font-size: 12px;
+    padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(var(--line-rgb),0.16);
+    background: var(--surface); color: var(--ink-soft); cursor: pointer; }
+  button.wtoggle.active { background: var(--home); border-color: var(--home); color: #fff; }
+
+  .panel { margin-top: 14px; background: var(--surface); border: 1px solid rgba(var(--line-rgb),0.12);
+    border-radius: 14px; padding: 16px 18px; }
+  .panel-title { font-size: 11px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase;
+    letter-spacing: 0.03em; margin-bottom: 10px; }
+
+  /* 퍼포먼스 차트 */
+  .perf-chart-svg { width: 100%; height: 160px; display: block; }
+  .perf-legend { display: flex; gap: 14px; font-size: 11px; color: var(--ink-soft); margin-top: 6px; }
+  .perf-legend span { display: flex; align-items: center; gap: 5px; }
+  .perf-legend .sw { width: 9px; height: 9px; border-radius: 2px; }
+
+  /* 스탯 요약 그리드 */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 10px; }
+  .stat-tile { background: var(--surface-soft); border-radius: 10px; padding: 10px 8px; text-align: center; }
+  .stat-tile .sv { font-family: "Big Shoulders Display", sans-serif; font-size: 19px; font-weight: 700;
+    font-variant-numeric: tabular-nums; }
+  .stat-tile .sl { font-family: "IBM Plex Mono", monospace; font-size: 9px; color: var(--ink-faint);
+    text-transform: uppercase; margin-top: 2px; }
+
+  /* 테이블 공통 */
+  .table-scroll { overflow-x: auto; }
+  table.data-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+  table.data-table th { font-family: "IBM Plex Mono", monospace; font-size: 9.5px; color: var(--ink-faint);
+    text-transform: uppercase; font-weight: 600; text-align: right; padding: 6px 8px;
+    border-bottom: 1px solid rgba(var(--line-rgb),0.14); }
+  table.data-table th:first-child, table.data-table th:nth-child(2) { text-align: left; }
+  table.data-table td { padding: 6px 8px; text-align: right; border-bottom: 1px solid rgba(var(--line-rgb),0.07);
+    font-variant-numeric: tabular-nums; }
+  table.data-table td:first-child, table.data-table td:nth-child(2) { text-align: left; }
+  table.data-table tr.cur-season { background: var(--gold-soft); font-weight: 700; }
+  .gl-opp { display: flex; align-items: center; gap: 5px; }
+  .gl-result { font-weight: 700; }
+  .gl-result.win { color: var(--home); }
+  .gl-result.loss { color: var(--ink-faint); }
+
+  /* 슛 히트맵 */
+  .heat-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  select#heatSeason { font-family: 'Pretendard', sans-serif; font-size: 12px; font-weight: 600;
+    padding: 6px 9px; border-radius: 8px; border: 1px solid rgba(var(--line-rgb),0.16);
+    background: var(--surface); color: var(--ink); }
+  .court-tilt { perspective: 800px; max-width: 320px; margin: 0 auto; }
+  .court-svg { width: 100%; height: auto; display: block; border-radius: 8px; overflow: hidden;
+    background: #d9b98a; transform: rotateX(18deg); transform-origin: center bottom;
+    box-shadow: 0 12px 18px -8px rgba(0,0,0,0.3); }
+  .heat-stat { text-align: center; font-size: 12px; color: var(--ink-soft); font-family: "IBM Plex Mono", monospace;
+    margin-top: 8px; }
+
+  footer.foot { margin-top: 30px; padding-top: 14px; border-top: 1px solid rgba(var(--line-rgb),0.1);
+    color: var(--ink-faint); font-size: 11px; font-family: "IBM Plex Mono", monospace; line-height: 1.7; }
+
+  @media (max-width: 620px) {
+    .wrap { padding: 20px 12px 50px; }
+    .p-header { flex-wrap: wrap; }
+  }
+</style>
+
+<div class="root">
+<div class="wrap">
+  <div class="title">선수 프로필</div>
+  <div class="subtitle">커리어 10경기 이상 뛴 선수 627명 - 최근 30경기 게임로그, 시즌별 기록, 슛 분포를
+    한 곳에서 확인합니다.</div>
+
+  <div class="search-row">
+    <input type="text" id="entitySearch" placeholder="선수 이름 검색... (예: 허훈, 이정현)" autocomplete="off">
+    <div class="entity-dropdown" id="entityDropdown"></div>
+  </div>
+
+  <div id="profileEmpty" class="empty-note">선수를 검색해서 선택하세요.</div>
+
+  <div id="profileBody">
+    <div class="p-header">
+      <div class="p-num" id="pNum">-</div>
+      <div class="p-name-block">
+        <div class="p-name" id="pName">-</div>
+        <div class="p-meta">
+          <span class="p-team-badge" id="pTeamBadge"></span>
+          <span id="pTeamName">-</span><span>·</span><span id="pPos">-</span>
+        </div>
+      </div>
+      <div class="p-gp" id="pGp">-</div>
+    </div>
+
+    <div class="window-row" id="windowRow"></div>
+
+    <div class="panel">
+      <div class="panel-title">최근 경기 득점 · 출전시간</div>
+      <svg class="perf-chart-svg" id="perfChart" viewBox="0 0 640 160"></svg>
+      <div class="perf-legend">
+        <span><span class="sw" style="background:var(--home)"></span>득점(PTS)</span>
+        <span><span class="sw" style="background:var(--gold)"></span>출전시간(MIN)</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title" id="statGridTitle">선택 구간 평균</div>
+      <div class="stat-grid" id="statGrid"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">게임 로그</div>
+      <div class="table-scroll"><table class="data-table" id="gameLogTable"></table></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">시즌별 기록</div>
+      <div class="table-scroll"><table class="data-table" id="seasonTable"></table></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">슛 분포</div>
+      <div class="heat-row">
+        <label style="font-size:12px;color:var(--ink-soft)">시즌</label>
+        <select id="heatSeason"></select>
+      </div>
+      <div class="court-tilt"><svg class="court-svg" id="heatCourt" viewBox="345 27 375 357"></svg></div>
+      <div class="heat-stat" id="heatStat"></div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    2011-12~2025-26 15시즌 전체 경기 기준 · 커리어 10경기 미만 선수 제외 · 게임로그는 최근 30경기까지만
+    보관(용량 제한) · 슛 분포는 시즌당 시도 30회 미만이면 표시 안 함.
+  </footer>
+</div>
+</div>
+
+<script>
+const PLAYERS = __PLAYER_JSON__;
+const SHOT = __SHOT_JSON__;
+const TEAM_META = __TEAM_META_JSON__;
+const GRID = SHOT.grid;
+const HX = GRID.hoopX, HY = GRID.hoopY;
+const CELL_W = (GRID.xMax - GRID.xMin) / GRID.cols;
+const CELL_H = (GRID.yMax - GRID.yMin) / GRID.rows;
+
+// courtside_template.html / scoring_distribution_template.html과 동일한 FIBA 실측 좌표
+// 로직(독립 페이지라 그대로 복사).
+const THREE_PT_M = 6.75, FT_LINE_M = 5.80, LANE_HALF_M = 2.45, FT_CIRCLE_R_M = 1.80,
+  RESTRICTED_R_M = 1.25, THREE_SIDE_MARGIN_M = 0.90, SCALE_M_PER_UNIT = 0.0413;
+function drawCourtMarkings(hoopX, baselineX, dir, stroke, sw) {
+  const u = v => v / SCALE_M_PER_UNIT;
+  const midY = (GRID.yMin + GRID.yMax) / 2;
+  const laneFar = baselineX + dir * u(FT_LINE_M);
+  const laneTop = midY - u(LANE_HALF_M), laneBot = midY + u(LANE_HALF_M);
+  let svg = `<rect x="${Math.min(baselineX, laneFar)}" y="${laneTop}" width="${Math.abs(laneFar - baselineX)}" height="${laneBot - laneTop}" fill="none" stroke="${stroke}" stroke-width="${sw}"/>`;
+  svg += `<circle cx="${laneFar}" cy="${midY}" r="${u(FT_CIRCLE_R_M)}" fill="none" stroke="${stroke}" stroke-width="${sw}" opacity="0.75"/>`;
+  const rr = u(RESTRICTED_R_M);
+  const sweep = dir > 0 ? 1 : 0;
+  svg += `<path d="M ${hoopX} ${midY - rr} A ${rr} ${rr} 0 0 ${sweep} ${hoopX} ${midY + rr}" fill="none" stroke="${stroke}" stroke-width="${sw}" opacity="0.85"/>`;
+  const topY = GRID.yMin + u(THREE_SIDE_MARGIN_M), botY = GRID.yMax - u(THREE_SIDE_MARGIN_M);
+  const R = u(THREE_PT_M);
+  const dy = midY - topY;
+  const dx = Math.sqrt(Math.max(0, R * R - dy * dy));
+  const archX = hoopX + dir * dx;
+  svg += `<path d="M ${baselineX} ${topY} L ${archX} ${topY} A ${R} ${R} 0 0 ${sweep} ${archX} ${botY} L ${baselineX} ${botY}" fill="none" stroke="${stroke}" stroke-width="${sw}"/>`;
+  return svg;
+}
+function drawHoop(hx, hy) {
+  let svg = `<line x1="${hx + 13}" y1="${hy - 19}" x2="${hx + 13}" y2="${hy + 19}" stroke="var(--ink-soft)" stroke-width="4.5" stroke-linecap="round"/>`;
+  svg += `<circle cx="${hx}" cy="${hy}" r="9.5" fill="none" stroke="#e8590c" stroke-width="3.2"/>`;
+  return svg;
+}
+function cellsToGrid(cellsObj) {
+  const grid = Array.from({ length: GRID.rows }, () => Array(GRID.cols).fill(null));
+  for (const key in cellsObj) {
+    const [r, c] = key.split('_').map(Number);
+    grid[r][c] = cellsObj[key];
+  }
+  return grid;
+}
+
+function teamBadgeHtml(tcode, cls) {
+  const tm = TEAM_META[tcode] || { name: tcode, abbr: tcode, color: '#5b5f6e', logo: null };
+  return tm.logo ? `<img src="${tm.logo}" alt="${tm.abbr}">` : tm.abbr;
+}
+function teamBadgeStyle(tcode) {
+  const tm = TEAM_META[tcode] || { color: '#5b5f6e' };
+  return tm.logo ? '' : `background:${tm.color}`;
+}
+function teamName(tcode) { return (TEAM_META[tcode] || {}).name || tcode; }
+
+const el = {
+  entitySearch: document.getElementById('entitySearch'),
+  entityDropdown: document.getElementById('entityDropdown'),
+  profileEmpty: document.getElementById('profileEmpty'),
+  profileBody: document.getElementById('profileBody'),
+  pNum: document.getElementById('pNum'), pName: document.getElementById('pName'),
+  pTeamBadge: document.getElementById('pTeamBadge'), pTeamName: document.getElementById('pTeamName'),
+  pPos: document.getElementById('pPos'), pGp: document.getElementById('pGp'),
+  windowRow: document.getElementById('windowRow'),
+  perfChart: document.getElementById('perfChart'),
+  statGridTitle: document.getElementById('statGridTitle'), statGrid: document.getElementById('statGrid'),
+  gameLogTable: document.getElementById('gameLogTable'), seasonTable: document.getElementById('seasonTable'),
+  heatSeason: document.getElementById('heatSeason'), heatCourt: document.getElementById('heatCourt'),
+  heatStat: document.getElementById('heatStat'),
+};
+
+let currentPcode = null;
+let windowN = 15;
+const WINDOWS = [5, 10, 15, 30];
+
+function entityList() {
+  return Object.keys(PLAYERS).map(pcode => ({ pcode, ...PLAYERS[pcode] }))
+    .sort((a, b) => b.careerGp - a.careerGp);
+}
+
+function renderDropdown(filterText) {
+  const q = (filterText || '').trim();
+  const list = entityList();
+  const filtered = q ? list.filter(p => p.name && p.name.includes(q)) : list;
+  el.entityDropdown.innerHTML = filtered.slice(0, 60).map(p =>
+    `<div class="entity-opt" data-pcode="${p.pcode}">` +
+    `<span class="eo-team" style="${teamBadgeStyle(p.tcode)}">${teamBadgeHtml(p.tcode)}</span>` +
+    `<span class="eo-name">${p.name}</span><span class="eo-gp">${p.careerGp}경기</span></div>`
+  ).join('') || '<div class="entity-opt">검색 결과 없음</div>';
+}
+
+function fmtPct(v) { return v == null ? '-' : v.toFixed(1) + '%'; }
+function avg(games, key) { return games.length ? games.reduce((s, g) => s + g[key], 0) / games.length : 0; }
+
+function renderPerfChart(games) {
+  const W = 640, H = 160, PAD_L = 24, PAD_R = 8, PAD_T = 10, PAD_B = 18;
+  const plotW = W - PAD_L - PAD_R, plotH = H - PAD_T - PAD_B;
+  const n = games.length;
+  if (!n) { el.perfChart.innerHTML = ''; return; }
+  const maxPts = Math.max(10, ...games.map(g => g.pts));
+  const maxMin = Math.max(20, ...games.map(g => g.min));
+  const bw = plotW / n;
+  let svg = '';
+  games.forEach((g, i) => {
+    const bh = (g.pts / maxPts) * plotH;
+    const x = PAD_L + i * bw;
+    svg += `<rect x="${x + bw * 0.14}" y="${PAD_T + plotH - bh}" width="${bw * 0.72}" height="${bh}" fill="var(--home)" rx="2"><title>${g.gameDate}: ${g.pts}점</title></rect>`;
+  });
+  const linePts = games.map((g, i) => {
+    const x = PAD_L + i * bw + bw / 2;
+    const y = PAD_T + plotH - (g.min / maxMin) * plotH;
+    return `${x},${y}`;
+  });
+  svg += `<polyline points="${linePts.join(' ')}" fill="none" stroke="var(--gold)" stroke-width="2"/>`;
+  svg += `<line x1="${PAD_L}" y1="${PAD_T + plotH}" x2="${W - PAD_R}" y2="${PAD_T + plotH}" stroke="var(--ink-faint)" stroke-width="1"/>`;
+  svg += `<text x="2" y="${PAD_T + 8}" font-size="9" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${maxPts}</text>`;
+  svg += `<text x="2" y="${PAD_T + plotH}" font-size="9" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">0</text>`;
+  el.perfChart.innerHTML = svg;
+}
+
+function renderStatGrid(games) {
+  const gp = games.length;
+  const fgm = games.reduce((s, g) => s + g.fgm, 0), fga = games.reduce((s, g) => s + g.fga, 0);
+  const tpm = games.reduce((s, g) => s + g.tpm, 0), tpa = games.reduce((s, g) => s + g.tpa, 0);
+  const ftm = games.reduce((s, g) => s + g.ftm, 0), fta = games.reduce((s, g) => s + g.fta, 0);
+  const tiles = [
+    ['MIN', avg(games, 'min').toFixed(1)], ['PTS', avg(games, 'pts').toFixed(1)],
+    ['REB', avg(games, 'reb').toFixed(1)], ['AST', avg(games, 'ast').toFixed(1)],
+    ['STL', avg(games, 'stl').toFixed(1)], ['BLK', avg(games, 'blk').toFixed(1)],
+    ['TOV', avg(games, 'tov').toFixed(1)],
+    ['FG%', fga ? (fgm / fga * 100).toFixed(1) + '%' : '-'],
+    ['3P%', tpa ? (tpm / tpa * 100).toFixed(1) + '%' : '-'],
+    ['FT%', fta ? (ftm / fta * 100).toFixed(1) + '%' : '-'],
+  ];
+  el.statGrid.innerHTML = tiles.map(([l, v]) => `<div class="stat-tile"><div class="sv">${v}</div><div class="sl">${l}</div></div>`).join('');
+  el.statGridTitle.textContent = `최근 ${gp}경기 평균`;
+}
+
+function renderGameLog(games) {
+  const rows = games.slice().reverse().map(g => {
+    const dateStr = `${g.gameDate.slice(2, 4)}.${g.gameDate.slice(4, 6)}.${g.gameDate.slice(6, 8)}`;
+    const resultHtml = g.win == null ? '-' : `<span class="gl-result ${g.win ? 'win' : 'loss'}">${g.win ? 'W' : 'L'}</span>`;
+    const vs = g.isHome ? 'vs' : '@';
+    return `<tr>
+      <td>${dateStr}</td>
+      <td><span class="gl-opp">${vs} <span class="eo-team" style="width:16px;height:16px;font-size:7px;${teamBadgeStyle(g.opponentTcode)}">${teamBadgeHtml(g.opponentTcode)}</span>${teamName(g.opponentTcode)}</span></td>
+      <td>${resultHtml}</td>
+      <td>${g.min.toFixed(1)}</td><td>${g.pts}</td><td>${g.reb}</td><td>${g.ast}</td>
+      <td>${g.stl}</td><td>${g.blk}</td><td>${g.tov}</td>
+      <td>${g.fgm}/${g.fga}</td><td>${g.tpm}/${g.tpa}</td><td>${g.ftm}/${g.fta}</td>
+    </tr>`;
+  }).join('');
+  el.gameLogTable.innerHTML = `<thead><tr><th>날짜</th><th>상대</th><th>결과</th><th>MIN</th><th>PTS</th>
+    <th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TOV</th><th>FG</th><th>3P</th><th>FT</th></tr></thead>
+    <tbody>${rows}</tbody>`;
+}
+
+function renderSeasonTable(seasons, latestSeason) {
+  const rows = seasons.slice().reverse().map(s => `<tr class="${s.season === latestSeason ? 'cur-season' : ''}">
+      <td>${s.season}</td><td><span class="gl-opp"><span class="eo-team" style="width:16px;height:16px;font-size:7px;${teamBadgeStyle(s.tcode)}">${teamBadgeHtml(s.tcode)}</span>${teamName(s.tcode)}</span></td>
+      <td>${s.gp}</td><td>${s.minPg}</td><td>${s.ptsPg}</td><td>${s.rebPg}</td><td>${s.astPg}</td>
+      <td>${s.stlPg}</td><td>${s.blkPg}</td><td>${s.tovPg}</td>
+      <td>${fmtPct(s.fgPct)}</td><td>${fmtPct(s.tpPct)}</td><td>${fmtPct(s.ftPct)}</td>
+    </tr>`).join('');
+  el.seasonTable.innerHTML = `<thead><tr><th>시즌</th><th>팀</th><th>GP</th><th>MIN</th><th>PTS</th>
+    <th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TOV</th><th>FG%</th><th>3P%</th><th>FT%</th></tr></thead>
+    <tbody>${rows}</tbody>`;
+}
+
+function renderHeatmap(pcode, season) {
+  const shotPlayer = SHOT.players[pcode];
+  const cellsObj = shotPlayer && shotPlayer.seasons[season];
+  if (!cellsObj) {
+    el.heatCourt.innerHTML = '';
+    el.heatStat.textContent = '이 시즌 슛 표본 부족(30회 미만) 또는 데이터 없음';
+    return;
+  }
+  const grid = cellsToGrid(cellsObj.cells);
+  const maxAtt = Math.max(1, ...Object.values(cellsObj.cells).map(v => v[0]));
+  let svg = `<rect x="${GRID.xMin}" y="${GRID.yMin}" width="${GRID.xMax - GRID.xMin}" height="${GRID.yMax - GRID.yMin}" fill="#d9b98a" stroke="var(--ink-faint)" stroke-width="2"/>`;
+  for (let r = 0; r < GRID.rows; r++) {
+    for (let c = 0; c < GRID.cols; c++) {
+      const v = grid[r][c];
+      if (!v || v[0] === 0) continue;
+      const [att, made] = v;
+      const x = GRID.xMin + c * CELL_W, y = GRID.yMin + r * CELL_H;
+      const ratio = Math.pow(att / maxAtt, 0.6);
+      const pct = att ? Math.round(made / att * 100) : 0;
+      svg += `<rect x="${x}" y="${y}" width="${CELL_W}" height="${CELL_H}" fill="var(--hot)" opacity="${(ratio * 0.88).toFixed(2)}"><title>${att}회 시도, ${made}회 성공(${pct}%)</title></rect>`;
+    }
+  }
+  svg += drawCourtMarkings(HX, GRID.xMax, -1, '#fff', 1.4);
+  svg += drawHoop(HX, HY);
+  el.heatCourt.innerHTML = svg;
+  const pct = cellsObj.totalAtt ? Math.round(cellsObj.totalMade / cellsObj.totalAtt * 100) : 0;
+  el.heatStat.textContent = `${cellsObj.totalAtt.toLocaleString()}회 시도 · ${cellsObj.totalMade.toLocaleString()}회 성공 (${pct}%)`;
+}
+
+function renderWindowRow() {
+  el.windowRow.innerHTML = WINDOWS.map(w => `<button class="wtoggle ${w === windowN ? 'active' : ''}" data-w="${w}">L${w}</button>`).join('');
+}
+
+function renderForWindow() {
+  const p = PLAYERS[currentPcode];
+  const games = p.recentGames.slice(-windowN);
+  renderPerfChart(games);
+  renderStatGrid(games);
+  renderGameLog(games);
+}
+
+function pickPlayer(pcode) {
+  currentPcode = pcode;
+  const p = PLAYERS[pcode];
+  el.profileEmpty.style.display = 'none';
+  el.profileBody.classList.add('show');
+  el.entitySearch.value = p.name;
+
+  el.pNum.textContent = p.backNum ? '#' + p.backNum : '?';
+  el.pName.textContent = p.name;
+  el.pTeamBadge.innerHTML = teamBadgeHtml(p.tcode);
+  el.pTeamBadge.style.cssText = teamBadgeStyle(p.tcode);
+  el.pTeamName.textContent = teamName(p.tcode);
+  el.pPos.textContent = p.pos || '-';
+  el.pGp.textContent = `커리어 ${p.careerGp}경기`;
+
+  renderWindowRow();
+  renderForWindow();
+
+  const latestSeason = p.seasons.length ? p.seasons[p.seasons.length - 1].season : null;
+  renderSeasonTable(p.seasons, latestSeason);
+
+  const shotPlayer = SHOT.players[pcode];
+  const shotSeasons = shotPlayer ? Object.keys(shotPlayer.seasons).sort() : [];
+  if (shotSeasons.length) {
+    el.heatSeason.innerHTML = shotSeasons.map(s => `<option value="${s}">${s}</option>`).join('');
+    el.heatSeason.value = shotSeasons[shotSeasons.length - 1];
+    el.heatSeason.disabled = false;
+    renderHeatmap(pcode, el.heatSeason.value);
+  } else {
+    el.heatSeason.innerHTML = '<option>데이터 없음</option>';
+    el.heatSeason.disabled = true;
+    renderHeatmap(pcode, null);
+  }
+}
+
+el.entitySearch.addEventListener('input', () => { renderDropdown(el.entitySearch.value); el.entityDropdown.classList.add('show'); });
+el.entitySearch.addEventListener('focus', () => { renderDropdown(el.entitySearch.value); el.entityDropdown.classList.add('show'); });
+document.addEventListener('click', (e) => {
+  if (!el.entitySearch.contains(e.target) && e.target !== el.entitySearch && !el.entityDropdown.contains(e.target)) {
+    el.entityDropdown.classList.remove('show');
+  }
+});
+el.entityDropdown.addEventListener('click', (e) => {
+  const opt = e.target.closest('.entity-opt');
+  if (!opt || !opt.dataset.pcode) return;
+  pickPlayer(opt.dataset.pcode);
+  el.entityDropdown.classList.remove('show');
+});
+el.windowRow.addEventListener('click', (e) => {
+  const btn = e.target.closest('.wtoggle');
+  if (!btn) return;
+  windowN = Number(btn.dataset.w);
+  renderWindowRow();
+  renderForWindow();
+});
+el.heatSeason.addEventListener('change', () => renderHeatmap(currentPcode, el.heatSeason.value));
+</script>
