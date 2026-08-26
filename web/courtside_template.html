@@ -70,6 +70,24 @@
     padding: 18px 20px; position: sticky; top: 0; z-index: 40; box-shadow: 0 2px 10px rgba(0,0,0,0.06);
     margin: 0 -18px 14px; }
   @media (max-width: 640px) { .scoreboard { margin: 0 -12px 14px; border-radius: 0; } }
+
+  /* 스코어보드 축소 모드 - 스크롤로 stickySentinel을 지나가면 켜짐(JS의
+     IntersectionObserver). 풀사이즈(sb-full)는 숨기고 한 줄 요약(sb-compact)만 보여줌. */
+  .sb-compact { display: none; align-items: center; justify-content: space-between; gap: 8px; }
+  .scoreboard.compact { padding: 8px 14px; }
+  .scoreboard.compact .sb-compact { display: flex; }
+  .scoreboard.compact .sb-full { display: none; }
+  .sbc-side { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 0; }
+  .sbc-side.home { justify-content: flex-end; }
+  .sbc-side.away { justify-content: flex-start; }
+  .sbc-prob { font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .sbc-prob.home { color: var(--home); } .sbc-prob.away { color: var(--away); }
+  .sbc-team { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; min-width: 0; }
+  .sbc-team.home { color: var(--home); } .sbc-team.away { color: var(--away); }
+  .sbc-score { font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 18px; flex-shrink: 0; }
+  .sbc-clock { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--ink-faint);
+    white-space: nowrap; flex-shrink: 0; }
   .sb-top { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
   .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; }
   .live-dot.on { background: var(--live); animation: pulse 1.4s ease-in-out infinite; }
@@ -605,36 +623,55 @@
        스크롤하면 사라지고, 승률 막대(prob-section)는 아예 슛차트 밑까지 떨어져 있어서
        화면 하나에 두 개가 안 붙어있었음 - 승률 퍼센트/막대를 이 카드 안으로 옮기고,
        카드 전체를 sticky로 상단 고정. -->
+  <!-- 요청: "위에 보이는 화면이 너무 커, 스크롤을 내리면 작게 보여지면서
+       (승률/팀명/점수 시간/점수/팀명/승률)식으로 보이도록" - 맨 위에선 풀사이즈로 보이다가,
+       스크롤로 이 지점을 지나가면(sentinel이 화면 밖으로 나가면) sb-compact 한 줄로 축소. -->
+  <div id="stickySentinel" style="height:1px"></div>
   <div class="scoreboard" id="stickyBar">
-    <div class="sb-top">
-      <span class="live-dot" id="liveDot"></span>
-      <span class="clock" id="clockLabel">경기 시작 전</span>
-    </div>
-    <div class="sb-main">
-      <div class="team">
-        <div class="team-badge" id="homeBadge">-</div>
-        <div class="team-name home" id="homeNameLabel">-</div>
-        <div class="team-score" id="homeScoreLabel">0</div>
+    <div class="sb-compact" id="sbCompact">
+      <div class="sbc-side home">
+        <span class="sbc-prob home" id="sbcProbHome">-</span>
+        <span class="sbc-team home" id="sbcNameHome">-</span>
+        <span class="sbc-score" id="sbcScoreHome">0</span>
       </div>
-      <div class="sb-sep">:</div>
-      <div class="team">
-        <div class="team-badge" id="awayBadge">-</div>
-        <div class="team-name away" id="awayNameLabel">-</div>
-        <div class="team-score" id="awayScoreLabel">0</div>
+      <span class="sbc-clock" id="sbcClock">-</span>
+      <div class="sbc-side away">
+        <span class="sbc-score" id="sbcScoreAway">0</span>
+        <span class="sbc-team away" id="sbcNameAway">-</span>
+        <span class="sbc-prob away" id="sbcProbAway">-</span>
       </div>
     </div>
-    <div class="sb-badges" id="sbBadges"></div>
-    <div id="timeoutNote"></div>
-    <div class="right-now-strip" id="rightNowStrip"></div>
+    <div class="sb-full" id="sbFull">
+      <div class="sb-top">
+        <span class="live-dot" id="liveDot"></span>
+        <span class="clock" id="clockLabel">경기 시작 전</span>
+      </div>
+      <div class="sb-main">
+        <div class="team">
+          <div class="team-badge" id="homeBadge">-</div>
+          <div class="team-name home" id="homeNameLabel">-</div>
+          <div class="team-score" id="homeScoreLabel">0</div>
+        </div>
+        <div class="sb-sep">:</div>
+        <div class="team">
+          <div class="team-badge" id="awayBadge">-</div>
+          <div class="team-name away" id="awayNameLabel">-</div>
+          <div class="team-score" id="awayScoreLabel">0</div>
+        </div>
+      </div>
+      <div class="sb-badges" id="sbBadges"></div>
+      <div id="timeoutNote"></div>
+      <div class="right-now-strip" id="rightNowStrip"></div>
 
-    <div class="prob-pct-row">
-      <div><span class="prob-pct home" id="homeProbLabel">-</span><span class="prob-pct-label">승리확률</span></div>
-      <div style="text-align:right"><span class="prob-pct away" id="awayProbLabel">-</span><span class="prob-pct-label">승리확률</span></div>
+      <div class="prob-pct-row">
+        <div><span class="prob-pct home" id="homeProbLabel">-</span><span class="prob-pct-label">승리확률</span></div>
+        <div style="text-align:right"><span class="prob-pct away" id="awayProbLabel">-</span><span class="prob-pct-label">승리확률</span></div>
+      </div>
+      <div class="split-bar"><div class="split-home" id="splitHome" style="width:50%"></div><div class="split-away" id="splitAway" style="width:50%"></div></div>
+
+      <div class="quarter-table-wrap"><table class="quarter-table" id="quarterTable"></table></div>
     </div>
-    <div class="split-bar"><div class="split-home" id="splitHome" style="width:50%"></div><div class="split-away" id="splitAway" style="width:50%"></div></div>
     <div class="sb-mini-alert" id="miniAlert"></div>
-
-    <div class="quarter-table-wrap"><table class="quarter-table" id="quarterTable"></table></div>
   </div>
 
   <div class="espn-panel" id="leadersPanel"></div>
@@ -853,6 +890,13 @@ const el = {
   clockLabel: document.getElementById('clockLabel'),
   homeName: document.getElementById('homeNameLabel'),
   awayName: document.getElementById('awayNameLabel'),
+  sbcProbHome: document.getElementById('sbcProbHome'),
+  sbcProbAway: document.getElementById('sbcProbAway'),
+  sbcNameHome: document.getElementById('sbcNameHome'),
+  sbcNameAway: document.getElementById('sbcNameAway'),
+  sbcScoreHome: document.getElementById('sbcScoreHome'),
+  sbcScoreAway: document.getElementById('sbcScoreAway'),
+  sbcClock: document.getElementById('sbcClock'),
   homeScore: document.getElementById('homeScoreLabel'),
   awayScore: document.getElementById('awayScoreLabel'),
   homeProb: document.getElementById('homeProbLabel'),
@@ -947,6 +991,8 @@ function colorDist(hexA, hexB) {
 function applyStaticLabels() {
   el.homeName.textContent = GAME.homeTname;
   el.awayName.textContent = GAME.awayTname;
+  el.sbcNameHome.textContent = GAME.homeAbbr || GAME.homeTname;
+  el.sbcNameAway.textContent = GAME.awayAbbr || GAME.awayTname;
   el.courtHomeLabel.textContent = GAME.homeTname;
   el.courtAwayLabel.textContent = GAME.awayTname;
   el.scrubber.max = N - 1;
@@ -2180,6 +2226,12 @@ function render(idx, opts) {
   el.awayProb.textContent = (100 - hp) + '%';
   el.splitHome.style.width = hp + '%';
   el.splitAway.style.width = (100 - hp) + '%';
+  // 요청: "스크롤 내리면 (승률/팀명/점수 시간/점수/팀명/승률) 형태로 작게" - 축소 모드 값도 같이 갱신.
+  el.sbcScoreHome.textContent = row.homeScore;
+  el.sbcScoreAway.textContent = row.awayScore;
+  el.sbcClock.textContent = fmtClock(row);
+  el.sbcProbHome.textContent = hp + '%';
+  el.sbcProbAway.textContent = (100 - hp) + '%';
   updateChart(idx);
   updateChartNowCard(row);
   el.scrubIdx.textContent = `${idx} / ${N - 1}`;
@@ -2848,6 +2900,26 @@ el.gamePicker.innerHTML = ALL_DATA.gameList.map(g => {
   return `<option value="${g.gmkey}">${label}</option>`;
 }).join('');
 el.gamePicker.addEventListener('change', () => loadGame(ALL_DATA.games[el.gamePicker.value]));
+
+// 요청: "스크롤을 내리면 작게 보여지도록" - 스코어보드 바로 위 sentinel이 화면 밖으로
+// 나가는 순간(=스코어보드가 sticky로 붙어버린 순간)을 감지해서 축소 모드로 전환.
+const stickySentinelEl = document.getElementById('stickySentinel');
+const stickyScoreboardEl = document.getElementById('stickyBar');
+if (stickySentinelEl && stickyScoreboardEl) {
+  const updateCompact = () => {
+    const rect = stickySentinelEl.getBoundingClientRect();
+    stickyScoreboardEl.classList.toggle('compact', rect.bottom <= 0);
+  };
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(([entry]) => {
+      stickyScoreboardEl.classList.toggle('compact', !entry.isIntersecting);
+    }, { threshold: 0 }).observe(stickySentinelEl);
+  }
+  // 카카오톡 인앱브라우저 등 IntersectionObserver 동작이 들쭉날쭉한 웹뷰 대비 스크롤
+  // 이벤트로도 같은 걸 한 번 더 확인(이중화 - 어느 한쪽만 붙어도 정상 동작).
+  window.addEventListener('scroll', updateCompact, { passive: true });
+  updateCompact();
+}
 
 loadGame(ALL_DATA.games[ALL_DATA.gameList[0].gmkey]);
 el.gamePicker.value = ALL_DATA.gameList[0].gmkey;
