@@ -496,6 +496,51 @@
   .push-msg { font-size: 12px; color: var(--ink-soft); margin-top: 1px; line-height: 1.4;
     overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
+  /* 요청: "득점이 오르면 귀여운 효과(농구공 튀는 효과)와 함께 점수가 오르도록" */
+  .team-score { position: relative; }
+  @keyframes scorePop { 0% { transform: scale(1); } 35% { transform: scale(1.32); } 65% { transform: scale(0.94); } 100% { transform: scale(1); } }
+  .team-score.bump { animation: scorePop 0.5s ease; }
+  @keyframes ballBounce {
+    0%   { transform: translate(-50%, -34px); opacity: 1; }
+    22%  { transform: translate(-50%, 4px); }
+    32%  { transform: translate(-50%, -16px); }
+    46%  { transform: translate(-50%, 4px); }
+    56%  { transform: translate(-50%, -7px); }
+    68%  { transform: translate(-50%, 4px); }
+    76%  { transform: translate(-50%, -3px); }
+    86%  { transform: translate(-50%, 4px); }
+    100% { transform: translate(-50%, 4px); opacity: 0; }
+  }
+  .score-ball { position: absolute; left: 50%; top: 0; font-size: 20px; pointer-events: none;
+    animation: ballBounce 0.9s ease-out forwards; }
+
+  /* 요청: "승률이 올라도 좌측팀이면 좌측팀 선수가 등장해서 이름/활약상/퍼센티지" -
+     홈은 왼쪽에서, 원정은 오른쪽에서 슬라이드인하는 득점 카드. */
+  .score-burst-zone { position: fixed; top: 96px; z-index: 55; pointer-events: none;
+    width: min(62vw, 250px); }
+  .score-burst-zone.left { left: 0; }
+  .score-burst-zone.right { right: 0; }
+  .score-burst-card { background: var(--surface); border: 1px solid rgba(var(--line-rgb),0.14);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.18); padding: 9px 12px; display: flex; align-items: center;
+    gap: 9px; opacity: 0; }
+  .score-burst-zone.left .score-burst-card { border-radius: 0 14px 14px 0;
+    animation: burstInLeft 0.4s cubic-bezier(.2,.9,.25,1) forwards; }
+  .score-burst-zone.right .score-burst-card { border-radius: 14px 0 0 14px; flex-direction: row-reverse;
+    text-align: right; animation: burstInRight 0.4s cubic-bezier(.2,.9,.25,1) forwards; }
+  .score-burst-card.out { animation: burstOut 0.35s ease forwards !important; }
+  @keyframes burstInLeft { from { opacity: 0; transform: translateX(-100%); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes burstInRight { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes burstOut { to { opacity: 0; } }
+  .score-burst-photo { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+  .score-burst-photo-fallback { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center; background: var(--surface-soft); font-size: 12px;
+    font-weight: 700; color: var(--ink-faint); }
+  .score-burst-body { min-width: 0; }
+  .score-burst-name { font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .score-burst-tag { font-size: 10.5px; color: var(--ink-faint); }
+  .score-burst-prob { font-size: 11px; font-weight: 700; margin-top: 1px; }
+  @media (max-width: 640px) { .score-burst-zone { top: 84px; width: 56vw; } }
+
   @media (max-width: 640px) {
     .wrap { padding: 18px 12px 90px; }
     .team-score { font-size: 42px; }
@@ -610,6 +655,10 @@
 </svg>
 <div class="root">
 <div class="push-stack" id="pushStack" aria-live="polite"></div>
+<!-- 요청: "득점이 오르면 귀여운 효과와 함께... 승률이 올라도 좌측팀이면 좌측팀 선수가
+     등장해서 이름/활약상/퍼센티지" - 홈=왼쪽/원정=오른쪽에서 슬라이드인하는 득점 카드. -->
+<div class="score-burst-zone left" id="scoreBurstLeft"></div>
+<div class="score-burst-zone right" id="scoreBurstRight"></div>
 <div class="wrap">
 
   <div class="eyebrow-row">
@@ -940,6 +989,8 @@ const el = {
   modalClose: document.getElementById('modalClose'),
   shotChartSvg: document.getElementById('shotChartSvg'),
   pushStack: document.getElementById('pushStack'),
+  scoreBurstLeft: document.getElementById('scoreBurstLeft'),
+  scoreBurstRight: document.getElementById('scoreBurstRight'),
   gamePicker: document.getElementById('gamePicker'),
   footGameDate: document.getElementById('footGameDate'),
   rightNowStrip: document.getElementById('rightNowStrip'),
@@ -2939,6 +2990,52 @@ function pushNotify(icon, title, msg) {
   while (el.pushStack.children.length > 3) el.pushStack.removeChild(el.pushStack.firstChild);
 }
 
+// 요청: "득점이 오르면 귀여운 효과(농구공이 튀어오르는듯한 효과)와 함께 점수가 오르도록"
+function animateScoreBump(scoreEl) {
+  if (!scoreEl) return;
+  scoreEl.classList.remove('bump');
+  void scoreEl.offsetWidth; // 강제 리플로우 - 연속 득점 시 애니메이션이 재시작되도록
+  scoreEl.classList.add('bump');
+  const ball = document.createElement('span');
+  ball.className = 'score-ball';
+  ball.textContent = '🏀';
+  scoreEl.appendChild(ball);
+  setTimeout(() => ball.remove(), 950);
+}
+
+// 요청: "승률이 올라도 좌측팀이면 좌측팀 선수가 등장해서 이름, 활약상, 퍼센티지, 점수가
+// 오르는 효과" - 홈(왼쪽)/원정(오른쪽) 중 득점한 쪽에서 선수 카드가 슬라이드인.
+function showScoreBurst(isHome, pcode, activityLabel) {
+  const p = GAME.players[pcode];
+  if (!p) return;
+  const zone = isHome ? el.scoreBurstLeft : el.scoreBurstRight;
+  if (!zone) return;
+  const hp = Math.round(timeline[curIdx].homeProb * 100);
+  const probTxt = (isHome ? hp : 100 - hp) + '%';
+  const probColor = isHome ? 'var(--home)' : 'var(--away)';
+  const card = document.createElement('div');
+  card.className = 'score-burst-card';
+  card.innerHTML = `${playerPhotoHtml(pcode, 'score-burst-photo')}
+    <div class="score-burst-body">
+      <div class="score-burst-name">${p.name}</div>
+      <div class="score-burst-tag">${activityLabel}</div>
+      <div class="score-burst-prob" style="color:${probColor}">${probTxt} 승리확률</div>
+    </div>`;
+  zone.innerHTML = ''; // 한 번에 카드 하나만(연속 득점 시 겹치지 않게 이전 걸 즉시 교체)
+  zone.appendChild(card);
+  setTimeout(() => {
+    card.classList.add('out');
+    setTimeout(() => card.remove(), 400);
+  }, 2200);
+}
+
+function checkScoreAnimations(row) {
+  if (!SCORING_CODES_JS.has(row.action) || !row.pcode) return;
+  const isHome = row.team === GAME.homeTcode;
+  animateScoreBump(isHome ? el.homeScore : el.awayScore);
+  showScoreBurst(isHome, row.pcode, row.actionLabel);
+}
+
 function checkPushNotifications(row, idx) {
   // 결정적 순간(큰 WPA 스윙) - checkMoment와 같은 이유로 beneficiary 기준 확률/부호로 통일
   // (수혜팀이 원정팀일 때 homeProb를 그대로 쓰면 확률도 부호도 다 반대로 보였음).
@@ -2971,6 +3068,7 @@ function stepForward() {
   curIdx++;
   render(curIdx, { appendOnly: true });
   checkPushNotifications(timeline[curIdx], curIdx);
+  checkScoreAnimations(timeline[curIdx]);
 }
 function stepBack() {
   if (curIdx <= 0) return;
