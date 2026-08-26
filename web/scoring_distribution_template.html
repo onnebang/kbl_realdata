@@ -1,0 +1,332 @@
+<title>득점 분포 탐색기</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+__FONT_BLOCK__
+<style>
+  :root {
+    --bg: #f4f5f8; --surface: #ffffff; --surface-soft: #eceef3;
+    --ink: #14161c; --ink-soft: #5b5f6e; --ink-faint: #9297a880;
+    --hot: #e8590c; --line-rgb: 20,22,28;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1115; --surface: #1a1d24; --surface-soft: #23272f;
+      --ink: #f2f3f7; --ink-soft: #9297a8; --ink-faint: #6a6f7f90;
+      --hot: #ff8c5a; --line-rgb: 242,243,247;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1115; --surface: #1a1d24; --surface-soft: #23272f;
+    --ink: #f2f3f7; --ink-soft: #9297a8; --ink-faint: #6a6f7f90;
+    --hot: #ff8c5a; --line-rgb: 242,243,247;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); }
+  .root { font-family: 'Pretendard', system-ui, -apple-system, sans-serif; color: var(--ink);
+    background: var(--bg); min-height: 100%; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 28px 18px 80px; }
+
+  .title { font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 30px; line-height: 1.1; }
+  .subtitle { font-size: 13px; color: var(--ink-soft); max-width: 68ch; margin-top: 8px; line-height: 1.6; }
+
+  .panel { margin-top: 18px; background: var(--surface); border: 1px solid rgba(var(--line-rgb),0.12);
+    border-radius: 14px; padding: 16px 18px; }
+
+  .controls-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  select, input[type="text"] { font-family: 'Pretendard', sans-serif; font-size: 12.5px; font-weight: 600;
+    padding: 7px 10px; border-radius: 8px; border: 1px solid rgba(var(--line-rgb),0.16);
+    background: var(--surface); color: var(--ink); }
+  .entity-search-wrap { position: relative; flex: 1 1 180px; min-width: 140px; }
+  .entity-search-wrap input { width: 100%; }
+  .entity-dropdown { position: absolute; top: 100%; left: 0; right: 0; margin-top: 2px; max-height: 240px;
+    overflow-y: auto; background: var(--surface); border: 1px solid rgba(var(--line-rgb),0.16);
+    border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); z-index: 20; display: none; }
+  .entity-dropdown.show { display: block; }
+  .entity-opt { padding: 7px 10px; font-size: 12.5px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+  .entity-opt:hover, .entity-opt.active { background: var(--surface-soft); }
+  .entity-opt .n { color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; font-size: 10.5px; flex-shrink: 0; }
+  .compare-label { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-soft);
+    cursor: pointer; white-space: nowrap; }
+
+  .season-controls { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  button.sctl { font-family: 'Pretendard', sans-serif; font-weight: 700; font-size: 12.5px;
+    border: 1px solid rgba(var(--line-rgb),0.16); background: var(--surface); color: var(--ink);
+    border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+  button.sctl:hover { background: var(--surface-soft); }
+  button.sctl.active { background: var(--hot); color: #fff; border-color: var(--hot); }
+  #seasonSlider { flex: 1; }
+  #seasonLabel { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; font-weight: 700;
+    min-width: 82px; text-align: right; }
+
+  .courts-wrap { display: flex; gap: 14px; margin-top: 14px; flex-wrap: wrap; }
+  .court-block { flex: 1 1 260px; min-width: 240px; }
+  .court-label { font-size: 12.5px; font-weight: 700; margin-bottom: 6px; }
+  .court-tilt { perspective: 800px; }
+  .court-svg { width: 100%; height: auto; display: block; border-radius: 8px; overflow: hidden;
+    background: #d9b98a; transform: rotateX(18deg); transform-origin: center bottom;
+    box-shadow: 0 12px 18px -8px rgba(0,0,0,0.3); }
+  .stat-line { margin-top: 8px; font-size: 12px; color: var(--ink-soft); font-family: "IBM Plex Mono", monospace; }
+  .empty-note { color: var(--ink-faint); font-size: 12.5px; padding: 30px 10px; text-align: center; }
+
+  .legend-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 10.5px;
+    color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; }
+  .legend-bar { flex: 1; max-width: 140px; height: 8px; border-radius: 4px;
+    background: linear-gradient(90deg, transparent, var(--hot)); }
+
+  footer.foot { margin-top: 24px; padding-top: 14px; border-top: 1px solid rgba(var(--line-rgb),0.1);
+    color: var(--ink-faint); font-size: 11px; font-family: "IBM Plex Mono", monospace; line-height: 1.7; }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 20px 12px 60px; }
+    .title { font-size: 24px; }
+  }
+</style>
+
+<div class="root">
+<div class="wrap">
+  <div class="title">득점 분포 탐색기</div>
+  <div class="subtitle">감독·선수·팀별로 슛을 어느 구역에서 얼마나 시도했는지, 시즌이 지나며 그
+    패턴이 어떻게 바뀌었는지 - 코트를 15x15 칸으로 나눠 시도 밀도를 열지도(짙을수록 시도 많음)로
+    보여줌. ▶ 재생을 누르면 시즌 순서대로 자동 전환됨.</div>
+
+  <div class="panel">
+    <div class="controls-row">
+      <select id="dimSelect">
+        <option value="team">팀별</option>
+        <option value="player">선수별</option>
+        <option value="coach">감독별</option>
+        <option value="league">리그 전체</option>
+      </select>
+      <div class="entity-search-wrap" id="entitySearchWrap">
+        <input type="text" id="entitySearch" placeholder="검색...">
+        <div class="entity-dropdown" id="entityDropdown"></div>
+      </div>
+      <label class="compare-label"><input type="checkbox" id="compareLeague"> 리그 평균과 비교</label>
+    </div>
+
+    <div class="season-controls">
+      <button class="sctl" id="btnPrev">◀</button>
+      <button class="sctl" id="btnPlay">▶ 재생</button>
+      <button class="sctl" id="btnNext">▶</button>
+      <input type="range" id="seasonSlider" min="0" max="0" value="0" step="1">
+      <span id="seasonLabel">-</span>
+    </div>
+
+    <div class="courts-wrap">
+      <div class="court-block">
+        <div class="court-label" id="mainLabel">-</div>
+        <div class="court-tilt"><svg class="court-svg" id="courtMain" viewBox="345 27 375 357"></svg></div>
+        <div class="stat-line" id="statMain"></div>
+      </div>
+      <div class="court-block" id="compareBlock" style="display:none">
+        <div class="court-label">리그 평균</div>
+        <div class="court-tilt"><svg class="court-svg" id="courtCompare" viewBox="345 27 375 357"></svg></div>
+        <div class="stat-line" id="statCompare"></div>
+      </div>
+    </div>
+    <div class="legend-row"><span>적음</span><span class="legend-bar"></span><span>시도 많음</span></div>
+  </div>
+
+  <footer class="foot">
+    15시즌(2011-12~2025-26) 전체 슛차트 기반 · (엔티티,시즌) 조합 중 시도 30회 미만은
+    표본 부족으로 제외 · 반코트 기준(원정 슛도 미러링해서 한 골대로 정규화).
+  </footer>
+</div>
+</div>
+
+<script>
+const DATA = __DIST_JSON__;
+const GRID = DATA.grid;
+const HX = GRID.hoopX, HY = GRID.hoopY;
+const CELL_W = (GRID.xMax - GRID.xMin) / GRID.cols;
+const CELL_H = (GRID.yMax - GRID.yMin) / GRID.rows;
+
+// courtside_template.html의 drawCourtMarkings()와 동일한 FIBA 실측 좌표 로직(독립 페이지라 그대로 복사).
+const THREE_PT_M = 6.75, FT_LINE_M = 5.80, LANE_HALF_M = 2.45, FT_CIRCLE_R_M = 1.80,
+  RESTRICTED_R_M = 1.25, THREE_SIDE_MARGIN_M = 0.90, SCALE_M_PER_UNIT = 0.0413;
+function drawCourtMarkings(hoopX, baselineX, dir, stroke, sw) {
+  const u = v => v / SCALE_M_PER_UNIT;
+  const midY = (GRID.yMin + GRID.yMax) / 2;
+  const laneFar = baselineX + dir * u(FT_LINE_M);
+  const laneTop = midY - u(LANE_HALF_M), laneBot = midY + u(LANE_HALF_M);
+  let svg = `<rect x="${Math.min(baselineX, laneFar)}" y="${laneTop}" width="${Math.abs(laneFar - baselineX)}" height="${laneBot - laneTop}" fill="none" stroke="${stroke}" stroke-width="${sw}"/>`;
+  svg += `<circle cx="${laneFar}" cy="${midY}" r="${u(FT_CIRCLE_R_M)}" fill="none" stroke="${stroke}" stroke-width="${sw}" opacity="0.75"/>`;
+  const rr = u(RESTRICTED_R_M);
+  const sweep = dir > 0 ? 1 : 0;
+  svg += `<path d="M ${hoopX} ${midY - rr} A ${rr} ${rr} 0 0 ${sweep} ${hoopX} ${midY + rr}" fill="none" stroke="${stroke}" stroke-width="${sw}" opacity="0.85"/>`;
+  const topY = GRID.yMin + u(THREE_SIDE_MARGIN_M), botY = GRID.yMax - u(THREE_SIDE_MARGIN_M);
+  const R = u(THREE_PT_M);
+  const dy = midY - topY;
+  const dx = Math.sqrt(Math.max(0, R * R - dy * dy));
+  const archX = hoopX + dir * dx;
+  svg += `<path d="M ${baselineX} ${topY} L ${archX} ${topY} A ${R} ${R} 0 0 ${sweep} ${archX} ${botY} L ${baselineX} ${botY}" fill="none" stroke="${stroke}" stroke-width="${sw}"/>`;
+  return svg;
+}
+function drawHoop(hx, hy) {
+  let svg = `<line x1="${hx + 13}" y1="${hy - 19}" x2="${hx + 13}" y2="${hy + 19}" stroke="var(--ink-soft)" stroke-width="4.5" stroke-linecap="round"/>`;
+  svg += `<circle cx="${hx}" cy="${hy}" r="9.5" fill="none" stroke="#e8590c" stroke-width="3.2"/>`;
+  return svg;
+}
+
+const el = {
+  dimSelect: document.getElementById('dimSelect'),
+  entitySearch: document.getElementById('entitySearch'),
+  entitySearchWrap: document.getElementById('entitySearchWrap'),
+  entityDropdown: document.getElementById('entityDropdown'),
+  compareLeague: document.getElementById('compareLeague'),
+  btnPrev: document.getElementById('btnPrev'),
+  btnPlay: document.getElementById('btnPlay'),
+  btnNext: document.getElementById('btnNext'),
+  seasonSlider: document.getElementById('seasonSlider'),
+  seasonLabel: document.getElementById('seasonLabel'),
+  mainLabel: document.getElementById('mainLabel'),
+  courtMain: document.getElementById('courtMain'),
+  statMain: document.getElementById('statMain'),
+  compareBlock: document.getElementById('compareBlock'),
+  courtCompare: document.getElementById('courtCompare'),
+  statCompare: document.getElementById('statCompare'),
+};
+
+let currentEntityKey = null;
+let currentSeasons = [];
+let seasonIdx = 0;
+let playing = false;
+let playTimer = null;
+
+function entityListFor(dim) {
+  const bucket = DATA[dim] || {};
+  return Object.keys(bucket).map(key => {
+    const e = bucket[key];
+    const totalAtt = Object.values(e.seasons).reduce((s, sv) => s + sv.totalAtt, 0);
+    return { key, name: e.name, totalAtt };
+  }).sort((a, b) => b.totalAtt - a.totalAtt);
+}
+
+function renderDropdown(filterText) {
+  const dim = el.dimSelect.value;
+  const list = entityListFor(dim);
+  const q = (filterText || '').trim();
+  const filtered = q ? list.filter(e => e.name.includes(q)) : list;
+  el.entityDropdown.innerHTML = filtered.slice(0, 60).map(e =>
+    `<div class="entity-opt" data-key="${e.key}"><span>${e.name}</span><span class="n">${e.totalAtt.toLocaleString()}회</span></div>`
+  ).join('') || '<div class="entity-opt">검색 결과 없음</div>';
+}
+
+function pickEntity(dim, key) {
+  currentEntityKey = key;
+  const e = DATA[dim][key];
+  currentSeasons = Object.keys(e.seasons).sort();
+  seasonIdx = currentSeasons.length - 1; // 최신 시즌부터
+  el.seasonSlider.max = Math.max(0, currentSeasons.length - 1);
+  el.seasonSlider.value = seasonIdx;
+  el.mainLabel.textContent = e.name;
+  el.entitySearch.value = e.name;
+  render();
+}
+
+function cellsToGrid(cellsObj) {
+  const grid = Array.from({ length: GRID.rows }, () => Array(GRID.cols).fill(null));
+  for (const key in cellsObj) {
+    const [r, c] = key.split('_').map(Number);
+    grid[r][c] = cellsObj[key];
+  }
+  return grid;
+}
+
+function renderCourtSvg(svgEl, cellsObj, statEl) {
+  if (!cellsObj) {
+    svgEl.innerHTML = '';
+    statEl.innerHTML = '<span class="empty-note">이 시즌 표본 부족(30회 미만) 또는 데이터 없음</span>';
+    return;
+  }
+  const grid = cellsToGrid(cellsObj.cells);
+  const maxAtt = Math.max(1, ...Object.values(cellsObj.cells).map(v => v[0]));
+
+  let svg = `<rect x="${GRID.xMin}" y="${GRID.yMin}" width="${GRID.xMax - GRID.xMin}" height="${GRID.yMax - GRID.yMin}" fill="#d9b98a" stroke="var(--ink-faint)" stroke-width="2"/>`;
+  for (let r = 0; r < GRID.rows; r++) {
+    for (let c = 0; c < GRID.cols; c++) {
+      const v = grid[r][c];
+      if (!v || v[0] === 0) continue;
+      const [att, made] = v;
+      const x = GRID.xMin + c * CELL_W, y = GRID.yMin + r * CELL_H;
+      const ratio = Math.pow(att / maxAtt, 0.6);
+      const pct = att ? Math.round(made / att * 100) : 0;
+      svg += `<rect x="${x}" y="${y}" width="${CELL_W}" height="${CELL_H}" fill="var(--hot)" opacity="${(ratio * 0.88).toFixed(2)}"><title>${att}회 시도, ${made}회 성공(${pct}%)</title></rect>`;
+    }
+  }
+  svg += drawCourtMarkings(HX, GRID.xMax, -1, '#fff', 1.4);
+  svg += drawHoop(HX, HY);
+  svgEl.innerHTML = svg;
+
+  const pct = cellsObj.totalAtt ? Math.round(cellsObj.totalMade / cellsObj.totalAtt * 100) : 0;
+  statEl.textContent = `${cellsObj.totalAtt.toLocaleString()}회 시도 · ${cellsObj.totalMade.toLocaleString()}회 성공 (${pct}%)`;
+}
+
+function render() {
+  if (!currentEntityKey || !currentSeasons.length) return;
+  const dim = el.dimSelect.value;
+  const season = currentSeasons[seasonIdx];
+  el.seasonLabel.textContent = season;
+  const entity = DATA[dim][currentEntityKey];
+  renderCourtSvg(el.courtMain, entity.seasons[season], el.statMain);
+
+  if (el.compareLeague.checked) {
+    el.compareBlock.style.display = '';
+    const league = DATA.league.league;
+    renderCourtSvg(el.courtCompare, league ? league.seasons[season] : null, el.statCompare);
+  } else {
+    el.compareBlock.style.display = 'none';
+  }
+}
+
+el.dimSelect.addEventListener('change', () => {
+  el.entitySearch.value = '';
+  const list = entityListFor(el.dimSelect.value);
+  if (list.length) pickEntity(el.dimSelect.value, list[0].key);
+});
+el.entitySearch.addEventListener('input', () => {
+  renderDropdown(el.entitySearch.value);
+  el.entityDropdown.classList.add('show');
+});
+el.entitySearch.addEventListener('focus', () => {
+  renderDropdown(el.entitySearch.value);
+  el.entityDropdown.classList.add('show');
+});
+document.addEventListener('click', (e) => {
+  if (!el.entitySearchWrap?.contains(e.target) && e.target !== el.entitySearch) el.entityDropdown.classList.remove('show');
+});
+el.entityDropdown.addEventListener('click', (e) => {
+  const opt = e.target.closest('.entity-opt');
+  if (!opt || !opt.dataset.key) return;
+  pickEntity(el.dimSelect.value, opt.dataset.key);
+  el.entityDropdown.classList.remove('show');
+});
+el.compareLeague.addEventListener('change', render);
+el.seasonSlider.addEventListener('input', () => { seasonIdx = Number(el.seasonSlider.value); render(); });
+el.btnPrev.addEventListener('click', () => { pause(); seasonIdx = Math.max(0, seasonIdx - 1); el.seasonSlider.value = seasonIdx; render(); });
+el.btnNext.addEventListener('click', () => { pause(); seasonIdx = Math.min(currentSeasons.length - 1, seasonIdx + 1); el.seasonSlider.value = seasonIdx; render(); });
+
+function play() {
+  if (playing) return;
+  playing = true;
+  el.btnPlay.textContent = '⏸ 정지';
+  el.btnPlay.classList.add('active');
+  playTimer = setInterval(() => {
+    seasonIdx++;
+    if (seasonIdx >= currentSeasons.length) seasonIdx = 0;
+    el.seasonSlider.value = seasonIdx;
+    render();
+  }, 1100);
+}
+function pause() {
+  playing = false;
+  el.btnPlay.textContent = '▶ 재생';
+  el.btnPlay.classList.remove('active');
+  clearInterval(playTimer);
+}
+el.btnPlay.addEventListener('click', () => playing ? pause() : play());
+
+// 초기 진입 - 팀별, 시도 최다 팀부터
+const initialList = entityListFor('team');
+if (initialList.length) pickEntity('team', initialList[0].key);
+</script>
