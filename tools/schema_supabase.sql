@@ -179,6 +179,8 @@ create table game_events (
   away_lineup    text[],
   home_win_prob  real,
   wpa_home       real,                 -- 직전 이벤트 대비 변화량
+  objective_prob real,                 -- 중립 코트(홈어드밴티지 제거) 기준 승률 - AI 프리뷰의
+                                        -- "객관적 승률"이 쓰는 값, 실제 UI에서 이미 쓰고 있어서 추가
   primary key (gmkey, event_order)
 );
 create index idx_events_gmkey on game_events(gmkey);
