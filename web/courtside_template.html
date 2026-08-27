@@ -388,6 +388,14 @@
   .shot-legend { display: flex; gap: 14px; margin-top: 8px; font-size: 11px; color: var(--ink-soft); }
   .shot-legend span { display: inline-flex; align-items: center; gap: 4px; }
 
+  /* 슛 흐름 애니메이션(요청: "쿼터별 슛 애니메이션") - 트래킹 데이터가 없어서 실제 이동
+     경로는 못 만들지만, 이미 있는 슛 시도 좌표를 시간순으로 하나씩 등장시켜 "이 선수가
+     쿼터가 지나며 어디서 던졌는지"의 흐름은 보여줄 수 있음(26차 리서치 결론의 대안). */
+  .shot-anim-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .shot-anim-row .tbtn { font-size: 12px; padding: 7px 12px; }
+  .shot-anim-label { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-faint); }
+  .shot-anim-label .q-badge { color: var(--gold); font-weight: 700; }
+
   /* 승률 히어로 */
   .prob-section { margin-top: 22px; }
   .prob-pct-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
@@ -963,6 +971,10 @@
       <span><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg> 성공</span>
       <span><svg width="10" height="10"><line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="2"/><line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="2"/></svg> 실패</span>
     </div>
+    <div class="shot-anim-row" id="shotAnimRow">
+      <button class="tbtn play" id="shotAnimPlay">▶ 슛 흐름 재생</button>
+      <span class="shot-anim-label" id="shotAnimLabel"></span>
+    </div>
     <div class="modal-sub" style="margin-top:8px;margin-bottom:0">현재 쿼터까지의 슛만 표시(문자중계·슛차트가 정확히 같은 시각 단위로 안 맞아있어 쿼터 단위로만 동기화)</div>
   </div>
 </div>
@@ -1034,6 +1046,9 @@ const el = {
   modalStatGrid: document.getElementById('modalStatGrid'),
   modalClose: document.getElementById('modalClose'),
   shotChartSvg: document.getElementById('shotChartSvg'),
+  shotAnimRow: document.getElementById('shotAnimRow'),
+  shotAnimPlay: document.getElementById('shotAnimPlay'),
+  shotAnimLabel: document.getElementById('shotAnimLabel'),
   pushStack: document.getElementById('pushStack'),
   scoreBurstLeft: document.getElementById('scoreBurstLeft'),
   scoreBurstRight: document.getElementById('scoreBurstRight'),
@@ -2524,11 +2539,15 @@ function hotPlayerTacticalNote(pcode, uptoQuarter) {
   return `${bestKey}에서 ${st.made}/${st.att}(${pct}%) - 이 구역을 막아야 합니다.`;
 }
 
-function drawShotChart(pcode, uptoQuarter) {
+// revealCount 생략 시(기존 동작, 다른 호출부 그대로 호환) 전체 슛 표시. 지정하면 시간순
+// 앞에서부터 그만큼만 그려서 슛 흐름 애니메이션(playShotAnim)이 한 개씩 더해가는 데 씀.
+// 반환값(shots 배열)은 애니메이션이 총 스텝 수/각 스텝의 쿼터를 알아야 해서 노출.
+function drawShotChart(pcode, uptoQuarter, revealCount) {
   const maxRank = uptoQuarter === null ? -1 : quarterRank(uptoQuarter);
   const rawShots = (GAME.shotChart[pcode] || []).filter(s => quarterRank(s.q) <= maxRank);
   // 왼쪽 골대(d='2') 슛은 오른쪽 골대 기준으로 좌우반전해서 반코트 하나에 전부 모음
-  const shots = rawShots.map(s => s.d === '2' ? { ...s, x: 750 - s.x } : s);
+  const allShots = rawShots.map(s => s.d === '2' ? { ...s, x: 750 - s.x } : s);
+  const shots = revealCount === undefined ? allShots : allShots.slice(0, revealCount);
   const p = GAME.players[pcode];
   const teamColorVar = p.tcode === GAME.homeTcode ? 'var(--home)' : 'var(--away)';
 
@@ -2546,18 +2565,22 @@ function drawShotChart(pcode, uptoQuarter) {
 
   const zoneAgg = {};
   for (const z of ZONE_BOUNDS_M) zoneAgg[z[0]] = { made: 0, att: 0 };
-  for (const s of shots) {
+  shots.forEach((s, i) => {
     const made = s.o === 'O';
     const zone = classifyZone(shotDistM(s.x, s.y))[0];
     zoneAgg[zone].att++;
     if (made) zoneAgg[zone].made++;
+    // 애니메이션 진행 중(revealCount 지정) 방금 막 그려진 슛만 골드 링으로 강조해서
+    // "지금 여기서 던졌다"는 흐름이 눈에 보이게 함.
+    const isLatest = revealCount !== undefined && i === shots.length - 1;
+    if (isLatest) svg += `<circle cx="${s.x}" cy="${s.y}" r="11" fill="none" stroke="var(--gold)" stroke-width="2"><animate attributeName="r" values="7;13;11" dur="0.5s"/><animate attributeName="opacity" values="1;0.5;0.9" dur="0.5s"/></circle>`;
     if (made) {
       svg += `<circle cx="${s.x}" cy="${s.y}" r="6" fill="${teamColorVar}" opacity="0.85"/>`;
     } else {
       svg += `<line x1="${s.x-5}" y1="${s.y-5}" x2="${s.x+5}" y2="${s.y+5}" stroke="${teamColorVar}" stroke-width="2" opacity="0.55"/>` +
              `<line x1="${s.x-5}" y1="${s.y+5}" x2="${s.x+5}" y2="${s.y-5}" stroke="${teamColorVar}" stroke-width="2" opacity="0.55"/>`;
     }
-  }
+  });
 
   // 구역별 성공률 라벨 - 각 구역 링의 중간 반지름 위치, 코트 하단쪽에 배치
   const labelPos = { rim: [HX, HY + 30], close: [HX, HY + 78], midShort: [HX, HY + 128], midLong: [HX, HY + 175], three: [HX, VY0 + 14] };
@@ -2571,7 +2594,53 @@ function drawShotChart(pcode, uptoQuarter) {
   }
 
   el.shotChartSvg.innerHTML = svg;
+  return allShots;
 }
+
+// 슛 흐름 애니메이션(요청: "쿼터별 슛 애니메이션" - 26차 리서치에서 진짜 선수 트래킹은
+// 데이터가 없어 불가능하다고 결론낸 대신 나온 대안) - 이미 있는 슛 시도 좌표를 시간순으로
+// 하나씩 드러내서, 이 선수가 쿼터가 지나며 어디서 던졌는지 흐름을 보여줌. 라이브 재생
+// 커서(curIdx)와는 별개의 로컬 애니메이션이라 모달을 닫으면 반드시 정리해야 함(안 그러면
+// setInterval이 백그라운드에 남아 다음 모달에 영향을 줌).
+let shotAnimTimer = null, shotAnimPlaying = false, shotAnimPcode = null, shotAnimUptoQuarter = null;
+const SHOT_ANIM_STEP_MS = 550;
+
+function shotAnimStop() {
+  clearInterval(shotAnimTimer);
+  shotAnimTimer = null;
+  shotAnimPlaying = false;
+  el.shotAnimPlay.textContent = '▶ 슛 흐름 재생';
+  el.shotAnimPlay.classList.remove('active');
+}
+
+function shotAnimLabelHtml(shots, step) {
+  if (!shots.length) return '이 선수의 슛 기록 없음';
+  if (step === 0) return `총 ${shots.length}개 슛 - 재생을 누르면 시간순으로 나타남`;
+  const cur = shots[step - 1];
+  // 다른 곳(예: renderQuarterGameChangers)과 동일한 쿼터 라벨 관례 - "Q1"->"1쿼터",
+  // 연장은 "X1"->"연장1"
+  const qLabel = cur.q.startsWith('X') ? '연장' + cur.q.slice(1) : cur.q.replace('Q', '') + '쿼터';
+  return `<span class="q-badge">${qLabel}</span> ${step}/${shots.length}번째 슛 · ${cur.o === 'O' ? '성공' : '실패'}`;
+}
+
+function shotAnimPlayToggle() {
+  if (shotAnimPlaying) { shotAnimStop(); return; }
+  if (!shotAnimPcode) return;
+  const allShots = drawShotChart(shotAnimPcode, shotAnimUptoQuarter, 0);
+  if (!allShots.length) { el.shotAnimLabel.innerHTML = shotAnimLabelHtml(allShots, 0); return; }
+  shotAnimPlaying = true;
+  el.shotAnimPlay.textContent = '⏸ 정지';
+  el.shotAnimPlay.classList.add('active');
+  el.shotAnimLabel.innerHTML = shotAnimLabelHtml(allShots, 0);
+  let step = 0;
+  shotAnimTimer = setInterval(() => {
+    step++;
+    drawShotChart(shotAnimPcode, shotAnimUptoQuarter, step);
+    el.shotAnimLabel.innerHTML = shotAnimLabelHtml(allShots, step);
+    if (step >= allShots.length) shotAnimStop();
+  }, SHOT_ANIM_STEP_MS);
+}
+el.shotAnimPlay.addEventListener('click', shotAnimPlayToggle);
 
 function openPlayerModal(pcode) {
   const p = GAME.players[pcode];
@@ -2590,11 +2659,16 @@ function openPlayerModal(pcode) {
   el.shotChartSvg.style.display = '';
   document.querySelector('.shot-legend').style.display = '';
   document.querySelectorAll('.modal-sub')[1].style.display = '';
-  drawShotChart(pcode, timeline[curIdx].q === 'PRE' ? null : timeline[curIdx].q);
+  shotAnimStop();
+  shotAnimPcode = pcode;
+  shotAnimUptoQuarter = timeline[curIdx].q === 'PRE' ? null : timeline[curIdx].q;
+  el.shotAnimRow.style.display = '';
+  drawShotChart(pcode, shotAnimUptoQuarter);
+  el.shotAnimLabel.textContent = '';
   el.modalOverlay.classList.add('show');
 }
 
-function closeModal() { el.modalOverlay.classList.remove('show'); }
+function closeModal() { el.modalOverlay.classList.remove('show'); shotAnimStop(); }
 
 el.previewToggle.addEventListener('click', () => {
   const open = el.previewBody.style.display !== 'none';
@@ -2641,6 +2715,9 @@ function openEventModal(idx) {
   el.shotChartSvg.style.display = 'none';
   document.querySelector('.shot-legend').style.display = 'none';
   document.querySelectorAll('.modal-sub')[1].style.display = 'none';
+  shotAnimStop();
+  shotAnimPcode = null;
+  el.shotAnimRow.style.display = 'none';
   el.modalOverlay.classList.add('show');
 }
 
