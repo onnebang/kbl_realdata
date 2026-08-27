@@ -1983,3 +1983,45 @@ MCP 연동 후 실제로 배포까지 진행.
 동기화. 실제 데이터(4207경기) 적재는 DB 연결 문자열 확보 후 진행 예정
 (`migrate_to_supabase.py` + `migrate_game_events_to_supabase.py`, 둘 다 로컬 Docker
 Postgres로 이미 전수 검증됨).
+
+### courtside-web - 실제 Supabase DB를 조회하는 첫 웹사이트 (2026-08-27, 32차)
+
+29~31차에서 스키마 설계·검증·실제 배포까지 끝낸 Supabase 데이터를, 처음으로 실제
+쿼리하는 웹사이트를 만듦. 그동안 만든 것들(`app/`+`backend/`="kbl-live-alerts" 푸시
+알림 앱, `web/*.html`=코트사이드 정적 아티팩트)은 전부 서로 다른 목적이라 이번이
+Supabase를 실제로 조회하는 최초의 화면.
+
+- **`courtside-web/`**(신규) - Next.js(App Router) + TypeScript + `@supabase/supabase-js`.
+  레포 루트에 이미 Expo용 `app/`이 있어서 이름 충돌 피하려 별도 디렉토리로 분리.
+- **범위(v1, 사용자 확정)**: 경기 목록(`/`, 시즌 필터) + 경기 상세(`/games/[gmkey]`,
+  승률 그래프 + 팀/선수 박스스코어). 기존 코트사이드처럼 이벤트 단위 스크러버/재생은
+  다음 라운드로 미룸 - 이번엔 "실제 DB 조회가 되는가"를 증명하는 게 목표.
+- **디자인 토큰 그대로 이식** - `courtside_template.html`의 `:root` 변수(홈/원정/골드
+  색상, Big Shoulders Display+Pretendard+IBM Plex Mono)를 `app/globals.css`로.
+- **승률 그래프는 차트 라이브러리 없이 직접 SVG** - Server Component에서 `game_events`를
+  `event_order` 순으로 조회해 polyline 좌표를 서버에서 계산 - 클라이언트 JS 없이도
+  렌더링됨(v1 범위가 정적 그래프라 인터랙티브 스크러버가 필요 없어서 가능한 단순화).
+- **실행 중 잡은 버그**: Server Component의 `<select onChange={...}>`는 이벤트 핸들러를
+  클라이언트로 못 넘겨서 500 에러 - "use client" 컴포넌트로 분리하는 대신, 클라이언트 JS
+  자체가 필요 없게 일반 `<form>`+제출 버튼으로 바꿔서 해결(v1 전체가 서버 컴포넌트만으로
+  완결).
+- **Node 버전 이슈**(이 프로젝트에서 반복되는 이슈) - Next.js 15가 요구하는 Node ≥20.9를
+  이 머신 기본 Node(19.2.0)가 만족 못 함 + `npm.cmd`로 감싸도 하위 프로세스가 여전히
+  기본 PATH의 Node를 씀 - `courtside-web/dev.cmd`(PATH를 명시적으로 Node 22로 바꾸는
+  배치 스크립트)를 만들어서 `.claude/launch.json`이 그걸 실행하게 함.
+- **로컬 개발 서버 launch.json 위치 정정** - 이 세션의 실제 launch.json은
+  `kbl_realdata/.claude/`가 아니라 세션 원래 작업 디렉토리(`C:\Users\mwon0\Downloads\files
+  \.claude\launch.json`)에 있었음(다른 프로젝트들의 기존 설정과 같은 파일) - 거기에
+  `courtside-web` 항목 추가.
+
+검증: 실제 시즌 필터(2025-2026 ↔ 2011-2012) 전환 시 진짜 다른 시대 데이터(예: 지금은
+없는 "고양 오리온스" 등 과거 팀명) 정상 표시, 경기 상세에서 실제 승률 그래프(637개
+이벤트, 최종 홈 승률 99% - 실제 승자와 방향 일치) + 박스스코어·선수기록 전부 실제 DB
+값과 일치 확인. 완료된 지 오래돼서 game_events가 아직 없는 시즌 첫 경기(S19G01N1,
+애초에 예측 모델 학습 데이터에서도 제외되는 워밍업 구간)는 "승률 데이터 없음" 안내로
+정상 폴백. 다크모드 토큰 정상 전환. 새 브라우저 탭 기준 콘솔 에러 0건.
+
+**다음 단계**: `game_events` 마이그레이션은 이 기능 개발 중에도 계속 백그라운드에서
+진행됨(인도 리전 Supabase라 로컬 Docker보다 느림) - 완료되면 전체 4182경기에서 승률
+그래프가 뜸. v1 다음으로는 매치업/선수 프로필/득점 분포도 실제 DB 기반으로 옮기는 게
+남음(각각 별도 라운드).

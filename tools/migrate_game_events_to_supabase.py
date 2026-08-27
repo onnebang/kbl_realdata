@@ -198,15 +198,17 @@ def load_events(cur, rows):
         """, chunk)
 
 
-def register_unknown_action_codes(cur, gmkeys):
+def scan_action_codes(gmkeys):
     """action_codes 시드(schema_supabase.sql의 ACTION_LABELS 32개)가 실제로는 전수가
     아니었음 - 600경기 표본만 봤을 때도 시드에 없는 "000" 코드가 발견됨(FK 위반으로
     실제 마이그레이션이 죽은 뒤 알게 됨). 표본을 믿는 대신 이번에 실제로 이관할 전체
-    경기의 text-cast.json을 훑어서 진짜로 나오는 코드를 다 모으고, 시드에 없는 건
-    "미확인(코드 {code})"로 등록해둠 - FK가 다시 죽는 일 없게."""
-    from psycopg2.extras import execute_values
-    cur.execute("select code from action_codes")
-    known = {r[0] for r in cur.fetchall()}
+    경기의 text-cast.json을 훑어서 진짜로 나오는 코드를 다 모음.
+
+    DB 연결 없이 순수 파일 스캔만 하는 함수로 분리(원래는 커서를 받아서 여기서 바로
+    조회+삽입까지 했는데, 4182개 파일을 읽는 동안(수십 초) DB 연결을 열어만 두고 아무
+    쿼리도 안 보내다 보니 Supabase 풀러가 유휴 연결로 판단해 끊어버림 - 실제 Supabase
+    프로젝트에 돌려보다 "SSL connection has been closed unexpectedly"로 발견함. 이제
+    연결을 열기 *전에* 이 스캔부터 끝내고, 연결은 실제 조회/삽입 직전에만 염."""
     seen = set()
     for gk in gmkeys:
         path = os.path.join(GAMES_DIR, gk, "text-cast.json")
@@ -218,7 +220,14 @@ def register_unknown_action_codes(cur, gmkeys):
             c = e.get("a")
             if c:
                 seen.add(c)
-    unknown = sorted(seen - known)
+    return seen
+
+
+def register_action_codes(cur, seen_codes):
+    from psycopg2.extras import execute_values
+    cur.execute("select code from action_codes")
+    known = {r[0] for r in cur.fetchall()}
+    unknown = sorted(seen_codes - known)
     if unknown:
         print(f"  시드에 없는 액션 코드 발견: {unknown} - 미확인 항목으로 등록", flush=True)
         execute_values(cur, "insert into action_codes (code, label) values %s on conflict do nothing",
@@ -231,6 +240,9 @@ def main():
     ap.add_argument("--predict-chunk-games", type=int, default=500,
                      help="predict_proba를 몇 경기치씩 묶어서 부를지(전체를 한 번에 하면 "
                           "메모리를 너무 많이 씀 - 500경기치씩 나눠서 여러 번 호출)")
+    ap.add_argument("--max-retries", type=int, default=5,
+                     help="DB 연결이 끊기면 재연결해서 재시도할 최대 횟수(Session Pooler로 "
+                          "오래 연결을 들고 있으면 가끔 끊김 - 실제로 겪음)")
     args = ap.parse_args()
 
     print("모델 로딩...", flush=True)
@@ -242,63 +254,92 @@ def main():
     if args.limit:
         gmkeys = gmkeys[:args.limit]
 
+    print("실제 등장하는 액션 코드 스캔 중(DB 연결 열기 전에 - 4182개 파일 읽는 동안 "
+          "연결을 유휴 상태로 열어두면 Supabase 풀러가 끊어버림)...", flush=True)
+    seen_codes = scan_action_codes(gmkeys)
+
+    import time
+    import psycopg2
+
     conn = get_conn()
     conn.autocommit = False
+    cur = conn.cursor()
+
+    def with_retry(op_name, fn):
+        """fn(cur)을 실행하고, 연결이 죽어있으면(OperationalError/InterfaceError) 재연결
+        후 재시도. Session Pooler로 오래 연결을 들고 있으면 실제로 가끔 끊김을 겪어서
+        (SSL connection has been closed unexpectedly / server closed the connection
+        unexpectedly - 4182경기 중 2000번째 부근에서 실제로 발생) 추가함. 이미 커밋된
+        청크는 ON CONFLICT DO NOTHING이라 재시도가 곧 안전하게 이어서 하기임."""
+        nonlocal conn, cur
+        for attempt in range(1, args.max_retries + 1):
+            try:
+                return fn(cur)
+            except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+                print(f"  [{op_name}] 연결 오류({e}) - 재연결 후 재시도 {attempt}/{args.max_retries}", flush=True)
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                time.sleep(min(2 ** attempt, 20))
+                conn = get_conn()
+                conn.autocommit = False
+                cur = conn.cursor()
+        raise RuntimeError(f"{op_name} - {args.max_retries}회 재시도 후에도 실패")
+
     total_events = 0
     skipped = 0
     try:
-        with conn.cursor() as cur:
-            print("실제 등장하는 액션 코드 스캔 중(시드에 없는 코드 미리 등록)...", flush=True)
-            register_unknown_action_codes(cur, gmkeys)
-            conn.commit()
-            # 게임을 predict-chunk-games개씩 묶어서: (1) 각 게임의 이벤트 루프를 먼저 다
-            # 돌려 rows/neutral_rows/meta_rows를 모으고 (2) 묶음 전체를 한 번에 이어붙여
-            # predict_proba를 딱 2번(실제/중립)만 불러 트리 앙상블의 호출당 오버헤드를
-            # 회피 (3) 게임별로 결과를 다시 잘라서 DB에 적재.
-            for chunk_start in range(0, len(gmkeys), args.predict_chunk_games):
-                chunk_gmkeys = gmkeys[chunk_start:chunk_start + args.predict_chunk_games]
-                built = []  # (gmkey, rows, neutral_rows, meta_rows)
-                for gk in chunk_gmkeys:
-                    result = build_game_rows(gk, pregame_ctx[gk])
-                    if result is None:
-                        skipped += 1
-                        continue
-                    built.append((gk, *result))
+        with_retry("액션코드 등록", lambda c: (register_action_codes(c, seen_codes), conn.commit()))
 
-                if not built:
+        # 게임을 predict-chunk-games개씩 묶어서: (1) 각 게임의 이벤트 루프를 먼저 다
+        # 돌려 rows/neutral_rows/meta_rows를 모으고 (2) 묶음 전체를 한 번에 이어붙여
+        # predict_proba를 딱 2번(실제/중립)만 불러 트리 앙상블의 호출당 오버헤드를
+        # 회피 (3) 게임별로 결과를 다시 잘라서 DB에 적재.
+        for chunk_start in range(0, len(gmkeys), args.predict_chunk_games):
+            chunk_gmkeys = gmkeys[chunk_start:chunk_start + args.predict_chunk_games]
+            built = []  # (gmkey, rows, neutral_rows, meta_rows)
+            for gk in chunk_gmkeys:
+                result = build_game_rows(gk, pregame_ctx[gk])
+                if result is None:
+                    skipped += 1
                     continue
+                built.append((gk, *result))
 
-                all_rows, all_neutral, offsets = [], [], []
-                pos = 0
-                for gk, rows, neutral_rows, meta_rows in built:
-                    all_rows.extend(rows)
-                    all_neutral.extend(neutral_rows)
-                    offsets.append(pos)
-                    pos += len(rows)
+            if not built:
+                continue
 
-                X = np.array(all_rows, dtype=float)
-                X_neutral = np.array(all_neutral, dtype=float)
-                probs_all = model.predict_proba(X)[:, 1]
-                probs_neutral_all = model.predict_proba(X_neutral)[:, 1]
+            all_rows, all_neutral, offsets = [], [], []
+            pos = 0
+            for gk, rows, neutral_rows, meta_rows in built:
+                all_rows.extend(rows)
+                all_neutral.extend(neutral_rows)
+                offsets.append(pos)
+                pos += len(rows)
 
-                for idx, (gk, rows, neutral_rows, meta_rows) in enumerate(built):
-                    start = offsets[idx]
-                    end = start + len(rows)
-                    event_rows = assemble_events(
-                        gk, meta_rows, probs_all[start:end], probs_neutral_all[start:end])
-                    load_events(cur, event_rows)
-                    total_events += len(event_rows)
+            X = np.array(all_rows, dtype=float)
+            X_neutral = np.array(all_neutral, dtype=float)
+            probs_all = model.predict_proba(X)[:, 1]
+            probs_neutral_all = model.predict_proba(X_neutral)[:, 1]
 
+            chunk_event_rows = []
+            for idx, (gk, rows, neutral_rows, meta_rows) in enumerate(built):
+                start = offsets[idx]
+                end = start + len(rows)
+                chunk_event_rows.extend(assemble_events(
+                    gk, meta_rows, probs_all[start:end], probs_neutral_all[start:end]))
+
+            def do_insert(c, rows=chunk_event_rows):
+                load_events(c, rows)
                 conn.commit()
-                done = min(chunk_start + args.predict_chunk_games, len(gmkeys))
-                print(f"  {done}/{len(gmkeys)}경기 처리, 누적 이벤트 {total_events}건...", flush=True)
+            with_retry("이벤트 적재", do_insert)
+            total_events += len(chunk_event_rows)
+
+            done = min(chunk_start + args.predict_chunk_games, len(gmkeys))
+            print(f"  {done}/{len(gmkeys)}경기 처리, 누적 이벤트 {total_events}건...", flush=True)
+
         print(f"완료 - {len(gmkeys)}경기 중 {skipped}경기 건너뜀(text-cast/player-stat 없음), "
               f"이벤트 {total_events}건 적재.")
-    except Exception:
-        conn.rollback()
-        print("에러 발생 - 마지막 커밋된 묶음까지는 저장됨. 다시 실행하면 ON CONFLICT로 "
-              "겹치는 부분은 건너뛰고 이어감.", file=sys.stderr)
-        raise
     finally:
         conn.close()
 
