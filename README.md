@@ -1958,3 +1958,28 @@ Supabase 프로젝트에서의 최종 동작은 미검증. Supabase MCP 연동 �
 이제 `tools/schema_supabase.sql` 전체(reference 테이블 + 경기/박스스코어/슛/라인업
 + 플레이바이플레이/승률)가 로컬에서 완전히 검증된 상태. 남은 건 팀로고/선수사진
 Storage 업로드와 `raw/schedule`의 예정 경기뿐.
+
+### 실제 Supabase 프로젝트에 스키마 배포 (2026-08-27, 31차)
+
+새 프로젝트 만드는 대신(컴퓨트 비용 아끼려고) 이미 컴퓨트 비용을 내고 있던 기존 프로젝트
+"who are u_kbl"(Who Are Ya 선수맞추기 게임용)에 코트사이드 스키마를 얹기로 함. Supabase
+MCP 연동 후 실제로 배포까지 진행.
+
+- **충돌 발견·수정**: 그 프로젝트에 이미 실사용자 742명이 들어있는 `profiles` 테이블
+  (nickname/favorite_team/saved_game 등 게임 전용 컬럼 - 내 스키마의 `profiles`와 이름만
+  같고 완전히 다른 데이터)이 있는 걸 배포 전에 발견 - 실사용자 데이터가 있는 기존 테이블을
+  건드리지 않기 위해 `profiles`/`subscriptions`를 `courtside_profiles`/
+  `courtside_subscriptions`로 리네임. 나머지 11개 테이블은 기존 24개 테이블과 이름 충돌
+  없음을 확인 후 배포.
+- **배포 후 보안 어드바이저(get_advisors) 실행** - 내가 만든 뷰(`team_season_running_avg`)가
+  `security_definer_view`로 ERROR 잡힘(뷰 조회자가 아니라 생성자 권한으로 실행돼 RLS를
+  우회할 수 있는 Postgres 기본 동작 - `security_invoker=true`를 명시 안 하면 이렇게 됨).
+  `alter view ... set (security_invoker = true)`로 즉시 고치고 재검사로 사라진 것 확인.
+  나머지 경고는 전부 기존 다른 앱(kbl540/kleague/kbo 등)의 사전 존재 이슈라 손 안 댐.
+- 배포 후 기존 24개 테이블 행 수(profiles 742, kbo_profiles 10465 등) 전부 그대로인 것
+  확인 - 실사용자 데이터 영향 없음.
+
+로컬 `tools/schema_supabase.sql`도 `security_invoker` 수정 + `courtside_` 리네임 반영해서
+동기화. 실제 데이터(4207경기) 적재는 DB 연결 문자열 확보 후 진행 예정
+(`migrate_to_supabase.py` + `migrate_game_events_to_supabase.py`, 둘 다 로컬 Docker
+Postgres로 이미 전수 검증됨).

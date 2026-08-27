@@ -218,7 +218,11 @@ create index idx_stints_away_lineup on lineup_stints using gin(away_lineup);
 
 -- 팀 시즌 누적 평균(그 경기 "들어가기 전까지", 정규시즌만) - 매치업 페이지의 seasonStats가
 -- 하던 걸 그대로 대체.
-create view team_season_running_avg as
+create view team_season_running_avg
+with (security_invoker = true)  -- Supabase 보안 어드바이저가 ERROR로 잡음: 이걸 안 주면
+                                  -- Postgres 기본값(뷰 생성자 권한으로 실행)이라 조회자의
+                                  -- RLS를 우회함 - 실제 프로젝트에 적용 후 advisor로 확인.
+as
 select
   gts.gmkey, g.season_name, gts.tcode, g.game_date,
   avg(gts.score) over w as ppg_before,
@@ -242,18 +246,25 @@ window w as (
 -- ---------------------------------------------------------------------------
 -- 인증/구독 (24차 요금제 페이지가 나중에 실제 결제와 연결될 때를 위한 최소 골격 -
 -- Stripe 등 실제 연동은 별도 작업)
+--
+-- 2026-08-27: 코트사이드를 별도 프로젝트 대신 기존 Supabase 프로젝트("who are u_kbl" -
+-- Who Are Ya 선수맞추기 게임용, 이미 컴퓨트 비용을 내고 있어서 새 프로젝트 비용을 아끼려
+-- 재사용하기로 함)에 얹기로 하면서, 그 프로젝트에 이미 실사용자 742명이 들어있는
+-- "profiles" 테이블(다른 스키마 - nickname/favorite_team/saved_game 등 게임 전용 컬럼)이
+-- 있는 걸 확인함 - 이름이 겹치면 그 테이블을 침범하게 되므로 courtside_ 접두어를 붙여
+-- 완전히 분리된 테이블로 만듦(실사용자 데이터가 있는 기존 테이블은 절대 건드리지 않음).
 -- ---------------------------------------------------------------------------
 
-create table profiles (
+create table courtside_profiles (
   id              uuid primary key references auth.users(id) on delete cascade,
   display_name    text,
   favorite_tcode  text references teams(tcode),
   created_at      timestamptz not null default now()
 );
 
-create table subscriptions (
+create table courtside_subscriptions (
   id                      bigint generated always as identity primary key,
-  user_id                 uuid not null references profiles(id) on delete cascade,
+  user_id                 uuid not null references courtside_profiles(id) on delete cascade,
   tier                    text not null check (tier in ('pro','elite','enterprise')),
   status                  text not null check (status in ('active','canceled','past_due','trialing')),
   stripe_customer_id      text,
@@ -261,7 +272,7 @@ create table subscriptions (
   current_period_end      timestamptz,
   created_at              timestamptz not null default now()
 );
-create index idx_subscriptions_user on subscriptions(user_id);
+create index idx_courtside_subscriptions_user on courtside_subscriptions(user_id);
 
 -- ---------------------------------------------------------------------------
 -- RLS(Row Level Security) - Supabase auto REST API는 RLS를 켜야 안전하게 노출됨.
@@ -302,11 +313,11 @@ create policy "public read game_events" on game_events for select using (true);
 alter table lineup_stints enable row level security;
 create policy "public read lineup_stints" on lineup_stints for select using (true);
 
-alter table profiles enable row level security;
-create policy "users read own profile" on profiles for select using (auth.uid() = id);
-create policy "users update own profile" on profiles for update using (auth.uid() = id);
+alter table courtside_profiles enable row level security;
+create policy "users read own profile" on courtside_profiles for select using (auth.uid() = id);
+create policy "users update own profile" on courtside_profiles for update using (auth.uid() = id);
 
-alter table subscriptions enable row level security;
-create policy "users read own subscription" on subscriptions for select using (auth.uid() = user_id);
--- subscriptions에 대한 insert/update는 클라이언트에서 직접 하지 않음(Stripe 웹훅을
--- 처리하는 Edge Function이 service_role 키로만 씀) - 그래서 write 정책은 의도적으로 없음.
+alter table courtside_subscriptions enable row level security;
+create policy "users read own subscription" on courtside_subscriptions for select using (auth.uid() = user_id);
+-- courtside_subscriptions에 대한 insert/update는 클라이언트에서 직접 하지 않음(Stripe
+-- 웹훅을 처리하는 Edge Function이 service_role 키로만 씀) - 그래서 write 정책은 의도적으로 없음.
