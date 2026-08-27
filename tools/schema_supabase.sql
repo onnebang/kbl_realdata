@@ -106,10 +106,15 @@ create index idx_games_away on games(away_tcode);
 
 -- 팀 박스스코어(경기당 2행) - 원래 SQLite 스키마엔 없던 테이블. 매치업 페이지(23차)의
 -- 시즌 평균/리그 순위 비교에 필요해서 추가.
+-- 리바운드: 원본 박스스코어 요약 필드(records.rb)엔 총 리바운드만 있고 공격/수비 분리가
+-- 없음(분리 비율인 orebRt/drebRt는 있지만 원시 개수가 아님) - 그래서 reb(총량)는 이번
+-- 마이그레이션에서 바로 채우고, oreb/dreb는 일단 null로 남겨둠. 실제 분리값은 플레이바이
+--플레이의 209(공격리바운드)/210(수비리바운드) 이벤트를 세야 나오는데, 그건 game_events
+-- 이관(승률모델 재실행이 필요한 별도 작업) 때 같이 채울 예정.
 create table game_team_stats (
   gmkey      text not null references games(gmkey),
   tcode      text not null references teams(tcode),
-  score integer, oreb integer, dreb integer, ast integer, stl integer, blk integer,
+  score integer, reb integer, oreb integer, dreb integer, ast integer, stl integer, blk integer,
   turnovers integer, fouls integer,
   fgm integer, fga integer, tpm integer, tpa integer, ftm integer, fta integer,
   off_rtg real, def_rtg real, net_rtg real, pace real, poss real,
@@ -119,6 +124,7 @@ create table game_team_stats (
 
 -- 선수 박스스코어 - 기존 SQLite 스키마와 거의 동일. back_num/pos는 선수 테이블이 아니라
 -- 여기 남김(등번호·포지션은 시즌/팀마다 바뀔 수 있음 - players 테이블은 불변 정보만).
+-- reb/oreb/dreb는 위 game_team_stats와 같은 이유로 reb만 지금 채움.
 create table game_player_stats (
   gmkey       text not null references games(gmkey),
   pcode       text not null references players(pcode),
@@ -127,7 +133,7 @@ create table game_player_stats (
   pos         text,
   is_starter  boolean not null default false,
   min_played  numeric(5,2),        -- playMin + playSec/60
-  pts integer, oreb integer, dreb integer, ast integer, stl integer, blk integer,
+  pts integer, reb integer, oreb integer, dreb integer, ast integer, stl integer, blk integer,
   turnovers integer, fouls integer,
   fgm integer, fga integer, tpm integer, tpa integer, ftm integer, fta integer,
   per real, off_rtg real, def_rtg real, net_rtg real, usage_rtg real, pie real,
@@ -149,7 +155,8 @@ create table shot_log (
   x           real not null,
   y           real not null,
   d           text not null,          -- 골대 방향 코드('1'/'2') - 원본 그대로
-  made        boolean not null
+  made        boolean not null,
+  unique (gmkey, pcode, shot_order)   -- 마이그레이션 재실행 시 ON CONFLICT로 중복 방지
 );
 create index idx_shotlog_game_player on shot_log(gmkey, pcode, shot_order);
 
@@ -190,7 +197,11 @@ create table lineup_stints (
   end_sec      integer not null,
   duration_sec integer not null,
   home_pts     integer not null,
-  away_pts     integer not null
+  away_pts     integer not null,
+  -- (gmkey, start_sec, end_sec)만으로는 부족함 - 실제로 한 경기(S25G01N140)에서 득점 없이
+  -- 연달아 일어난 교체 3번이 전부 같은 초 단위 구간(1200~1336초)에 찍혀서 서로 다른
+  -- 라인업인데도 겹침. 라인업까지 포함해야 진짜 중복(재실행)과 이런 실제 케이스를 구분함.
+  unique (gmkey, start_sec, end_sec, home_lineup, away_lineup)
 );
 create index idx_stints_gmkey on lineup_stints(gmkey);
 create index idx_stints_home_lineup on lineup_stints using gin(home_lineup);
@@ -212,19 +223,19 @@ select
   avg(opp.score) over w as opp_ppg_before,
   avg(gts.tpm) over w as tpg_before,
   avg(gts.ast) over w as apg_before,
-  avg(gts.oreb + gts.dreb) over w as rpg_before,
+  avg(gts.reb) over w as rpg_before,
   avg(gts.stl) over w as spg_before,
   avg(gts.blk) over w as bpg_before,
   avg(gts.turnovers) over w as topg_before
 from game_team_stats gts
 join games g on g.gmkey = gts.gmkey
 join game_team_stats opp on opp.gmkey = gts.gmkey and opp.tcode <> gts.tcode
+where g.season_category = '정규시즌'
 window w as (
   partition by gts.tcode, g.season_name
   order by g.game_date
   rows between unbounded preceding and 1 preceding  -- 이 경기 자신은 제외 = 리크프리
-)
-where g.season_category = '정규시즌';
+);
 
 -- ---------------------------------------------------------------------------
 -- 인증/구독 (24차 요금제 페이지가 나중에 실제 결제와 연결될 때를 위한 최소 골격 -

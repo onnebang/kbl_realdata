@@ -1870,3 +1870,54 @@ Spectrum류 광학 트래킹처럼 선수 위치를 매 순간(초 단위) 연�
 해봄(문법은 신중하게 짰지만) - Supabase SQL Editor에 붙여넣고 돌려본 뒤 에러 있으면
 알려주면 바로 고칠 수 있음. 다음 단계는 기존 JSON/SQLite 데이터를 이 스키마로 옮기는
 마이그레이션 스크립트.
+
+### 마이그레이션 스크립트 + 실제 검증 (2026-08-27, 29차)
+
+28차에서 설계한 스키마를 실제로 채우는 스크립트(`tools/migrate_to_supabase.py`, 신규).
+로컬에 Supabase/Postgres가 없어서 스키마 파일 자체가 "문법은 신중하게 짰지만 실행은 안
+해봄" 상태였는데, 이번엔 로컬 Docker로 진짜 Postgres 컨테이너를 띄워서 스키마 적용부터
+4207경기 전체 마이그레이션까지 끝까지 실행해서 검증함(추측 대신 실측).
+
+- **범위 안**: teams/coaches/seasons/players/games/game_team_stats/game_player_stats/
+  shot_log/lineup_stints. `raw/games/*`(meta.json·team-record.json·player-stat.json·
+  match-chart.json)를 한 번의 스캔으로 순회하며 필요한 값을 전부 뽑고, 이미 계산 끝난
+  `lineup_stints`만 `raw/kbl_realdata.db`(SQLite)에서 그대로 가져옴(스틴트 세그멘테이션
+  로직을 다시 짤 필요 없음). 전부 `ON CONFLICT DO NOTHING`이라 재실행 안전.
+- **범위 밖**(README 28차와 동일 이유): `game_events`(플레이바이플레이+승률 - 4207경기
+  전체에 모델 재추론이 필요한 별개 작업), `raw/schedule`의 예정 경기, 팀로고/선수사진
+  Storage 업로드.
+
+**실제 실행하며 잡은 버그 3건**(전부 로컬 Docker Postgres에 진짜로 돌려보다 발견 - 스키마
+파일만 눈으로 검토했으면 못 잡았을 것들):
+1. **`meta.json`엔 스코어 필드가 없음** - `g.get("scoreH")`로 가져오려 했는데 실제로는
+   그 필드 자체가 없어서 항상 null이 됐을 뻔함. `team-record.json`의 팀별 `records.score`
+   에서 가져오도록 수정.
+2. **뷰 문법 오류** - `team_season_running_avg` 뷰에서 `WINDOW` 절 뒤에 `WHERE`를 써서
+   "syntax error at or near where" - SQL 절 순서(WHERE가 WINDOW보다 먼저)를 몰라서 낸
+   실수. 순서 수정.
+3. **`shot_log`/`lineup_stints`에 자연 키가 없어서 재실행하면 통째로 중복** - 스키마를
+   처음 짤 때 이 두 테이블에 `ON CONFLICT`가 걸릴 unique 제약을 안 넣었었음(id 컬럼만
+   있고). 실제로 마이그레이션을 두 번 돌려서 553,248행짜리 shot_log가 1,106,496행으로
+   두 배가 되는 걸 직접 확인한 뒤, `shot_log(gmkey,pcode,shot_order)`/`lineup_stints
+   (gmkey,start_sec,end_sec,home_lineup,away_lineup)` unique 제약을 추가. lineup_stints는
+   처음엔 라인업을 안 뺀 좁은 제약(gmkey,start_sec,end_sec)만 넣었다가, 실제 데이터에서
+   한 경기(S25G01N140)가 득점 없이 연달아 일어난 교체 3번을 전부 같은 초 단위 구간에
+   기록해둔 걸 발견(라인업은 다른데 시간 구간이 겹침) - 좁은 제약이 이 3개 중 2개를
+   중복으로 오인해 삭제해버려서(110,147행 중 2행 유실) 라인업까지 포함하도록 넓힘.
+- `game_team_stats`/`game_player_stats`의 `oreb`/`dreb` 분리도 이 검증 과정에서 재검토 -
+  원본 박스스코어 요약 필드엔 총 리바운드(`rb`)만 있고 공격/수비 분리가 없음(비율
+  `orebRt`/`drebRt`는 있지만 원시 개수가 아님)을 재확인하고, `reb`(총량) 컬럼을 추가해서
+  지금 채울 수 있는 값은 채우고 분리값은 `game_events` 이관 때(이벤트의 209/210 코드를
+  세야 나옴)로 미루기로 함.
+
+**검증 결과**(전체 4207경기, 로컬 Docker Postgres 16 기준): games 4207 · game_team_stats
+8414 · game_player_stats 100,921 · shot_log 553,248 · lineup_stints 110,147 - 전부
+기존에 검증된 SQLite 파이프라인(`raw/kbl_realdata.db`)의 동일 항목 행수와 정확히 일치.
+FK 무결성 검사(고아 행) 전부 0건, 스코어 누락 0건. 3연속 재실행으로 멱등성(중복 없음)
+확인. `team_season_running_avg` 뷰를 실제 데이터로 조회해서 리크프리 로직이 맞게
+동작하는지도 확인(시즌 첫 경기는 평균 null, 이후부터 실제 누적 평균 채워짐).
+
+**아직 검증 못한 부분**: `auth.uid()`/`auth.users`는 로컬 Postgres엔 없어서(Supabase
+플랫폼이 제공하는 함수/테이블) 최소한으로 흉내만 내서 RLS 정책 문법만 확인함 - 실제
+Supabase 프로젝트에서의 최종 동작은 미검증. Supabase MCP 연동 방법은 사용자에게 안내함
+(`claude mcp add --transport http supabase "https://mcp.supabase.com/mcp?project_ref=..."`).
