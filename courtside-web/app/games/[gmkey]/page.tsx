@@ -5,6 +5,7 @@ import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBo
 import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights";
 import { getGameRarity } from "@/lib/rarity";
 import { getSeasonStatsAsOf, getRecentSchedule, getHeadToHead, getStandingsAsOf } from "@/lib/matchups";
+import { teamZoneStats, buildZoneCompareSvg, type ShotRow } from "@/lib/zoneCompare";
 
 type TeamRef = { tcode: string; name: string; abbr: string; color: string } | null;
 
@@ -126,6 +127,11 @@ async function getPregameFeatures(gmkey: string): Promise<PregameFeatures | null
   return (data as PregameFeatures) ?? null;
 }
 
+async function getShots(gmkey: string): Promise<ShotRow[]> {
+  const { data } = await supabase.from("shot_log").select("x, y, d, made, tcode").eq("gmkey", gmkey);
+  return (data ?? []) as ShotRow[];
+}
+
 function WinProbChart({ events, homeColor }: { events: EventRow[]; homeColor: string }) {
   const valid = events.filter((e) => e.home_win_prob != null);
   if (!valid.length) {
@@ -186,12 +192,13 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
   const game = await getGame(gmkey);
   if (!game) notFound();
 
-  const [teamStats, playerStats, events, pregameFeatures, actionLabels] = await Promise.all([
+  const [teamStats, playerStats, events, pregameFeatures, actionLabels, shots] = await Promise.all([
     getTeamStats(gmkey),
     getPlayerStats(gmkey),
     getEvents(gmkey),
     getPregameFeatures(gmkey),
     getActionLabels(),
+    getShots(gmkey),
   ]);
 
   const homeTeam = teamStats.find((t) => t.tcode === game.home_team?.tcode);
@@ -286,6 +293,14 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
     ]);
   }
   const teamMetaByTcode = new Map(allTeams.map((t) => [t.tcode, t]));
+
+  // 득점 분포(README "다음 단계" 세 번째) - shot_log는 이미 마이그레이션돼 있어서 새 작업
+  // 없이 바로 포팅. lib/zoneCompare.ts가 courtside_template.html의 teamZoneStats/
+  // renderZoneCompare/drawCourtMarkings/drawHoop을 그대로 옮김.
+  const zoneCompareSvg =
+    shots.length > 0 && game.home_team && game.away_team
+      ? buildZoneCompareSvg(teamZoneStats(shots, game.home_team.tcode), teamZoneStats(shots, game.away_team.tcode))
+      : null;
 
   const playerTable = (rows: PlayerStatRow[]) => (
     <div className="table-scroll">
@@ -513,6 +528,19 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
         <div className="panel-title">승률 흐름 (game_events, {events.length}개 이벤트)</div>
         <WinProbChart events={events} homeColor={game.home_team?.color ?? "#888"} />
       </div>
+
+      {zoneCompareSvg && (
+        <div className="panel">
+          <div className="panel-title">구역별 시도·성공 비교 (막대가 길수록 시도 많음, shot_log {shots.length}건)</div>
+          <div className="zc-court-tilt">
+            <svg className="zc-court" viewBox="355 27 375 357" dangerouslySetInnerHTML={{ __html: zoneCompareSvg }} />
+          </div>
+          <div className="zone-compare-legend">
+            <span className="zcl-home">● {game.home_team?.name}</span>
+            <span className="zcl-away">{game.away_team?.name} ●</span>
+          </div>
+        </div>
+      )}
 
       {reportSections.length > 0 && (
         <div className="panel">
