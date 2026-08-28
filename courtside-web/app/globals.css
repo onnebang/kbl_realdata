@@ -61,6 +61,31 @@ a {
   text-decoration: none;
 }
 
+.nav-bar {
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.1);
+  background: var(--surface);
+}
+.nav-bar-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 18px;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+}
+.nav-link {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  padding: 12px 10px;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+.nav-link:hover {
+  color: var(--ink);
+  border-bottom-color: var(--home);
+}
+
 .wrap {
   max-width: 900px;
   margin: 0 auto;
@@ -508,6 +533,57 @@ table.data-table td:nth-child(2) {
   font-size: 10px;
   color: var(--ink-faint);
   margin-top: 4px;
+}
+
+/* 승리 기여도 리더보드(app/leaderboards/win-contribution) - 양/음 WPA 컬러는 팀 컬러와
+   충돌 안 하는 별도 시맨틱 컬러(빨강/파랑 계열이 아니라 home/away 톤 재사용은 오해 소지가
+   있어서 초록/주황으로 분리). */
+.wpa-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 12.5px;
+}
+.wpa-bar-name {
+  width: 96px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.wpa-bar-track {
+  flex: 1;
+  height: 14px;
+  background: var(--surface-soft);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.wpa-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+.wpa-bar-fill.pos {
+  background: #2e9e5b;
+}
+.wpa-bar-fill.neg {
+  background: #d9640a;
+}
+.wpa-bar-val {
+  width: 56px;
+  text-align: right;
+  flex-shrink: 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+}
+.wpa-bar-val.pos,
+.wpa-pos {
+  color: #2e9e5b;
+}
+.wpa-bar-val.neg,
+.wpa-neg {
+  color: #d9640a;
 }
 
 footer.foot {
