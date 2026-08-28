@@ -498,41 +498,210 @@ table.data-table td:nth-child(2) {
   font-weight: 700;
 }
 
-/* 선수 프로필(/players/[pcode]) */
-.player-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 4px;
+/* 선수 프로필(/players/[pcode]) 히어로 - "스탯 헤드라인" (perthirtysix.com 레퍼런스로
+   3안 병렬 디자인 워크플로우 → judge 합성. 새 --hero-* 토큰 없이 기존 --home/--gold/
+   --line-rgb/--ink만 재사용해서 다크모드가 자동으로 따라옴). 실측 버그 픽스: 기존
+   .title(Big Shoulders Display)엔 한글 글리프가 없어서 선수 이름이 조용히
+   sans-serif로 폴백되고 있었음 - 아래 .player-name은 Pretendard Black으로 렌더링하고,
+   Big Shoulders Display는 라틴 이니셜(.player-ename)/숫자에만 씀(이 사이트 전체
+   컨벤션과 일치). app/page.tsx·leaderboards 3곳도 같은 .title 버그가 있지만 이번
+   스코프(선수 프로필) 밖이라 건드리지 않음. */
+.player-hero {
+  position: relative;
+  overflow: hidden;
+  background-image: linear-gradient(rgba(var(--line-rgb), 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--line-rgb), 0.05) 1px, transparent 1px);
+  background-size: 26px 26px;
 }
-.player-photo {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
+
+/* 배경 스파크라인 - 최근 경기 득점(recentGames.pts) 실데이터로 그린 옅은 폴리라인.
+   장식용 곡선이 아니라 바로 아래 "최근 폼" 패널의 TrendChart와 같은 데이터를 같은
+   시각 언어(폴리라인+--home)로 먼저 흐리게 보여주는 예고편. */
+.player-hero-wave {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.player-hero-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+/* 사진 프레임 - 원형 아바타 대신 .matchup-banner-side가 이미 쓰는 대각선 clip-path
+   언어를 재사용한 사각 컷 프레임 + 뒤에 깔리는 골드 컬러블록. 사진이 없으면
+   (KBL 로스터 중 photo_url 없는 선수 실제로 있음) 이름 첫 글자 모노그램으로 폴백. */
+.player-photo-frame {
+  position: relative;
+  flex-shrink: 0;
+  width: 112px;
+  height: 112px;
+}
+.player-photo-frame::before {
+  content: "";
+  position: absolute;
+  inset: 6px -6px -6px 6px;
+  background: var(--gold);
+  clip-path: polygon(0 0, 100% 0, 100% 82%, 82% 100%, 0 100%);
+  opacity: 0.45;
+}
+.player-photo,
+.player-photo-mono {
+  position: relative;
+  display: block;
+  width: 112px;
+  height: 112px;
+  clip-path: polygon(0 0, 100% 0, 100% 82%, 82% 100%, 0 100%);
   object-fit: cover;
   background: var(--surface-soft);
-  flex-shrink: 0;
 }
-.career-stat-row {
+.player-photo-mono {
   display: flex;
-  gap: 24px;
-}
-.career-stat {
-  display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  font-family: "Pretendard", sans-serif;
+  font-weight: 900;
+  font-size: 44px;
+  color: var(--home);
+  background: var(--home-soft);
 }
-.career-stat-val {
-  font-family: "Big Shoulders Display", sans-serif;
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1;
+
+.player-hero-identity {
+  flex: 1;
+  min-width: 220px;
 }
-.career-stat-label {
+
+.player-hero-eyebrow {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--ink-faint);
-  margin-top: 4px;
+  margin-bottom: 6px;
+}
+
+/* 한글 이름 헤드라인 - word-break: keep-all로 한글 어절이 음절 중간에서 끊기는 걸
+   막고, overflow-wrap: break-word는 그래도 넘칠 만큼 긴 토큰에 대한 최후 폴백. */
+.player-name {
+  margin: 0;
+  font-family: "Pretendard", sans-serif;
+  font-weight: 900;
+  font-size: clamp(38px, 11vw, 68px);
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+.player-name-line {
+  display: block;
+}
+.player-name-line:first-child {
+  color: var(--home);
+}
+
+.player-ename {
+  display: inline-block;
+  margin-top: 10px;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  padding: 3px 8px;
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+}
+
+.player-hero-stats {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 28px;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.1);
+}
+.stat-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.stat-headline-val {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: clamp(52px, 14vw, 84px);
+  line-height: 0.85;
+  color: var(--home);
+  font-variant-numeric: tabular-nums;
+}
+.stat-headline-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+.stat-companion {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.stat-companion-val {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 700;
+  font-size: 30px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.stat-companion-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-faint);
+}
+
+.player-hero-pct {
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.player-hero-pct b {
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 420px) {
+  .player-hero-stats {
+    gap: 18px;
+  }
+}
+
+/* "최근 폼" 스탯 타일 보강 - 이번 windowN 평균이 커리어 평균을 웃도는 지표를 히어로와
+   같은 --home 액센트로 강조해 히어로 → 최근 폼 패널이 같은 신호 색으로 이어지게 함. */
+.stat-tile.is-up {
+  background: var(--home-soft);
+}
+.stat-tile.is-up .stat-tile-val {
+  color: var(--home);
 }
 
 /* 최근 폼(L5/L10/L15/L30 토글 + 트렌드 차트 + 10칸 스탯 그리드) - 선수 프로필 아티팩트의
