@@ -65,19 +65,34 @@
     color: var(--ink); background: var(--surface); border: 1px solid rgba(var(--line-rgb),0.16);
     border-radius: 10px; padding: 10px 12px; margin-bottom: 16px; cursor: pointer; }
 
-  /* 스코어보드 - 요청: "점수판과 승률 그래프를 합쳐서 제일 상단에 고정" - sticky로 상단
-     고정, 배경이 불투명해야 아래 콘텐츠가 스크롤돼 지나갈 때 비쳐 보이지 않음. */
+  /* 스코어보드 - 요청: "점수판과 승률 그래프를 합쳐서 제일 상단에 고정".
+     처음엔 이 카드 자체를 position:sticky로 고정하고, 스크롤을 내리면 이 안의 내용을
+     sb-compact/sb-full로 바꿔치기했었는데 - 실제로 돌려보니 "sticky로 붙어있는 요소
+     자신의 높이가 줄어들면(또는 사라지면) 브라우저가 scrollY를 0으로 되돌려버리는"
+     버그가 있었음(사용자 제보 - "gamePicker가 스크롤할 때마다 통통통통 튕김" - 직접
+     재현: sticky 요소를 그대로 둔 채 position만 relative로 바꾸면 증상이 사라지는 것까지
+     확인, DOM을 분리해서 다른 sticky/fixed 요소로 교체해도 "원래 sticky였던 요소가
+     사라진다"는 사실 자체만으로 재현됨 - 즉 자기 자신이 줄어들거나 사라지는 sticky
+     요소는 그 자체가 근본 원인). 그래서 이 카드는 이제 sticky가 아니라 그냥 평범하게
+     스크롤을 따라 지나가는 카드로 바꿈 - "고정" 역할은 완전히 별개의 .sb-compact(아래)가
+     담당. */
   .scoreboard { background: var(--surface); border: 1px solid rgba(var(--line-rgb),0.12); border-radius: 14px;
-    padding: 18px 20px; position: sticky; top: 0; z-index: 40; box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    padding: 18px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);
     margin: 0 -18px 14px; }
   @media (max-width: 640px) { .scoreboard { margin: 0 -12px 14px; border-radius: 0; } }
 
   /* 스코어보드 축소 모드 - 스크롤로 stickySentinel을 지나가면 켜짐(JS의
-     IntersectionObserver). 풀사이즈(sb-full)는 숨기고 한 줄 요약(sb-compact)만 보여줌. */
-  .sb-compact { display: none; align-items: center; justify-content: space-between; gap: 8px; }
-  .scoreboard.compact { padding: 8px 14px; }
-  .scoreboard.compact .sb-compact { display: flex; }
-  .scoreboard.compact .sb-full { display: none; }
+     IntersectionObserver). 이제 위 .scoreboard와 완전히 분리된 별개 요소 - 항상
+     position:fixed(sticky 아님 - "붙었다 떨어졌다" 상태 계산 자체가 없어서 위 버그가
+     원천적으로 발생 안 함)로 DOM에 존재하고, display 대신 transform으로만 등장/퇴장시킴
+     (레이아웃/문서높이에 전혀 영향을 안 줘서 스크롤 위치가 흔들릴 여지가 없음). */
+  .sb-compact { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 40;
+    max-width: 720px; margin: 0 auto; padding: 10px 18px;
+    background: var(--surface); box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transform: translateY(-100%); transition: transform 0.15s ease-out; }
+  .sb-compact.show { transform: translateY(0); }
+  @media (max-width: 640px) { .sb-compact { padding: 10px 12px; } }
   .sbc-side { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 0; }
   .sbc-side.home { justify-content: flex-end; }
   .sbc-side.away { justify-content: flex-start; }
@@ -730,20 +745,20 @@
        (승률/팀명/점수 시간/점수/팀명/승률)식으로 보이도록" - 맨 위에선 풀사이즈로 보이다가,
        스크롤로 이 지점을 지나가면(sentinel이 화면 밖으로 나가면) sb-compact 한 줄로 축소. -->
   <div id="stickySentinel" style="height:1px"></div>
-  <div class="scoreboard" id="stickyBar">
-    <div class="sb-compact" id="sbCompact">
-      <div class="sbc-side home">
-        <span class="sbc-prob home" id="sbcProbHome">-</span>
-        <span class="sbc-team home" id="sbcNameHome">-</span>
-        <span class="sbc-score" id="sbcScoreHome">0</span>
-      </div>
-      <span class="sbc-clock" id="sbcClock">-</span>
-      <div class="sbc-side away">
-        <span class="sbc-score" id="sbcScoreAway">0</span>
-        <span class="sbc-team away" id="sbcNameAway">-</span>
-        <span class="sbc-prob away" id="sbcProbAway">-</span>
-      </div>
+  <div class="sb-compact" id="sbCompact">
+    <div class="sbc-side home">
+      <span class="sbc-prob home" id="sbcProbHome">-</span>
+      <span class="sbc-team home" id="sbcNameHome">-</span>
+      <span class="sbc-score" id="sbcScoreHome">0</span>
     </div>
+    <span class="sbc-clock" id="sbcClock">-</span>
+    <div class="sbc-side away">
+      <span class="sbc-score" id="sbcScoreAway">0</span>
+      <span class="sbc-team away" id="sbcNameAway">-</span>
+      <span class="sbc-prob away" id="sbcProbAway">-</span>
+    </div>
+  </div>
+  <div class="scoreboard" id="stickyBar">
     <div class="sb-full" id="sbFull">
       <div class="sb-top">
         <span class="live-dot" id="liveDot"></span>
@@ -3175,17 +3190,33 @@ el.gamePicker.innerHTML = ALL_DATA.gameList.map(g => {
 el.gamePicker.addEventListener('change', () => loadGame(ALL_DATA.games[el.gamePicker.value]));
 
 // 요청: "스크롤을 내리면 작게 보여지도록" - 스코어보드 바로 위 sentinel이 화면 밖으로
-// 나가는 순간(=스코어보드가 sticky로 붙어버린 순간)을 감지해서 축소 모드로 전환.
+// 나가는 순간을 감지해서 별도 축소바(.sb-compact)를 등장시킴.
+//
+// 버그(사용자 제보 - "gamePicker가 스크롤할 때마다 통통통통 튕김") 실측으로 잡은 진짜 원인:
+// 처음엔 스코어보드 자체가 position:sticky였고, 스크롤로 sentinel을 지나가면 그 안에서
+// sb-full을 숨기고 sb-compact를 보여주는 식으로(자기 자신의 높이가 확 줄어듦, 417px ->
+// 43px) 축소시켰음. 그런데 "지금 sticky로 붙어있는 요소 자신이 줄어들거나 사라지면
+// 브라우저가 scrollY를 0으로 되돌린다"는 걸 직접 재현해서 확인함(scrollTo(0,130) 호출
+// 후 실측 window.scrollY가 0으로 리셋 - gamePicker가 다시 화면에 나타나 보이던 원인).
+// requestAnimationFrame으로 지연시켜봐도(타이밍 문제로 오해했었음), 심지어 그 sticky
+// 요소를 완전히 별개의 다른 요소(sticky든 fixed든)로 교체해도 동일하게 재현됨 - 즉
+// "원래 sticky였던 요소 자신이 사라진다"는 사실 자체가 원인이라 DOM 구조를 어떻게
+// 바꿔도 그 요소를 안 건드리는 것 말곤 답이 없었음.
+// 실제 해결책: 스코어보드(.scoreboard)는 이제 sticky를 아예 안 씀(평범하게 스크롤을
+// 따라 지나감, 절대 크기가 안 바뀜) - "고정" 역할은 완전히 별개의 .sb-compact가
+// position:fixed(sticky처럼 "붙었다 뗀다"는 상태 계산 자체가 없음)로 전담하고,
+// display가 아니라 transform(translateY)으로만 등장/퇴장시켜서 문서 레이아웃/높이에
+// 전혀 영향을 안 줌 - 이러면 스크롤 위치가 흔들릴 메커니즘 자체가 없어짐.
 const stickySentinelEl = document.getElementById('stickySentinel');
-const stickyScoreboardEl = document.getElementById('stickyBar');
-if (stickySentinelEl && stickyScoreboardEl) {
+const sbCompactEl = document.getElementById('sbCompact');
+if (stickySentinelEl && sbCompactEl) {
   const updateCompact = () => {
     const rect = stickySentinelEl.getBoundingClientRect();
-    stickyScoreboardEl.classList.toggle('compact', rect.bottom <= 0);
+    sbCompactEl.classList.toggle('show', rect.bottom <= 0);
   };
   if ('IntersectionObserver' in window) {
     new IntersectionObserver(([entry]) => {
-      stickyScoreboardEl.classList.toggle('compact', !entry.isIntersecting);
+      sbCompactEl.classList.toggle('show', !entry.isIntersecting);
     }, { threshold: 0 }).observe(stickySentinelEl);
   }
   // 카카오톡 인앱브라우저 등 IntersectionObserver 동작이 들쭉날쭉한 웹뷰 대비 스크롤
