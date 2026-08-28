@@ -2029,6 +2029,46 @@ Supabase를 실제로 조회하는 최초의 화면.
 **다음 단계**: 매치업/선수 프로필/득점 분포도 실제 DB 기반으로 옮기는 게 남음(각각 별도
 라운드).
 
+### AI 코트사이드 리포트를 courtside-web으로 포팅 (2026-08-28, 36차)
+
+사용자 요청: "코트사이드웹에도 같은 리포트 붙여줘" - 35차에서 만든 프리뷰 인사이트/경기종료
+통합 리포트를 courtside-web(Supabase 직접 조회)에도. 스키마 확인 결과 경기종료 리포트에
+필요한 데이터(`game_events`의 `wpa_home`/`home_win_prob`/라인업 스냅샷,
+`game_player_stats`의 `is_starter`)는 이미 다 있어서 새 마이그레이션 없이 포팅 가능했지만,
+프리뷰용 원본 데이터(`pregame_training_table.json`의 페이스·4팩터·구장별성적 등)는
+Supabase에 아예 없어서 새 테이블이 필요 - 사용자 확인 후 둘 다 진행.
+
+- **새 테이블 `pregame_features`**(Supabase MCP `apply_migration`) + `tools/migrate_
+  pregame_features_to_supabase.py` - `pregameInsightItems()`가 실제로 읽는 15개 필드만
+  (전체 필드가 아니라) 좁혀서 4182경기 전부 이관.
+- **`courtside-web/lib/postgameReport.ts`**: A1-A8 전체를 TypeScript로 포팅
+  (`findStatBursts`/`findTopWpaSwings`/`computeHighlightScore`+`findAiPickBestScene`/
+  `findDramaticProbSwing`/`teamTopPerformer`+`explainLosingDespiteTopPerformer`/
+  `findBestSixthManSpark`/`findFoulTroubleEvents`). `game_events`엔 `runHome`/`runAway`가
+  없어서(정적 빌드 때만 Python이 계산해 JSON에 박아넣던 필드) `attachDerivedFields()`가
+  점수 델타로 직접 재계산.
+- **`lib/pregameInsights.ts`/`lib/josa.ts`/`lib/rarity.ts`**: `pregameInsightItems()`/
+  `eunNeun`/`iGa` 그대로 포팅. `marginPercentile`은 `games` 테이블(4207행, 가벼움)에서
+  라이브로 계산(`wpaSwingRank`는 240만 `game_events` 집계가 필요해 이번 범위 밖 - 정적
+  페이지에서도 이 리포트가 아니라 다른 곳에서만 쓰임).
+
+실측 검증 중 진짜 버그 3개 발견/수정:
+1. `game_player_stats.fgm`/`fga`가 이 스키마에선 2점슛 전용(3점은 `tpm`/`tpa` 별도) -
+   `gameScore()`/FG% 비교 로직은 정적 페이지의 합산 FG를 기대해서 `fgm+tpm`/`fga+tpa`로
+   합쳐서 넘기도록 수정(실측 - 이광재 예시가 합산 전엔 "2/5", 합산 후 정적 페이지와 동일한
+   "6/10"으로 일치).
+2. `oreb`/`dreb`가 전체 행 NULL(리바운드 종류 분리는 프로젝트 초기부터 보류 상태) - 합산
+   `reb` 컬럼만 실제로 채워져 있어서 그걸로 전환, `gameScore()`의 리바운드 가중치도
+   재조정(0.7×오펜시브+0.3×디펜시브 → 합산에 0.4, 리그 평균 오프리바 비중 반영한 근사).
+3. `getGameRarity`가 `games` 테이블을 range 없이 통째로 fetch해서 Supabase 기본
+   max_rows(1000)에 조용히 잘림(4207행인데 1000행만) - 56점차 대승 경기에서 "1000경기 중
+   X%"로 잘못 나오는 걸 발견, 페이지네이션으로 수정.
+
+검증: 플래그십 데모(S23G01N209)가 정적 페이지 리포트와 완전히 일치, 최대 마진 실경기
+(56점차)에서 "압도적인 승리" 프레이밍 정상, `game_events`/`pregame_features` 둘 다 없는
+시즌 개막전(S19G01N1)이 크래시 없이 두 패널 다 우아하게 생략, 랜덤 12경기 샘플 전부
+에러 없이 렌더링.
+
 ### 스크롤 시 스코어보드 "통통통통" 튕김 버그 수정 (2026-08-27, 33차)
 
 사용자 제보: "id=gamePicker가 스크롤할 때마다 계속 튕김". 20차(스크롤 시 축소 스코어보드)
