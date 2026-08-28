@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/leaderboards/win-contribution", label: "승리 기여도" },
   { href: "/leaderboards/scoring-explorer", label: "득점 분포" },
   { href: "/leaderboards/form-index", label: "폼 지수" },
+  { href: "/leaderboards/custom-metric", label: "커스텀 지표" },
 ];
 
 export function NavBar() {

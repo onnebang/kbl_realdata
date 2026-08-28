@@ -997,6 +997,35 @@ table.data-table td:nth-child(2) {
   flex-shrink: 0;
 }
 
+/* 커스텀 지표(components/CustomMetricBuilder.tsx) - 슬라이더가 핵심 상호작용이라
+   GameReplay.tsx에 이어 두 번째 "use client" 예외. */
+.metric-slider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px 20px;
+  margin-top: 4px;
+}
+.metric-slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.metric-slider-label {
+  display: flex;
+  justify-content: space-between;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.metric-slider-val {
+  color: var(--home);
+}
+.metric-slider {
+  width: 100%;
+  accent-color: var(--home);
+}
+
 footer.foot {
   margin-top: 30px;
   padding-top: 14px;
