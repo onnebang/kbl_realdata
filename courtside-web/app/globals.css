@@ -304,6 +304,50 @@ table.data-table td:nth-child(2) {
   text-align: center;
 }
 
+/* AI 코트사이드 리포트(courtside_template.html의 postgameReport/pregameInsights를 그대로
+   이식) - .panel 안에 섹션별로 쌓임. */
+.report-section {
+  margin-bottom: 14px;
+}
+.report-section:last-child {
+  margin-bottom: 0;
+}
+.report-section-title {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+}
+.report-text {
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--ink-soft);
+  margin: 0 0 4px;
+}
+.report-text:last-child {
+  margin-bottom: 0;
+}
+.report-text b {
+  color: var(--gold);
+}
+.report-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--ink-soft);
+}
+.report-list li::marker {
+  color: var(--ink-faint);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+}
+.report-list b {
+  color: var(--ink);
+}
+
 footer.foot {
   margin-top: 30px;
   padding-top: 14px;

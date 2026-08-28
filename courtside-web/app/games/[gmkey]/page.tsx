@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBox } from "@/lib/postgameReport";
+import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights";
+import { getGameRarity } from "@/lib/rarity";
 
 type TeamRef = { tcode: string; name: string; abbr: string; color: string } | null;
 
@@ -40,6 +43,9 @@ type PlayerStatRow = {
   ast: number | null;
   stl: number | null;
   blk: number | null;
+  turnovers: number | null;
+  fouls: number | null;
+  is_starter: boolean | null;
   min_played: number | null;
   fgm: number | null;
   fga: number | null;
@@ -50,7 +56,20 @@ type PlayerStatRow = {
   player: { name: string } | null;
 };
 
-type EventRow = { event_order: number; home_win_prob: number | null };
+type EventRow = {
+  event_order: number;
+  quarter: string;
+  clock_min: number | null;
+  clock_sec: number | null;
+  action_code: string | null;
+  pcode: string | null;
+  tcode: string | null;
+  home_score: number;
+  away_score: number;
+  home_win_prob: number | null;
+  wpa_home: number | null;
+  objective_prob: number | null;
+};
 
 async function getGame(gmkey: string): Promise<GameInfo | null> {
   const { data, error } = await supabase
@@ -78,7 +97,7 @@ async function getPlayerStats(gmkey: string) {
   const { data } = await supabase
     .from("game_player_stats")
     .select(
-      "pcode, tcode, pts, reb, ast, stl, blk, min_played, fgm, fga, tpm, tpa, ftm, fta, player:players(name)"
+      "pcode, tcode, pts, reb, ast, stl, blk, turnovers, fouls, is_starter, min_played, fgm, fga, tpm, tpa, ftm, fta, player:players(name)"
     )
     .eq("gmkey", gmkey)
     .order("pts", { ascending: false });
@@ -88,10 +107,22 @@ async function getPlayerStats(gmkey: string) {
 async function getEvents(gmkey: string) {
   const { data } = await supabase
     .from("game_events")
-    .select("event_order, home_win_prob")
+    .select("event_order, quarter, clock_min, clock_sec, action_code, pcode, tcode, home_score, away_score, home_win_prob, wpa_home, objective_prob")
     .eq("gmkey", gmkey)
     .order("event_order", { ascending: true });
   return (data ?? []) as EventRow[];
+}
+
+// action_codes(30여 개, 가벼움) 통째로 가져와 code->label 맵 - courtside_template.html의
+// ACTION_LABELS 오브젝트와 같은 역할.
+async function getActionLabels(): Promise<Map<string, string>> {
+  const { data } = await supabase.from("action_codes").select("code, label");
+  return new Map((data ?? []).map((r) => [r.code as string, r.label as string]));
+}
+
+async function getPregameFeatures(gmkey: string): Promise<PregameFeatures | null> {
+  const { data } = await supabase.from("pregame_features").select("*").eq("gmkey", gmkey).maybeSingle();
+  return (data as PregameFeatures) ?? null;
 }
 
 function WinProbChart({ events, homeColor }: { events: EventRow[]; homeColor: string }) {
@@ -154,16 +185,83 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
   const game = await getGame(gmkey);
   if (!game) notFound();
 
-  const [teamStats, playerStats, events] = await Promise.all([
+  const [teamStats, playerStats, events, pregameFeatures, actionLabels] = await Promise.all([
     getTeamStats(gmkey),
     getPlayerStats(gmkey),
     getEvents(gmkey),
+    getPregameFeatures(gmkey),
+    getActionLabels(),
   ]);
 
   const homeTeam = teamStats.find((t) => t.tcode === game.home_team?.tcode);
   const awayTeam = teamStats.find((t) => t.tcode === game.away_team?.tcode);
   const homePlayers = playerStats.filter((p) => p.tcode === game.home_team?.tcode);
   const awayPlayers = playerStats.filter((p) => p.tcode === game.away_team?.tcode);
+
+  // 요청: "코트사이드웹에도 같은 리포트 붙여줘" - courtside_template.html(35차)의 AI
+  // 코트사이드 리포트/프리뷰 인사이트를 그대로 포팅. 정적 페이지는 미리 구운 timeline
+  // 배열을 클라이언트에서 훑었지만, 여기는 Supabase game_events를 서버에서 한 번에
+  // 불러와 lib/postgameReport.ts(A1-A8 그대로 이식)가 같은 계산을 함.
+  const playerNameMap = new Map(playerStats.map((p) => [p.pcode, p.player?.name ?? p.pcode]));
+  const rawEvents = events.map((e) => ({
+    event_order: e.event_order,
+    quarter: e.quarter,
+    clock_min: e.clock_min,
+    clock_sec: e.clock_sec,
+    action_code: e.action_code,
+    action_label: e.action_code ? actionLabels.get(e.action_code) ?? e.action_code : null,
+    pcode: e.pcode,
+    player_name: e.pcode ? playerNameMap.get(e.pcode) ?? null : null,
+    tcode: e.tcode,
+    home_score: e.home_score,
+    away_score: e.away_score,
+    home_win_prob: e.home_win_prob,
+    wpa_home: e.wpa_home,
+    objective_prob: e.objective_prob,
+  }));
+  const derivedEvents: GameEvent[] = attachDerivedFields(rawEvents);
+
+  const box: PlayerBox[] = playerStats.map((p) => ({
+    pcode: p.pcode,
+    tcode: p.tcode,
+    name: p.player?.name ?? p.pcode,
+    is_starter: p.is_starter,
+    pts: p.pts ?? 0,
+    // game_player_stats.fgm/fga는 원본 소스가 2점슛만 따로 셈(3점은 tpm/tpa) - 리포트
+    // 엔진(gameScore 등)은 정적 페이지처럼 합산 FG를 기대해서 여기서 더해서 넘김(실측
+    // 확인 - lib/postgameReport.ts의 PlayerBox 주석 참고).
+    fgm: (p.fgm ?? 0) + (p.tpm ?? 0),
+    fga: (p.fga ?? 0) + (p.tpa ?? 0),
+    ftm: p.ftm ?? 0,
+    fta: p.fta ?? 0,
+    reb: p.reb ?? 0,
+    ast: p.ast ?? 0,
+    stl: p.stl ?? 0,
+    blk: p.blk ?? 0,
+    fouls: p.fouls ?? 0,
+    turnovers: p.turnovers ?? 0,
+  }));
+
+  let reportSections: { title: string; html: string }[] = [];
+  if (game.home_score != null && game.away_score != null && derivedEvents.length > 0 && game.home_team && game.away_team) {
+    const rarity = await getGameRarity(game.home_score, game.away_score);
+    reportSections = buildPostgameReport({
+      events: derivedEvents,
+      box,
+      homeTcode: game.home_team.tcode,
+      awayTcode: game.away_team.tcode,
+      homeTname: game.home_team.name,
+      awayTname: game.away_team.name,
+      homeScore: game.home_score,
+      awayScore: game.away_score,
+      rarity,
+    });
+  }
+
+  const pregameLines =
+    pregameFeatures && game.home_team && game.away_team
+      ? pregameInsightItems(pregameFeatures, game.home_team.name, game.away_team.name)
+      : [];
 
   const playerTable = (rows: PlayerStatRow[]) => (
     <div className="table-scroll">
@@ -234,10 +332,33 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
         {game.game_date} · {game.season_name} {game.season_category} · {game.gmkey}
       </div>
 
+      {pregameLines.length > 0 && (
+        <div className="panel">
+          <div className="panel-title">더 깊은 프리뷰 인사이트</div>
+          <ul className="report-list">
+            {pregameLines.map((line, i) => (
+              <li key={i} dangerouslySetInnerHTML={{ __html: line }} />
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="panel">
         <div className="panel-title">승률 흐름 (game_events, {events.length}개 이벤트)</div>
         <WinProbChart events={events} homeColor={game.home_team?.color ?? "#888"} />
       </div>
+
+      {reportSections.length > 0 && (
+        <div className="panel">
+          <div className="panel-title">🏀 AI 코트사이드 리포트</div>
+          {reportSections.map((s) => (
+            <div className="report-section" key={s.title}>
+              <div className="report-section-title">{s.title}</div>
+              <div dangerouslySetInnerHTML={{ __html: s.html }} />
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="panel">
         <div className="panel-title">팀 박스스코어</div>
