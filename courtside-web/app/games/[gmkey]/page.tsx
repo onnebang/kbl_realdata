@@ -7,6 +7,7 @@ import { getGameRarity } from "@/lib/rarity";
 import { getSeasonStatsAsOf, getRecentSchedule, getHeadToHead, getStandingsAsOf } from "@/lib/matchups";
 import { teamZoneStats, buildZoneCompareSvg, type ShotRow } from "@/lib/zoneCompare";
 import { TeamBadge } from "@/components/TeamBadge";
+import GameReplay from "@/components/GameReplay";
 
 type TeamRef = { tcode: string; name: string; abbr: string; color: string; logo_url: string | null } | null;
 
@@ -128,9 +129,12 @@ async function getPregameFeatures(gmkey: string): Promise<PregameFeatures | null
   return (data as PregameFeatures) ?? null;
 }
 
-async function getShots(gmkey: string): Promise<ShotRow[]> {
-  const { data } = await supabase.from("shot_log").select("x, y, d, made, tcode").eq("gmkey", gmkey);
-  return (data ?? []) as ShotRow[];
+// GameReplay(인터랙티브 리플레이)가 "현재 쿼터까지" 슛만 필터링하는 데 quarter가 필요해서
+// 같이 받아둠 - zoneCompareSvg(전체 경기 요약, 하단 고정 패널)는 quarter 필드를 무시하고
+// 그대로 씀(ShotRow의 상위 집합이라 타입 호환).
+async function getShots(gmkey: string): Promise<(ShotRow & { quarter: string })[]> {
+  const { data } = await supabase.from("shot_log").select("x, y, d, made, tcode, quarter").eq("gmkey", gmkey);
+  return (data ?? []) as (ShotRow & { quarter: string })[];
 }
 
 function WinProbChart({ events, homeColor }: { events: EventRow[]; homeColor: string }) {
@@ -303,6 +307,8 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
       ? buildZoneCompareSvg(teamZoneStats(shots, game.home_team.tcode), teamZoneStats(shots, game.away_team.tcode))
       : null;
 
+  const replayPlayers = playerStats.map((p) => ({ pcode: p.pcode, name: p.player?.name ?? p.pcode, tcode: p.tcode }));
+
   const playerTable = (rows: PlayerStatRow[]) => (
     <div className="table-scroll">
       <table className="data-table">
@@ -381,6 +387,28 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
       <div className="subtitle">
         {game.game_date} · {game.season_name} {game.season_category} · {game.gmkey}
       </div>
+
+      {game.home_team && game.away_team && derivedEvents.length > 0 && (
+        <GameReplay
+          events={derivedEvents}
+          players={replayPlayers}
+          homeTeam={{
+            tcode: game.home_team.tcode,
+            name: game.home_team.name,
+            abbr: game.home_team.abbr,
+            color: game.home_team.color,
+            logoUrl: game.home_team.logo_url,
+          }}
+          awayTeam={{
+            tcode: game.away_team.tcode,
+            name: game.away_team.name,
+            abbr: game.away_team.abbr,
+            color: game.away_team.color,
+            logoUrl: game.away_team.logo_url,
+          }}
+          shots={shots}
+        />
+      )}
 
       {pregameLines.length > 0 && (
         <div className="panel">
