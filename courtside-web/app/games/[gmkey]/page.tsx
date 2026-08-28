@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBox } from "@/lib/postgameReport";
 import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights";
 import { getGameRarity } from "@/lib/rarity";
+import { getSeasonStatsAsOf, getRecentSchedule, getHeadToHead, getStandingsAsOf } from "@/lib/matchups";
 
 type TeamRef = { tcode: string; name: string; abbr: string; color: string } | null;
 
@@ -263,6 +264,29 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
       ? pregameInsightItems(pregameFeatures, game.home_team.name, game.away_team.name)
       : [];
 
+  // 매치업 패널(README "다음 단계" - 매치업/선수 프로필/득점 분포 중 첫 번째) - 전부
+  // games/game_team_stats에서 라이브로 계산 가능해서(정적 페이지처럼 미리 구운 JSON이
+  // 필요 없음) 새 마이그레이션 없이 바로 포팅.
+  let homeSeasonStats = null as Awaited<ReturnType<typeof getSeasonStatsAsOf>>;
+  let awaySeasonStats = null as Awaited<ReturnType<typeof getSeasonStatsAsOf>>;
+  let homeSchedule: Awaited<ReturnType<typeof getRecentSchedule>> = [];
+  let awaySchedule: Awaited<ReturnType<typeof getRecentSchedule>> = [];
+  let h2h: Awaited<ReturnType<typeof getHeadToHead>> | null = null;
+  let standings: Awaited<ReturnType<typeof getStandingsAsOf>> = [];
+  let allTeams: { tcode: string; name: string; abbr: string; color: string }[] = [];
+  if (game.home_team && game.away_team) {
+    [homeSeasonStats, awaySeasonStats, homeSchedule, awaySchedule, h2h, standings, allTeams] = await Promise.all([
+      getSeasonStatsAsOf(game.home_team.tcode, game.season_name, game.game_date),
+      getSeasonStatsAsOf(game.away_team.tcode, game.season_name, game.game_date),
+      getRecentSchedule(game.home_team.tcode, game.game_date),
+      getRecentSchedule(game.away_team.tcode, game.game_date),
+      getHeadToHead(game.home_team.tcode, game.away_team.tcode, game.game_date),
+      getStandingsAsOf(game.season_name, game.game_date),
+      supabase.from("teams").select("tcode, name, abbr, color").then((r) => r.data ?? []),
+    ]);
+  }
+  const teamMetaByTcode = new Map(allTeams.map((t) => [t.tcode, t]));
+
   const playerTable = (rows: PlayerStatRow[]) => (
     <div className="table-scroll">
       <table className="data-table">
@@ -340,6 +364,148 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
               <li key={i} dangerouslySetInnerHTML={{ __html: line }} />
             ))}
           </ul>
+        </div>
+      )}
+
+      {(homeSeasonStats || awaySeasonStats) && (
+        <div className="panel">
+          <div className="panel-title">시즌 평균 비교 ({(homeSeasonStats ?? awaySeasonStats)?.gp}경기 기준, 이 경기 이전)</div>
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{game.home_team?.name}</th>
+                  <th>항목</th>
+                  <th>{game.away_team?.name}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(
+                  [
+                    ["경기당 득점", "ppg"],
+                    ["경기당 실점", "oppPpg"],
+                    ["3점 성공", "threePg"],
+                    ["어시스트", "astPg"],
+                    ["리바운드", "rebPg"],
+                    ["스틸", "stlPg"],
+                    ["블록", "blkPg"],
+                    ["턴오버", "tovPg"],
+                  ] as const
+                ).map(([label, key]) => (
+                  <tr key={key}>
+                    <td>{homeSeasonStats ? homeSeasonStats[key].toFixed(1) : "-"}</td>
+                    <td>{label}</td>
+                    <td>{awaySeasonStats ? awaySeasonStats[key].toFixed(1) : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {(homeSchedule.length > 0 || awaySchedule.length > 0) && (
+        <div className="panel">
+          <div className="panel-title">최근 결과 (이 경기 이전 5경기)</div>
+          <div className="matchup-schedule-grid">
+            {[
+              [game.home_team, homeSchedule],
+              [game.away_team, awaySchedule],
+            ].map(([team, sched], i) => (
+              <div className="sched-col" key={i}>
+                <div className="sched-col-title">{(team as TeamRef)?.name}</div>
+                {(sched as typeof homeSchedule).map((g) => (
+                  <div className="sched-row" key={g.gmkey}>
+                    <span className={`sched-result ${g.teamScore > g.oppScore ? "win" : "loss"}`}>
+                      {g.teamScore > g.oppScore ? "W" : "L"}
+                    </span>
+                    <span className="sched-opp">
+                      {g.isHome ? "vs" : "@"} {g.oppName}
+                    </span>
+                    <span className="sched-score">
+                      {g.teamScore}-{g.oppScore}
+                    </span>
+                  </div>
+                ))}
+                {(sched as typeof homeSchedule).length === 0 && <div className="empty-note">기록 없음</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {h2h && (
+        <div className="panel">
+          <div className="panel-title">역대 맞대결</div>
+          {h2h.meetings > 0 ? (
+            <>
+              <p className="report-text">
+                역대 맞대결 {h2h.meetings}경기 - {game.home_team?.name} {h2h.homeWins}승, {game.away_team?.name} {h2h.awayWins}승
+              </p>
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>날짜</th>
+                      <th>홈</th>
+                      <th>스코어</th>
+                      <th>원정</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {h2h.recentMeetings.map((m) => (
+                      <tr key={m.gmkey}>
+                        <td>{m.gameDate}</td>
+                        <td>{teamMetaByTcode.get(m.homeTcode)?.name ?? m.homeTcode}</td>
+                        <td>
+                          {m.homeScore}-{m.awayScore}
+                        </td>
+                        <td>{teamMetaByTcode.get(m.awayTcode)?.name ?? m.awayTcode}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <div className="empty-note">이 경기 이전 맞대결 기록 없음(첫 대결 또는 신생팀)</div>
+          )}
+        </div>
+      )}
+
+      {standings.length > 0 && (
+        <div className="panel">
+          <div className="panel-title">
+            리그 순위 ({game.season_name} 정규시즌, 이 경기 시점 기준)
+          </div>
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>팀</th>
+                  <th>W</th>
+                  <th>L</th>
+                  <th>PCT</th>
+                </tr>
+              </thead>
+              <tbody>
+                {standings.map((r, i) => {
+                  const tm = teamMetaByTcode.get(r.tcode);
+                  const isCurrent = r.tcode === game.home_team?.tcode || r.tcode === game.away_team?.tcode;
+                  return (
+                    <tr key={r.tcode} style={isCurrent ? { color: tm?.color } : undefined}>
+                      <td>{i + 1}</td>
+                      <td>{tm?.name ?? r.tcode}</td>
+                      <td>{r.wins}</td>
+                      <td>{r.losses}</td>
+                      <td>{(r.pct * 100).toFixed(1)}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
