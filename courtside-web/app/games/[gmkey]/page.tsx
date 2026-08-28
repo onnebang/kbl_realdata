@@ -322,7 +322,9 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
         <tbody>
           {rows.map((p) => (
             <tr key={p.pcode}>
-              <td>{p.player?.name ?? p.pcode}</td>
+              <td>
+                <Link href={`/players/${p.pcode}`}>{p.player?.name ?? p.pcode}</Link>
+              </td>
               <td>{p.min_played?.toFixed(1) ?? "-"}</td>
               <td>{p.pts}</td>
               <td>{p.reb}</td>
