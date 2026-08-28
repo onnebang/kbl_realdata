@@ -1295,6 +1295,87 @@ function computeHotStreakEvents(uptoIdx) {
   return events;
 }
 
+// 요청: "2연속 득점만 표시하는게 아닌, 3분사이 5리바, 5분사이 4어시, 10분사이 2블락" -
+// computeHotStreakEvents처럼 "이벤트 인덱스" 기준이 아니라 실제 게임시계(초)를 쓰는 범용
+// 슬라이딩 윈도우 폭발 감지기. elapsedOfRow(row)로 절대 경과초를 구해서 그룹(선수)별 큐를
+// 유지하고, 윈도우 밖으로 나간 이벤트는 버림. computeHotStreakEvents와 같은 "처음 임계값을
+// 넘는 순간만 기록"하는 원칙이되, 미스로 카운터가 리셋되는 대신 큐가 자연스럽게 minCount
+// 밑으로 줄어들 때 active 플래그가 풀려서 나중에 진짜 새로운 폭발이 또 잡힐 수 있음(한
+// 선수가 한 경기에 여러 번 몰아치는 경우도 각각 잡아야 해서).
+function findStatBursts(uptoIdx, { codes, groupKeyFn, windowSec, minCount }) {
+  const queues = {};
+  const active = {};
+  const bursts = [];
+  for (let i = 1; i <= uptoIdx; i++) {
+    const row = timeline[i];
+    if (!row.pcode || !codes.has(row.action)) continue;
+    const key = groupKeyFn(row);
+    const elapsed = elapsedOfRow(row);
+    const q = queues[key] || (queues[key] = []);
+    q.push({ elapsed, idx: i, row });
+    while (q.length && elapsed - q[0].elapsed > windowSec) q.shift();
+    if (q.length >= minCount) {
+      if (!active[key]) {
+        active[key] = true;
+        bursts.push({
+          key, count: q.length, startIdx: q[0].idx, endIdx: i,
+          startRow: q[0].row, endRow: row, durationSec: elapsed - q[0].elapsed,
+        });
+      }
+    } else {
+      active[key] = false;
+    }
+  }
+  return bursts;
+}
+
+// 튜닝값은 초기 제안 - 실제 데모 경기로 확인 후 필요하면 조정(농구는 리바운드/어시스트
+// 빈도가 경기마다 편차가 커서 한 경기 기준으로 튜닝한 값이 다른 경기엔 과다/과소 발동할 수 있음).
+const STAT_BURST_DEFS = [
+  { key: 'rebound', label: '리바운드', codes: REB_CODES_JS, minCount: 5, windowSec: 240 },
+  { key: 'assist', label: '어시스트', codes: new Set(['211']), minCount: 4, windowSec: 300 },
+  { key: 'block', label: '블록', codes: new Set(['213']), minCount: 3, windowSec: 300 },
+];
+function computeStatBursts(uptoIdx) {
+  const out = [];
+  for (const def of STAT_BURST_DEFS) {
+    const bursts = findStatBursts(uptoIdx, { codes: def.codes, groupKeyFn: r => r.pcode, windowSec: def.windowSec, minCount: def.minCount });
+    for (const b of bursts) out.push({ ...b, defKey: def.key, label: def.label });
+  }
+  return out;
+}
+
+// 225(팀파울)는 특정 선수 귀책이 아니라서 제외 - FOUL_CODES_JS(박스스코어 집계용, 216/224만)와
+// 다르게 215(파울자유투로 이어지는 슈팅파울)도 포함해야 "이 선수가 짧은 시간에 파울을 몰아
+// 범했다"를 놓치지 않음.
+const PERSONAL_FOUL_CODES_JS = new Set(['215', '216', '224']);
+const FOUL_TROUBLE_WINDOW_SEC = 360, FOUL_TROUBLE_QUICK_COUNT = 3;
+function findFoulTroubleEvents(uptoIdx) {
+  return findStatBursts(uptoIdx, {
+    codes: PERSONAL_FOUL_CODES_JS, groupKeyFn: r => r.pcode,
+    windowSec: FOUL_TROUBLE_WINDOW_SEC, minCount: FOUL_TROUBLE_QUICK_COUNT,
+  });
+}
+
+// 파울트러블로 물러난 뒤 상대가 런을 탔는지 - 이 선수의 다음 교체-OUT(102) 시점까지(못 찾으면
+// +40이벤트로 폴백) row.runHome/runAway(이미 매 이벤트에 있는 필드)로 상대 최대 런을 확인.
+function checkOpponentRunAfterFoulTrouble(foulEvent, uptoIdx) {
+  const pcode = foulEvent.key;
+  const team = foulEvent.endRow.team;
+  let scanEnd = Math.min(uptoIdx, foulEvent.endIdx + 40);
+  for (let i = foulEvent.endIdx + 1; i <= uptoIdx; i++) {
+    const r = timeline[i];
+    if (r.action === '102' && r.pcode === pcode) { scanEnd = i; break; }
+  }
+  let maxOppRun = 0;
+  for (let i = foulEvent.endIdx; i <= scanEnd; i++) {
+    const r = timeline[i];
+    const oppRun = team === GAME.homeTcode ? r.runAway : r.runHome;
+    if (oppRun && oppRun > maxOppRun) maxOppRun = oppRun;
+  }
+  return maxOppRun >= 6 ? { pcode, team, maxOppRun, scanEndIdx: scanEnd } : null;
+}
+
 function gameScore(b) {
   return b.pts + 0.4 * b.fgm - 0.7 * b.fga - 0.4 * (b.fta - b.ftm) + 0.7 * b.oreb + 0.3 * b.dreb
     + b.stl + 0.7 * b.ast + 0.7 * b.blk - 0.4 * b.foul - b.to;
