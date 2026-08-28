@@ -92,6 +92,27 @@ select {
   color: var(--ink);
 }
 
+/* 팀 배지(로고 or 컬러+약어 폴백) - components/TeamBadge.tsx, ESPN 참고("팀별로 색상과
+   로고를 주고 구분") */
+.team-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+.team-badge.has-logo {
+  background: var(--surface);
+  object-fit: contain;
+  padding: 3px;
+  border: 1px solid rgba(var(--line-rgb), 0.1);
+  vertical-align: middle;
+}
+
 .game-list {
   display: flex;
   flex-direction: column;
@@ -137,16 +158,33 @@ select {
   font-weight: 700;
 }
 
+.team-side {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.team-side.home {
+  flex-direction: row-reverse;
+}
+
+.team-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.62;
+}
 .team-name.home {
   color: var(--home);
   text-align: right;
-  flex: 1;
 }
-
 .team-name.away {
   color: var(--away);
   text-align: left;
-  flex: 1;
+}
+.team-name.win {
+  opacity: 1;
 }
 
 .game-card-score {
@@ -154,6 +192,14 @@ select {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   white-space: nowrap;
+  flex-shrink: 0;
+}
+.game-card-score .lose {
+  opacity: 0.45;
+}
+.game-card-score .score-sep {
+  margin: 0 2px;
+  color: var(--ink-faint);
 }
 
 .game-card-category {

@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { TeamBadge } from "@/components/TeamBadge";
 
 type TeamRef = {
   tcode: string;
   name: string;
   abbr: string;
   color: string;
+  logo_url: string | null;
 } | null;
 
 type GameRow = {
@@ -32,8 +34,8 @@ async function getGames(seasonName: string | undefined) {
     .from("games")
     .select(
       `gmkey, game_date, home_score, away_score, season_category, season_name,
-       home_team:teams!games_home_tcode_fkey(tcode, name, abbr, color),
-       away_team:teams!games_away_tcode_fkey(tcode, name, abbr, color)`
+       home_team:teams!games_home_tcode_fkey(tcode, name, abbr, color, logo_url),
+       away_team:teams!games_away_tcode_fkey(tcode, name, abbr, color, logo_url)`
     )
     .not("home_score", "is", null)
     .order("game_date", { ascending: false })
@@ -86,21 +88,36 @@ export default async function HomePage({
         {games.length === 0 && (
           <div className="empty-note">이 시즌 경기 데이터가 아직 없음(마이그레이션 진행 중일 수 있음)</div>
         )}
-        {games.map((g) => (
-          <Link key={g.gmkey} href={`/games/${g.gmkey}`} className="game-card">
-            <div className="game-card-row">
-              <span className="game-card-date">{fmtDate(g.game_date)}</span>
-              <span className="game-card-teams">
-                <span className="team-name home">{g.home_team?.name ?? g.gmkey}</span>
-                <span className="game-card-score">
-                  {g.home_score} - {g.away_score}
+        {games.map((g) => {
+          const homeWon = (g.home_score ?? 0) > (g.away_score ?? 0);
+          return (
+            <Link key={g.gmkey} href={`/games/${g.gmkey}`} className="game-card">
+              <div className="game-card-row">
+                <span className="game-card-date">{fmtDate(g.game_date)}</span>
+                <span className="game-card-teams">
+                  <span className="team-side home">
+                    <TeamBadge
+                      team={g.home_team ? { name: g.home_team.name, abbr: g.home_team.abbr, color: g.home_team.color, logoUrl: g.home_team.logo_url } : null}
+                    />
+                    <span className={`team-name home ${homeWon ? "win" : ""}`}>{g.home_team?.name ?? g.gmkey}</span>
+                  </span>
+                  <span className="game-card-score">
+                    <span className={homeWon ? "win" : "lose"}>{g.home_score}</span>
+                    <span className="score-sep">-</span>
+                    <span className={!homeWon ? "win" : "lose"}>{g.away_score}</span>
+                  </span>
+                  <span className="team-side away">
+                    <span className={`team-name away ${!homeWon ? "win" : ""}`}>{g.away_team?.name ?? ""}</span>
+                    <TeamBadge
+                      team={g.away_team ? { name: g.away_team.name, abbr: g.away_team.abbr, color: g.away_team.color, logoUrl: g.away_team.logo_url } : null}
+                    />
+                  </span>
                 </span>
-                <span className="team-name away">{g.away_team?.name ?? ""}</span>
-              </span>
-              <span className="game-card-category">{g.season_category}</span>
-            </div>
-          </Link>
-        ))}
+                <span className="game-card-category">{g.season_category}</span>
+              </div>
+            </Link>
+          );
+        })}
       </div>
 
       <footer className="foot">

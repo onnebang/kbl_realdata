@@ -6,8 +6,9 @@ import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights
 import { getGameRarity } from "@/lib/rarity";
 import { getSeasonStatsAsOf, getRecentSchedule, getHeadToHead, getStandingsAsOf } from "@/lib/matchups";
 import { teamZoneStats, buildZoneCompareSvg, type ShotRow } from "@/lib/zoneCompare";
+import { TeamBadge } from "@/components/TeamBadge";
 
-type TeamRef = { tcode: string; name: string; abbr: string; color: string } | null;
+type TeamRef = { tcode: string; name: string; abbr: string; color: string; logo_url: string | null } | null;
 
 type GameInfo = {
   gmkey: string;
@@ -78,8 +79,8 @@ async function getGame(gmkey: string): Promise<GameInfo | null> {
     .from("games")
     .select(
       `gmkey, game_date, home_score, away_score, season_name, season_category,
-       home_team:teams!games_home_tcode_fkey(tcode, name, abbr, color),
-       away_team:teams!games_away_tcode_fkey(tcode, name, abbr, color)`
+       home_team:teams!games_home_tcode_fkey(tcode, name, abbr, color, logo_url),
+       away_team:teams!games_away_tcode_fkey(tcode, name, abbr, color, logo_url)`
     )
     .eq("gmkey", gmkey)
     .single();
@@ -280,7 +281,7 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
   let awaySchedule: Awaited<ReturnType<typeof getRecentSchedule>> = [];
   let h2h: Awaited<ReturnType<typeof getHeadToHead>> | null = null;
   let standings: Awaited<ReturnType<typeof getStandingsAsOf>> = [];
-  let allTeams: { tcode: string; name: string; abbr: string; color: string }[] = [];
+  let allTeams: { tcode: string; name: string; abbr: string; color: string; logo_url: string | null }[] = [];
   if (game.home_team && game.away_team) {
     [homeSeasonStats, awaySeasonStats, homeSchedule, awaySchedule, h2h, standings, allTeams] = await Promise.all([
       getSeasonStatsAsOf(game.home_team.tcode, game.season_name, game.game_date),
@@ -289,7 +290,7 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
       getRecentSchedule(game.away_team.tcode, game.game_date),
       getHeadToHead(game.home_team.tcode, game.away_team.tcode, game.game_date),
       getStandingsAsOf(game.season_name, game.game_date),
-      supabase.from("teams").select("tcode, name, abbr, color").then((r) => r.data ?? []),
+      supabase.from("teams").select("tcode, name, abbr, color, logo_url").then((r) => r.data ?? []),
     ]);
   }
   const teamMetaByTcode = new Map(allTeams.map((t) => [t.tcode, t]));
@@ -360,6 +361,10 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
         }}
       >
         <div className="matchup-banner-side home" style={{ background: game.home_team?.color ?? "#888" }}>
+          <TeamBadge
+            team={game.home_team ? { name: game.home_team.name, abbr: game.home_team.abbr, color: "#ffffff33", logoUrl: game.home_team.logo_url } : null}
+            size={36}
+          />
           <span className="matchup-banner-name">{game.home_team?.name ?? game.gmkey}</span>
           <span className="matchup-banner-score">{game.home_score}</span>
         </div>
@@ -367,6 +372,10 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
         <div className="matchup-banner-side away" style={{ background: game.away_team?.color ?? "#888" }}>
           <span className="matchup-banner-score">{game.away_score}</span>
           <span className="matchup-banner-name">{game.away_team?.name ?? ""}</span>
+          <TeamBadge
+            team={game.away_team ? { name: game.away_team.name, abbr: game.away_team.abbr, color: "#ffffff33", logoUrl: game.away_team.logo_url } : null}
+            size={36}
+          />
         </div>
       </div>
       <div className="subtitle">
@@ -437,7 +446,7 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
                       {g.teamScore > g.oppScore ? "W" : "L"}
                     </span>
                     <span className="sched-opp">
-                      {g.isHome ? "vs" : "@"} {g.oppName}
+                      {g.isHome ? "vs" : "@"} <TeamBadge team={teamMetaByTcode.get(g.oppTcode) ? { ...teamMetaByTcode.get(g.oppTcode)!, logoUrl: teamMetaByTcode.get(g.oppTcode)!.logo_url } : null} size={16} /> {g.oppName}
                     </span>
                     <span className="sched-score">
                       {g.teamScore}-{g.oppScore}
@@ -473,11 +482,17 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
                     {h2h.recentMeetings.map((m) => (
                       <tr key={m.gmkey}>
                         <td>{m.gameDate}</td>
-                        <td>{teamMetaByTcode.get(m.homeTcode)?.name ?? m.homeTcode}</td>
+                        <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <TeamBadge team={teamMetaByTcode.get(m.homeTcode) ? { ...teamMetaByTcode.get(m.homeTcode)!, logoUrl: teamMetaByTcode.get(m.homeTcode)!.logo_url } : null} size={16} />
+                          {teamMetaByTcode.get(m.homeTcode)?.name ?? m.homeTcode}
+                        </td>
                         <td>
                           {m.homeScore}-{m.awayScore}
                         </td>
-                        <td>{teamMetaByTcode.get(m.awayTcode)?.name ?? m.awayTcode}</td>
+                        <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <TeamBadge team={teamMetaByTcode.get(m.awayTcode) ? { ...teamMetaByTcode.get(m.awayTcode)!, logoUrl: teamMetaByTcode.get(m.awayTcode)!.logo_url } : null} size={16} />
+                          {teamMetaByTcode.get(m.awayTcode)?.name ?? m.awayTcode}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -513,7 +528,10 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
                   return (
                     <tr key={r.tcode} style={isCurrent ? { color: tm?.color } : undefined}>
                       <td>{i + 1}</td>
-                      <td>{tm?.name ?? r.tcode}</td>
+                      <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <TeamBadge team={tm ? { ...tm, logoUrl: tm.logo_url } : null} size={18} />
+                        {tm?.name ?? r.tcode}
+                      </td>
                       <td>{r.wins}</td>
                       <td>{r.losses}</td>
                       <td>{(r.pct * 100).toFixed(1)}%</td>
