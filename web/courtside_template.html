@@ -1562,15 +1562,18 @@ function renderZoneCompare() {
     const hx0 = x - GAP / 2 - BAR_W, ax0 = x + GAP / 2;
     svg += `<rect x="${hx0}" y="${HY - hLen}" width="${BAR_W}" height="${hLen}" fill="var(--home)" rx="1.5"/>`;
     svg += `<rect x="${ax0}" y="${HY - aLen}" width="${BAR_W}" height="${aLen}" fill="${awayFill}" rx="1.5"/>`;
-    // 회전된(rotate(-90)) 값 라벨은 자기 앵커점에서 위쪽으로 글자폭만큼(~16) 더 뻗어
-    // 나가므로, 구역명 라벨은 그만큼 더 띄워야 겹치지 않음(getBoundingClientRect로 실측
-    // 후 확정한 여백).
-    const labelY = HY - Math.max(hLen, aLen, 14) - 24;
-    svg += `<text x="${x}" y="${labelY}" text-anchor="middle" font-size="8.5" font-weight="700" fill="var(--ink)" font-family="Pretendard, sans-serif">${zoneLabels[z]}</text>`;
+    // 회전된(rotate(-90)) 값 라벨은 자기 앵커점에서 위쪽으로 글자폭만큼(퍼센트 라벨을
+    // 12px→10px로 키운 뒤로는 "100%" 기준 ~24) 더 뻗어나가므로, 구역명 라벨은 그보다
+    // 더 띄워야 겹치지 않음(폰트 확대에 맞춰 24→38로 여백도 같이 키움).
+    const labelY = HY - Math.max(hLen, aLen, 14) - 38;
+    // 요청: "팀 통계에서도 글자가 너무 작아서 안보여" - rotateX(24deg) 틸트까지 걸린 코트라
+    // 실제 렌더 크기가 더 작아 보임(8.5/6.5는 사실상 5~6px 수준) - 12/10으로, 퍼센트
+    // 라벨은 굵게 키워서 가독성 확보.
+    svg += `<text x="${x}" y="${labelY}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)" font-family="Pretendard, sans-serif">${zoneLabels[z]}</text>`;
     const hvx = hx0 + BAR_W / 2, hvy = HY - hLen - 4;
     const avx = ax0 + BAR_W / 2, avy = HY - aLen - 4;
-    svg += `<text x="${hvx}" y="${hvy}" text-anchor="start" font-size="6.5" fill="var(--home)" font-family="IBM Plex Mono, monospace" transform="rotate(-90 ${hvx} ${hvy})">${hPct}%</text>`;
-    svg += `<text x="${avx}" y="${avy}" text-anchor="start" font-size="6.5" fill="var(--away)" font-family="IBM Plex Mono, monospace" transform="rotate(-90 ${avx} ${avy})">${aPct}%</text>`;
+    svg += `<text x="${hvx}" y="${hvy}" text-anchor="start" font-size="10" font-weight="700" fill="var(--home)" font-family="IBM Plex Mono, monospace" transform="rotate(-90 ${hvx} ${hvy})">${hPct}%</text>`;
+    svg += `<text x="${avx}" y="${avy}" text-anchor="start" font-size="10" font-weight="700" fill="var(--away)" font-family="IBM Plex Mono, monospace" transform="rotate(-90 ${avx} ${avy})">${aPct}%</text>`;
   });
 
   el.zcCourt.innerHTML = svg;
@@ -2570,12 +2573,17 @@ function drawShotChart(pcode, uptoQuarter, revealCount) {
   const VX0 = 340, VX1 = 730, VY0 = 20, VY1 = 392;  // 반코트만 보여주는 뷰박스
   el.shotChartSvg.setAttribute('viewBox', `${VX0} ${VY0} ${VX1-VX0} ${VY1-VY0}`);
 
-  let svg = `<rect x="${COURT_X[0]}" y="${COURT_Y[0]}" width="${COURT_X[1]-COURT_X[0]}" height="${COURT_Y[1]-COURT_Y[0]}" fill="none" stroke="var(--ink-faint)" stroke-width="2"/>`;
-  svg += `<circle cx="${HX}" cy="${HY}" r="6" fill="none" stroke="var(--ink-faint)" stroke-width="2"/>`;
+  // 요청: "선수 개인정보에서, 조금더 농구장스러운 이미지에, 우리가 만들었던 코트의 느낌" -
+  // 이 모달만 옛날 방식(테두리만 있는 사각형 + 골대는 작은 원 하나)으로 남아있었음 -
+  // renderZoneCompare()/팀 슛차트 등 다른 코트들이 이미 쓰는 나무색 배경 + 실제 FIBA
+  // 라인(drawCourtMarkings) + 진짜 골대(drawHoop)로 통일.
+  let svg = `<rect x="${COURT_X[0]}" y="${COURT_Y[0]}" width="${COURT_X[1]-COURT_X[0]}" height="${COURT_Y[1]-COURT_Y[0]}" fill="#d9b98a" stroke="var(--ink-faint)" stroke-width="2"/>`;
+  svg += drawCourtMarkings(HX, COURT_X[1], -1, '#fff', 1.6);
+  svg += drawHoop(HOOP_RIGHT[0], HOOP_RIGHT[1], false);
   for (const [, , maxM] of ZONE_BOUNDS_M) {
     if (maxM > 900) continue;
     const r = maxM / SCALE_M_PER_UNIT;
-    svg += `<circle cx="${HX}" cy="${HY}" r="${r}" fill="none" stroke="var(--ink-faint)" stroke-width="1" opacity="0.35" stroke-dasharray="3,3"/>`;
+    svg += `<circle cx="${HX}" cy="${HY}" r="${r}" fill="none" stroke="#fff" stroke-width="1" opacity="0.45" stroke-dasharray="3,3"/>`;
   }
 
   const zoneAgg = {};
