@@ -535,6 +535,60 @@ table.data-table td:nth-child(2) {
   margin-top: 4px;
 }
 
+/* 최근 폼(L5/L10/L15/L30 토글 + 트렌드 차트 + 10칸 스탯 그리드) - 선수 프로필 아티팩트의
+   윈도우 토글 UI를 이 프로젝트 컨벤션대로 query-param 링크로 구현(클라이언트 JS 없음). */
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.window-toggle {
+  display: flex;
+  gap: 4px;
+}
+.window-btn {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 6px;
+  color: var(--ink-soft);
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+}
+.window-btn.active {
+  color: #fff;
+  background: var(--home);
+  border-color: var(--home);
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 4px;
+  background: var(--surface-soft);
+  border-radius: 10px;
+}
+.stat-tile-val {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.stat-tile-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-faint);
+}
+
 /* 승리 기여도 리더보드(app/leaderboards/win-contribution) - 양/음 WPA 컬러는 팀 컬러와
    충돌 안 하는 별도 시맨틱 컬러(빨강/파랑 계열이 아니라 home/away 톤 재사용은 오해 소지가
    있어서 초록/주황으로 분리). */

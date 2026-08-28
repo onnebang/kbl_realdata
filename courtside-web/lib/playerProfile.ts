@@ -35,6 +35,7 @@ export type GameLogRow = {
   ast: number;
   stl: number;
   blk: number;
+  tov: number;
   fgm: number;
   fga: number;
   tpm: number;
@@ -146,21 +147,52 @@ export async function getPlayerCareerBySeason(pcode: string): Promise<{ seasons:
 // 최근 경기가 아니라 사실상 무작위/삽입 순서가 나왔음). games를 FROM으로 두고
 // game_player_stats를 N:1의 반대 방향(1:N, 이 선수 pcode로 필터한 임베드)으로 붙이면
 // game_date가 games 테이블 자체의 네이티브 컬럼이라 정상적으로 정렬됨.
-export async function getPlayerRecentGames(pcode: string, limit = 15): Promise<GameLogRow[]> {
+// "선수 프로필" 아티팩트(claude.ai/code/artifact/725944e9...) 참고 - L5/L10/L15/L30
+// 토글이 있어서 최소 30경기는 미리 받아둠(윈도우 슬라이싱은 페이지에서).
+export const MAX_GAME_LOG = 30;
+export const WINDOWS = [5, 10, 15, 30] as const;
+
+export function computeWindowAverages(games: GameLogRow[], windowN: number) {
+  const slice = games.slice(0, windowN);
+  const gp = slice.length;
+  if (!gp) return null;
+  const sum = (fn: (g: GameLogRow) => number) => slice.reduce((s, g) => s + fn(g), 0);
+  const fgm = sum((g) => g.fgm),
+    fga = sum((g) => g.fga);
+  const tpm = sum((g) => g.tpm),
+    tpa = sum((g) => g.tpa);
+  const ftm = sum((g) => g.ftm),
+    fta = sum((g) => g.fta);
+  return {
+    gp,
+    min: sum((g) => g.min) / gp,
+    pts: sum((g) => g.pts) / gp,
+    reb: sum((g) => g.reb) / gp,
+    ast: sum((g) => g.ast) / gp,
+    stl: sum((g) => g.stl) / gp,
+    blk: sum((g) => g.blk) / gp,
+    tov: sum((g) => g.tov) / gp,
+    fgPct: fga > 0 ? (fgm / fga) * 100 : null,
+    tpPct: tpa > 0 ? (tpm / tpa) * 100 : null,
+    ftPct: fta > 0 ? (ftm / fta) * 100 : null,
+  };
+}
+
+export async function getPlayerRecentGames(pcode: string, limit = MAX_GAME_LOG): Promise<GameLogRow[]> {
   const { data } = await supabase
     .from("games")
     .select(
       `gmkey, game_date, home_tcode, away_tcode, home_score, away_score,
        home_team:teams!games_home_tcode_fkey(tcode, name),
        away_team:teams!games_away_tcode_fkey(tcode, name),
-       game_player_stats!inner(pcode, tcode, min_played, pts, reb, ast, stl, blk, fgm, fga, tpm, tpa, ftm, fta)`
+       game_player_stats!inner(pcode, tcode, min_played, pts, reb, ast, stl, blk, turnovers, fgm, fga, tpm, tpa, ftm, fta)`
     )
     .eq("game_player_stats.pcode", pcode)
     .order("game_date", { ascending: false })
     .limit(limit);
   if (!data) return [];
   return data.map((row) => {
-    const stat = (row.game_player_stats as unknown as { tcode: string; min_played: number | null; pts: number | null; reb: number | null; ast: number | null; stl: number | null; blk: number | null; fgm: number | null; fga: number | null; tpm: number | null; tpa: number | null; ftm: number | null; fta: number | null }[])[0];
+    const stat = (row.game_player_stats as unknown as { tcode: string; min_played: number | null; pts: number | null; reb: number | null; ast: number | null; stl: number | null; blk: number | null; turnovers: number | null; fgm: number | null; fga: number | null; tpm: number | null; tpa: number | null; ftm: number | null; fta: number | null }[])[0];
     const homeTeam = row.home_team as unknown as { tcode: string; name: string } | null;
     const awayTeam = row.away_team as unknown as { tcode: string; name: string } | null;
     const isHome = stat.tcode === row.home_tcode;
@@ -176,6 +208,7 @@ export async function getPlayerRecentGames(pcode: string, limit = 15): Promise<G
       ast: stat.ast ?? 0,
       stl: stat.stl ?? 0,
       blk: stat.blk ?? 0,
+      tov: stat.turnovers ?? 0,
       fgm: stat.fgm ?? 0,
       fga: stat.fga ?? 0,
       tpm: stat.tpm ?? 0,
