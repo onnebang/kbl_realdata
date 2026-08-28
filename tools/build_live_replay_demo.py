@@ -181,12 +181,30 @@ def load_pregame_detail(gmkey, pregame_rows_by_gmkey, team_timelines, h2h, start
       행을 찾음(임의 5인 조합이 아니라 진짜 선발 라인업 궁합). 그 정확한 조합이 시즌 내내
       180초 미만만 같이 뛰었으면 데이터가 없을 수 있음(null로 정직하게 표시).
     - h2h: 두 팀의 과거 맞대결 전적 - 이 경기 이전 것만(leak-free), h2h는 이미 날짜순 정렬된
-      리스트라 이 gmkey 위치 이전 것만 세면 됨."""
+      리스트라 이 gmkey 위치 이전 것만 세면 됨.
+
+    2026-08-28 확장(사용자 요청 - 프리뷰를 훨씬 풍부하게) - pregame_training_table.json에
+    이미 계산돼있지만 지금까지 UI에 전혀 안 나오던 필드들 추가. 전부 순수 pass-through라
+    새 계산 로직 없음(단, ageCurveLevel_*는 export_training_table.py 쪽에서 이미
+    "FEATURE_KEYS에 아직 미포함"이라고 스스로 플래그해둔 가장 실험적인 필드라 UI에서도
+    coverage 높을 때만 노출 권장)."""
     row = pregame_rows_by_gmkey.get(gmkey)
     if row is None:
         return None
     keys = ["offrtg", "defrtg", "netrtg", "winPctRecent", "last10_winPct", "last5_netrtg", "last5_winPct",
-            "synergyOnOffRating", "restDays", "coachWinPct"]
+            "synergyOnOffRating", "restDays", "coachWinPct",
+            "pace", "efgRt", "tsRt", "rebRt", "astRt", "tovRt",
+            "last1_netrtg", "last1_offrtg", "last1_defrtg", "last1_winPct",
+            "last3_netrtg", "last3_offrtg", "last3_defrtg", "last3_winPct",
+            "last5_offrtg", "last5_defrtg",
+            "last10_netrtg", "last10_offrtg", "last10_defrtg",
+            "avgAge", "avgHeightCm", "avgWeightKg", "avgVerticalJumpCm", "verticalJumpCoverage",
+            "avgWingspanCm", "wingspanCoverage", "synergyCoverage",
+            "venueNetRtg", "foreignConcentration", "foreignPlayerCount", "rosterContinuity",
+            "runVulnBigRuns", "runVulnWorstRun",
+            "ageCurveLevel_astRt", "ageCurveLevel_astRt_coverage",
+            "ageCurveLevel_dk", "ageCurveLevel_dk_coverage",
+            "ageCurveLevel_per", "ageCurveLevel_per_coverage"]
     home_tcode, away_tcode = row["homeTcode"], row["awayTcode"]
 
     def recent_trend(tcode):

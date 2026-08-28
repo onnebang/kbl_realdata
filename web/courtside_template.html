@@ -824,6 +824,11 @@
         <div class="table-scroll"><table class="standings-table" id="standingsTable"></table></div>
       </div>
 
+      <div class="chart-block" style="margin-top:12px">
+        <div class="chart-title">더 깊은 프리뷰 인사이트</div>
+        <ul class="ai-summary" id="pregameInsights"></ul>
+      </div>
+
       <div class="ai-summary-title">AI 프리뷰 요약</div>
       <ol class="ai-summary" id="aiSummary"></ol>
 
@@ -1074,6 +1079,7 @@ const el = {
   previewBody: document.getElementById('previewBody'),
   previewChevron: document.getElementById('previewChevron'),
   previewCompare: document.getElementById('previewCompare'),
+  pregameInsights: document.getElementById('pregameInsights'),
   trendChart: document.getElementById('trendChart'),
   zcCourt: document.getElementById('zcCourt'),
   zclHomeName: document.getElementById('zclHomeName'),
@@ -1769,11 +1775,126 @@ function renderComebackStory() {
 
 function renderPreviewPanel() {
   renderPreviewCompare();
+  renderPregameInsights();
   renderTrendChart();
   renderZoneCompare();
   renderMatchups();
   renderStandings();
   renderComebackStory();
+}
+
+// 요청: "코트사이드의 분석이 더 나올 수 있도록" - pregame_training_table.json엔 이미
+// 계산돼있지만(export_training_table.py) 지금까지 UI에 전혀 안 나오던 팀 지표(4팩터·
+// 페이스·구장별 성적·런 취약성·로스터 연속성 등, load_pregame_detail()에서 새로 pd에
+// 실어둠)를 실제 인사이트 문장으로. renderZoneDominance()의 "차이가 유의미할 때만
+// 문장 생성" 패턴 재사용 - 모든 경기가 모든 지표에서 차이나는 게 아니라서 억지로 개수를
+// 채우지 않고, 실제 유의미한 차이가 있는 것만 나열(그래서 경기마다 줄 수가 다름).
+// ageCurveLevel_*(포지션별 나이-곡선 지표)는 원본 스크립트 자체가 "아직 모델 피처에도
+// 미포함"이라고 셀프 플래그한 가장 실험적인 값이라, 정직하게 문장화하기 어려워서 이번엔
+// 일부러 제외(추후 필요하면 coverage 높을 때만 노출하는 식으로 추가 가능).
+function pregameInsightItems() {
+  const pd = GAME.pregameDetail;
+  if (!pd) return [];
+  const h = pd.home, a = pd.away;
+  const lines = [];
+
+  if (h.rebRt != null && a.rebRt != null) {
+    const d = h.rebRt - a.rebRt;
+    if (Math.abs(d) >= 3) {
+      const team = d > 0 ? GAME.homeTname : GAME.awayTname;
+      lines.push(`리바운드에서 <b>${team}</b> 우위(리바운드율 ${Math.round(Math.abs(d))}%p 차이) - 세컨찬스 싸움을 눈여겨볼 것.`);
+    }
+  }
+
+  if (h.tovRt != null && a.tovRt != null) {
+    const d = a.tovRt - h.tovRt; // 홈 턴오버가 더 적으면 양수
+    if (Math.abs(d) >= 2) {
+      const team = d > 0 ? GAME.homeTname : GAME.awayTname;
+      lines.push(`턴오버 관리에서 <b>${team}</b> 우위(턴오버율 ${Math.abs(d).toFixed(1)}%p 차이) - 볼 소유권 싸움에서 유리할 가능성.`);
+    }
+  }
+
+  if (h.tsRt != null && a.tsRt != null) {
+    const d = h.tsRt - a.tsRt;
+    if (Math.abs(d) >= 2) {
+      const team = d > 0 ? GAME.homeTname : GAME.awayTname;
+      lines.push(`슈팅 효율(TS%)에서 <b>${team}</b> 우위(${Math.abs(d).toFixed(1)}%p 차이).`);
+    }
+  }
+
+  if (h.pace != null && a.pace != null) {
+    const d = Math.abs(h.pace - a.pace);
+    if (d >= 3) {
+      const fast = h.pace > a.pace ? GAME.homeTname : GAME.awayTname;
+      const slow = h.pace > a.pace ? GAME.awayTname : GAME.homeTname;
+      lines.push(`템포 스타일 충돌 - <b>${fast}</b>${eunNeun(fast)} 빠른 템포, <b>${slow}</b>${eunNeun(slow)} 느린 템포(포제션당 ${d.toFixed(1)}회 차이) - 누가 자기 페이스로 끌고 가는지가 관건.`);
+    }
+  }
+
+  for (const [side, name] of [[h, GAME.homeTname], [a, GAME.awayTname]]) {
+    if (side.last3_netrtg == null || side.last10_netrtg == null) continue;
+    const d = side.last3_netrtg - side.last10_netrtg;
+    if (Math.abs(d) >= 5) {
+      const dir = d > 0 ? '상승세' : '하락세';
+      lines.push(`<b>${name}</b> 최근 3경기 넷레이팅이 직전 10경기 평균 대비 뚜렷한 ${dir}(${fmtRating(side.last3_netrtg)} vs ${fmtRating(side.last10_netrtg)}).`);
+    }
+  }
+
+  if (h.venueNetRtg != null && h.netrtg != null) {
+    const d = h.venueNetRtg - h.netrtg;
+    if (Math.abs(d) >= 5) {
+      const dir = d > 0 ? '안방에서 유독 강함' : '안방에서 유독 부진';
+      lines.push(`<b>${GAME.homeTname}</b>${eunNeun(GAME.homeTname)} 이 홈구장에서 ${dir}(구장 넷레이팅 ${fmtRating(h.venueNetRtg)} vs 전체 ${fmtRating(h.netrtg)}).`);
+    }
+  }
+
+  for (const [side, name, oppName] of [[h, GAME.homeTname, GAME.awayTname], [a, GAME.awayTname, GAME.homeTname]]) {
+    if (side.runVulnBigRuns == null) continue;
+    if (side.runVulnBigRuns >= 2) {
+      lines.push(`<b>${name}</b>${eunNeun(name)} 최근 상대에게 8점 이상 런을 경기당 평균 ${side.runVulnBigRuns.toFixed(1)}회 허용 - <b>${oppName}</b>${iGa(oppName)} 몰아치기 시작하면 위험할 수 있음.`);
+    }
+  }
+
+  if (h.rosterContinuity != null && a.rosterContinuity != null) {
+    const d = h.rosterContinuity - a.rosterContinuity;
+    if (Math.abs(d) >= 0.15) {
+      const stable = d > 0 ? GAME.homeTname : GAME.awayTname;
+      const changed = d > 0 ? GAME.awayTname : GAME.homeTname;
+      lines.push(`로스터 안정성 차이 - <b>${stable}</b>${eunNeun(stable)} 지난 시즌 주축을 그대로 유지, <b>${changed}</b>${eunNeun(changed)} 변화 폭이 더 큼.`);
+    }
+  }
+
+  for (const [side, name] of [[h, GAME.homeTname], [a, GAME.awayTname]]) {
+    if (side.foreignConcentration == null || side.foreignPlayerCount == null) continue;
+    if (side.foreignPlayerCount >= 2 && side.foreignConcentration >= 0.75) {
+      lines.push(`<b>${name}</b>${eunNeun(name)} 외국선수 의존도가 높은 '1옵션 집중형' - 그 선수를 묶으면 공격 전체가 흔들릴 수 있음.`);
+    }
+  }
+
+  if (h.avgHeightCm != null && a.avgHeightCm != null) {
+    const d = h.avgHeightCm - a.avgHeightCm;
+    if (Math.abs(d) >= 3) {
+      const taller = d > 0 ? GAME.homeTname : GAME.awayTname;
+      lines.push(`평균 신장에서 <b>${taller}</b>${iGa(taller)} ${Math.abs(d).toFixed(1)}cm 더 큼 - 골밑 싸움에 영향을 줄 수 있음.`);
+    }
+  }
+  if (h.avgVerticalJumpCm != null && a.avgVerticalJumpCm != null &&
+      h.verticalJumpCoverage >= 0.5 && a.verticalJumpCoverage >= 0.5) {
+    const d = h.avgVerticalJumpCm - a.avgVerticalJumpCm;
+    if (Math.abs(d) >= 5) {
+      const higher = d > 0 ? GAME.homeTname : GAME.awayTname;
+      lines.push(`평균 버티컬 점프에서 <b>${higher}</b>${iGa(higher)} 우위(${Math.abs(d).toFixed(1)}cm 차이) - 리바운드·블록 경합에서 유리할 수 있음.`);
+    }
+  }
+
+  return lines;
+}
+
+function renderPregameInsights() {
+  const lines = pregameInsightItems();
+  el.pregameInsights.innerHTML = lines.length
+    ? lines.map(l => `<li>${l}</li>`).join('')
+    : '<li style="color:var(--ink-faint)">두 팀 사이 뚜렷한 지표 차이가 없음 - 전력이 비슷한 경기.</li>';
 }
 
 // 임의 팀 배지(요청: 매치업 페이지 리디자인 - teamBadgeHtml()은 "이 경기의 홈/원정" 둘 중
