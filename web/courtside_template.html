@@ -1376,6 +1376,70 @@ function checkOpponentRunAfterFoulTrouble(foulEvent, uptoIdx) {
   return maxOppRun >= 6 ? { pcode, team, maxOppRun, scanEndIdx: scanEnd } : null;
 }
 
+// 기존 renderAiSummary의 단일 "biggest" WPA 스윙 reduce를 상위 K개로 확장(A1). 득점 직후
+// 앤드원 자유투처럼 30초 이내 붙어있는 이벤트는 "같은 장면"으로 보고 하나만 채택 - 안 그러면
+// 사실상 같은 순간이 두 번 나열됨.
+function findTopWpaSwings(uptoIdx, k = 3) {
+  const candidates = [];
+  for (let i = 1; i <= uptoIdx; i++) {
+    const row = timeline[i];
+    if (row.wpaHome == null || !row.player) continue;
+    candidates.push({ idx: i, row, absWpa: Math.abs(row.wpaHome) });
+  }
+  candidates.sort((x, y) => y.absWpa - x.absWpa);
+  const picked = [];
+  for (const c of candidates) {
+    if (picked.length >= k) break;
+    if (picked.some(p => Math.abs(elapsedOfRow(p.row) - elapsedOfRow(c.row)) < 30)) continue;
+    picked.push(c);
+  }
+  return picked;
+}
+
+// A2: "AI 선정 베스트 장면" - WPA 크기만으로 고르면 A1과 항상 같은 장면이 뽑히므로, 대신
+// "얼마나 화려/짜릿한 장면인가"를 액션 종류(3점/덩크/블록/스틸)와 클러치 타이밍(4Q·연장
+// 3분 이내) 가중치로 따로 정의. A1이 이미 고른 인덱스는 제외해서 중복 방지.
+const HIGHLIGHT_ACTION_BONUS = { '205': 0.15, '207': 0.20, '213': 0.10, '212': 0.05 };
+function computeHighlightScore(row) {
+  const wpa = Math.abs(row.wpaHome || 0);
+  const isLateClutch = (row.q === 'Q4' || row.q.startsWith('X')) && row.m < 3;
+  return wpa + (isLateClutch ? 0.10 : 0) + (HIGHLIGHT_ACTION_BONUS[row.action] || 0);
+}
+function findAiPickBestScene(uptoIdx, excludeIdxSet) {
+  let best = null, bestScore = -1;
+  for (let i = 1; i <= uptoIdx; i++) {
+    const row = timeline[i];
+    if (!row.player || (excludeIdxSet && excludeIdxSet.has(i))) continue;
+    const score = computeHighlightScore(row);
+    if (score > bestScore) { bestScore = score; best = { idx: i, row, score }; }
+  }
+  return best;
+}
+
+// A3: "25%가 10분 뒤 53%가 됐다면" - 단일 이벤트 WPA(A1/A2)가 아니라, 트레일링 시간 윈도우
+// 안에서 승률이 얼마나 이동했는지. 투포인터로 각 시점 i에 대해 윈도우 안에서 가장 오래된
+// 지점(j)과 비교 - 실제 농구 승률 곡선은 이 정도 윈도우(기본 10분) 안에서 크게 출렁였다가
+// 되돌아오는 경우가 드물어서 "가장 오래된 지점 대비"만으로도 대체로 충분하지만, 만약 윈도우
+// 중간에 큰 골짜기/봉우리가 있었다면 그 내부 변동은 놓칠 수 있음(알려진 단순화).
+const DRAMATIC_SWING_WINDOW_SEC = 600, DRAMATIC_SWING_MIN_DELTA = 0.20;
+function findDramaticProbSwing(uptoIdx, windowSec = DRAMATIC_SWING_WINDOW_SEC, minDelta = DRAMATIC_SWING_MIN_DELTA) {
+  // j=0(PRE 행)은 제외하고 1부터 시작 - cumulativeElapsedJs는 'PRE' 같은 미지의 쿼터
+  // 태그를 만나면(QUARTER_ORDER_JS.indexOf가 -1) 그걸 "전체 쿼터 길이 합"으로 처리해버려서
+  // (다른 목적으로 만들어진 폴백) PRE 행의 경과시간이 마치 경기 막판인 것처럼 잘못 계산됨.
+  // marginRefAt() 등 기존 함수들도 전부 PRE 행을 명시적으로 건너뛰는 것과 같은 이유.
+  let best = null, j = 1;
+  for (let i = 1; i <= uptoIdx; i++) {
+    const ei = elapsedOfRow(timeline[i]);
+    while (j < i && elapsedOfRow(timeline[j]) < ei - windowSec) j++;
+    if (j >= i) continue;
+    const delta = timeline[i].homeProb - timeline[j].homeProb;
+    if (!best || Math.abs(delta) > Math.abs(best.delta)) {
+      best = { startIdx: j, endIdx: i, delta, durationSec: ei - elapsedOfRow(timeline[j]) };
+    }
+  }
+  return (best && Math.abs(best.delta) >= minDelta) ? best : null;
+}
+
 function gameScore(b) {
   return b.pts + 0.4 * b.fgm - 0.7 * b.fga - 0.4 * (b.fta - b.ftm) + 0.7 * b.oreb + 0.3 * b.dreb
     + b.stl + 0.7 * b.ast + 0.7 * b.blk - 0.4 * b.foul - b.to;
