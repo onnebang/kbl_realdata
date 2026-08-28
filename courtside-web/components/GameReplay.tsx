@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { TeamBadge } from "./TeamBadge";
-import { teamZoneStats, buildZoneCompareSvg, type ShotRow } from "@/lib/zoneCompare";
+import { buildCourtDotsSvg, type ShotRow } from "@/lib/zoneCompare";
 import type { GameEvent } from "@/lib/postgameReport";
 
 // "코트사이드" 시그니처 기능(인터랙티브 리플레이/스크럽) 포팅 - courtside_template.html의
@@ -164,10 +164,12 @@ export default function GameReplay({
     () => shots.filter((s) => (quarterRank.get(s.quarter) ?? 0) <= curQRank),
     [shots, curQRank, quarterRank]
   );
-  const zoneSvg =
-    filteredShots.length > 0
-      ? buildZoneCompareSvg(teamZoneStats(filteredShots, homeTeam.tcode), teamZoneStats(filteredShots, awayTeam.tcode))
-      : null;
+  // 실제 슛 점 차트(app/games/[gmkey]/page.tsx와 같은 lib/zoneCompare.ts의
+  // buildCourtDotsSvg) - 스크럽할수록 점이 하나씩 채워지는 느낌을 그대로 살림.
+  const homeQuarterShots = useMemo(() => filteredShots.filter((s) => s.tcode === homeTeam.tcode), [filteredShots, homeTeam.tcode]);
+  const awayQuarterShots = useMemo(() => filteredShots.filter((s) => s.tcode === awayTeam.tcode), [filteredShots, awayTeam.tcode]);
+  const homeDotsSvg = homeQuarterShots.length > 0 ? buildCourtDotsSvg(homeQuarterShots, homeTeam.color) : null;
+  const awayDotsSvg = awayQuarterShots.length > 0 ? buildCourtDotsSvg(awayQuarterShots, awayTeam.color) : null;
 
   const feed = events.slice(0, idx + 1).slice(-200).reverse();
 
@@ -344,11 +346,30 @@ export default function GameReplay({
         </div>
       </div>
 
-      {zoneSvg && (
+      {(homeDotsSvg || awayDotsSvg) && (
         <div className="report-section" style={{ marginTop: 16 }}>
-          <div className="report-section-title">현재 쿼터까지 구역별 슛 분포</div>
-          <div className="zc-court-tilt">
-            <svg className="zc-court" viewBox="30 27 690 357" dangerouslySetInnerHTML={{ __html: zoneSvg }} />
+          <div className="report-section-title">현재 쿼터까지 슛 차트</div>
+          <div className="matchup-schedule-grid">
+            <div>
+              <div className="explorer-stat-line">
+                {homeTeam.abbr} · {homeQuarterShots.filter((s) => s.made).length}/{homeQuarterShots.length}
+              </div>
+              {homeDotsSvg && (
+                <div className="zc-court-tilt">
+                  <svg className="zc-court" viewBox="355 27 375 357" dangerouslySetInnerHTML={{ __html: homeDotsSvg }} />
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="explorer-stat-line">
+                {awayTeam.abbr} · {awayQuarterShots.filter((s) => s.made).length}/{awayQuarterShots.length}
+              </div>
+              {awayDotsSvg && (
+                <div className="zc-court-tilt">
+                  <svg className="zc-court" viewBox="355 27 375 357" dangerouslySetInnerHTML={{ __html: awayDotsSvg }} />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

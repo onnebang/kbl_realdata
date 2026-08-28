@@ -5,7 +5,7 @@ import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBo
 import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights";
 import { getGameRarity } from "@/lib/rarity";
 import { getSeasonStatsAsOf, getRecentSchedule, getHeadToHead, getStandingsAsOf } from "@/lib/matchups";
-import { teamZoneStats, buildZoneCompareSvg, type ShotRow } from "@/lib/zoneCompare";
+import { buildCourtDotsSvg, shotValue, type ShotRow } from "@/lib/zoneCompare";
 import { TeamBadge } from "@/components/TeamBadge";
 import GameReplay from "@/components/GameReplay";
 
@@ -192,8 +192,15 @@ function statLine(t: TeamStatRow | undefined) {
   ] as const;
 }
 
-export default async function GamePage({ params }: { params: Promise<{ gmkey: string }> }) {
+export default async function GamePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ gmkey: string }>;
+  searchParams: Promise<{ outcome?: string; value?: string; quarter?: string }>;
+}) {
   const { gmkey } = await params;
+  const { outcome, value, quarter } = await searchParams;
   const game = await getGame(gmkey);
   if (!game) notFound();
 
@@ -299,13 +306,25 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
   }
   const teamMetaByTcode = new Map(allTeams.map((t) => [t.tcode, t]));
 
-  // 득점 분포(README "다음 단계" 세 번째) - shot_log는 이미 마이그레이션돼 있어서 새 작업
-  // 없이 바로 포팅. lib/zoneCompare.ts가 courtside_template.html의 teamZoneStats/
-  // renderZoneCompare/drawCourtMarkings/drawHoop을 그대로 옮김.
-  const zoneCompareSvg =
-    shots.length > 0 && game.home_team && game.away_team
-      ? buildZoneCompareSvg(teamZoneStats(shots, game.home_team.tcode), teamZoneStats(shots, game.away_team.tcode))
-      : null;
+  // 실제 슛 위치 점 차트(구역 막대 대신) - perthirtysix.com(NBA 데이터 저널리즘 사이트)을
+  // 레퍼런스로 사용자가 요청한 업그레이드("우리가 만든 팀 그래프를, 위 사이트와 같이
+  // 비교"). 필터(성공여부/슛종류/쿼터)는 이 사이트 전체 컨벤션대로 query-param GET 폼으로
+  // 서버에서 필터링(클라이언트 JS 없음) - 경기당 shot_log가 보통 100~300건이라 매번
+  // .filter()해도 비용 무시 가능. perthirtysix는 시즌 전체(수천 개) 슛이라 hexbin
+  // 밀도가 맞지만, 한 경기 단위는 이 정도 개수면 점 하나하나가 더 읽기 쉬움
+  // (lib/zoneCompare.ts의 buildCourtDotsSvg 참고).
+  const shotQuarters = Array.from(new Set(shots.map((s) => s.quarter)));
+  const filteredShots = shots.filter((s) => {
+    if (outcome === "make" && !s.made) return false;
+    if (outcome === "miss" && s.made) return false;
+    if (value && value !== "all" && shotValue(s.x, s.y, s.d) !== Number(value)) return false;
+    if (quarter && quarter !== "all" && s.quarter !== quarter) return false;
+    return true;
+  });
+  const homeFilteredShots = game.home_team ? filteredShots.filter((s) => s.tcode === game.home_team!.tcode) : [];
+  const awayFilteredShots = game.away_team ? filteredShots.filter((s) => s.tcode === game.away_team!.tcode) : [];
+  const homeShotDotsSvg = game.home_team ? buildCourtDotsSvg(homeFilteredShots, game.home_team.color) : null;
+  const awayShotDotsSvg = game.away_team ? buildCourtDotsSvg(awayFilteredShots, game.away_team.color) : null;
 
   const replayPlayers = playerStats.map((p) => ({ pcode: p.pcode, name: p.player?.name ?? p.pcode, tcode: p.tcode }));
 
@@ -577,15 +596,55 @@ export default async function GamePage({ params }: { params: Promise<{ gmkey: st
         <WinProbChart events={events} homeColor={game.home_team?.color ?? "#888"} />
       </div>
 
-      {zoneCompareSvg && (
+      {shots.length > 0 && game.home_team && game.away_team && (
         <div className="panel">
-          <div className="panel-title">구역별 시도·성공 비교 (막대가 길수록 시도 많음, shot_log {shots.length}건)</div>
-          <div className="zc-court-tilt">
-            <svg className="zc-court" viewBox="355 27 375 357" dangerouslySetInnerHTML={{ __html: zoneCompareSvg }} />
+          <div className="panel-title">
+            슛 차트 (shot_log {shots.length}건 중 {filteredShots.length}건 표시)
           </div>
-          <div className="zone-compare-legend">
-            <span className="zcl-home">● {game.home_team?.name}</span>
-            <span className="zcl-away">{game.away_team?.name} ●</span>
+          <form style={{ marginBottom: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <select name="outcome" defaultValue={outcome ?? "all"}>
+              <option value="all">성공+실패</option>
+              <option value="make">성공만</option>
+              <option value="miss">실패만</option>
+            </select>
+            <select name="value" defaultValue={value ?? "all"}>
+              <option value="all">2점+3점</option>
+              <option value="2">2점만</option>
+              <option value="3">3점만</option>
+            </select>
+            <select name="quarter" defaultValue={quarter ?? "all"}>
+              <option value="all">전체 쿼터</option>
+              {shotQuarters.map((q) => (
+                <option key={q} value={q}>
+                  {q}
+                </option>
+              ))}
+            </select>
+            <button type="submit" className="back-link" style={{ cursor: "pointer", display: "inline" }}>
+              적용
+            </button>
+          </form>
+          <div className="matchup-schedule-grid">
+            <div>
+              <div className="explorer-stat-line">
+                {game.home_team.name} · {homeFilteredShots.filter((s) => s.made).length}/{homeFilteredShots.length}
+              </div>
+              {homeShotDotsSvg && (
+                <div className="zc-court-tilt">
+                  <svg className="zc-court" viewBox="355 27 375 357" dangerouslySetInnerHTML={{ __html: homeShotDotsSvg }} />
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="explorer-stat-line">
+                {game.away_team.name} · {awayFilteredShots.filter((s) => s.made).length}/{awayFilteredShots.length}
+              </div>
+              {awayShotDotsSvg && (
+                <div className="zc-court-tilt">
+                  <svg className="zc-court" viewBox="355 27 375 357" dangerouslySetInnerHTML={{ __html: awayShotDotsSvg }} />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

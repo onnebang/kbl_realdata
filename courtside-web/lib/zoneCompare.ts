@@ -34,6 +34,21 @@ function classifyZone(distM: number): [string, number, number, string] {
   return ZONE_BOUNDS_M.find((z) => distM >= z[1] && distM < z[2]) ?? ZONE_BOUNDS_M[ZONE_BOUNDS_M.length - 1];
 }
 
+// d 필드는 "어느 골대 쪽인지"(전반/후반 코트 스위치) - 항상 오른쪽 골대 기준으로 미러링해서
+// 그리는 컨벤션이 이 파일 전체(teamZoneStats)와 scoringExplorer.ts/formIndex.ts에서
+// 일관되게 쓰임. 이 파일 밖에서도 필요해서(app/games/[gmkey]/page.tsx의 슛 필터) export.
+export function mirrorShotX(x: number, d: string): number {
+  return d === "2" ? 750 - x : x;
+}
+
+// 2점/3점 판정 - build_xpts_shot_quality.py에서 검증한 것과 같은 THREE_PT_M(6.75m)
+// 거리 기준. shot_log엔 값(2/3)을 직접 담은 컬럼이 없어서(x/y/d로 매번 역산) 여기서
+// 한 번만 export해두고 슛 종류 필터에서 재사용.
+export function shotValue(x: number, y: number, d: string): 2 | 3 {
+  const mx = mirrorShotX(x, d);
+  return shotDistM(mx, y) >= THREE_PT_M ? 3 : 2;
+}
+
 export function drawCourtMarkings(hoopX: number, baselineX: number, dir: 1 | -1, stroke: string, sw: number): string {
   const u = (v: number) => v / SCALE_M_PER_UNIT;
   const midY = (COURT_Y[0] + COURT_Y[1]) / 2;
@@ -73,7 +88,7 @@ export function teamZoneStats(shots: ShotRow[], tcode: string): ZoneStats {
   for (const [key] of ZONE_BOUNDS_M) stats[key] = { att: 0, made: 0 };
   for (const s of shots) {
     if (s.tcode !== tcode) continue;
-    const x = s.d === "2" ? 750 - s.x : s.x;
+    const x = mirrorShotX(s.x, s.d);
     const [zoneKey] = classifyZone(shotDistM(x, s.y));
     stats[zoneKey].att++;
     if (s.made) stats[zoneKey].made++;
@@ -116,5 +131,31 @@ export function buildZoneCompareSvg(home: ZoneStats, away: ZoneStats): string {
     svg += `<text x="${avx}" y="${avy}" text-anchor="start" font-size="10" font-weight="700" fill="var(--away)" font-family="IBM Plex Mono, monospace" transform="rotate(-90 ${avx} ${avy})">${aPct}%</text>`;
   });
 
+  return svg;
+}
+
+// 실제 슛 위치 점 차트 - perthirtysix.com(NBA 데이터 저널리즘 사이트) 레퍼런스로 사용자가
+// 요청("우리가 만든 팀 그래프를, 위 사이트와 같이 비교")한 리디자인. 그 사이트는 시즌
+// 전체(수천 개) 슛을 다루니 hexbin 밀도가 맞지만, 여기는 한 경기 한 팀(대개 60~90개)
+// 수준이라 hexbin으로 뭉개는 것보다 슛 하나하나를 점으로 찍는 게 더 정보량이 많고
+// 구현도 단순함 - "Make/Miss" 뷰를 팀별로 분리한 버전. 성공=팀컬러 채운 원,
+// 실패=옅은 링(테두리만). 2점/3점 반지름 차이로 살짝 구분.
+export function buildCourtDotsSvg(shots: ShotRow[], color: string): string {
+  const HX = HOOP_RIGHT[0],
+    HY = HOOP_RIGHT[1];
+  let svg = `<rect x="${COURT_X[0]}" y="${COURT_Y[0]}" width="${COURT_X[1] - COURT_X[0]}" height="${COURT_Y[1] - COURT_Y[0]}" fill="#d9b98a" stroke="var(--ink-faint)" stroke-width="2"/>`;
+  svg += drawCourtMarkings(HX, COURT_X[1], -1, "#fff", 1.6);
+
+  for (const s of shots) {
+    const x = mirrorShotX(s.x, s.d);
+    const r = shotValue(s.x, s.y, s.d) === 3 ? 4.2 : 3.4;
+    if (s.made) {
+      svg += `<circle cx="${x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="${r}" fill="${color}" opacity="0.88"/>`;
+    } else {
+      svg += `<circle cx="${x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="${r}" fill="none" stroke="${color}" stroke-width="1.3" opacity="0.4"/>`;
+    }
+  }
+
+  svg += drawHoop(HOOP_RIGHT[0], HOOP_RIGHT[1], false);
   return svg;
 }
