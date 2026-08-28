@@ -6,6 +6,7 @@ import Link from "next/link";
 const LINKS = [
   { href: "/", label: "경기 목록" },
   { href: "/leaderboards/win-contribution", label: "승리 기여도" },
+  { href: "/leaderboards/scoring-explorer", label: "득점 분포" },
 ];
 
 export function NavBar() {

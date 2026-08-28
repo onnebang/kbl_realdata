@@ -9,9 +9,9 @@
 // 매 페이지 요청마다 라이브로 계산하기엔 무거움(rarity.ts의 wpaSwingRank를 범위 밖으로 뺀
 // 것과 같은 이유 - 나중에 필요하면 사전 집계 테이블로).
 
-const HOOP_RIGHT: [number, number] = [681, 205];
-const COURT_X: [number, number] = [30, 720];
-const COURT_Y: [number, number] = [27, 384];
+export const HOOP_RIGHT: [number, number] = [681, 205];
+export const COURT_X: [number, number] = [30, 720];
+export const COURT_Y: [number, number] = [27, 384];
 const SCALE_M_PER_UNIT = 0.0413;
 const ZONE_BOUNDS_M: [string, number, number, string][] = [
   ["rim", 0, 1.2, "림"],
@@ -34,7 +34,7 @@ function classifyZone(distM: number): [string, number, number, string] {
   return ZONE_BOUNDS_M.find((z) => distM >= z[1] && distM < z[2]) ?? ZONE_BOUNDS_M[ZONE_BOUNDS_M.length - 1];
 }
 
-function drawCourtMarkings(hoopX: number, baselineX: number, dir: 1 | -1, stroke: string, sw: number): string {
+export function drawCourtMarkings(hoopX: number, baselineX: number, dir: 1 | -1, stroke: string, sw: number): string {
   const u = (v: number) => v / SCALE_M_PER_UNIT;
   const midY = (COURT_Y[0] + COURT_Y[1]) / 2;
   const laneFar = baselineX + dir * u(FT_LINE_M);
@@ -55,7 +55,7 @@ function drawCourtMarkings(hoopX: number, baselineX: number, dir: 1 | -1, stroke
   return svg;
 }
 
-function drawHoop(hx: number, hy: number, onLeftSide: boolean): string {
+export function drawHoop(hx: number, hy: number, onLeftSide: boolean): string {
   const bbX = onLeftSide ? hx - 18 : hx + 18;
   let svg = `<line x1="${bbX}" y1="${hy - 24}" x2="${bbX}" y2="${hy + 24}" stroke="var(--ink-soft)" stroke-width="5.5" stroke-linecap="round"/>`;
   svg += `<circle cx="${hx}" cy="${hy}" r="13" fill="none" stroke="#e8590c" stroke-width="4"/>`;

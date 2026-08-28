@@ -586,6 +586,29 @@ table.data-table td:nth-child(2) {
   color: #d9640a;
 }
 
+/* 득점 분포 탐색기(app/leaderboards/scoring-explorer) */
+.explorer-stat-line {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+}
+.explorer-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.explorer-legend-gradient {
+  flex: 1;
+  max-width: 160px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(to right, transparent, var(--home));
+}
+
 footer.foot {
   margin-top: 30px;
   padding-top: 14px;
