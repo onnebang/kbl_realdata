@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/", label: "경기 목록" },
   { href: "/leaderboards/win-contribution", label: "승리 기여도" },
   { href: "/leaderboards/scoring-explorer", label: "득점 분포" },
+  { href: "/leaderboards/form-index", label: "폼 지수" },
 ];
 
 export function NavBar() {
