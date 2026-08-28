@@ -59,6 +59,9 @@ export async function getSeasonStatsAsOf(tcode: string, seasonName: string, befo
     .eq("tcode", tcode)
     .in("gmkey", gmkeys);
   if (!stats || !stats.length) return null;
+  // stats는 위 가드로 non-null이 됐지만 "typeof stats"로 만든 타입 별칭은 그 좁혀진 타입을
+  // 못 따라가서(TS2537 - null을 인덱싱하려 함) 새 const로 다시 받아 좁혀진 타입을 고정.
+  const rows = stats;
 
   const oppScoreByGmkey = new Map(
     games.map((g) => [g.gmkey, g.home_tcode === tcode ? (g.away_score as number) : (g.home_score as number)])
@@ -67,8 +70,8 @@ export async function getSeasonStatsAsOf(tcode: string, seasonName: string, befo
     games.map((g) => [g.gmkey, g.home_tcode === tcode ? (g.home_score as number) : (g.away_score as number)])
   );
 
-  const gp = stats.length;
-  const sum = (fn: (s: (typeof stats)[number]) => number) => stats.reduce((s, row) => s + fn(row), 0);
+  const gp = rows.length;
+  const sum = (fn: (s: (typeof rows)[number]) => number) => rows.reduce((s, row) => s + fn(row), 0);
   return {
     gp,
     ppg: sum((s) => teamScoreByGmkey.get(s.gmkey) ?? 0) / gp,
