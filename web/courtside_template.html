@@ -1537,6 +1537,58 @@ function gameWideTopPerformer(box, homeScore, awayScore) {
   return top;
 }
 
+// A4: 팀별 스포트라이트(이긴 팀/진 팀 각각) - gameWideTopPerformer와 달리 블로아웃 가드 없이
+// 한 팀 안에서만 게임스코어 최고를 고름(어차피 팀을 이미 tcode로 한정했으니 블로아웃 상황이
+// 왜곡을 일으킬 이유가 없음).
+function teamTopPerformer(box, tcode) {
+  let top = null;
+  for (const pcode in box) {
+    const b = box[pcode];
+    if (!GAME.players[pcode] || GAME.players[pcode].tcode !== tcode) continue;
+    if (b.fga + b.fta + b.ast + b.oreb + b.dreb === 0) continue;
+    if (!top || gameScore(b) > gameScore(box[top])) top = pcode;
+  }
+  return top;
+}
+
+// A5: 전체 MVP(gameWideTopPerformer)가 진 팀 소속일 때만 호출 - "왜 최고 활약을 하고도
+// 졌는가"를 팀 스탯 격차 중 실제로 유의미한 것만 골라 설명. renderZoneDominance/
+// pregameInsightItems와 같은 "차이가 유의미할 때만" 원칙 재사용.
+function explainLosingDespiteTopPerformer(finalBox, winnerTcode, loserTcode) {
+  const reasons = [];
+
+  const wFgm = sumTeam(finalBox, winnerTcode, b => b.fgm), wFga = sumTeam(finalBox, winnerTcode, b => b.fga);
+  const lFgm = sumTeam(finalBox, loserTcode, b => b.fgm), lFga = sumTeam(finalBox, loserTcode, b => b.fga);
+  const wPct = wFga ? wFgm / wFga * 100 : 0, lPct = lFga ? lFgm / lFga * 100 : 0;
+  if (wPct - lPct >= 8) reasons.push(`팀 전체 야투율 격차(${wPct.toFixed(1)}% vs ${lPct.toFixed(1)}%)`);
+
+  const wTo = sumTeam(finalBox, winnerTcode, b => b.to), lTo = sumTeam(finalBox, loserTcode, b => b.to);
+  if (lTo - wTo >= 5) reasons.push(`턴오버 열세(${lTo}개 vs ${wTo}개)`);
+
+  // 각 쿼터 구간에서 "진 팀 득점 - 이긴 팀 득점" 델타 중 가장 나쁜(가장 음수인) 쿼터
+  let worstQ = null, worstDelta = 0;
+  for (let qi = 0; qi < qBounds.length; qi++) {
+    const startI = qBounds[qi].i;
+    const endI = qi + 1 < qBounds.length ? qBounds[qi + 1].i - 1 : N - 1;
+    const startRow = timeline[startI], endRow = timeline[endI];
+    const loserStart = loserTcode === GAME.homeTcode ? startRow.homeScore : startRow.awayScore;
+    const loserEnd = loserTcode === GAME.homeTcode ? endRow.homeScore : endRow.awayScore;
+    const winnerStart = winnerTcode === GAME.homeTcode ? startRow.homeScore : startRow.awayScore;
+    const winnerEnd = winnerTcode === GAME.homeTcode ? endRow.homeScore : endRow.awayScore;
+    const qDelta = (loserEnd - loserStart) - (winnerEnd - winnerStart);
+    if (qDelta < worstDelta) { worstDelta = qDelta; worstQ = qBounds[qi].q; }
+  }
+  if (worstQ && worstDelta <= -8) reasons.push(`${worstQ} 쿼터에서만 ${Math.abs(worstDelta)}점 열세`);
+
+  const benchPts = tcode => Object.keys(GAME.players)
+    .filter(pc => GAME.players[pc].tcode === tcode && GAME.players[pc].isStarter === false)
+    .reduce((s, pc) => s + (finalBox[pc] ? finalBox[pc].pts : 0), 0);
+  const wBench = benchPts(winnerTcode), lBench = benchPts(loserTcode);
+  if (wBench - lBench >= 10) reasons.push(`벤치 득점 격차(${wBench}점 vs ${lBench}점)`);
+
+  return reasons;
+}
+
 function playerRowHtml(pcode, box, onCourt, topPcode) {
   const p = GAME.players[pcode];
   if (!p) return '';
@@ -2404,7 +2456,58 @@ function computeSubSpark(row) {
   const sign = row.team === GAME.homeTcode ? 1 : -1;  // 홈 기준 margin을 이 선수 팀 기준으로
   const before = sign * netRtg(atSub.margin - beforeRef.margin, beforeDur);
   const after = sign * netRtg(afterRef.margin - atSub.margin, afterDur);
-  return { delta: after - before };
+  // beforeDur/afterDur도 같이 반환(기존 호출부 subMarginNote는 .delta만 읽어서 영향 없음) -
+  // findBestSixthManSpark/findNotableSubSparks가 여러 교체를 모아 "가장 큰 값"을 고를 때,
+  // 30초에 가까운 짧은 표본은 마진이 조금만 바뀌어도 2400/durSec 배율 때문에 순위/농구
+  // 상식 밖으로 부풀려진 값이 나와서(예: 30초 동안 2점 변화 -> 넷레이팅 160) 필터링이 필요함.
+  return { delta: after - before, beforeDur, afterDur };
+}
+
+// A6: 기존 "식스맨 스파크 지수"(computeSubSpark)는 지금까지 교체 이벤트마다 인라인으로만
+// 보여주고 게임 전체 집계는 없었음 - 벤치 선수(isStarter===false) 전체 교체-IN을 훑어서
+// 가장 큰 양수 스파크(팀이 확실히 좋아진 경우) 하나를 "이 경기 최고의 식스맨"으로 뽑음.
+// 새 계산 없이 기존 computeSubSpark를 그대로 재사용.
+// 30초에 가까운 짧은 전후 표본은 2400/durSec 배율 때문에 넷레이팅이 100+ 로 부풀려질 수
+// 있음(computeSubSpark 자체의 30초 하한은 subMarginNote의 "교체 하나당 배지 한 개" 용도엔
+// 괜찮지만, 아래처럼 게임 전체 교체를 모아 "가장 큰 값"을 뽑는 용도로는 그 부풀려진 값이
+// 항상 1등으로 뽑혀버림) - 여기서는 전후 각 2분(120초) 이상 확보된 것만 인정.
+const SUB_SPARK_MIN_SAMPLE_SEC = 120;
+function findBestSixthManSpark(uptoIdx) {
+  let best = null;
+  for (let i = 1; i <= uptoIdx; i++) {
+    const row = timeline[i];
+    if (row.action !== '101' || !row.pcode) continue;
+    const p = GAME.players[row.pcode];
+    if (!p || p.isStarter !== false) continue;
+    const spark = computeSubSpark(row);
+    if (!spark || spark.delta <= 0) continue;
+    if (spark.beforeDur < SUB_SPARK_MIN_SAMPLE_SEC || spark.afterDur < SUB_SPARK_MIN_SAMPLE_SEC) continue;
+    if (!best || spark.delta > best.spark.delta) best = { idx: i, row, pcode: row.pcode, spark };
+  }
+  return best;
+}
+
+// A8-a: 벤치 여부 상관없이 모든 교체-IN 중 스파크가 뚜렷한(±15 이상) 것 전부 - "투입 후
+// 수비/공격이 뚜렷하게 좋아짐/나빠짐" 내레이션용. findBestSixthManSpark(양수·벤치만 단
+// 1건)와 달리 이쪽은 방향 무관, 선발 포함, 여러 건 나올 수 있음.
+// 요청대로 "±15"로 처음 잡았다가 실측 결과 이 지표(3분 창을 40분 기준 넷레이팅으로 환산)
+// 자체의 정상 스케일이 훨씬 크다는 걸 확인 - 120초 이상 표본만으로도 중앙값이 이미 52,
+// 상위 10%가 148 이상(전체 데모 10경기 784건의 교체-IN 스파크 실측). 15는 사실상 전부를
+// 통과시켜 "notable"의 의미가 없었음 - 상위 ~10-15% 구간인 120으로 재조정.
+const SUB_SPARK_NOTABLE_THRESHOLD = 120;
+function findNotableSubSparks(uptoIdx) {
+  const out = [];
+  for (let i = 1; i <= uptoIdx; i++) {
+    const row = timeline[i];
+    if (row.action !== '101' || !row.pcode) continue;
+    const spark = computeSubSpark(row);
+    if (!spark) continue;
+    if (spark.beforeDur < SUB_SPARK_MIN_SAMPLE_SEC || spark.afterDur < SUB_SPARK_MIN_SAMPLE_SEC) continue;
+    if (Math.abs(spark.delta) >= SUB_SPARK_NOTABLE_THRESHOLD) {
+      out.push({ idx: i, row, pcode: row.pcode, spark });
+    }
+  }
+  return out;
 }
 
 function subMarginNote(row) {
