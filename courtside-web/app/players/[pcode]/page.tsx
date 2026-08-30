@@ -168,7 +168,7 @@ export default async function PlayerPage({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={info.photoUrl} alt={info.name} className="player-photo" />
             ) : (
-              <div className="player-photo-mono">{nameHead}</div>
+              <div className="player-photo-mono">{nameHead.charAt(0)}</div>
             )}
           </div>
 
