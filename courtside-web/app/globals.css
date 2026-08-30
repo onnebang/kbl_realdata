@@ -947,41 +947,119 @@ table.data-table td:nth-child(2) {
 .replay-panel {
   margin-top: 18px;
 }
-.replay-score-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  margin-bottom: 6px;
+/* 스코어보드(요청: "경기 세부는 courtside_template을 참고해서 개발") - 원본
+   web/courtside_template.html의 #stickyBar(.sb-main/.team-badge/.team-score/.prob-pct/
+   .split-bar/.quarter-table)를 그대로 이식. 원본은 --home/--away 전역 CSS 변수를 이
+   경기의 실제 팀컬러로 매 경기 덮어써서(document.documentElement.style.setProperty)
+   모든 곳이 자동으로 팀컬러를 따라갔는데, 여기서는 이 페이지의 다른 컴포넌트들이 이미
+   game.home_team?.color를 prop으로 직접 받는 관례라 그대로 따름(전역 변수를 건드리면
+   같은 페이지의 다른 곳까지 영향을 주는 범위 누수 위험) - homeTeam.color/awayTeam.color를
+   style={{}}로 직접 사용. */
+.replay-scoreboard {
+  max-width: 420px;
+  margin: 0 auto 14px;
 }
-.replay-score-side {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.replay-score-side.away {
-  flex-direction: row-reverse;
-}
-.replay-score-abbr {
+.replay-scoreboard-clock {
+  text-align: center;
   font-family: "IBM Plex Mono", monospace;
   font-size: 12px;
   font-weight: 700;
-  color: var(--ink-soft);
+  color: var(--ink-faint);
+  margin-bottom: 10px;
 }
-.replay-score-val {
-  font-family: "Big Shoulders Display", sans-serif;
-  font-size: 34px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
+.replay-scoreboard-main {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
 }
-.replay-clock {
-  font-family: "IBM Plex Mono", monospace;
+.replay-team-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.replay-team-name {
   font-size: 13px;
   font-weight: 700;
-  color: var(--ink-faint);
-  min-width: 90px;
   text-align: center;
+}
+.replay-team-score {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 48px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.replay-sb-sep {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink-faint);
+}
+
+.replay-prob-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.replay-prob-pct {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 700;
+  font-size: 26px;
+  margin-right: 6px;
+}
+.replay-prob-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--ink-faint);
+}
+.replay-split-bar {
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  background: var(--surface-soft);
+  margin-bottom: 16px;
+}
+.replay-split-home,
+.replay-split-away {
+  height: 100%;
+  transition: width 0.25s ease;
+}
+
+.replay-quarter-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.replay-quarter-table th,
+.replay-quarter-table td {
+  padding: 5px 8px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.replay-quarter-table th {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+.replay-quarter-tname {
+  text-align: left !important;
+  font-weight: 700;
+}
+.replay-quarter-total {
+  font-weight: 700;
+  border-left: 1px solid rgba(var(--line-rgb), 0.12);
+}
+.replay-quarter-live {
+  color: var(--gold);
+  margin-left: 1px;
 }
 .replay-now-line {
   text-align: center;

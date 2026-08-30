@@ -68,8 +68,42 @@ function computeBoxScore(events: GameEvent[], uptoIdx: number, players: PlayerMe
 }
 
 function clockStr(e: GameEvent) {
-  if (e.quarter === "PRE") return "경기 전";
+  if (e.quarter === "PRE") return "경기 시작 전";
   return `${e.quarter} ${e.clock_min}:${String(e.clock_sec).padStart(2, "0")}`;
+}
+
+// 쿼터별 점수(요청: "경기 세부는 courtside_template을 참고해서 개발" - 원본
+// renderQuarterTable(idx)와 동일한 계산: 각 쿼터 "끝" 시점 누적점수 - 그 전 쿼터 누적점수
+// = 그 쿼터에서만 낸 점수. 아직 안 온 쿼터는 null("-"), 현재 진행 중인 쿼터는 live 표시.
+type QuarterCell = { v: number; live: boolean } | null;
+function computeQuarterScores(
+  events: GameEvent[],
+  idx: number,
+  quarterOrder: string[],
+  lastIdxByQuarter: Map<string, number>
+): { homeByQ: QuarterCell[]; awayByQ: QuarterCell[] } {
+  const curQuarter = events[idx].quarter;
+  const curRank = curQuarter === "PRE" ? -1 : quarterOrder.indexOf(curQuarter);
+  let prevH = 0,
+    prevA = 0;
+  const homeByQ: QuarterCell[] = [];
+  const awayByQ: QuarterCell[] = [];
+  quarterOrder.forEach((q, qi) => {
+    if (qi > curRank) {
+      homeByQ.push(null);
+      awayByQ.push(null);
+      return;
+    }
+    const isCurrent = qi === curRank;
+    const endIdx = isCurrent ? idx : lastIdxByQuarter.get(q) ?? idx;
+    const h = events[endIdx].home_score,
+      a = events[endIdx].away_score;
+    homeByQ.push({ v: h - prevH, live: isCurrent });
+    awayByQ.push({ v: a - prevA, live: isCurrent });
+    prevH = h;
+    prevA = a;
+  });
+  return { homeByQ, awayByQ };
 }
 
 type PlayerMeta = { pcode: string; name: string; tcode: string };
@@ -156,6 +190,10 @@ export default function GameReplay({
 
   const row = events[idx];
   const box = useMemo(() => computeBoxScore(events, idx, players), [events, idx, players]);
+  const { homeByQ, awayByQ } = useMemo(
+    () => computeQuarterScores(events, idx, quarterOrder, lastIdxByQuarter),
+    [events, idx, quarterOrder, lastIdxByQuarter]
+  );
   const homePlayers = players.filter((p) => p.tcode === homeTeam.tcode);
   const awayPlayers = players.filter((p) => p.tcode === awayTeam.tcode);
 
@@ -228,21 +266,88 @@ export default function GameReplay({
     <div className="panel replay-panel">
       <div className="panel-title">인터랙티브 리플레이</div>
 
-      <div className="replay-score-row">
-        <div className="replay-score-side">
-          <TeamBadge team={homeTeam} size={28} />
-          <span className="replay-score-abbr">{homeTeam.abbr}</span>
-          <span className="replay-score-val" style={{ color: "var(--home)" }}>
-            {row.home_score}
-          </span>
+      <div className="replay-scoreboard">
+        <div className="replay-scoreboard-clock">{clockStr(row)}</div>
+
+        <div className="replay-scoreboard-main">
+          <div className="replay-team-col">
+            <TeamBadge team={homeTeam} size={56} />
+            <div className="replay-team-name" style={{ color: homeTeam.color }}>
+              {homeTeam.name}
+            </div>
+            <div className="replay-team-score">{row.home_score}</div>
+          </div>
+          <div className="replay-sb-sep">:</div>
+          <div className="replay-team-col">
+            <TeamBadge team={awayTeam} size={56} />
+            <div className="replay-team-name" style={{ color: awayTeam.color }}>
+              {awayTeam.name}
+            </div>
+            <div className="replay-team-score">{row.away_score}</div>
+          </div>
         </div>
-        <div className="replay-clock">{clockStr(row)}</div>
-        <div className="replay-score-side away">
-          <span className="replay-score-val" style={{ color: "var(--away)" }}>
-            {row.away_score}
-          </span>
-          <span className="replay-score-abbr">{awayTeam.abbr}</span>
-          <TeamBadge team={awayTeam} size={28} />
+
+        {row.home_win_prob != null && (
+          <>
+            <div className="replay-prob-row">
+              <div>
+                <span className="replay-prob-pct" style={{ color: homeTeam.color }}>
+                  {Math.round(row.home_win_prob * 100)}%
+                </span>
+                <span className="replay-prob-label">승리확률</span>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <span className="replay-prob-pct" style={{ color: awayTeam.color }}>
+                  {Math.round((1 - row.home_win_prob) * 100)}%
+                </span>
+                <span className="replay-prob-label">승리확률</span>
+              </div>
+            </div>
+            <div className="replay-split-bar">
+              <div className="replay-split-home" style={{ width: `${row.home_win_prob * 100}%`, background: homeTeam.color }} />
+              <div className="replay-split-away" style={{ width: `${(1 - row.home_win_prob) * 100}%`, background: awayTeam.color }} />
+            </div>
+          </>
+        )}
+
+        <div className="table-scroll">
+          <table className="replay-quarter-table">
+            <thead>
+              <tr>
+                <th></th>
+                {quarterOrder.map((q) => (
+                  <th key={q}>{q}</th>
+                ))}
+                <th>계</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="replay-quarter-tname" style={{ color: homeTeam.color }}>
+                  {homeTeam.abbr}
+                </td>
+                {homeByQ.map((c, i) => (
+                  <td key={i}>
+                    {c == null ? "-" : c.v}
+                    {c?.live && <span className="replay-quarter-live">*</span>}
+                  </td>
+                ))}
+                <td className="replay-quarter-total">{row.home_score}</td>
+              </tr>
+              <tr>
+                <td className="replay-quarter-tname" style={{ color: awayTeam.color }}>
+                  {awayTeam.abbr}
+                </td>
+                {awayByQ.map((c, i) => (
+                  <td key={i}>
+                    {c == null ? "-" : c.v}
+                    {c?.live && <span className="replay-quarter-live">*</span>}
+                  </td>
+                ))}
+                <td className="replay-quarter-total">{row.away_score}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -312,7 +417,7 @@ export default function GameReplay({
         ))}
       </div>
 
-      <WinProbLiveChart events={events} idx={idx} homeColor="var(--home)" />
+      <WinProbLiveChart events={events} idx={idx} homeColor={homeTeam.color} />
 
       <div className="replay-cols">
         <div>
@@ -331,7 +436,7 @@ export default function GameReplay({
                 <span className="replay-feed-clock">{clockStr(e)}</span>
                 <span
                   className="replay-feed-dot"
-                  style={{ background: e.tcode === homeTeam.tcode ? "var(--home)" : e.tcode === awayTeam.tcode ? "var(--away)" : "transparent" }}
+                  style={{ background: e.tcode === homeTeam.tcode ? homeTeam.color : e.tcode === awayTeam.tcode ? awayTeam.color : "transparent" }}
                 />
                 <span className="replay-feed-text">
                   {e.player_name ? `${e.player_name} ` : ""}
