@@ -116,6 +116,40 @@ export async function getRecentSchedule(tcode: string, beforeDate: string, limit
   });
 }
 
+// 팀 시즌 일정(요청: "팀별, 시즌별 보기를 좀더 세분화" - ESPN 팀 스케줄 페이지 참고,
+// /teams/[tcode]) - getRecentSchedule과 달리 날짜 컷오프 없이 이 시즌 전체(정규시즌+
+// 플레이오프 다 포함, KBL 한 시즌 최대 60여 경기라 1000행 cap 걱정 없음).
+export type TeamSeasonGame = ScheduleGame & { seasonCategory: string };
+export async function getTeamSeasonSchedule(tcode: string, seasonName: string): Promise<TeamSeasonGame[]> {
+  const { data } = await supabase
+    .from("games")
+    .select(
+      `gmkey, game_date, season_category, home_tcode, away_tcode, home_score, away_score,
+       home_team:teams!games_home_tcode_fkey(tcode, name),
+       away_team:teams!games_away_tcode_fkey(tcode, name)`
+    )
+    .eq("season_name", seasonName)
+    .or(`home_tcode.eq.${tcode},away_tcode.eq.${tcode}`)
+    .not("home_score", "is", null)
+    .order("game_date", { ascending: true });
+  if (!data) return [];
+  return data.map((g) => {
+    const isHome = g.home_tcode === tcode;
+    const homeTeam = g.home_team as unknown as { tcode: string; name: string } | null;
+    const awayTeam = g.away_team as unknown as { tcode: string; name: string } | null;
+    return {
+      gmkey: g.gmkey as string,
+      gameDate: g.game_date as string,
+      seasonCategory: g.season_category as string,
+      oppTcode: isHome ? (g.away_tcode as string) : (g.home_tcode as string),
+      oppName: (isHome ? awayTeam?.name : homeTeam?.name) ?? (isHome ? (g.away_tcode as string) : (g.home_tcode as string)),
+      isHome,
+      teamScore: (isHome ? g.home_score : g.away_score) as number,
+      oppScore: (isHome ? g.away_score : g.home_score) as number,
+    };
+  });
+}
+
 export async function getHeadToHead(homeTcode: string, awayTcode: string, beforeDate: string): Promise<H2H> {
   const { data } = await supabase
     .from("games")

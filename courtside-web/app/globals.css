@@ -198,18 +198,32 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  opacity: 0.62;
+  opacity: 0.55;
+  /* 팀컬러(teams.color)는 JSX에서 style={{color}}로 인라인 지정 - 팀마다 실제
+     브랜드 색이 달라서 CSS 클래스로는 표현이 안 됨(예전엔 홈=주황/원정=파랑
+     고정 2색이었는데, 사용자 요청으로 팀별 실제 색상으로 교체). */
 }
 .team-name.home {
-  color: var(--home);
   text-align: right;
 }
 .team-name.away {
-  color: var(--away);
   text-align: left;
 }
 .team-name.win {
   opacity: 1;
+  font-weight: 800;
+}
+
+.win-pill {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  font-weight: 800;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin: 0 5px;
+  flex-shrink: 0;
 }
 
 .game-card-score {
@@ -273,6 +287,33 @@ select {
 
 .matchup-banner-name {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+/* 팀 페이지 배너(app/teams/[tcode]) - 이 팀 전용 페이지라는 느낌을 주려고 팀컬러를
+   배경 전체에 씀(다른 페이지는 전부 중립 --surface 톤이라 여기만 예외). */
+.team-page-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  margin-top: 18px;
+  color: #fff;
+}
+.team-page-name {
+  /* 팀 이름은 한글이라 Big Shoulders Display(한글 글리프 없음 - 선수 프로필
+     리디자인 때 겪은 것과 같은 함정) 대신 Pretendard 굵은 웨이트로. */
+  font-family: "Pretendard", sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1.1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.team-page-record {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  opacity: 0.85;
+  margin-top: 4px;
 }
 
 .matchup-banner-score {
