@@ -58,7 +58,7 @@ export default async function ScoringExplorerPage({
             </option>
           ))}
         </select>
-        <button type="submit" className="back-link" style={{ cursor: "pointer" }}>
+        <button type="submit" className="btn-primary">
           조회
         </button>
       </form>

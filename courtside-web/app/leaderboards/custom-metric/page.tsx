@@ -24,7 +24,7 @@ export default async function CustomMetricPage({ searchParams }: { searchParams:
             </option>
           ))}
         </select>
-        <button type="submit" className="back-link" style={{ cursor: "pointer" }}>
+        <button type="submit" className="btn-primary">
           시즌 보기
         </button>
       </form>

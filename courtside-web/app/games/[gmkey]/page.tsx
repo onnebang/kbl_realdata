@@ -620,7 +620,7 @@ export default async function GamePage({
                 </option>
               ))}
             </select>
-            <button type="submit" className="back-link" style={{ cursor: "pointer", display: "inline" }}>
+            <button type="submit" className="btn-primary">
               적용
             </button>
           </form>

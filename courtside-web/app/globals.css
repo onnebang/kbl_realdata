@@ -117,6 +117,31 @@ select {
   color: var(--ink);
 }
 
+/* 필터 폼 + 버튼(요청: "보기버튼, 시즌 보기 버튼을 우리에게 맞는 디자인으로") - 예전엔
+   .back-link(텍스트 링크 스타일)를 그대로 submit 버튼에 썼는데, 실제 액션 버튼처럼
+   보이지 않는다는 지적 - .replay-btn-play/.btn-primary처럼 이 사이트의 실제 버튼
+   컨벤션(--home 채운 배경)으로. */
+.filter-form {
+  margin-top: 18px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.btn-primary {
+  font-family: "Pretendard", sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: none;
+  background: var(--home);
+  color: #fff;
+  cursor: pointer;
+}
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
 /* 팀 배지(로고 or 컬러+약어 폴백) - components/TeamBadge.tsx, ESPN 참고("팀별로 색상과
    로고를 주고 구분") */
 .team-badge {
@@ -158,40 +183,21 @@ select {
   border-color: var(--home);
 }
 
+/* 경기 카드 - 요청: "점수판 위치는 고정시키고 양 옆으로 대칭이 되도록(승패-팀이름-로고-
+   점수-로고-팀이름-승패)". flex 레이아웃은 팀 이름 길이에 따라 스코어 위치가 흔들려서
+   (예: "안양 정관장" vs "DB") CSS Grid로 전환 - 이름 칸(minmax(0,1fr))이 양쪽 대칭이라
+   스코어 칸이 항상 정중앙 고정. */
 .game-card-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 52px 24px minmax(0, 1fr) 30px 76px 30px minmax(0, 1fr) 24px 64px;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 6px;
 }
 
 .game-card-date {
   font-family: "IBM Plex Mono", monospace;
   font-size: 11px;
   color: var(--ink-faint);
-  width: 76px;
-  flex-shrink: 0;
-}
-
-.game-card-teams {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-size: 13.5px;
-  font-weight: 700;
-}
-
-.team-side {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
-.team-side.home {
-  flex-direction: row-reverse;
 }
 
 .team-name {
@@ -199,6 +205,8 @@ select {
   text-overflow: ellipsis;
   white-space: nowrap;
   opacity: 0.55;
+  font-size: 13.5px;
+  font-weight: 700;
   /* 팀컬러(teams.color)는 JSX에서 style={{color}}로 인라인 지정 - 팀마다 실제
      브랜드 색이 달라서 CSS 클래스로는 표현이 안 됨(예전엔 홈=주황/원정=파랑
      고정 2색이었는데, 사용자 요청으로 팀별 실제 색상으로 교체). */
@@ -214,24 +222,37 @@ select {
   font-weight: 800;
 }
 
-.win-pill {
-  display: inline-block;
+/* 승/패 배지 - 요청: "W 표시때문에 점수판 레이아웃이 들쑥날쑥함" → 예전엔 이긴 쪽에만
+   조건부로 넣어서 칸 자체가 없다 생겼다 했음. 이제 양쪽 다 항상 렌더링(칸 폭 고정,
+   24px) - 이긴 쪽은 팀컬러 채운 배지, 진 쪽은 옅은 아웃라인만(승자 강조는 유지하되
+   레이아웃은 항상 대칭). */
+.result-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
+}
+.result-badge.win {
   color: #fff;
-  padding: 1px 5px;
-  border-radius: 4px;
-  margin: 0 5px;
-  flex-shrink: 0;
+}
+.result-badge.loss {
+  color: var(--ink-faint);
+  border: 1px solid rgba(var(--line-rgb), 0.14);
 }
 
 .game-card-score {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: "IBM Plex Mono", monospace;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 .game-card-score .lose {
   opacity: 0.45;
@@ -241,13 +262,60 @@ select {
   color: var(--ink-faint);
 }
 
+.game-card-category-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
 .game-card-category {
   font-family: "IBM Plex Mono", monospace;
   font-size: 9.5px;
   color: var(--ink-faint);
-  width: 60px;
   text-align: right;
-  flex-shrink: 0;
+}
+
+/* AI 분석 배지(요청: "짜릿한 역전승, 압도적 승리 등등") - 사전 계산된
+   game_summary_tags(마이그레이션, game_events 전체를 매번 라이브로 훑지 않기 위함)에서
+   조회만. 태그 종류별로 톤을 다르게(역전승=골드, 압도적=주황, 접전=파랑) - 시맨틱
+   컬러라 팀컬러(teams.color)와는 별개 팔레트. */
+.ai-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.ai-tag-comeback {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+.ai-tag-blowout {
+  background: var(--home-soft);
+  color: var(--home);
+}
+.ai-tag-nailbiter {
+  background: var(--away-soft);
+  color: var(--away);
+}
+
+/* 하단 메타 줄(예상 승률/MVP) - 요청 반영, 메인 매치업 줄과는 시각적 위계를 낮춰서
+   작은 보조 정보로. */
+.game-card-meta {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.06);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  font-family: "IBM Plex Mono", monospace;
+}
+.game-card-mvp {
+  color: var(--ink-soft);
+}
+.game-card-mvp:hover {
+  color: var(--home);
 }
 
 /* 매치업 배너 - courtside_template.html의 .matchup-banner와 동일 패턴 */

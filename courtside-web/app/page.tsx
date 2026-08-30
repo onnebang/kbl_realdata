@@ -1,63 +1,6 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 import { TeamBadge } from "@/components/TeamBadge";
-
-type TeamRef = {
-  tcode: string;
-  name: string;
-  abbr: string;
-  color: string;
-  logo_url: string | null;
-} | null;
-
-type GameRow = {
-  gmkey: string;
-  game_date: string;
-  home_score: number | null;
-  away_score: number | null;
-  season_category: string;
-  season_name: string;
-  home_team: TeamRef;
-  away_team: TeamRef;
-};
-
-type TeamOption = { tcode: string; name: string };
-
-async function getSeasons() {
-  const { data } = await supabase
-    .from("seasons")
-    .select("season_name")
-    .order("season_name", { ascending: false });
-  return (data ?? []).map((s) => s.season_name);
-}
-
-async function getTeamOptions(): Promise<TeamOption[]> {
-  const { data } = await supabase.from("teams").select("tcode, name").order("name");
-  return (data ?? []) as TeamOption[];
-}
-
-async function getGames(seasonName: string | undefined, tcode: string | undefined) {
-  let query = supabase
-    .from("games")
-    .select(
-      `gmkey, game_date, home_score, away_score, season_category, season_name,
-       home_team:teams!games_home_tcode_fkey(tcode, name, abbr, color, logo_url),
-       away_team:teams!games_away_tcode_fkey(tcode, name, abbr, color, logo_url)`
-    )
-    .not("home_score", "is", null)
-    .order("game_date", { ascending: false })
-    .limit(200);
-
-  if (seasonName) query = query.eq("season_name", seasonName);
-  // 팀 필터(요청: "팀별, 시즌별 보기를 좀더 세분화") - home_tcode/away_tcode 어느 쪽이든
-  // 이 팀이 나온 경기. Supabase는 or()에 컬럼명을 직접 나열하는 문법이라 .eq() 두 번
-  // 대신 or() 하나로.
-  if (tcode) query = query.or(`home_tcode.eq.${tcode},away_tcode.eq.${tcode}`);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as unknown as GameRow[];
-}
+import { getSeasons, getTeamsForSeason, getGames, getPregameWinProbs, getGameMvps, getGameTags } from "@/lib/homeGames";
 
 function fmtDate(d: string) {
   const [y, m, day] = d.split("-");
@@ -70,9 +13,12 @@ export default async function HomePage({
   searchParams: Promise<{ season?: string; team?: string }>;
 }) {
   const { season, team } = await searchParams;
-  const [seasons, teamOptions] = await Promise.all([getSeasons(), getTeamOptions()]);
+  const seasons = await getSeasons();
   const activeSeason = season ?? seasons[0];
-  const games = await getGames(activeSeason, team);
+  const [teamOptions, games] = await Promise.all([getTeamsForSeason(activeSeason), getGames(activeSeason, team)]);
+
+  const gmkeys = games.map((g) => g.gmkey);
+  const [winProbs, mvps, tags] = await Promise.all([getPregameWinProbs(gmkeys), getGameMvps(games), getGameTags(gmkeys)]);
 
   return (
     <div className="wrap">
@@ -83,7 +29,7 @@ export default async function HomePage({
         이동합니다.
       </div>
 
-      <form style={{ marginTop: 18, display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <form className="filter-form">
         <select name="season" defaultValue={activeSeason}>
           {seasons.map((s) => (
             <option key={s} value={s}>
@@ -99,7 +45,7 @@ export default async function HomePage({
             </option>
           ))}
         </select>
-        <button type="submit" className="back-link" style={{ cursor: "pointer" }}>
+        <button type="submit" className="btn-primary">
           보기
         </button>
       </form>
@@ -110,58 +56,73 @@ export default async function HomePage({
         )}
         {games.map((g) => {
           const homeWon = (g.home_score ?? 0) > (g.away_score ?? 0);
+          const homeProb = winProbs.get(g.gmkey);
+          const mvp = mvps.get(g.gmkey);
+          const tag = tags.get(g.gmkey);
           return (
             <div key={g.gmkey} className="game-card">
               <div className="game-card-row">
                 <span className="game-card-date">{fmtDate(g.game_date)}</span>
-                <span className="game-card-teams">
-                  <span className="team-side home">
-                    <Link href={`/teams/${g.home_team?.tcode}?season=${activeSeason}`}>
-                      <TeamBadge
-                        team={g.home_team ? { name: g.home_team.name, abbr: g.home_team.abbr, color: g.home_team.color, logoUrl: g.home_team.logo_url } : null}
-                      />
-                    </Link>
-                    <Link
-                      href={`/teams/${g.home_team?.tcode}?season=${activeSeason}`}
-                      className={`team-name home ${homeWon ? "win" : ""}`}
-                      style={{ color: g.home_team?.color }}
-                    >
-                      {g.home_team?.name ?? g.gmkey}
-                    </Link>
-                    {homeWon && (
-                      <span className="win-pill" style={{ background: g.home_team?.color ?? "var(--home)" }}>
-                        W
-                      </span>
-                    )}
-                  </span>
-                  <Link href={`/games/${g.gmkey}`} className="game-card-score">
-                    <span className={homeWon ? "win" : "lose"}>{g.home_score}</span>
-                    <span className="score-sep">-</span>
-                    <span className={!homeWon ? "win" : "lose"}>{g.away_score}</span>
-                  </Link>
-                  <span className="team-side away">
-                    {!homeWon && (
-                      <span className="win-pill" style={{ background: g.away_team?.color ?? "var(--away)" }}>
-                        W
-                      </span>
-                    )}
-                    <Link
-                      href={`/teams/${g.away_team?.tcode}?season=${activeSeason}`}
-                      className={`team-name away ${!homeWon ? "win" : ""}`}
-                      style={{ color: g.away_team?.color }}
-                    >
-                      {g.away_team?.name ?? ""}
-                    </Link>
-                    <Link href={`/teams/${g.away_team?.tcode}?season=${activeSeason}`}>
-                      <TeamBadge
-                        team={g.away_team ? { name: g.away_team.name, abbr: g.away_team.abbr, color: g.away_team.color, logoUrl: g.away_team.logo_url } : null}
-                      />
-                    </Link>
-                  </span>
+
+                <span className={`result-badge ${homeWon ? "win" : "loss"}`} style={homeWon ? { background: g.home_team?.color } : undefined}>
+                  {homeWon ? "W" : "L"}
                 </span>
-                <Link href={`/games/${g.gmkey}`} className="game-card-category">
-                  {g.season_category}
+                <Link
+                  href={`/teams/${g.home_team?.tcode}?season=${activeSeason}`}
+                  className={`team-name home ${homeWon ? "win" : ""}`}
+                  style={{ color: g.home_team?.color }}
+                >
+                  {g.home_team?.name ?? g.gmkey}
                 </Link>
+                <Link href={`/teams/${g.home_team?.tcode}?season=${activeSeason}`}>
+                  <TeamBadge
+                    team={g.home_team ? { name: g.home_team.name, abbr: g.home_team.abbr, color: g.home_team.color, logoUrl: g.home_team.logo_url } : null}
+                  />
+                </Link>
+
+                <Link href={`/games/${g.gmkey}`} className="game-card-score">
+                  <span className={homeWon ? "win" : "lose"}>{g.home_score}</span>
+                  <span className="score-sep">-</span>
+                  <span className={!homeWon ? "win" : "lose"}>{g.away_score}</span>
+                </Link>
+
+                <Link href={`/teams/${g.away_team?.tcode}?season=${activeSeason}`}>
+                  <TeamBadge
+                    team={g.away_team ? { name: g.away_team.name, abbr: g.away_team.abbr, color: g.away_team.color, logoUrl: g.away_team.logo_url } : null}
+                  />
+                </Link>
+                <Link
+                  href={`/teams/${g.away_team?.tcode}?season=${activeSeason}`}
+                  className={`team-name away ${!homeWon ? "win" : ""}`}
+                  style={{ color: g.away_team?.color }}
+                >
+                  {g.away_team?.name ?? ""}
+                </Link>
+                <span className={`result-badge ${!homeWon ? "win" : "loss"}`} style={!homeWon ? { background: g.away_team?.color } : undefined}>
+                  {!homeWon ? "W" : "L"}
+                </span>
+
+                <span className="game-card-category-col">
+                  <Link href={`/games/${g.gmkey}`} className="game-card-category">
+                    {g.season_category}
+                  </Link>
+                  {tag && <span className={`ai-tag ai-tag-${tag.key}`}>{tag.label}</span>}
+                </span>
+              </div>
+
+              <div className="game-card-meta">
+                {homeProb != null && (
+                  <span className="game-card-meta-item">
+                    예상 승률 {g.home_team?.abbr} {Math.round(homeProb * 100)}% · {g.away_team?.abbr} {Math.round((1 - homeProb) * 100)}%
+                  </span>
+                )}
+                {mvp && (
+                  <span className="game-card-meta-item">
+                    <Link href={`/players/${mvp.pcode}`} className="game-card-mvp">
+                      MVP {mvp.name} {mvp.pts}점
+                    </Link>
+                  </span>
+                )}
               </div>
             </div>
           );

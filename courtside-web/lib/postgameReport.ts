@@ -320,7 +320,9 @@ function teamTopPerformer(box: PlayerBox[], tcode: string): PlayerBox | null {
 
 // 블로아웃(마진 15+)일 땐 이기는 팀 안에서만 - courtside_template.html의 gameWideTopPerformer
 // 가드(과거 "50점차로 지는 팀 선수가 MVP로 표시됨" 버그를 막기 위한 것)를 그대로 포팅.
-function gameWideTopPerformer(box: PlayerBox[], homeScore: number, awayScore: number, homeTcode: string, awayTcode: string): PlayerBox | null {
+// export - 홈 화면 경기 목록(app/page.tsx)의 "MVP 표시" 요청에서도 그대로 재사용(중복 구현
+// 방지, 블로아웃 가드까지 같이 재사용됨).
+export function gameWideTopPerformer(box: PlayerBox[], homeScore: number, awayScore: number, homeTcode: string, awayTcode: string): PlayerBox | null {
   const margin = homeScore - awayScore;
   const blowout = Math.abs(margin) >= 15;
   const leaderTcode = margin > 0 ? homeTcode : awayTcode;
