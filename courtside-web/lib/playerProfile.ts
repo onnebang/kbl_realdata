@@ -8,16 +8,33 @@ import { supabase } from "./supabase";
 
 export type PlayerInfo = { pcode: string; name: string; ename: string | null; photoUrl: string | null };
 
+// 템플릿 player_profile_template.html의 teamBadgeHtml()/teamBadgeStyle() 대응 - 이 프로젝트는
+// components/TeamBadge.tsx가 이미 그 역할을 하므로, 여기서는 tcode -> 배지에 필요한 필드
+// (name/abbr/color/logo_url)만 한 번에 가져와 Map으로 반환. teams 테이블이 30행 미만이라
+// 페이지네이션 불필요.
+export type TeamMeta = { tcode: string; name: string; abbr: string; color: string; logoUrl: string | null };
+
+export async function getAllTeams(): Promise<Map<string, TeamMeta>> {
+  const { data } = await supabase.from("teams").select("tcode, name, abbr, color, logo_url");
+  const map = new Map<string, TeamMeta>();
+  for (const t of data ?? []) {
+    map.set(t.tcode, { tcode: t.tcode, name: t.name, abbr: t.abbr, color: t.color, logoUrl: t.logo_url });
+  }
+  return map;
+}
+
 export type SeasonLine = {
   seasonName: string;
   tcode: string;
   teamName: string;
   gp: number;
+  minPg: number;
   ppg: number;
   rpg: number;
   apg: number;
   spg: number;
   bpg: number;
+  tovPg: number;
   fgPct: number | null;
   tpPct: number | null;
   ftPct: number | null;
@@ -26,6 +43,9 @@ export type SeasonLine = {
 export type GameLogRow = {
   gmkey: string;
   gameDate: string;
+  tcode: string;
+  backNum: string | null;
+  pos: string | null;
   oppTcode: string;
   oppName: string;
   isHome: boolean;
@@ -56,11 +76,13 @@ export async function getPlayerInfo(pcode: string): Promise<PlayerInfo | null> {
 type RawStatRow = {
   gmkey: string;
   tcode: string;
+  min_played: number | null;
   pts: number | null;
   reb: number | null;
   ast: number | null;
   stl: number | null;
   blk: number | null;
+  turnovers: number | null;
   fgm: number | null;
   fga: number | null;
   tpm: number | null;
@@ -75,7 +97,7 @@ async function fetchAllPlayerStats(pcode: string): Promise<RawStatRow[]> {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from("game_player_stats")
-      .select("gmkey, tcode, pts, reb, ast, stl, blk, fgm, fga, tpm, tpa, ftm, fta")
+      .select("gmkey, tcode, min_played, pts, reb, ast, stl, blk, turnovers, fgm, fga, tpm, tpa, ftm, fta")
       .eq("pcode", pcode)
       .range(from, from + PAGE - 1);
     if (error || !data || !data.length) break;
@@ -126,11 +148,13 @@ export async function getPlayerCareerBySeason(pcode: string): Promise<{ seasons:
         tcode,
         teamName: teamNameByTcode.get(tcode) ?? tcode,
         gp,
+        minPg: sum((r) => r.min_played ?? 0) / gp,
         ppg: sum((r) => r.pts ?? 0) / gp,
         rpg: sum((r) => r.reb ?? 0) / gp,
         apg: sum((r) => r.ast ?? 0) / gp,
         spg: sum((r) => r.stl ?? 0) / gp,
         bpg: sum((r) => r.blk ?? 0) / gp,
+        tovPg: sum((r) => r.turnovers ?? 0) / gp,
         fgPct: fga > 0 ? fgm / fga : null,
         tpPct: tpa > 0 ? tpm / tpa : null,
         ftPct: fta > 0 ? ftm / fta : null,
@@ -185,20 +209,23 @@ export async function getPlayerRecentGames(pcode: string, limit = MAX_GAME_LOG):
       `gmkey, game_date, home_tcode, away_tcode, home_score, away_score,
        home_team:teams!games_home_tcode_fkey(tcode, name),
        away_team:teams!games_away_tcode_fkey(tcode, name),
-       game_player_stats!inner(pcode, tcode, min_played, pts, reb, ast, stl, blk, turnovers, fgm, fga, tpm, tpa, ftm, fta)`
+       game_player_stats!inner(pcode, tcode, back_num, pos, min_played, pts, reb, ast, stl, blk, turnovers, fgm, fga, tpm, tpa, ftm, fta)`
     )
     .eq("game_player_stats.pcode", pcode)
     .order("game_date", { ascending: false })
     .limit(limit);
   if (!data) return [];
   return data.map((row) => {
-    const stat = (row.game_player_stats as unknown as { tcode: string; min_played: number | null; pts: number | null; reb: number | null; ast: number | null; stl: number | null; blk: number | null; turnovers: number | null; fgm: number | null; fga: number | null; tpm: number | null; tpa: number | null; ftm: number | null; fta: number | null }[])[0];
+    const stat = (row.game_player_stats as unknown as { tcode: string; back_num: string | null; pos: string | null; min_played: number | null; pts: number | null; reb: number | null; ast: number | null; stl: number | null; blk: number | null; turnovers: number | null; fgm: number | null; fga: number | null; tpm: number | null; tpa: number | null; ftm: number | null; fta: number | null }[])[0];
     const homeTeam = row.home_team as unknown as { tcode: string; name: string } | null;
     const awayTeam = row.away_team as unknown as { tcode: string; name: string } | null;
     const isHome = stat.tcode === row.home_tcode;
     return {
       gmkey: row.gmkey as string,
       gameDate: row.game_date as string,
+      tcode: stat.tcode,
+      backNum: stat.back_num,
+      pos: stat.pos,
       oppTcode: isHome ? (row.away_tcode as string) : (row.home_tcode as string),
       oppName: (isHome ? awayTeam?.name : homeTeam?.name) ?? (isHome ? (row.away_tcode as string) : (row.home_tcode as string)),
       isHome,

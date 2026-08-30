@@ -1213,6 +1213,76 @@ table.data-table td:nth-child(2) {
   accent-color: var(--home);
 }
 
+/* 팀 스탯 바 비교(app/games/[gmkey]) - courtside_template.html의 .ts-row/.ts-nums/.ts-bar/
+   .ts-bar-fill(679~695행)을 그대로 이식. 기존엔 그냥 data-table로 홈/원정 스탯을 나란히
+   숫자로만 나열했는데, 템플릿 정밀 대조 결과 원본은 스탯마다 "홈 막대가 오른쪽 끝에서
+   왼쪽으로, 원정 막대가 왼쪽 끝에서 오른쪽으로" 서로 마주보게 채워지는 막대 비교였음. */
+.ts-row {
+  margin-bottom: 14px;
+}
+.ts-row:last-child {
+  margin-bottom: 0;
+}
+.ts-nums {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  margin-bottom: 5px;
+}
+.ts-nums .ts-home {
+  color: var(--home);
+  font-weight: 700;
+}
+.ts-nums .ts-away {
+  color: var(--away);
+  font-weight: 700;
+}
+.ts-nums .ts-label {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.ts-nums .ts-raw {
+  color: var(--ink-faint);
+  font-weight: 400;
+  font-size: 10.5px;
+  margin-left: 4px;
+  margin-right: 4px;
+}
+.ts-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-soft);
+  gap: 2px;
+}
+.ts-bar-fill {
+  height: 100%;
+}
+.ts-bar-fill.home {
+  background: var(--home);
+  margin-left: auto;
+  border-radius: 4px 0 0 4px;
+}
+.ts-bar-fill.away {
+  background: var(--away);
+  border-radius: 0 4px 4px 0;
+}
+
+/* 박스스코어 선발/벤치 구분행(courtside_template.html의 .bench-divider, 201행을 테이블
+   행 형태로 이식 - 원본은 코트 위 패널의 div 리스트용이라 그대로 못 쓰고, <tr><td colSpan>
+   으로 테이블 컨텍스트에 맞게 변형). */
+tr.bench-divider-row td {
+  padding-top: 10px;
+  padding-bottom: 4px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+  border-bottom: none;
+}
+
 footer.foot {
   margin-top: 30px;
   padding-top: 14px;

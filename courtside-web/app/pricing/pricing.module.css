@@ -1,0 +1,316 @@
+/* app/pricing/page.tsx 전용 - web/pricing_template.html의 <style> 블록을 그대로 이식.
+   색상 토큰은 이미 app/globals.css :root에 동일한 값이 있지만(전역 디자인 시스템),
+   이 페이지 색은 템플릿에 얼려있는 값이라 전역 값이 나중에 바뀌어도 이 페이지가 영향받지
+   않도록 .pageRoot에 그대로 다시 스코프해서 정의(다른 페이지로 색이 새어나갈 위험도 없음). */
+.pageRoot {
+  --bg: #f4f5f8;
+  --surface: #ffffff;
+  --surface-soft: #eceef3;
+  --ink: #14161c;
+  --ink-soft: #5b5f6e;
+  --ink-faint: #9297a880;
+  --home: #d9640a;
+  --home-soft: #d9640a1a;
+  --away: #1f6fd6;
+  --away-soft: #1f6fd61a;
+  --gold: #9a6b00;
+  --gold-soft: #9a6b0022;
+  --line-rgb: 20, 22, 28;
+
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  min-height: 100%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pageRoot {
+    --bg: #0f1115;
+    --surface: #1a1d24;
+    --surface-soft: #23272f;
+    --ink: #f2f3f7;
+    --ink-soft: #9297a8;
+    --ink-faint: #6a6f7f90;
+    --home: #ff8a3d;
+    --home-soft: #ff8a3d26;
+    --away: #3ea6ff;
+    --away-soft: #3ea6ff26;
+    --gold: #ffd166;
+    --gold-soft: #ffd16626;
+    --line-rgb: 242, 243, 247;
+  }
+}
+
+:root[data-theme="dark"] .pageRoot {
+  --bg: #0f1115;
+  --surface: #1a1d24;
+  --surface-soft: #23272f;
+  --ink: #f2f3f7;
+  --ink-soft: #9297a8;
+  --ink-faint: #6a6f7f90;
+  --home: #ff8a3d;
+  --home-soft: #ff8a3d26;
+  --away: #3ea6ff;
+  --away-soft: #3ea6ff26;
+  --gold: #ffd166;
+  --gold-soft: #ffd16626;
+  --line-rgb: 242, 243, 247;
+}
+
+.wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 44px 20px 70px;
+}
+
+.hero {
+  text-align: center;
+  max-width: 620px;
+  margin: 0 auto 40px;
+}
+.kicker {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--home);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+.heroTitle {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 38px;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+.heroSub {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  line-height: 1.7;
+  margin-top: 12px;
+}
+
+.toggleRow {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 26px auto 0;
+}
+.toggleBtn {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.toggleBtn.active {
+  background: var(--home);
+  border-color: var(--home);
+  color: #fff;
+}
+.toggleNote {
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 6px;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.tiers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 34px;
+  align-items: start;
+}
+.tierCard {
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 16px;
+  padding: 26px 22px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.tierCard.featured {
+  border-color: var(--gold);
+  box-shadow: 0 18px 34px -18px rgba(154, 107, 0, 0.35);
+  transform: translateY(-8px);
+}
+.tierRibbon {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--gold);
+  color: #14161c;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-family: "IBM Plex Mono", monospace;
+  white-space: nowrap;
+}
+.tierName {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+}
+.tierDesc {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+  min-height: 34px;
+  line-height: 1.5;
+}
+.tierPriceRow {
+  margin: 18px 0 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.tierPrice {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 32px;
+}
+.tierPriceUnit {
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+.tierPriceNote {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  font-family: "IBM Plex Mono", monospace;
+  margin-bottom: 18px;
+}
+
+.tierFeatures {
+  list-style: none;
+  margin: 6px 0 22px;
+  padding: 0;
+  flex: 1;
+}
+.tierFeatures li {
+  font-size: 12.5px;
+  padding: 6px 0;
+  display: flex;
+  gap: 8px;
+  line-height: 1.5;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.06);
+}
+.tierFeatures li:last-child {
+  border-bottom: none;
+}
+.chk {
+  color: var(--home);
+  flex-shrink: 0;
+  font-weight: 700;
+}
+.inheritNote {
+  color: var(--ink-faint);
+  font-size: 11px;
+  font-style: normal;
+  display: block;
+  margin: 2px 0 4px;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.tierCta {
+  font-family: "Pretendard", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 11px;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  background: var(--surface-soft);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.tierCard.featured .tierCta {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: var(--gold-soft);
+}
+.tierCta .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.pricingFootnote {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin-top: 20px;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.proof {
+  margin-top: 56px;
+}
+.proofTitle {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  text-align: center;
+  margin-bottom: 18px;
+}
+.proofGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.proofCard {
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.1);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.proofCard .pname {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.proofCard .pdesc {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.foot {
+  margin-top: 50px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.1);
+  color: var(--ink-faint);
+  font-size: 11px;
+  font-family: "IBM Plex Mono", monospace;
+  line-height: 1.8;
+  text-align: center;
+}
+
+@media (max-width: 820px) {
+  .wrap {
+    padding: 32px 16px 50px;
+  }
+  .heroTitle {
+    font-size: 28px;
+  }
+  .tiers {
+    grid-template-columns: 1fr;
+  }
+  .tierCard.featured {
+    transform: none;
+    order: -1;
+  }
+}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBox } from "@/lib/postgameReport";
@@ -137,6 +138,10 @@ async function getShots(gmkey: string): Promise<(ShotRow & { quarter: string })[
   return (data ?? []) as (ShotRow & { quarter: string })[];
 }
 
+// courtside_template.html의 buildChartStatic()/updateChart(idx)(2508~2545행) 스타일을
+// 그대로 이식 - 50% 기준 점선 + 쿼터 경계 세로선 + 곡선 아래 영역 채우기(area fill) +
+// 마지막 지점 세로 가이드선/점. 이전 구현은 이 중 area fill과 쿼터 경계선이 빠져 있었고,
+// 대신 템플릿에 없는 좌상단/좌하단 "홈100%/원정100%" 축 라벨이 들어가 있었음(제거).
 function WinProbChart({ events, homeColor }: { events: EventRow[]; homeColor: string }) {
   const valid = events.filter((e) => e.home_win_prob != null);
   if (!valid.length) {
@@ -148,48 +153,88 @@ function WinProbChart({ events, homeColor }: { events: EventRow[]; homeColor: st
   }
   const W = 640,
     H = 160,
-    PAD = 14;
+    PAD = 0;
   const n = valid.length;
-  const points = valid
-    .map((e, i) => {
-      const x = PAD + (i / Math.max(1, n - 1)) * (W - 2 * PAD);
-      const y = PAD + (1 - (e.home_win_prob as number)) * (H - 2 * PAD);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-  const midY = PAD + 0.5 * (H - 2 * PAD);
+  const xOf = (i: number) => PAD + (i / Math.max(1, n - 1)) * (W - 2 * PAD);
+  const yOf = (p: number) => PAD + (1 - p) * (H - 2 * PAD);
+  const points = valid.map((e, i) => [xOf(i), yOf(e.home_win_prob as number)] as const);
+  const linePath = "M " + points.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L ");
+  const areaPath = `${linePath} L ${points[points.length - 1][0].toFixed(1)} ${H} L 0 ${H} Z`;
+  const midY = H / 2;
+
+  // 쿼터 경계선(qBounds) - valid 배열 안에서 쿼터가 바뀌는 첫 지점의 x좌표.
+  const quarterBounds: { x: number; q: string }[] = [];
+  let lastQ: string | null = null;
+  valid.forEach((e, i) => {
+    if (e.quarter !== "PRE" && e.quarter !== lastQ) {
+      quarterBounds.push({ x: xOf(i), q: e.quarter });
+      lastQ = e.quarter;
+    }
+  });
+
+  const last = points[points.length - 1];
   const finalProb = Math.round((valid[valid.length - 1].home_win_prob as number) * 100);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 160, display: "block" }}>
-      <line x1={PAD} y1={midY} x2={W - PAD} y2={midY} stroke="var(--ink-faint)" strokeWidth={1} strokeDasharray="3,3" />
-      <text x={PAD} y={PAD - 2} fontSize={9} fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
-        홈 100%
-      </text>
-      <text x={PAD} y={H - 2} fontSize={9} fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
-        원정 100%
-      </text>
-      <polyline points={points} fill="none" stroke={homeColor} strokeWidth={2} />
-      <text x={W - PAD} y={PAD - 2} fontSize={11} fill={homeColor} textAnchor="end" fontWeight={700} fontFamily="IBM Plex Mono, monospace">
+      <line x1={0} y1={midY} x2={W} y2={midY} stroke="var(--ink-faint)" strokeWidth={1} strokeDasharray="3,4" />
+      {quarterBounds.map((b) => (
+        <line key={b.q} x1={b.x} y1={0} x2={b.x} y2={H} stroke="var(--ink-faint)" strokeWidth={1} opacity={0.35} />
+      ))}
+      <path d={areaPath} fill={homeColor} fillOpacity={0.12} />
+      <path d={linePath} fill="none" stroke={homeColor} strokeWidth={2} />
+      <line x1={last[0]} y1={0} x2={last[0]} y2={H} stroke="var(--ink)" strokeWidth={1.4} opacity={0.55} />
+      <circle cx={last[0]} cy={last[1]} r={5.5} fill="var(--ink)" stroke="var(--surface)" strokeWidth={2} />
+      <text x={last[0]} y={Math.max(12, last[1] - 10)} textAnchor="end" fontSize={11} fill={homeColor} fontWeight={700} fontFamily="IBM Plex Mono, monospace">
         최종 홈 승률 {finalProb}%
       </text>
     </svg>
   );
 }
 
-function statLine(t: TeamStatRow | undefined) {
-  if (!t) return null;
-  return [
-    ["PTS", t.score],
-    ["REB", t.reb],
-    ["AST", t.ast],
-    ["STL", t.stl],
-    ["BLK", t.blk],
-    ["TO", t.turnovers],
-    ["FG", `${t.fgm ?? "-"}/${t.fga ?? "-"}`],
-    ["3P", `${t.tpm ?? "-"}/${t.tpa ?? "-"}`],
-    ["FT", `${t.ftm ?? "-"}/${t.fta ?? "-"}`],
-  ] as const;
+// 팀 스탯 바 비교 - courtside_template.html의 tsBarHtml/tsPctRow/tsCountRow(3387~3400행)를
+// 그대로 이식. 정밀 대조 전에는 이 자리가 그냥 숫자만 나열한 data-table이었는데, 원본은
+// 스탯마다 홈 막대(오른쪽 끝에서 왼쪽으로 자람)와 원정 막대(왼쪽 끝에서 오른쪽으로 자람)가
+// 가운데서 마주보는 형태 - .ts-row/.ts-nums/.ts-bar(globals.css)에 그 스타일을 그대로 추가.
+function tsBarRow(label: string, hVal: number, aVal: number, hDisp: ReactNode, aDisp: ReactNode) {
+  const total = hVal + aVal;
+  const hPct = total > 0 ? (hVal / total) * 100 : 50;
+  return (
+    <div className="ts-row" key={label}>
+      <div className="ts-nums">
+        <span className="ts-home">{hDisp}</span>
+        <span className="ts-label">{label}</span>
+        <span className="ts-away">{aDisp}</span>
+      </div>
+      <div className="ts-bar">
+        <div className="ts-bar-fill home" style={{ width: `${hPct}%` }} />
+        <div className="ts-bar-fill away" style={{ width: `${100 - hPct}%` }} />
+      </div>
+    </div>
+  );
+}
+// 템플릿의 tsPctRow와 동일하게, 막대 길이는 성공/시도 개수가 아니라 두 팀의 "성공률(%)"
+// 값 자체를 서로 비교해 나눔(예: 45% vs 38% → 45:38 비율로 막대 분할).
+function tsPctRow(label: string, hPct: number, aPct: number, hRaw: string, aRaw: string) {
+  return tsBarRow(
+    label,
+    hPct,
+    aPct,
+    <>
+      {hPct}% <span className="ts-raw">{hRaw}</span>
+    </>,
+    <>
+      <span className="ts-raw">{aRaw}</span> {aPct}%
+    </>
+  );
+}
+function tsCountRow(label: string, hVal: number, aVal: number) {
+  return tsBarRow(label, hVal, aVal, hVal, aVal);
+}
+function fgPct(m: number | null | undefined, a: number | null | undefined) {
+  const mm = m ?? 0,
+    aa = a ?? 0;
+  return aa > 0 ? Math.round((mm / aa) * 100) : 0;
 }
 
 export default async function GamePage({
@@ -217,6 +262,16 @@ export default async function GamePage({
   const awayTeam = teamStats.find((t) => t.tcode === game.away_team?.tcode);
   const homePlayers = playerStats.filter((p) => p.tcode === game.home_team?.tcode);
   const awayPlayers = playerStats.filter((p) => p.tcode === game.away_team?.tcode);
+
+  // 최대 리드(팀 스탯 바의 마지막 행) - courtside_template.html의 renderTeamStats()가
+  // timeline을 훑어 계산하던 것과 동일하게 game_events 전체를 훑음.
+  let largestLeadHome = 0;
+  let largestLeadAway = 0;
+  for (const e of events) {
+    const diff = e.home_score - e.away_score;
+    if (diff > largestLeadHome) largestLeadHome = diff;
+    if (-diff > largestLeadAway) largestLeadAway = -diff;
+  }
 
   // 요청: "코트사이드웹에도 같은 리포트 붙여줘" - courtside_template.html(35차)의 AI
   // 코트사이드 리포트/프리뷰 인사이트를 그대로 포팅. 정적 페이지는 미리 구운 timeline
@@ -328,50 +383,65 @@ export default async function GamePage({
 
   const replayPlayers = playerStats.map((p) => ({ pcode: p.pcode, name: p.player?.name ?? p.pcode, tcode: p.tcode }));
 
-  const playerTable = (rows: PlayerStatRow[]) => (
-    <div className="table-scroll">
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>선수</th>
-            <th>MIN</th>
-            <th>PTS</th>
-            <th>REB</th>
-            <th>AST</th>
-            <th>STL</th>
-            <th>BLK</th>
-            <th>FG</th>
-            <th>3P</th>
-            <th>FT</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((p) => (
-            <tr key={p.pcode}>
-              <td>
-                <Link href={`/players/${p.pcode}`}>{p.player?.name ?? p.pcode}</Link>
-              </td>
-              <td>{p.min_played?.toFixed(1) ?? "-"}</td>
-              <td>{p.pts}</td>
-              <td>{p.reb}</td>
-              <td>{p.ast}</td>
-              <td>{p.stl}</td>
-              <td>{p.blk}</td>
-              <td>
-                {p.fgm}/{p.fga}
-              </td>
-              <td>
-                {p.tpm}/{p.tpa}
-              </td>
-              <td>
-                {p.ftm}/{p.fta}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+  // 선발/벤치 구분선 - courtside_template.html의 .bench-divider(코트 위 패널에서 현재
+  // 라인업 5인 다음 벤치 선수들 사이에 "벤치" 텍스트 행을 넣던 것)를 정적 박스스코어
+  // 테이블 컨텍스트로 옮김. 원본은 "지금 코트 위에 있는가"(실시간 교체 추적) 기준이지만,
+  // 이 정적 테이블엔 그 데이터가 없어 game_player_stats.is_starter(선발 여부)로 대체.
+  const playerRow = (p: PlayerStatRow) => (
+    <tr key={p.pcode}>
+      <td>
+        <Link href={`/players/${p.pcode}`}>{p.player?.name ?? p.pcode}</Link>
+      </td>
+      <td>{p.min_played?.toFixed(1) ?? "-"}</td>
+      <td>{p.pts}</td>
+      <td>{p.reb}</td>
+      <td>{p.ast}</td>
+      <td>{p.stl}</td>
+      <td>{p.blk}</td>
+      <td>
+        {p.fgm}/{p.fga}
+      </td>
+      <td>
+        {p.tpm}/{p.tpa}
+      </td>
+      <td>
+        {p.ftm}/{p.fta}
+      </td>
+    </tr>
   );
+  const playerTable = (rows: PlayerStatRow[]) => {
+    const starters = rows.filter((p) => p.is_starter);
+    const bench = rows.filter((p) => !p.is_starter);
+    return (
+      <div className="table-scroll">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>선수</th>
+              <th>MIN</th>
+              <th>PTS</th>
+              <th>REB</th>
+              <th>AST</th>
+              <th>STL</th>
+              <th>BLK</th>
+              <th>FG</th>
+              <th>3P</th>
+              <th>FT</th>
+            </tr>
+          </thead>
+          <tbody>
+            {starters.map(playerRow)}
+            {starters.length > 0 && bench.length > 0 && (
+              <tr className="bench-divider-row">
+                <td colSpan={10}>벤치</td>
+              </tr>
+            )}
+            {bench.map(playerRow)}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
 
   return (
     <div className="wrap">
@@ -407,28 +477,12 @@ export default async function GamePage({
         {game.game_date} · {game.season_name} {game.season_category} · {game.gmkey}
       </div>
 
-      {game.home_team && game.away_team && derivedEvents.length > 0 && (
-        <GameReplay
-          events={derivedEvents}
-          players={replayPlayers}
-          homeTeam={{
-            tcode: game.home_team.tcode,
-            name: game.home_team.name,
-            abbr: game.home_team.abbr,
-            color: game.home_team.color,
-            logoUrl: game.home_team.logo_url,
-          }}
-          awayTeam={{
-            tcode: game.away_team.tcode,
-            name: game.away_team.name,
-            abbr: game.away_team.abbr,
-            color: game.away_team.color,
-            logoUrl: game.away_team.logo_url,
-          }}
-          shots={shots}
-        />
-      )}
-
+      {/* 패널 순서 - courtside_template.html 정밀 대조 결과에 맞춤: 프리뷰 정보 → 매치업 →
+          순위 → 스코어보드/리플레이 → AI 리포트 → 팀스탯 → 박스스코어. 템플릿은 프리뷰/매치업/
+          순위가 하나의 접이식 .preview-panel 안에 이 순서로 중첩돼 있고(797~841행), 스코어보드는
+          그 앞에 sticky 헤더로 항상 보이는 별개 요소라 원본 raw DOM 순서만 보면 스코어보드가
+          먼저지만 - 이 페이지는 sticky 헤더가 없는 정적 페이지라 "경기 배경 정보를 먼저 읽고
+          리플레이를 보는" 흐름이 더 자연스러움. */}
       {pregameLines.length > 0 && (
         <div className="panel">
           <div className="panel-title">더 깊은 프리뷰 인사이트</div>
@@ -591,10 +645,27 @@ export default async function GamePage({
         </div>
       )}
 
-      <div className="panel">
-        <div className="panel-title">승률 흐름 (game_events, {events.length}개 이벤트)</div>
-        <WinProbChart events={events} homeColor={game.home_team?.color ?? "#888"} />
-      </div>
+      {game.home_team && game.away_team && derivedEvents.length > 0 && (
+        <GameReplay
+          events={derivedEvents}
+          players={replayPlayers}
+          homeTeam={{
+            tcode: game.home_team.tcode,
+            name: game.home_team.name,
+            abbr: game.home_team.abbr,
+            color: game.home_team.color,
+            logoUrl: game.home_team.logo_url,
+          }}
+          awayTeam={{
+            tcode: game.away_team.tcode,
+            name: game.away_team.name,
+            abbr: game.away_team.abbr,
+            color: game.away_team.color,
+            logoUrl: game.away_team.logo_url,
+          }}
+          shots={shots}
+        />
+      )}
 
       {shots.length > 0 && game.home_team && game.away_team && (
         <div className="panel">
@@ -649,6 +720,11 @@ export default async function GamePage({
         </div>
       )}
 
+      <div className="panel">
+        <div className="panel-title">승률 흐름 (game_events, {events.length}개 이벤트)</div>
+        <WinProbChart events={events} homeColor={game.home_team?.color ?? "#888"} />
+      </div>
+
       {reportSections.length > 0 && (
         <div className="panel">
           <div className="panel-title">🏀 AI 코트사이드 리포트</div>
@@ -662,36 +738,41 @@ export default async function GamePage({
       )}
 
       <div className="panel">
-        <div className="panel-title">팀 박스스코어</div>
-        <div className="table-scroll">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>팀</th>
-                <th></th>
-                {statLine(homeTeam)?.map(([label]) => (
-                  <th key={label}>{label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style={{ color: game.home_team?.color }}>{game.home_team?.name}</td>
-                <td></td>
-                {statLine(homeTeam)?.map(([label, val]) => (
-                  <td key={label}>{val ?? "-"}</td>
-                ))}
-              </tr>
-              <tr>
-                <td style={{ color: game.away_team?.color }}>{game.away_team?.name}</td>
-                <td></td>
-                {statLine(awayTeam)?.map(([label, val]) => (
-                  <td key={label}>{val ?? "-"}</td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <div className="panel-title">팀 스탯</div>
+        {homeTeam && awayTeam ? (
+          <>
+            {tsPctRow(
+              "FG%",
+              fgPct(homeTeam.fgm, homeTeam.fga),
+              fgPct(awayTeam.fgm, awayTeam.fga),
+              `${homeTeam.fgm ?? 0}-${homeTeam.fga ?? 0}`,
+              `${awayTeam.fgm ?? 0}-${awayTeam.fga ?? 0}`
+            )}
+            {tsPctRow(
+              "3PT%",
+              fgPct(homeTeam.tpm, homeTeam.tpa),
+              fgPct(awayTeam.tpm, awayTeam.tpa),
+              `${homeTeam.tpm ?? 0}-${homeTeam.tpa ?? 0}`,
+              `${awayTeam.tpm ?? 0}-${awayTeam.tpa ?? 0}`
+            )}
+            {tsPctRow(
+              "FT%",
+              fgPct(homeTeam.ftm, homeTeam.fta),
+              fgPct(awayTeam.ftm, awayTeam.fta),
+              `${homeTeam.ftm ?? 0}-${homeTeam.fta ?? 0}`,
+              `${awayTeam.ftm ?? 0}-${awayTeam.fta ?? 0}`
+            )}
+            {tsCountRow("턴오버", homeTeam.turnovers ?? 0, awayTeam.turnovers ?? 0)}
+            {tsCountRow("리바운드", homeTeam.reb ?? 0, awayTeam.reb ?? 0)}
+            {tsCountRow("어시스트", homeTeam.ast ?? 0, awayTeam.ast ?? 0)}
+            {tsCountRow("스틸", homeTeam.stl ?? 0, awayTeam.stl ?? 0)}
+            {tsCountRow("블록", homeTeam.blk ?? 0, awayTeam.blk ?? 0)}
+            {tsCountRow("파울", homeTeam.fouls ?? 0, awayTeam.fouls ?? 0)}
+            {tsCountRow("최대 리드", largestLeadHome, largestLeadAway)}
+          </>
+        ) : (
+          <div className="empty-note">팀 스탯 데이터 없음</div>
+        )}
       </div>
 
       <div className="panel">

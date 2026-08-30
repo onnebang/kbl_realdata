@@ -1,49 +1,141 @@
 import { supabase } from "./supabase";
-import { HOOP_RIGHT, COURT_X, COURT_Y, drawCourtMarkings, drawHoop } from "./zoneCompare";
+import { drawCourtMarkings } from "./zoneCompare";
 
-// "득점 분포 탐색기" 아티팩트(claude.ai/code/artifact/788e8698...) 포팅 - 팀/선수/코치/리그
-// 단위로 한 시즌의 슛 시도를 15x15 반코트 그리드에 히트맵으로. 원본은 미리 구운 DATA blob
-// (grid/coach/player/team/league)이었지만, shot_log가 이미 FK까지 갖춰 마이그레이션돼
-// 있어서(gmkey->games, pcode->players, tcode->teams) 라이브로 그대로 계산 가능. 그리드
-// 좌표계는 lib/zoneCompare.ts와 동일(원본 courtside_template.html 기준).
+// "득점 분포 탐색기" 아티팩트(claude.ai 원본, web/scoring_distribution_template.html) 리디자인
+// 2차 포팅 - 원본은 Python이 미리 구운 DATA blob(팀/선수/감독/리그 x 전체 15시즌의 15x15 격자를
+// 전부 미리 계산해서 박아둔 JSON)을 브라우저에서 그냥 훑는 구조라 즉각적인 시즌 재생 애니메이션이
+// 가능했음. 여기서는 그 "엔티티 하나를 고르면 그 엔티티의 전체 15시즌 격자를 한번에 들고 있다가
+// 클라이언트에서 시즌 인덱스만 바꿔가며 애니메이션"하는 형태를 유지하되, 데이터는 shot_log에서
+// 라이브로 계산 - 엔티티를 고를 때(초기 진입 포함) lib/scoringExplorerActions.ts의 Server Action이
+// 그 엔티티의 전체 이력을 한 번에 그리드로 뭉쳐서 내려주고, 이후 재생/이전/다음/슬라이더 조작은
+// 전부 클라이언트 메모리 안에서만 일어남(추가 서버 왕복 없음 - components/GameReplay.tsx가 이미
+// 로드된 events 배열을 스크럽하는 것과 같은 패턴).
 export const GRID = { cols: 15, rows: 15, xMin: 345, xMax: 720, yMin: 27, yMax: 384, hoopX: 681, hoopY: 205 };
+
+// (엔티티, 시즌) 조합의 시도가 이 미만이면 표본 부족으로 취급 - 원본 아티팩트의 Python 빌드
+// 스크립트가 DATA JSON을 구울 때 적용했던 것과 동일한 기준(minAttempts:30). 원본은 이 기준
+// 미달 시즌을 아예 DATA.entity.seasons에서 빼버려서 클라이언트가 그 시즌을 목록에서 볼 일이
+// 없었는데, 여기서도 같은 효과를 내려고 getEntitySeasonGrids가 미달 시즌을 결과에서 제외.
+const MIN_SAMPLE = 30;
 
 export type GridCell = { row: number; col: number; att: number; made: number };
 export type GridResult = { cells: GridCell[]; totalAtt: number; totalMade: number };
 export type Dimension = "player" | "team" | "coach" | "league";
-export type EntityOption = { id: string; label: string; subLabel?: string };
+export type EntityOption = { id: string; label: string };
 
-// 실측 버그(이 세션에서 세 번째로 걸림 - rarity.ts, winContributionLeaderboard.ts에 이어) -
-// Supabase 기본 max_rows(1000)에 range 없는 select가 조용히 잘림. 여기는 shot_log 전체
-// (55만행)를 다루는 파일이라 거의 모든 쿼리가 이 위험에 걸려서, 매번 따로 페이지네이션을
-// 손으로 쓰는 대신 공용 헬퍼로 통일 - 이 파일 안 모든 잠재적 대량 조회는 반드시 이걸 통해서.
+// 실측 버그(rarity.ts, winContributionLeaderboard.ts에 이어 이 파일에서도 세 번째) - Supabase
+// 기본 max_rows(1000)에 range 없는 select가 조용히 잘림. 이 함수는 그 위에 "전체 페이지를
+// 병렬로" 얹은 버전 - 첫 페이지에서 count:'exact'로 총 행수를 받아 남은 페이지 수를 계산하고,
+// CONCURRENCY개씩 묶어 Promise.all로 동시에 쏨. 왜 필요했냐면: league 차원(전체 15시즌
+// 55만행)이나 시도 많은 팀(시즌당 최대 5.7만행)을 순차 페이지네이션(기존 fetchAllPages처럼
+// 1000행씩 하나씩 기다림)으로 받으면 수십 초~분 단위로 느려져서 "재생" 애니메이션용 데이터를
+// 한 번에 들고 오는 이 페이지의 목적 자체가 무너짐 - DB 마이그레이션(집계 RPC)으로 푸는 게
+// 정공법이지만 이번 작업 범위에서 권한상 막혀서, 병렬 페이지네이션으로 절충.
 const PAGE = 1000;
-async function fetchAllPages<T>(
-  buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>
+const CONCURRENCY = 6;
+const MAX_RETRIES = 4;
+
+// 실측으로 발견한 버그 - 처음엔 배치 안에서 에러난 페이지를 그냥 건너뛰었더니(!r.error 체크만
+// 하고 조용히 drop), 동시성이 겹칠 때(예: "리그 평균과 비교"의 3시즌 병렬 fetch가 팀/선수
+// 전환과 동시에 돌 때) 일부 페이지 요청이 실패하면서 실제 37,621건짜리 시즌이 13,000건으로
+// 조용히 잘려서 화면에 나온 걸 브라우저로 직접 확인함(팀 상세를 curl로 재검증해서 진짜 버그임을
+// 확정) - "라이브 쿼리 결과가 정확해야 한다"는 이 페이지의 핵심 전제를 깨는 심각한 문제라,
+// 페이지 하나가 실패하면 지수 백오프로 재시도하고 그래도 안 되면 조용히 빈 배열을 반환하는 대신
+// 예외를 던져서(호출부가 그대로 실패) "숫자는 틀렸는데 화면은 정상처럼 보이는" 상황을 막음.
+async function fetchPageWithRetry<T>(
+  makeQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown; count?: number | null }>,
+  from: number,
+  to: number
+): Promise<{ data: T[] | null; error: unknown; count?: number | null }> {
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 200 * 2 ** (attempt - 1)));
+    const res = await makeQuery(from, to);
+    if (!res.error && res.data) return res;
+    lastErr = res.error;
+  }
+  throw new Error(`scoring-explorer: shot_log 페이지 조회 실패(range ${from}-${to}) - ${String(lastErr)}`);
+}
+
+async function fetchAllPagesBounded<T>(
+  makeQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown; count?: number | null }>
 ): Promise<T[]> {
-  const rows: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await buildQuery(from, from + PAGE - 1);
-    if (error || !data || !data.length) break;
-    rows.push(...data);
-    if (data.length < PAGE) break;
+  const first = await fetchPageWithRetry(makeQuery, 0, PAGE - 1);
+  const rows: T[] = [...(first.data ?? [])];
+  if (!first.data || first.data.length < PAGE) return rows;
+
+  const total = first.count ?? null;
+  if (total == null) {
+    // count를 못 받은 경우(드묾) - 안전하게 순차 폴백.
+    let from = PAGE;
+    for (;;) {
+      const { data } = await fetchPageWithRetry(makeQuery, from, from + PAGE - 1);
+      if (!data || !data.length) break;
+      rows.push(...data);
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+    return rows;
+  }
+
+  const totalPages = Math.ceil(total / PAGE);
+  const remainingPages = Array.from({ length: Math.max(0, totalPages - 1) }, (_, i) => i + 1);
+  for (let i = 0; i < remainingPages.length; i += CONCURRENCY) {
+    const batch = remainingPages.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(batch.map((p) => fetchPageWithRetry(makeQuery, p * PAGE, p * PAGE + PAGE - 1)));
+    for (const r of results) if (r.data) rows.push(...r.data);
   }
   return rows;
 }
 
-function cellKey(row: number, col: number) {
-  return `${row}_${col}`;
+// 시즌 목록(순서만 필요 - 실제 어느 시즌에 데이터가 있는지는 getEntitySeasonGrids가 개별
+// 엔티티 단위로 다시 계산).
+export async function getSeasonsWithShots(): Promise<string[]> {
+  const { data } = await supabase.from("seasons").select("season_name").order("season_name", { ascending: false });
+  return (data ?? []).map((s) => s.season_name);
 }
 
-function toGrid(shots: { x: number; y: number; d: string; made: boolean }[]): GridResult {
+// 검색 드롭다운용 "이 차원의 전체 이력 상 존재하는 모든 엔티티" 목록 - 원본 아티팩트는
+// DATA[dim]을 총 시도 횟수 내림차순으로 정렬해서 보여줬지만(entityListFor), 그 정렬 기준
+// 자체가 shot_log 55만행 전체를 훑어야 나오는 값이라 검색창을 열 때마다 계산하기엔 무거움.
+// 대신 teams/players/coaches 테이블(각각 그 자체로 이미 전체 이력 명단)을 직접 읽어
+// 한글 로케일 이름순으로 정렬 - "시도 많은 순" 배지는 포기하는 대신 검색 자체는 즉시 응답.
+export async function getAllEntityOptions(dim: Dimension): Promise<EntityOption[]> {
+  if (dim === "league") return [{ id: "league", label: "리그 전체" }];
+
+  if (dim === "team") {
+    const { data } = await supabase.from("teams").select("tcode, name");
+    return (data ?? [])
+      .map((t) => ({ id: t.tcode as string, label: t.name as string }))
+      .sort((a, b) => a.label.localeCompare(b.label, "ko"));
+  }
+
+  if (dim === "coach") {
+    const { data } = await supabase.from("coaches").select("coach_id, name");
+    return (data ?? [])
+      .map((c) => ({ id: String(c.coach_id), label: c.name as string }))
+      .sort((a, b) => a.label.localeCompare(b.label, "ko"));
+  }
+
+  // player: players 테이블이 741행으로 1000 미만 - 페이지네이션 없이 한 번에.
+  const { data } = await supabase.from("players").select("pcode, name");
+  return (data ?? [])
+    .map((p) => ({ id: p.pcode as string, label: p.name as string }))
+    .sort((a, b) => a.label.localeCompare(b.label, "ko"));
+}
+
+type ShotXYDM = { x: number; y: number; d: string; made: boolean };
+type ShotWithSeason = ShotXYDM & { season: string };
+
+function toGrid(shots: ShotXYDM[]): GridResult {
   const map = new Map<string, GridCell>();
-  let totalAtt = 0,
-    totalMade = 0;
+  let totalAtt = 0;
+  let totalMade = 0;
   for (const s of shots) {
     const x = s.d === "2" ? 750 - s.x : s.x;
     const col = Math.min(GRID.cols - 1, Math.max(0, Math.floor(((x - GRID.xMin) / (GRID.xMax - GRID.xMin)) * GRID.cols)));
     const row = Math.min(GRID.rows - 1, Math.max(0, Math.floor(((s.y - GRID.yMin) / (GRID.yMax - GRID.yMin)) * GRID.rows)));
-    const key = cellKey(row, col);
+    const key = `${row}_${col}`;
     const cell = map.get(key) ?? { row, col, att: 0, made: 0 };
     cell.att++;
     if (s.made) cell.made++;
@@ -54,76 +146,66 @@ function toGrid(shots: { x: number; y: number; d: string; made: boolean }[]): Gr
   return { cells: Array.from(map.values()), totalAtt, totalMade };
 }
 
-export async function getSeasonsWithShots(): Promise<string[]> {
-  const { data } = await supabase.from("seasons").select("season_name").order("season_name", { ascending: false });
-  return (data ?? []).map((s) => s.season_name);
-}
-
-export async function getEntityOptions(dim: Dimension, seasonName: string): Promise<EntityOption[]> {
-  if (dim === "league") return [{ id: "league", label: "리그 전체" }];
-
-  if (dim === "team") {
-    const { data } = await supabase.from("teams").select("tcode, name").order("name");
-    return (data ?? []).map((t) => ({ id: t.tcode, label: t.name }));
-  }
-
-  if (dim === "coach") {
-    // 한 시즌 최대 270경기 x 2(홈/원정 코치) = 540행 - 1000 미만이라 안전하지만 통일성을
-    // 위해 그냥 헬퍼로.
-    const rows = await fetchAllPages<{
-      home_coach: { coach_id: number; name: string } | null;
-      away_coach: { coach_id: number; name: string } | null;
-    }>((from, to) =>
+// 코치 전용: shot_log엔 코치 FK가 없어서(games.home_coach_id/away_coach_id 단위) 이 코치가
+// 담당한 전체 이력의 (gmkey, tcode, season) 조합을 games에서 먼저 구하고, 그 gmkey 묶음으로
+// shot_log를 청크 조회(getShotGrid의 기존 시즌 스코프 버전과 같은 2단계 패턴을 전체 이력으로
+// 확장).
+async function fetchCoachShotsAllSeasons(coachId: string): Promise<ShotWithSeason[]> {
+  const [homeGames, awayGames] = await Promise.all([
+    fetchAllPagesBounded<{ gmkey: string; home_tcode: string; season_name: string }>((from, to) =>
       supabase
         .from("games")
-        .select(
-          "home_coach:coaches!games_home_coach_id_fkey(coach_id, name), away_coach:coaches!games_away_coach_id_fkey(coach_id, name)"
-        )
-        .eq("season_name", seasonName)
-        .range(from, to) as unknown as PromiseLike<{
-        data: { home_coach: { coach_id: number; name: string } | null; away_coach: { coach_id: number; name: string } | null }[] | null;
-        error: unknown;
-      }>
-    );
-    const seen = new Map<string, string>();
-    for (const g of rows) {
-      if (g.home_coach) seen.set(String(g.home_coach.coach_id), g.home_coach.name);
-      if (g.away_coach) seen.set(String(g.away_coach.coach_id), g.away_coach.name);
-    }
-    return Array.from(seen.entries())
-      .map(([id, label]) => ({ id, label }))
-      .sort((a, b) => a.label.localeCompare(b.label, "ko"));
-  }
+        .select("gmkey, home_tcode, season_name", { count: "exact" })
+        .eq("home_coach_id", coachId)
+        .range(from, to)
+    ),
+    fetchAllPagesBounded<{ gmkey: string; away_tcode: string; season_name: string }>((from, to) =>
+      supabase
+        .from("games")
+        .select("gmkey, away_tcode, season_name", { count: "exact" })
+        .eq("away_coach_id", coachId)
+        .range(from, to)
+    ),
+  ]);
+  const meta = new Map<string, { tcode: string; season: string }>();
+  for (const g of homeGames) meta.set(g.gmkey, { tcode: g.home_tcode, season: g.season_name });
+  for (const g of awayGames) meta.set(g.gmkey, { tcode: g.away_tcode, season: g.season_name });
+  const gmkeys = Array.from(meta.keys());
+  if (!gmkeys.length) return [];
 
-  // player: 이 시즌 실제로 뛴 선수만(볼륨 적은 선수까지 다 보여주면 목록이 너무 길어짐 -
-  // 원본 아티팩트의 minAttempts:30처럼 표본 기준 필요하지만, 여기선 "이 시즌 출전 기록
-  // 있음"만으로 단순화 - 커리어 전체가 아니라 시즌 단위 탐색기라 자연스러운 필터). 한
-  // 시즌 최대 270경기 x ~24명 ≈ 6000행이라 반드시 페이지네이션 필요.
-  const rows = await fetchAllPages<{ pcode: string; player: { name: string } | null }>((from, to) =>
-    supabase
-      .from("game_player_stats")
-      .select("pcode, player:players(name), games!inner(season_name)")
-      .eq("games.season_name", seasonName)
-      .range(from, to) as unknown as PromiseLike<{ data: { pcode: string; player: { name: string } | null }[] | null; error: unknown }>
-  );
-  const seen = new Map<string, string>();
-  for (const r of rows) {
-    if (r.player) seen.set(r.pcode, r.player.name);
+  const shots: ShotWithSeason[] = [];
+  for (let i = 0; i < gmkeys.length; i += 100) {
+    const chunk = gmkeys.slice(i, i + 100);
+    const chunkShots = await fetchAllPagesBounded<{ gmkey: string; tcode: string } & ShotXYDM>((from, to) =>
+      supabase.from("shot_log").select("gmkey, tcode, x, y, d, made", { count: "exact" }).in("gmkey", chunk).range(from, to)
+    );
+    for (const s of chunkShots) {
+      const m = meta.get(s.gmkey);
+      if (m && s.tcode === m.tcode) shots.push({ x: s.x, y: s.y, d: s.d, made: s.made, season: m.season });
+    }
   }
-  return Array.from(seen.entries())
-    .map(([id, label]) => ({ id, label }))
-    .sort((a, b) => a.label.localeCompare(b.label, "ko"));
+  return shots;
 }
 
-type ShotXYDM = { x: number; y: number; d: string; made: boolean };
-
-async function getCoachGameTcodes(coachId: string, seasonName: string): Promise<{ gmkey: string; tcode: string }[]> {
+// 코치 전용(단일 시즌 스코프) - app/players/[pcode]/page.tsx가 쓰는 getShotGrid("player", ...)는
+// 이 함수를 안 타지만, getShotGrid의 dim==="coach" 분기가 필요로 해서 유지.
+async function getCoachGameTcodesForSeason(coachId: string, seasonName: string): Promise<{ gmkey: string; tcode: string }[]> {
   const [homeGames, awayGames] = await Promise.all([
-    fetchAllPages<{ gmkey: string; home_tcode: string }>((from, to) =>
-      supabase.from("games").select("gmkey, home_tcode").eq("season_name", seasonName).eq("home_coach_id", coachId).range(from, to)
+    fetchAllPagesBounded<{ gmkey: string; home_tcode: string }>((from, to) =>
+      supabase
+        .from("games")
+        .select("gmkey, home_tcode", { count: "exact" })
+        .eq("season_name", seasonName)
+        .eq("home_coach_id", coachId)
+        .range(from, to)
     ),
-    fetchAllPages<{ gmkey: string; away_tcode: string }>((from, to) =>
-      supabase.from("games").select("gmkey, away_tcode").eq("season_name", seasonName).eq("away_coach_id", coachId).range(from, to)
+    fetchAllPagesBounded<{ gmkey: string; away_tcode: string }>((from, to) =>
+      supabase
+        .from("games")
+        .select("gmkey, away_tcode", { count: "exact" })
+        .eq("season_name", seasonName)
+        .eq("away_coach_id", coachId)
+        .range(from, to)
     ),
   ]);
   return [
@@ -132,37 +214,42 @@ async function getCoachGameTcodes(coachId: string, seasonName: string): Promise<
   ];
 }
 
+// app/players/[pcode]/page.tsx(선수 프로필 페이지)가 쓰는 단일 시즌 스코프 버전 - 이 리디자인
+// 이전부터 있던 함수로, 다른 페이지가 이미 의존하고 있어 시그니처를 그대로 유지.
 export async function getShotGrid(dim: Dimension, entityId: string, seasonName: string): Promise<GridResult> {
   if (dim === "league" || dim === "team") {
-    const shots = await fetchAllPages<ShotXYDM>((from, to) => {
-      let q = supabase.from("shot_log").select("x, y, d, made, games!inner(season_name)").eq("games.season_name", seasonName);
+    const shots = await fetchAllPagesBounded<ShotXYDM>((from, to) => {
+      let q = supabase
+        .from("shot_log")
+        .select("x, y, d, made, games!inner(season_name)", { count: "exact" })
+        .eq("games.season_name", seasonName);
       if (dim === "team") q = q.eq("tcode", entityId);
-      return q.range(from, to);
+      return q.range(from, to) as unknown as PromiseLike<{ data: ShotXYDM[] | null; error: unknown; count: number | null }>;
     });
     return toGrid(shots);
   }
   if (dim === "player") {
-    const shots = await fetchAllPages<ShotXYDM>((from, to) =>
-      supabase
-        .from("shot_log")
-        .select("x, y, d, made, games!inner(season_name)")
-        .eq("games.season_name", seasonName)
-        .eq("pcode", entityId)
-        .range(from, to)
+    const shots = await fetchAllPagesBounded<ShotXYDM>(
+      (from, to) =>
+        supabase
+          .from("shot_log")
+          .select("x, y, d, made, games!inner(season_name)", { count: "exact" })
+          .eq("games.season_name", seasonName)
+          .eq("pcode", entityId)
+          .range(from, to) as unknown as PromiseLike<{ data: ShotXYDM[] | null; error: unknown; count: number | null }>
     );
     return toGrid(shots);
   }
-  // coach: 이 코치가 이 시즌에 담당한 (경기, 팀) 목록을 먼저 구하고, 그 조합에 해당하는
-  // shot_log만 - 코치별 전용 FK가 없어서(games.home_coach_id/away_coach_id 단위) 2단계로.
-  const pairs = await getCoachGameTcodes(entityId, seasonName);
+  // coach
+  const pairs = await getCoachGameTcodesForSeason(entityId, seasonName);
   if (!pairs.length) return { cells: [], totalAtt: 0, totalMade: 0 };
   const gmkeys = Array.from(new Set(pairs.map((p) => p.gmkey)));
   const tcodeByGmkey = new Map(pairs.map((p) => [p.gmkey, p.tcode]));
   const shots: ShotXYDM[] = [];
   for (let i = 0; i < gmkeys.length; i += 100) {
     const chunk = gmkeys.slice(i, i + 100);
-    const chunkShots = await fetchAllPages<{ gmkey: string; tcode: string } & ShotXYDM>((from, to) =>
-      supabase.from("shot_log").select("gmkey, tcode, x, y, d, made").in("gmkey", chunk).range(from, to)
+    const chunkShots = await fetchAllPagesBounded<{ gmkey: string; tcode: string } & ShotXYDM>((from, to) =>
+      supabase.from("shot_log").select("gmkey, tcode, x, y, d, made", { count: "exact" }).in("gmkey", chunk).range(from, to)
     );
     for (const s of chunkShots) {
       if (s.tcode === tcodeByGmkey.get(s.gmkey)) shots.push(s);
@@ -171,21 +258,93 @@ export async function getShotGrid(dim: Dimension, entityId: string, seasonName: 
   return toGrid(shots);
 }
 
-// 셀 불투명도 = (시도/이시즌최대시도)^0.6 * 0.88 - 원본 아티팩트 공식 그대로(감마 압축으로
-// 저빈도 구간도 어느 정도 보이게). 코트/골대는 zoneCompare.ts의 나무색 코트를 그대로 재사용.
+export type EntitySeasonGrids = { seasons: string[]; grids: Record<string, GridResult> };
+
+// 리그 전체(15시즌 55만행)를 이 페이지 방식대로(엔티티 하나의 전체 이력을 한 번에) 끌어오면
+// 얼마나 느린지 실측함(병렬 페이지네이션, 동시성 8 기준) - 70개 배치 중 21번째(16만9천행)에서
+// 이미 47.8초, 전체를 끝내면 150초 이상 걸릴 것으로 추정 - Server Action/서버리스 함수 타임아웃을
+// 확실히 넘김. 반면 시즌 하나(약 3.5만행)는 실측 7.6초 - 그래서 리그 차원(단독 선택 + "리그
+// 평균과 비교" 체크박스 둘 다)만 최근 N시즌으로 제한(memory 지침의 "리그 옵션은 최근 시즌
+// 몇 개만 우선 지원" 절충안). 팀/선수/코치는 실측상 문제없어서(최대 팀 tcode=10 57043행 =
+// 10.3초) 전체 15시즌 그대로 유지.
+const LEAGUE_RECENT_SEASONS = 3;
+
+// 이 페이지의 핵심 데이터 함수 - 엔티티(팀/선수/코치) 또는 리그 전체의 "표본이 30회 이상인
+// 시즌"의 15x15 격자를 한 번에 계산해서 반환(리그는 최근 LEAGUE_RECENT_SEASONS개로 제한 -
+// 위 주석). lib/scoringExplorerActions.ts의 Server Action이 이 함수를 감싸서 클라이언트가
+// 엔티티를 바꿀 때마다 호출.
+export async function getEntitySeasonGrids(dim: Dimension, entityId: string): Promise<EntitySeasonGrids> {
+  if (dim === "league") {
+    const allSeasons = await getSeasonsWithShots(); // 최신순
+    const recent = allSeasons.slice(0, LEAGUE_RECENT_SEASONS);
+    const results = await Promise.all(recent.map((season) => getShotGrid("league", "league", season)));
+    const grids: Record<string, GridResult> = {};
+    recent.forEach((season, i) => {
+      if (results[i].totalAtt >= MIN_SAMPLE) grids[season] = results[i];
+    });
+    return { seasons: Object.keys(grids).sort(), grids };
+  }
+
+  let shots: ShotWithSeason[];
+
+  if (dim === "coach") {
+    shots = await fetchCoachShotsAllSeasons(entityId);
+  } else {
+    type Row = ShotXYDM & { games: { season_name: string } | { season_name: string }[] };
+    const rows = await fetchAllPagesBounded<Row>((from, to) => {
+      let q = supabase.from("shot_log").select("x, y, d, made, games!inner(season_name)", { count: "exact" });
+      if (dim === "team") q = q.eq("tcode", entityId);
+      if (dim === "player") q = q.eq("pcode", entityId);
+      return q.range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: unknown; count: number | null }>;
+    });
+    shots = rows.map((r) => {
+      const g = Array.isArray(r.games) ? r.games[0] : r.games;
+      return { x: r.x, y: r.y, d: r.d, made: r.made, season: g.season_name };
+    });
+  }
+
+  const bySeasonShots = new Map<string, ShotXYDM[]>();
+  for (const s of shots) {
+    const arr = bySeasonShots.get(s.season) ?? [];
+    arr.push(s);
+    bySeasonShots.set(s.season, arr);
+  }
+
+  const grids: Record<string, GridResult> = {};
+  for (const [season, arr] of bySeasonShots) {
+    const g = toGrid(arr);
+    if (g.totalAtt >= MIN_SAMPLE) grids[season] = g;
+  }
+  const seasons = Object.keys(grids).sort();
+  return { seasons, grids };
+}
+
+// 셀 불투명도 = (시도/이시즌최대시도)^0.6 * 0.88, 코트/골대 - 원본 아티팩트(scoring_distribution_
+// template.html)의 renderCourtSvg()/drawCourtMarkings()/drawHoop() 그대로. drawCourtMarkings는
+// lib/zoneCompare.ts와 상수·공식이 완전히 동일해 재사용(출력이 바이트 단위로 같음 - 중복 구현
+// 아님). drawHoop만은 템플릿 로컬 버전이 zoneCompare.ts 버전(두 골대짜리 전체 코트용, 그물 표시
+// 있음)과 달라서 이 파일에 템플릿 그대로 복사.
+function drawHoop(hx: number, hy: number): string {
+  let svg = `<line x1="${hx + 13}" y1="${hy - 19}" x2="${hx + 13}" y2="${hy + 19}" stroke="var(--ink-soft)" stroke-width="4.5" stroke-linecap="round"/>`;
+  svg += `<circle cx="${hx}" cy="${hy}" r="9.5" fill="none" stroke="#e8590c" stroke-width="3.2"/>`;
+  return svg;
+}
+
 export function buildHeatmapSvg(grid: GridResult): string {
   const maxAtt = Math.max(1, ...grid.cells.map((c) => c.att));
   const cellW = (GRID.xMax - GRID.xMin) / GRID.cols;
   const cellH = (GRID.yMax - GRID.yMin) / GRID.rows;
 
-  let svg = `<rect x="${COURT_X[0]}" y="${COURT_Y[0]}" width="${COURT_X[1] - COURT_X[0]}" height="${COURT_Y[1] - COURT_Y[0]}" fill="#d9b98a" stroke="var(--ink-faint)" stroke-width="2"/>`;
+  let svg = `<rect x="${GRID.xMin}" y="${GRID.yMin}" width="${GRID.xMax - GRID.xMin}" height="${GRID.yMax - GRID.yMin}" fill="#d9b98a" stroke="var(--ink-faint)" stroke-width="2"/>`;
   for (const cell of grid.cells) {
+    if (cell.att === 0) continue;
     const x = GRID.xMin + cell.col * cellW;
     const y = GRID.yMin + cell.row * cellH;
     const ratio = Math.pow(cell.att / maxAtt, 0.6);
-    svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${cellW.toFixed(1)}" height="${cellH.toFixed(1)}" fill="var(--home)" opacity="${(ratio * 0.88).toFixed(2)}"><title>${cell.att}회 시도, ${cell.made}회 성공(${cell.att ? Math.round((cell.made / cell.att) * 100) : 0}%)</title></rect>`;
+    const pct = cell.att ? Math.round((cell.made / cell.att) * 100) : 0;
+    svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${cellW.toFixed(1)}" height="${cellH.toFixed(1)}" fill="var(--hot)" opacity="${(ratio * 0.88).toFixed(2)}"><title>${cell.att}회 시도, ${cell.made}회 성공(${pct}%)</title></rect>`;
   }
-  svg += drawCourtMarkings(HOOP_RIGHT[0], COURT_X[1], -1, "#fff", 1.6);
-  svg += drawHoop(HOOP_RIGHT[0], HOOP_RIGHT[1], false);
+  svg += drawCourtMarkings(GRID.hoopX, GRID.xMax, -1, "#fff", 1.4);
+  svg += drawHoop(GRID.hoopX, GRID.hoopY);
   return svg;
 }

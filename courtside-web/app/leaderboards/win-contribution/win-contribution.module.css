@@ -1,0 +1,186 @@
+/* wpa_leaderboard_template.html 포팅 - 이 페이지 전용 스코프. globals.css는 건드리지
+   않고, 템플릿에서 이 페이지만 쓰는 값(시맨틱 --pos/--neg 컬러, TOP10 바 차트 grid 폭,
+   패널 타이틀 모노 스타일, explain-box)을 이 클래스들로 별도 정의함. globals.css의
+   .wrap/.panel/.table-scroll/.data-table/.foot는 그대로 재사용(className으로 병기).
+
+   --pos/--neg는 팀 컬러(--home/--away)가 아니라 "WPA 양수=파랑, 음수=빨강"이라는 절대적
+   의미의 시맨틱 컬러 - 템플릿 :root 값 그대로. globals.css의 .wpa-bar-.../.wpa-pos/.wpa-neg는
+   form-index 등 다른 페이지와 공유하는 초록/주황 톤이라 여기서는 쓰지 않음. */
+.pageRoot {
+  --pos: #0b3d91;
+  --neg: #c8102e;
+}
+@media (prefers-color-scheme: dark) {
+  .pageRoot {
+    --pos: #5b8fd9;
+    --neg: #ff6b81;
+  }
+}
+
+/* 헤더: 타이틀+부제 좌측, 시즌 폼 우측 - 템플릿 .header-row 레이아웃 그대로.
+   (템플릿은 select 하나만 두고 onchange로 즉시 갱신하지만, 이 사이트는 시즌 변경 시
+   서버에서 새로 쿼리해야 해서 - 다른 리더보드 페이지들과 같은 이유로 - submit 버튼이
+   달린 폼을 씀. 레이아웃 위치만 템플릿처럼 헤더 우측으로 맞춤.) */
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.titleSize {
+  font-size: 30px;
+}
+.subtitleWidth {
+  max-width: 480px;
+}
+.seasonForm {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* 템플릿 .panel-title은 IBM Plex Mono 소문자 라벨 스타일 - globals.css의 .panel-title
+   (Pretendard sans, 글자간격 다름)과 달라서 오버라이드. */
+.panelTitle {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 14px;
+}
+
+/* TOP10 바 차트 - 템플릿 .bar-row grid 그대로: 26px(순위) 108px(이름) 1fr(바) 60px(값) */
+.barRow {
+  display: grid;
+  grid-template-columns: 26px 108px 1fr 60px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+}
+.barRank {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--ink-faint);
+  text-align: center;
+}
+.barNameWrap {
+  min-width: 0;
+}
+.barName {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.barTeam {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-faint);
+}
+.barTrack {
+  height: 20px;
+  border-radius: 5px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+.barFill {
+  height: 100%;
+  border-radius: 5px;
+}
+.barVal {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pos {
+  color: var(--pos);
+}
+.neg {
+  color: var(--neg);
+}
+.barFill.pos {
+  background: var(--pos);
+}
+.barFill.neg {
+  background: var(--neg);
+}
+
+/* 전체 테이블 - globals.css .data-table 위에 템플릿 고유 사이즈(폰트 12.5px, th 10.5px,
+   td 패딩 8px 6px)만 오버라이드. 팀 컬럼은 배지만(이름 텍스트 없음), WPA 컬럼만 +/-로 채색
+   (WPA/G, +WPA, -WPA는 템플릿에서 특별히 채색하지 않음). */
+.table {
+  font-size: 12.5px;
+}
+.table th {
+  font-size: 10.5px;
+  padding: 8px 6px;
+}
+.table td {
+  padding: 8px 6px;
+}
+.rankCell {
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--ink-faint);
+  width: 30px;
+}
+.playerCell {
+  font-weight: 700;
+}
+.sortLink {
+  color: inherit;
+}
+.activeHeader {
+  color: var(--ink);
+}
+.arrow {
+  font-size: 8px;
+  margin-left: 2px;
+  opacity: 0.6;
+}
+.totalPos {
+  color: var(--pos);
+  font-weight: 700;
+}
+.totalNeg {
+  color: var(--neg);
+  font-weight: 700;
+}
+
+.explainBox {
+  margin-top: 14px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--ink-soft);
+}
+.explainBox b {
+  color: var(--ink);
+}
+.term {
+  border-bottom: 1px dotted var(--ink-faint);
+}
+
+@media (max-width: 560px) {
+  .titleSize {
+    font-size: 24px;
+  }
+  .barRow {
+    grid-template-columns: 20px 84px 1fr 50px;
+    gap: 6px;
+  }
+  .barName {
+    font-size: 11px;
+  }
+  .table {
+    font-size: 11px;
+  }
+  .table th,
+  .table td {
+    padding: 6px 4px;
+  }
+}

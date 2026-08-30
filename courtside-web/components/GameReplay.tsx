@@ -110,37 +110,52 @@ type PlayerMeta = { pcode: string; name: string; tcode: string };
 type TeamMeta = { tcode: string; name: string; abbr: string; color: string; logoUrl: string | null };
 type ShotWithQuarter = ShotRow & { quarter: string };
 
+// courtside_template.html의 buildChartStatic()/updateChart(idx)(2508~2545행) 스타일로
+// 정밀 대조 - 50% 기준 점선 + 쿼터 경계 세로선 + 곡선 아래 영역 채우기(area fill)를
+// 추가(이전엔 빠져 있었음). 스크럽 위치를 따라가는 마커(세로 가이드선+점+% 라벨)는 이
+// 컴포넌트만의 인터랙티브 기능이라 그대로 유지.
 function WinProbLiveChart({ events, idx, homeColor }: { events: GameEvent[]; idx: number; homeColor: string }) {
   const valid = events.map((e, i) => ({ e, i })).filter((r) => r.e.home_win_prob != null);
   if (!valid.length) return <div className="empty-note">승률 데이터 없음</div>;
   const W = 640,
-    H = 150,
-    PAD = 14;
+    H = 150;
   const n = valid.length;
-  const points = valid
-    .map((r, vi) => {
-      const x = PAD + (vi / Math.max(1, n - 1)) * (W - 2 * PAD);
-      const y = PAD + (1 - (r.e.home_win_prob as number)) * (H - 2 * PAD);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+  const xOf = (vi: number) => (vi / Math.max(1, n - 1)) * W;
+  const yOf = (p: number) => (1 - p) * H;
+  const points = valid.map((r, vi) => [xOf(vi), yOf(r.e.home_win_prob as number)] as const);
+  const linePath = "M " + points.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L ");
+  const areaPath = `${linePath} L ${points[points.length - 1][0].toFixed(1)} ${H} L 0 ${H} Z`;
+
+  const quarterBounds: { x: number; q: string }[] = [];
+  let lastQ: string | null = null;
+  valid.forEach((r, vi) => {
+    if (r.e.quarter !== "PRE" && r.e.quarter !== lastQ) {
+      quarterBounds.push({ x: xOf(vi), q: r.e.quarter });
+      lastQ = r.e.quarter;
+    }
+  });
+
   let markerVi = 0;
   for (let vi = 0; vi < valid.length; vi++) {
     if (valid[vi].i <= idx) markerVi = vi;
     else break;
   }
   const marker = valid[markerVi];
-  const mx = PAD + (markerVi / Math.max(1, n - 1)) * (W - 2 * PAD);
-  const my = PAD + (1 - (marker.e.home_win_prob as number)) * (H - 2 * PAD);
-  const midY = PAD + 0.5 * (H - 2 * PAD);
+  const mx = xOf(markerVi);
+  const my = yOf(marker.e.home_win_prob as number);
+  const midY = H / 2;
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 150, display: "block" }}>
-      <line x1={PAD} y1={midY} x2={W - PAD} y2={midY} stroke="var(--ink-faint)" strokeWidth={1} strokeDasharray="3,3" />
-      <polyline points={points} fill="none" stroke={homeColor} strokeWidth={2} opacity={0.85} />
-      <line x1={mx} y1={PAD} x2={mx} y2={H - PAD} stroke="var(--ink-faint)" strokeWidth={1} strokeDasharray="2,3" />
+      <line x1={0} y1={midY} x2={W} y2={midY} stroke="var(--ink-faint)" strokeWidth={1} strokeDasharray="3,4" />
+      {quarterBounds.map((b) => (
+        <line key={b.q} x1={b.x} y1={0} x2={b.x} y2={H} stroke="var(--ink-faint)" strokeWidth={1} opacity={0.35} />
+      ))}
+      <path d={areaPath} fill={homeColor} fillOpacity={0.12} />
+      <path d={linePath} fill="none" stroke={homeColor} strokeWidth={2} />
+      <line x1={mx} y1={0} x2={mx} y2={H} stroke="var(--ink-faint)" strokeWidth={1} strokeDasharray="2,3" />
       <circle cx={mx} cy={my} r={4.5} fill={homeColor} stroke="var(--surface)" strokeWidth={1.5} />
-      <text x={mx} y={my - 10} textAnchor="middle" fontSize={11} fontWeight={700} fill={homeColor} fontFamily="IBM Plex Mono, monospace">
+      <text x={mx} y={Math.max(11, my - 10)} textAnchor="middle" fontSize={11} fontWeight={700} fill={homeColor} fontFamily="IBM Plex Mono, monospace">
         {Math.round((marker.e.home_win_prob as number) * 100)}%
       </text>
     </svg>

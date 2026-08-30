@@ -1,0 +1,442 @@
+/* web/season_browser_template.html의 CSS를 그대로 포팅 - 클래스명만 camelCase CSS
+   Module로 바꿨을 뿐 색상 토큰/치수/폰트는 원본과 동일. 문서 전체 :root를 건드리지 않기
+   위해 색상 변수는 .pageRoot에 스코프(courtside-web CLAUDE.md 지침). globals.css의
+   :root 변수와 값 자체는 같지만(사이트 전역 브랜드 팔레트), 이 페이지가 다른 페이지의
+   :root를 절대 건드리지 않도록 독립적으로 정의. */
+
+.pageRoot {
+  --bg: #f4f5f8;
+  --surface: #ffffff;
+  --surface-soft: #eceef3;
+  --ink: #14161c;
+  --ink-soft: #5b5f6e;
+  --ink-faint: #9297a880;
+  --home: #d9640a;
+  --home-soft: #d9640a1a;
+  --away: #1f6fd6;
+  --away-soft: #1f6fd61a;
+  --gold: #9a6b00;
+  --gold-soft: #9a6b0022;
+  --line-rgb: 20, 22, 28;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pageRoot {
+    --bg: #0f1115;
+    --surface: #1a1d24;
+    --surface-soft: #23272f;
+    --ink: #f2f3f7;
+    --ink-soft: #9297a8;
+    --ink-faint: #6a6f7f90;
+    --home: #ff8a3d;
+    --home-soft: #ff8a3d26;
+    --away: #3ea6ff;
+    --away-soft: #3ea6ff26;
+    --gold: #ffd166;
+    --gold-soft: #ffd16626;
+    --line-rgb: 242, 243, 247;
+  }
+}
+
+:root[data-theme="dark"] .pageRoot {
+  --bg: #0f1115;
+  --surface: #1a1d24;
+  --surface-soft: #23272f;
+  --ink: #f2f3f7;
+  --ink-soft: #9297a8;
+  --ink-faint: #6a6f7f90;
+  --home: #ff8a3d;
+  --home-soft: #ff8a3d26;
+  --away: #3ea6ff;
+  --away-soft: #3ea6ff26;
+  --gold: #ffd166;
+  --gold-soft: #ffd16626;
+  --line-rgb: 242, 243, 247;
+}
+
+.pageRoot {
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  color: var(--ink);
+}
+
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 28px 18px 80px;
+}
+
+.headerRow {
+  margin-bottom: 18px;
+}
+.title {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 30px;
+  line-height: 1.1;
+}
+.subtitle {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
+
+.seasonForm {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.seasonForm select {
+  font-family: "Pretendard", sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  background: var(--surface);
+  color: var(--ink);
+}
+.btnPrimary {
+  font-family: "Pretendard", sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: none;
+  background: var(--home);
+  color: #fff;
+  cursor: pointer;
+}
+.btnPrimary:hover {
+  opacity: 0.9;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+.filters input,
+.filters select {
+  font-family: "Pretendard", sans-serif;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  border-radius: 9px;
+  padding: 9px 12px;
+}
+.filters input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.gameRow {
+  display: grid;
+  grid-template-columns: 78px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.08);
+  cursor: pointer;
+  font-size: 13px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  color: inherit;
+}
+.gameRow:last-child {
+  border-bottom: none;
+}
+.gameRow:hover {
+  background: var(--surface-soft);
+}
+.grDate {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+.grCat {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8.5px;
+  color: var(--gold);
+  background: var(--gold-soft);
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-top: 2px;
+}
+.grMatchup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.grTeam {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.grVs {
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+.grScore {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  text-align: right;
+  white-space: nowrap;
+}
+.win {
+  color: var(--home);
+}
+.grEmpty {
+  padding: 30px;
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 13px;
+}
+
+.countLine {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+
+/* 박스스코어 모달 */
+.bsOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 50;
+  padding: 20px 12px;
+  overflow-y: auto;
+}
+.bsBox {
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  color: var(--ink);
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 20px;
+  max-width: 640px;
+  width: 100%;
+  border: 1px solid rgba(var(--line-rgb), 0.15);
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+.bsHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+.bsClose {
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 22px;
+  cursor: pointer;
+  line-height: 1;
+}
+.bsClose:hover {
+  color: var(--ink);
+}
+.bsScoreRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 4px;
+}
+.bsTeamCol {
+  text-align: center;
+}
+.bsTeamCol :global(.team-badge) {
+  margin: 0 auto 6px;
+}
+.bsTeamName {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.bsScore {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 1;
+}
+.bsSep {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 24px;
+  color: var(--ink-faint);
+}
+.bsMeta {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  font-family: "IBM Plex Mono", monospace;
+  margin-bottom: 16px;
+}
+.bsMetaLeft {
+  text-align: left;
+  margin-bottom: 0;
+}
+
+.bsQuarterTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+.bsQuarterTable th,
+.bsQuarterTable td {
+  padding: 6px 8px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.bsQuarterTable th {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.12);
+}
+.tname {
+  text-align: left;
+  font-weight: 700;
+}
+.rowHome .tname {
+  color: var(--home);
+}
+.rowAway .tname {
+  color: var(--away);
+}
+.total {
+  font-weight: 800;
+  border-left: 1px solid rgba(var(--line-rgb), 0.12);
+}
+
+.bsSectionTitle {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 18px 0 8px;
+}
+.tsRow {
+  margin-bottom: 12px;
+}
+.tsNums {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.tsHome {
+  color: var(--home);
+  font-weight: 700;
+}
+.tsAway {
+  color: var(--away);
+  font-weight: 700;
+}
+.tsLabel {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.tsBar {
+  display: flex;
+  height: 7px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+.tsBarFillHome {
+  background: var(--home);
+  margin-left: auto;
+}
+.tsBarFillAway {
+  background: var(--away);
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+.bsPlayers {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  min-width: 480px;
+}
+.bsPlayers th {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  text-align: right;
+  padding: 5px 6px;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.14);
+  white-space: nowrap;
+}
+.bsPlayers th:first-child {
+  text-align: left;
+}
+.bsPlayers td {
+  padding: 5px 6px;
+  text-align: right;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.06);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bsPlayers td:first-child {
+  text-align: left;
+}
+.bench td:first-child {
+  color: var(--ink-faint);
+}
+.benchSep td {
+  padding-top: 4px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8.5px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  border-bottom: none;
+}
+
+.modalLoading {
+  padding: 40px 10px;
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 12.5px;
+}
+
+@media (max-width: 560px) {
+  .wrap {
+    padding: 20px 12px 60px;
+  }
+  .title {
+    font-size: 24px;
+  }
+  .bsScore {
+    font-size: 30px;
+  }
+}
