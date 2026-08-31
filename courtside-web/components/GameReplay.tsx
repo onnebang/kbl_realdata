@@ -1,12 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { TeamBadge } from "./TeamBadge";
-import { buildCourtDotsSvg, shotValue, type ShotRow } from "@/lib/zoneCompare";
-import { findShootingStreaks, computeStatBursts, computeCurrentDroughts, fmtRating, type GameEvent } from "@/lib/postgameReport";
+import { buildCourtDotsSvg, shotValue, COURT_X, COURT_Y } from "@/lib/zoneCompare";
+import { findShootingStreaks, computeStatBursts, computeCurrentDroughts, fmtRating, gameWideTopPerformer, type GameEvent, type PlayerBox } from "@/lib/postgameReport";
+import {
+  buildRecentFeed,
+  buildShotReliability,
+  drawMiniShotSpot,
+  findShotForScoreRow,
+  KEY_FLOW_CODES,
+  KEY_FLOW_TAGS,
+  SCORING_CODES,
+  type PossessionItem,
+  type ShotWithMeta,
+} from "@/lib/possessionFeed";
 import { iGa } from "@/lib/josa";
-import { currentOnCourt, comboKey } from "@/lib/gameLineups";
+import { currentOnCourt, comboKey, computeFinalPlusMinus } from "@/lib/gameLineups";
 import type { LineupRating } from "@/lib/lineupNetRating";
 
 // "코트사이드" 시그니처 기능(인터랙티브 리플레이/스크럽) 포팅 - courtside_template.html의
@@ -19,7 +30,9 @@ const MISS_CODES = new Set(["202", "206", "208"]);
 const FOUL_CODES = new Set(["216", "224"]);
 
 function emptyBoxLine() {
-  return { pts: 0, fgm: 0, fga: 0, threePM: 0, threePA: 0, ftm: 0, fta: 0, reb: 0, ast: 0, stl: 0, blk: 0, to: 0, foul: 0 };
+  // oreb/dreb - Game Leaders 카드(REBOUNDS 항목의 "N DREB, M OREB" 서브라인)용으로 209/210을
+  // 나눠 셈. reb는 그대로 둘의 합(기존 박스스코어 테이블 REB 컬럼이 이미 이 값을 씀).
+  return { pts: 0, fgm: 0, fga: 0, threePM: 0, threePA: 0, ftm: 0, fta: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, to: 0, foul: 0 };
 }
 type BoxLine = ReturnType<typeof emptyBoxLine>;
 
@@ -55,6 +68,8 @@ function computeBoxScore(events: GameEvent[], uptoIdx: number, players: PlayerMe
       b.fta++;
     } else if (code === "209" || code === "210") {
       b.reb++;
+      if (code === "209") b.oreb++;
+      else b.dreb++;
     } else if (code === "211") {
       b.ast++;
     } else if (code === "212") {
@@ -73,6 +88,67 @@ function computeBoxScore(events: GameEvent[], uptoIdx: number, players: PlayerMe
 function clockStr(e: GameEvent) {
   if (e.quarter === "PRE") return "경기 시작 전";
   return `${e.quarter} ${e.clock_min}:${String(e.clock_sec).padStart(2, "0")}`;
+}
+
+// --- 모바일 푸시 알림(courtside_template.html의 pushNotify/checkPushNotifications 포팅) ---
+// 순방향 스크럽(재생 또는 "다음" 버튼 - advanceForward)에서만 호출됨. 슬라이더/쿼터버튼
+// 점프나 "이전" 버튼은 render만 하고 이 함수를 절대 안 부름 - 스크러버로 아무 데나 점프할
+// 때마다 알림이 우수수 쏟아지는 스팸을 막기 위해(레퍼런스 아티팩트가 명시한 이유 그대로).
+const BIG_MOMENT_THRESHOLD = 0.12; // 레퍼런스와 동일 기준(0.05 NOTABLE_WPA_THRESHOLD보다 훨씬 큰 스윙만 - 알림은 진짜 큰 순간에만)
+const PUSH_RUN_THRESHOLD = 6; // 아래 컴포넌트의 flow-chip RUN_THRESHOLD(6)와 같은 값
+const PUSH_DROUGHT_SEC = 180; // 3분 - flow-chip의 DROUGHT_MIN_SEC(90초, "지금 흐름" 표시용)보다 높은 알림 전용 기준
+type PushToastSpec = { icon: string; title: string; msg: string };
+
+function computePushNotifications(
+  events: GameEvent[],
+  prevIdx: number,
+  newIdx: number,
+  homeTeam: { tcode: string; name: string },
+  awayTeam: { tcode: string; name: string }
+): PushToastSpec[] {
+  const row = events[newIdx];
+  const out: PushToastSpec[] = [];
+
+  // 결정적 순간(큰 승률 스윙) - 이 프로젝트가 이미 확립한 "수혜팀 기준" 컨벤션
+  // (postgameReport.ts "결정적 장면들"과 동일 - wpa_home 원시 부호를 그대로 안 쓰고
+  // 수혜팀 자신의 승률/부호로 통일, 원정팀이 득점해도 숫자가 거꾸로 안 보이게).
+  if (row.wpa_home != null && Math.abs(row.wpa_home) >= BIG_MOMENT_THRESHOLD) {
+    const beneficiaryIsHome = row.wpa_home > 0;
+    const beneficiary = beneficiaryIsHome ? homeTeam.name : awayTeam.name;
+    const beneficiaryProb = row.home_win_prob == null ? null : beneficiaryIsHome ? row.home_win_prob : 1 - row.home_win_prob;
+    const swingPts = Math.round(Math.abs(row.wpa_home) * 100);
+    const clutch = (row.quarter === "Q4" || row.quarter.startsWith("X")) && (row.clock_min ?? 99) < 1;
+    out.push({
+      icon: clutch ? "🚨" : "⚡",
+      title: clutch ? `버저비터! ${row.player_name ?? ""}` : `승부처! ${row.player_name ?? ""}`,
+      msg: `${row.action_label ?? ""} - ${beneficiary} 승률 ${beneficiaryProb != null ? Math.round(beneficiaryProb * 100) : "-"}% (+${swingPts}%p)`,
+    });
+  }
+
+  // 6-0 이상 런 "시작 전환점"에만 - runHome/runAway는 다음 득점 전까지 값이 유지되는데, 그
+  // 사이 무득점 이벤트(리바운드/파울 등)에서도 이 함수가 매번 불려서, 이전 idx 값과 비교
+  // 안 하면 같은 알림이 계속 중복 발사됨(레퍼런스가 실제로 겪은 버그 - 그대로 재도입 안 함).
+  const prevRow = prevIdx >= 0 ? events[prevIdx] : null;
+  if (row.runHome >= PUSH_RUN_THRESHOLD && (!prevRow || prevRow.runHome < PUSH_RUN_THRESHOLD)) {
+    out.push({ icon: "🔥", title: `${homeTeam.name} 런!`, msg: `상대 무득점 구간에 ${row.runHome}점 연속 - 지금 흐름이 넘어가고 있습니다.` });
+  }
+  if (row.runAway >= PUSH_RUN_THRESHOLD && (!prevRow || prevRow.runAway < PUSH_RUN_THRESHOLD)) {
+    out.push({ icon: "🔥", title: `${awayTeam.name} 런!`, msg: `상대 무득점 구간에 ${row.runAway}점 연속 - 지금 흐름이 넘어가고 있습니다.` });
+  }
+
+  // 3분+ 무득점 가뭄 "시작 전환점"에만 - computeCurrentDroughts(eventsUpToIdx)는 이미 이
+  // 컴포넌트의 flow-chip이 매 idx마다 재계산해 쓰는 함수(events.slice 비용 무시 가능 -
+  // computeBoxScore와 같은 원칙)를 그대로 재사용, prevIdx 시점에도 한 번 더 돌려 전환 여부만 비교.
+  const droughtsNow = computeCurrentDroughts(events.slice(0, newIdx + 1));
+  const droughtsPrev = prevIdx >= 0 ? computeCurrentDroughts(events.slice(0, prevIdx + 1)) : { homeSec: 0, awaySec: 0 };
+  if (droughtsNow.homeSec >= PUSH_DROUGHT_SEC && droughtsPrev.homeSec < PUSH_DROUGHT_SEC) {
+    out.push({ icon: "🧊", title: `${homeTeam.name} 침묵`, msg: "3분 넘게 득점이 없습니다." });
+  }
+  if (droughtsNow.awaySec >= PUSH_DROUGHT_SEC && droughtsPrev.awaySec < PUSH_DROUGHT_SEC) {
+    out.push({ icon: "🧊", title: `${awayTeam.name} 침묵`, msg: "3분 넘게 득점이 없습니다." });
+  }
+
+  return out;
 }
 
 // 쿼터별 점수(요청: "경기 세부는 courtside_template을 참고해서 개발" - 원본
@@ -109,9 +185,15 @@ function computeQuarterScores(
   return { homeByQ, awayByQ };
 }
 
-type PlayerMeta = { pcode: string; name: string; tcode: string; isStarter?: boolean | null };
+// photoUrl/backNum - 새 포제션 피드(아래 playerPhoto)의 선수 사진 카드용. page.tsx가
+// game_player_stats 조회에 players.photo_url/back_num을 얹어서 로스터 전체를 한 번에
+// 넘겨줌(선수별 추가 조회 없음 - lib/playerProfile.ts의 getPlayerInfo와 같은 필드명).
+// minPlayed - 박스스코어 테이블의 DNP 판정용(page.tsx의 replayPlayers가 game_player_stats.
+// min_played를 그대로 얹어줌). 실측(Supabase 전체 100,921행) - min_played는 null이 0건,
+// 뛰지 않은 선수는 예외 없이 "0.00"으로 채워져 있어서 0(또는 방어적으로 null)이면 DNP.
+type PlayerMeta = { pcode: string; name: string; tcode: string; isStarter?: boolean | null; photoUrl?: string | null; backNum?: string | null; minPlayed?: number | null };
 type TeamMeta = { tcode: string; name: string; abbr: string; color: string; logoUrl: string | null };
-type ShotWithQuarter = ShotRow & { quarter: string };
+type ShotWithQuarter = ShotWithMeta;
 
 // courtside_template.html의 buildChartStatic()/updateChart(idx)(2508~2545행) 스타일로
 // 정밀 대조 - 50% 기준 점선 + 쿼터 경계 세로선 + 곡선 아래 영역 채우기(area fill)를
@@ -197,15 +279,84 @@ export default function GameReplay({
   const [shotOutcome, setShotOutcome] = useState<"all" | "make" | "miss">("all");
   const [shotVal, setShotVal] = useState<"all" | "2" | "3">("all");
 
+  // 요청: "실시간 순방향 재생 중에만 푸시 알림" - pushNotify/checkPushNotifications 포팅
+  // (레퍼런스 courtside_template.html). 최대 3개 스택, ~4.7초 후 자동 제거(CSS 페이드아웃
+  // 애니메이션 4.2s+0.4s와 맞춤 - 아래 globals.css .replay-push-toast).
+  const [toasts, setToasts] = useState<(PushToastSpec & { id: number })[]>([]);
+  const toastIdRef = useRef(0);
+  const pushToast = useCallback((spec: PushToastSpec) => {
+    const id = ++toastIdRef.current;
+    setToasts((prev) => {
+      const next = [...prev, { ...spec, id }];
+      return next.length > 3 ? next.slice(next.length - 3) : next;
+    });
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4700);
+  }, []);
+
+  // 순방향 한 칸 전진 - 재생 타이머와 "다음"(▶) 버튼 딱 두 곳만 이걸 호출함(아래).
+  // 슬라이더/쿼터버튼/"이전" 버튼은 setIdx를 직접 불러 이 경로를 거치지 않으므로
+  // computePushNotifications가 절대 안 불림 - "순방향 자동재생 중에만 알림" 요구사항의
+  // 실제 구현 지점은 여기 하나뿐.
+  //
+  // idxRef - advanceForward가 클로저로 캡처한 idx 대신 이 ref를 읽고 직접 갱신함. 리렌더를
+  // 기다리지 않고 자기 자신을 즉시 최신 상태로 만들어서, 리렌더가 끼어들 틈 없이 "다음"
+  // 버튼이 연타되거나(테스트로 실측 - 동기 루프에서 클릭을 여러 번 몰아치면 리렌더 전이라
+  // 클로저의 idx가 그대로라 매번 "처음 idx+1"로만 계산됨) 재생 타이머 콜백이 겹치는
+  // 경우에도 항상 직전 호출이 만든 값에서 이어서 전진 - 아래 useEffect가 idx가 바뀔 때마다
+  // (스크럽 등 다른 경로로 바뀐 경우 포함) ref를 동기화해줌.
+  const idxRef = useRef(idx);
   useEffect(() => {
-    if (!playing) return;
-    if (idx >= events.length - 1) {
-      setPlaying(false);
-      return;
-    }
-    const t = setTimeout(() => setIdx((i) => Math.min(events.length - 1, i + 1)), speedMs);
+    idxRef.current = idx;
+  }, [idx]);
+  const advanceForward = useCallback(() => {
+    const cur = idxRef.current;
+    const next = Math.min(events.length - 1, cur + 1);
+    if (next === cur) return;
+    idxRef.current = next;
+    for (const spec of computePushNotifications(events, cur, next, homeTeam, awayTeam)) pushToast(spec);
+    setIdx(next);
+    // 재생 타이머가 마지막 이벤트에 도달하면 여기서 바로 멈춤(끝에 다다른 idx로의 setIdx와
+    // 같은 tick) - 아래 useEffect 본문에서 동기적으로 setPlaying을 부르면
+    // react-hooks/set-state-in-effect 린트 에러가 나서, 그 대신 idx를 실제로 옮기는 이
+    // 지점(setTimeout 콜백/버튼 클릭 - 둘 다 effect 본문 밖)에서 처리.
+    if (next >= events.length - 1) setPlaying(false);
+  }, [events, homeTeam, awayTeam, pushToast]);
+
+  useEffect(() => {
+    if (!playing || idx >= events.length - 1) return;
+    const t = setTimeout(() => advanceForward(), speedMs);
     return () => clearTimeout(t);
-  }, [playing, idx, events.length, speedMs]);
+  }, [playing, idx, events.length, speedMs, advanceForward]);
+
+  // 요청: "스크롤을 내리면 상단에 점수/팀/예상승률/현재 쿼터 시간등을 작게 틀 고정" - 처음엔
+  // 순수 CSS position:sticky였는데, "자기 자신이 줄어들거나 사라지는 sticky 요소가 있으면
+  // 브라우저가 scrollY를 0으로 되돌린다"는 실제 버그를 겪음(레퍼런스 아티팩트가 이미 겪고
+  // 고친 것과 동일 - courtside_template.html 3692~3726행 주석 참고). 그래서 이 프로젝트도
+  // 같은 구조로 포팅: 전체 스코어보드는 이제 sticky가 아닌 완전히 평범한 카드(그냥 스크롤을
+  // 따라 지나감, 자기 높이가 안 바뀜)이고, "고정" 역할은 완전히 별개의 position:fixed 요소
+  // (아래 .replay-sticky-bar)가 전담 - display가 아니라 transform(translateY)+"show"
+  // 클래스로만 등장/퇴장시켜서 문서 레이아웃/스크롤 높이에 전혀 영향을 안 줌. 스코어보드
+  // 바로 아래(그 카드가 끝나는 지점)에 심어둔 sentinel을 IntersectionObserver로 지켜보다가
+  // 화면 밖으로 나가면 켬 - 인앱브라우저 등 IO 동작이 들쭉날쭉한 웹뷰 대비 scroll 이벤트
+  // 폴백도 이중화(둘 중 하나만 붙어도 정상 동작).
+  const stickySentinelRef = useRef<HTMLDivElement | null>(null);
+  const [stickyVisible, setStickyVisible] = useState(false);
+  useEffect(() => {
+    const el = stickySentinelRef.current;
+    if (!el) return;
+    const updateFromRect = () => setStickyVisible(el.getBoundingClientRect().bottom <= 0);
+    let observer: IntersectionObserver | null = null;
+    if ("IntersectionObserver" in window) {
+      observer = new IntersectionObserver(([entry]) => setStickyVisible(!entry.isIntersecting), { threshold: 0 });
+      observer.observe(el);
+    }
+    window.addEventListener("scroll", updateFromRect, { passive: true });
+    updateFromRect();
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("scroll", updateFromRect);
+    };
+  }, []);
 
   const quarterOrder = useMemo(() => {
     const seen: string[] = [];
@@ -291,11 +442,35 @@ export default function GameReplay({
     }
     return best;
   };
+  // sub - 레퍼런스 renderGameLeaders(courtside_template.html 3358~3380행)의 카테고리별
+  // 서브라인 그대로: POINTS는 슈팅 스플릿, REBOUNDS는 위에서 새로 나눈 oreb/dreb, ASSISTS는
+  // 턴오버(어시스트-턴오버 비율을 가늠하는 보조 지표로 같이 보여줌).
   const LEADER_STATS = [
-    { key: "pts", label: "POINTS" },
-    { key: "reb", label: "REBOUNDS" },
-    { key: "ast", label: "ASSISTS" },
+    { key: "pts", label: "POINTS", sub: (b: BoxLine) => `${b.fgm}/${b.fga} FG, ${b.ftm}/${b.fta} FT` },
+    { key: "reb", label: "REBOUNDS", sub: (b: BoxLine) => `${b.dreb} DREB, ${b.oreb} OREB` },
+    { key: "ast", label: "ASSISTS", sub: (b: BoxLine) => `${b.to} TO` },
   ] as const;
+  // leaderBlock(레퍼런스의 leaderBlock/leaderPhotoHtml 포팅) - 위 playerPhoto 헬퍼(사진 있으면
+  // img, 없으면 등번호/이니셜 폴백 div)를 그대로 재사용해서 사진 렌더링 로직을 중복시키지 않음.
+  const leaderBlock = (best: { p: PlayerMeta; v: number } | null, side: "home" | "away", color: string, sub: (b: BoxLine) => string) => (
+    <div className={`replay-leaders-player ${side}`}>
+      {playerPhoto(best?.p.pcode ?? null, "replay-leaders-photo")}
+      <div className="replay-leaders-info">
+        <div className="replay-leaders-val" style={best ? { color } : undefined}>
+          {best ? best.v : "-"}
+        </div>
+        {best && (
+          <>
+            <div className="replay-leaders-name">
+              {best.p.name}
+              {best.p.backNum ? ` #${best.p.backNum}` : ""}
+            </div>
+            <div className="replay-leaders-sub">{sub(box.get(best.p.pcode) ?? emptyBoxLine())}</div>
+          </>
+        )}
+      </div>
+    </div>
+  );
 
   // 요청: "현재 라인업 1인, 2인, 3인, 4인, 5인 조합과 넷레이팅을 보여줌" - 지금 스크럽
   // 시점의 온코트 5인을 교체(101 IN/102 OUT) 이벤트로 재구성(lib/gameLineups.ts, 시작
@@ -392,59 +567,282 @@ export default function GameReplay({
   const awayDotsSvg = awayQuarterShots.length > 0 ? buildCourtDotsSvg(awayQuarterShots, awayTeam.color) : null;
 
   // 요청: "실시간 중계에서 팀별로 묶어서 보여주고, 누가 어시를 했는지, 승률이 어떻게
-  // 변화됐는지 표시" - 득점 이벤트 바로 다음(같은 타이밍대)에 어시스트(211) 이벤트가 오는
-  // 실제 데이터 패턴을 확인(실측 - event_order 50 2점슛 성공 바로 다음 51이 같은 팀·같은
-  // 시각의 어시스트)해서 그 인접 관계로 연결(별도 조인 데이터 불필요). 승률 변화는 항상
-  // "그 플레이를 한 팀 자신에게 얼마나 도움이 됐는지" 기준으로 부호를 맞춤(원정팀 이벤트면
-  // wpa_home 부호 반전 - 위 "결정적 장면들" 표기 수정과 같은 이유).
-  const MAKE_CODES_FOR_ASSIST = new Set(["201", "205", "207"]);
-  const feedRows = useMemo(() => {
-    const start = Math.max(0, idx - 200 + 1);
-    const rows: { e: GameEvent; assistName: string | null; teamDelta: number | null }[] = [];
-    for (let i = idx; i >= start; i--) {
-      const e = events[i];
-      let assistName: string | null = null;
-      if (e.action_code && MAKE_CODES_FOR_ASSIST.has(e.action_code)) {
-        const next = events[i + 1];
-        if (next && next.action_code === "211" && next.tcode === e.tcode && next.elapsed === e.elapsed) {
-          assistName = next.player_name;
-        }
-      }
-      const teamDelta = e.wpa_home == null ? null : e.tcode === homeTeam.tcode ? e.wpa_home : e.tcode === awayTeam.tcode ? -e.wpa_home : null;
-      rows.push({ e, assistName, teamDelta });
-    }
-    return rows;
-  }, [events, idx, homeTeam.tcode, awayTeam.tcode]);
-  const homeFeedRows = useMemo(() => feedRows.filter((r) => r.e.tcode === homeTeam.tcode), [feedRows, homeTeam.tcode]);
-  const awayFeedRows = useMemo(() => feedRows.filter((r) => r.e.tcode === awayTeam.tcode), [feedRows, awayTeam.tcode]);
-  const feedRow = (r: (typeof feedRows)[number]) => (
-    <div key={`${r.e.event_order}`} className="replay-feed-row">
-      <span className="replay-feed-clock">{clockStr(r.e)}</span>
-      <span className="replay-feed-text">
-        {r.e.player_name ? `${r.e.player_name} ` : ""}
-        {r.e.action_label ?? ""}
-        {r.assistName && <span className="replay-feed-assist"> (AST: {r.assistName})</span>}
-      </span>
-      <span className="replay-feed-score">
-        {r.e.home_score}-{r.e.away_score}
-      </span>
-      {r.teamDelta != null && (
-        <span className={`replay-feed-delta ${r.teamDelta >= 0 ? "up" : "down"}`}>
-          {r.teamDelta >= 0 ? "+" : ""}
-          {Math.round(r.teamDelta * 100)}%p
-        </span>
-      )}
-    </div>
+  // 변화됐는지 표시" - "한 공격(포제션)" 단위로 이벤트를 묶어(스틸-어시-득점처럼) 시간
+  // 순서 그대로 한 줄 피드로(레퍼런스 아티팩트 courtside_template.html의
+  // segmentPossessions/renderGroup 포팅 - lib/possessionFeed.ts). 예전엔 팀별 2열로 나눠
+  // 단순 인접(i+1) 어시스트 감지만 하던 M6 구현을 완전히 대체 - 포제션 단위 그룹핑이
+  // "두경민 3점 실패 - 공격리바운드 - 유기상 3점" 같은 실제 흐름을 훨씬 잘 보여줌.
+  const recentFeed = useMemo(() => buildRecentFeed(events, idx), [events, idx]);
+  const playerByPcode = useMemo(() => new Map(players.map((p) => [p.pcode, p])), [players]);
+  // (선수,쿼터) 조합별 신뢰도 - 경기 전체를 대상으로 하는 정적 결과라 스크럽 위치(idx)와
+  // 무관, shots/events가 바뀔 때만 다시 계산.
+  const shotReliability = useMemo(() => buildShotReliability(events, shots), [events, shots]);
+
+  // 박스스코어 +/- 컬럼 - game_player_stats엔 plus_minus 컬럼이 없어서 game_events 전체를
+  // 훑어 직접 계산(lib/gameLineups.ts의 computeFinalPlusMinus, currentOnCourt와 같은 IN=101/
+  // OUT=102 온코트 추적 재사용). 경기 최종 값 하나만 필요(레퍼런스 박스스코어도 스크럽
+  // 위치와 무관한 고정 +/-)라 events 전체로 한 번만(useMemo) 계산 - idx 의존성 없음.
+  const finalPlusMinus = useMemo(
+    () => computeFinalPlusMinus(events, players, homeTeam.tcode, awayTeam.tcode),
+    [events, players, homeTeam.tcode, awayTeam.tcode]
   );
+
+  // ⭐ 배지("이 경기 최고 활약")용 - 항상 경기 최종 박스스코어 기준(스크럽 위치와 무관,
+  // lib/postgameReport.ts의 gameWideTopPerformer를 그대로 재사용 - 블로아웃 가드까지 포함).
+  const finalBox = useMemo(() => computeBoxScore(events, events.length - 1, players), [events, players]);
+  const topPcode = useMemo(() => {
+    const finalRow = events[events.length - 1];
+    const asPlayerBox: PlayerBox[] = players.map((p) => {
+      const b = finalBox.get(p.pcode) ?? emptyBoxLine();
+      return {
+        pcode: p.pcode,
+        tcode: p.tcode,
+        name: p.name,
+        is_starter: p.isStarter ?? null,
+        pts: b.pts,
+        fgm: b.fgm,
+        fga: b.fga,
+        ftm: b.ftm,
+        fta: b.fta,
+        reb: b.reb,
+        ast: b.ast,
+        stl: b.stl,
+        blk: b.blk,
+        fouls: b.foul,
+        turnovers: b.to,
+      };
+    });
+    return gameWideTopPerformer(asPlayerBox, finalRow.home_score, finalRow.away_score, homeTeam.tcode, awayTeam.tcode)?.pcode ?? null;
+  }, [finalBox, players, events, homeTeam.tcode, awayTeam.tcode]);
+
+  const playerPhoto = (pcode: string | null, cls: string) => {
+    const p = pcode ? playerByPcode.get(pcode) : undefined;
+    if (!p) return <div className={`${cls}-fallback`}>?</div>;
+    // components/TeamBadge.tsx와 같은 이유(외부 kbl.or.kr 호스팅 사진이라 next/image 최적화 대상이 아님).
+    // eslint-disable-next-line @next/next/no-img-element
+    if (p.photoUrl) return <img className={cls} src={p.photoUrl} alt={p.name} />;
+    return <div className={`${cls}-fallback`}>{p.backNum ? `#${p.backNum}` : (p.name || "?").slice(0, 1)}</div>;
+  };
+
+  // 요청: "허훈의 2점슛 실패로 승률이 어느정도 떨어지는지 분석" - 큰 스윙이 아니어도 눈에
+  // 띄는 미스/플레이의 승률 영향은 줄 옆에 바로 보여줌(±5%p 이상). 부호는 위 결정적
+  // 장면들과 같은 팀-상대 컨벤션이 아니라 "이 플레이를 한 팀 자신에게 좋았는지"
+  // 기준(row.tcode 관점) - 턴오버/미스처럼 득점으로 안 끝나는 줄에도 자연스럽게 맞음.
+  const NOTABLE_WPA_THRESHOLD = 0.05;
+  const possLineRow = (r: GameEvent) => {
+    const isMiss = r.action_code ? MISS_CODES.has(r.action_code) : false;
+    const delta = r.wpa_home == null ? null : r.tcode === homeTeam.tcode ? r.wpa_home : r.tcode === awayTeam.tcode ? -r.wpa_home : null;
+    return (
+      <div className="replay-poss-line" key={r.event_order}>
+        <span>
+          {isMiss && <span className="replay-pl-miss">✕</span>} {r.player_name && <b>{r.player_name}</b>} {r.action_label ?? ""}
+          {delta != null && Math.abs(delta) >= NOTABLE_WPA_THRESHOLD && (
+            <span className={`replay-pl-wpa ${delta >= 0 ? "up" : "down"}`}> {delta >= 0 ? "+" : ""}{Math.round(delta * 100)}%p</span>
+          )}
+        </span>
+        <span className="replay-pl-clock">{clockStr(r)}</span>
+      </div>
+    );
+  };
+
+  const possDivider = (item: PossessionItem & { type: "divider" }) => {
+    const last = item.rows[item.rows.length - 1];
+    // 교체는 한꺼번에 몰려서 나오는 경우가 많아 개별 줄 대신 하나의 "교체 N명" 구분선으로.
+    if (item.rows.length > 1) {
+      return (
+        <div className="replay-poss-divider" key={`div-${last.event_order}`}>
+          선수교체 {item.rows.length}명 · {clockStr(last)}
+        </div>
+      );
+    }
+    const r = item.rows[0];
+    return (
+      <div className="replay-poss-divider" key={`div-${r.event_order}`}>
+        {r.action_label ?? ""}
+        {r.player_name ? ` · ${r.player_name}` : ""} · {clockStr(r)}
+      </div>
+    );
+  };
+
+  const possessionCard = (group: PossessionItem & { type: "group" }) => {
+    const isHome = group.team === homeTeam.tcode;
+    const isAway = group.team === awayTeam.tcode;
+    const team = isHome ? homeTeam : isAway ? awayTeam : null;
+    const oppTeam = isHome ? awayTeam : isAway ? homeTeam : null;
+    const color = team ? team.color : "var(--ink-faint)";
+
+    const rows = group.rows;
+    const veryLast = rows[rows.length - 1];
+    // 득점 바로 뒤에 어시스트가 같은 그룹에 묶여 있으면(요청) 마지막 줄이 어시스트가 되므로,
+    // "득점으로 끝났는가"는 어시스트를 건너뛰고 그 앞의 득점 이벤트로 판정해야 함.
+    const isAssistLast = veryLast.action_code === "211";
+    const scoreRow = isAssistLast ? rows[rows.length - 2] : veryLast;
+    const assistRow = isAssistLast ? veryLast : null;
+    const endedInScore = !!scoreRow.action_code && SCORING_CODES.has(scoreRow.action_code);
+
+    const trimCount = endedInScore ? (isAssistLast ? 2 : 1) : 0;
+    const bodyRows = trimCount ? rows.slice(0, rows.length - trimCount) : rows;
+    // 요청: "스틸-어시-득점", "블락-어시-득점" 처럼 중요한 흐름은 사진으로 이어서 보여달라 -
+    // 득점으로 끝난 섹션에서 스틸/블록/공격리바운드는 텍스트 줄 대신 득점자·어시스트와 같은
+    // 사진 카드로 승격(미스는 여전히 텍스트 줄에 ✕ 표시로 남김).
+    const keyFlowRows = endedInScore ? bodyRows.filter((r) => r.action_code && KEY_FLOW_CODES.has(r.action_code) && r.pcode) : [];
+    const plainRows = endedInScore ? bodyRows.filter((r) => !(r.action_code && KEY_FLOW_CODES.has(r.action_code) && r.pcode)) : bodyRows;
+
+    let shotSvg: string | null = null;
+    if (endedInScore) {
+      const shot = findShotForScoreRow(events, shots, shotReliability, scoreRow);
+      if (shot) shotSvg = drawMiniShotSpot(shot, isAway, color, homeTeam.logoUrl);
+    }
+
+    const resultTxt = endedInScore ? `${scoreRow.home_score}-${scoreRow.away_score}` : veryLast.action_code === "214" ? "턴오버" : "";
+
+    // 요청: "승률 60%→48%인데 정관장이 유리해졌다는 표현이 이상하다"에서 이미 확립된
+    // 컨벤션(lib/postgameReport.ts "결정적 장면들" 참고) - 득점 줄 맨 아래 요약은 항상
+    // 득점한 팀 자신의 승률로 보여줌(home_win_prob를 그대로 쓰면 원정팀이 득점해도 숫자가
+    // home 기준으로만 오르내려 헷갈림 - 이 프로젝트가 이미 겪고 고친 버그를 재도입하지 않음).
+    const scoringIsHome = scoreRow.tcode === homeTeam.tcode;
+    const scoringTeam = scoringIsHome ? homeTeam : awayTeam;
+    const scoringProb = scoreRow.home_win_prob == null ? null : scoringIsHome ? scoreRow.home_win_prob : 1 - scoreRow.home_win_prob;
+    const scoringDelta = scoreRow.wpa_home == null ? null : scoringIsHome ? scoreRow.wpa_home : -scoreRow.wpa_home;
+
+    const totalCards = keyFlowRows.length + 1 + (assistRow ? 1 : 0);
+
+    return (
+      <div className="replay-poss-group" style={{ "--pg-color": color } as CSSProperties} key={rows[0].event_order}>
+        <div className="replay-poss-banner">
+          <TeamBadge team={team ? { name: team.name, abbr: team.abbr, color: team.color, logoUrl: team.logoUrl } : null} size={18} />
+          <span className="replay-poss-team-name" style={{ color }}>
+            {team?.name ?? ""}
+          </span>
+          {oppTeam && <span className="replay-poss-vs-tag">vs {oppTeam.abbr}</span>}
+          {resultTxt && <span className="replay-poss-result">{resultTxt}</span>}
+        </div>
+        <div className="replay-poss-body">
+          {plainRows.map(possLineRow)}
+          {endedInScore && (
+            <>
+              {shotSvg && (
+                <div className="replay-mini-court-tilt">
+                  <svg
+                    className="replay-mini-court"
+                    viewBox={`${COURT_X[0]} ${COURT_Y[0]} ${COURT_X[1] - COURT_X[0]} ${COURT_Y[1] - COURT_Y[0]}`}
+                    dangerouslySetInnerHTML={{ __html: shotSvg }}
+                  />
+                </div>
+              )}
+              <div className={`replay-poss-score-card${totalCards <= 1 ? " single" : ""}`}>
+                {keyFlowRows.map((r) => (
+                  <div className="replay-psc-player" key={r.event_order}>
+                    {playerPhoto(r.pcode, "replay-psc-photo")}
+                    <div>
+                      <div className="replay-psc-name">
+                        {r.pcode === topPcode && (
+                          <span className="replay-psc-star" title="이 경기 최고 활약">
+                            ⭐
+                          </span>
+                        )}
+                        {r.player_name ?? "-"}
+                      </div>
+                      <div className="replay-psc-tag">{KEY_FLOW_TAGS[r.action_code!]}</div>
+                    </div>
+                  </div>
+                ))}
+                <div className="replay-psc-player">
+                  {playerPhoto(scoreRow.pcode, "replay-psc-photo")}
+                  <div>
+                    <div className="replay-psc-name">
+                      {scoreRow.pcode === topPcode && (
+                        <span className="replay-psc-star" title="이 경기 최고 활약">
+                          ⭐
+                        </span>
+                      )}
+                      {scoreRow.player_name ?? "-"}
+                    </div>
+                    <div className="replay-psc-tag">{scoreRow.action_code === "203" ? "+1 PTS" : scoreRow.action_code === "205" ? "+3 PTS" : "+2 PTS"}</div>
+                  </div>
+                </div>
+                {assistRow && (
+                  <div className="replay-psc-player">
+                    {playerPhoto(assistRow.pcode, "replay-psc-photo")}
+                    <div>
+                      <div className="replay-psc-name">
+                        {assistRow.pcode === topPcode && (
+                          <span className="replay-psc-star" title="이 경기 최고 활약">
+                            ⭐
+                          </span>
+                        )}
+                        {assistRow.player_name ?? "-"}
+                      </div>
+                      <div className="replay-psc-tag">AST</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="replay-poss-scoreline">
+                <span className="replay-feed-score">
+                  {scoreRow.home_score} - {scoreRow.away_score}
+                </span>
+                <span className="replay-poss-winpct">
+                  {scoringTeam.name} {scoringProb != null ? Math.round(scoringProb * 100) : "-"}%
+                  {scoringDelta != null && (
+                    <span className={`replay-poss-wpa ${scoringDelta >= 0 ? "up" : "down"}`}> {scoringDelta >= 0 ? "+" : ""}{Math.round(scoringDelta * 100)}%p</span>
+                  )}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   // 요청: "선수 기록과 인터랙티브 리플레이의 선수기록이 중복" - 독립 선수기록 패널(선발/벤치
   // 구분선 있던)을 없애고 여기로 흡수시키면서 그 구분선도 같이 옮김.
+  //
+  // DNP 판정(요청 4-2) - 실측(Supabase game_player_stats 전체 100,921행): min_played는 null이
+  // 0건, 뛰지 않은 선수는 예외 없이 "0.00"으로 채워짐(S47G03N18 등 여러 경기로 재확인). 즉
+  // 새 로스터 조회가 필요한 "데이터 누락" 문제가 아니라 이미 있는 값을 다르게 렌더링하는
+  // 문제 - min_played가 0(또는 방어적으로 null)이면 스탯 칸 대신 DNP 행 하나로.
+  const isDnp = (p: PlayerMeta) => p.minPlayed == null || Number(p.minPlayed) === 0;
+  const jerseyNum = (p: PlayerMeta) => (p.backNum ? <span className="replay-jersey-num">#{p.backNum}</span> : null);
+  const plusMinusCell = (p: PlayerMeta) => {
+    const pm = finalPlusMinus.get(p.pcode) ?? 0;
+    return <td className={pm > 0 ? "replay-pm pos" : pm < 0 ? "replay-pm neg" : "replay-pm"}>{pm > 0 ? `+${pm}` : pm}</td>;
+  };
+  const BOX_COLS = 11; // 선수 1 + PTS/REB/AST/STL/BLK/TO/FG/3P/FT 9 + +/- 1
+  const boxHeaderRow = (key: string) => (
+    <tr key={key}>
+      <th>선수</th>
+      <th>PTS</th>
+      <th>REB</th>
+      <th>AST</th>
+      <th>STL</th>
+      <th>BLK</th>
+      <th>TO</th>
+      <th>FG</th>
+      <th>3P</th>
+      <th>FT</th>
+      <th>+/-</th>
+    </tr>
+  );
   const playerRow = (p: PlayerMeta) => {
+    if (isDnp(p)) {
+      return (
+        <tr key={p.pcode} className="replay-dnp-row">
+          <td>
+            <Link href={`/players/${p.pcode}`}>{p.name}</Link> {jerseyNum(p)}
+          </td>
+          <td colSpan={BOX_COLS - 1} className="replay-dnp-label">
+            DNP - 감독 결정
+          </td>
+        </tr>
+      );
+    }
     const b = box.get(p.pcode) ?? emptyBoxLine();
     return (
       <tr key={p.pcode}>
         <td>
-          <Link href={`/players/${p.pcode}`}>{p.name}</Link>
+          <Link href={`/players/${p.pcode}`}>{p.name}</Link> {jerseyNum(p)}
         </td>
         <td>{b.pts}</td>
         <td>{b.reb}</td>
@@ -461,6 +859,7 @@ export default function GameReplay({
         <td>
           {b.ftm}/{b.fta}
         </td>
+        {plusMinusCell(p)}
       </tr>
     );
   };
@@ -471,26 +870,18 @@ export default function GameReplay({
     return (
       <div className="table-scroll">
         <table className="data-table">
-          <thead>
-            <tr>
-              <th>선수</th>
-              <th>PTS</th>
-              <th>REB</th>
-              <th>AST</th>
-              <th>STL</th>
-              <th>BLK</th>
-              <th>TO</th>
-              <th>FG</th>
-              <th>3P</th>
-              <th>FT</th>
-            </tr>
-          </thead>
+          <thead>{boxHeaderRow("top")}</thead>
           <tbody>
             {starters.map(playerRow)}
             {starters.length > 0 && bench.length > 0 && (
-              <tr className="bench-divider-row">
-                <td colSpan={10}>벤치</td>
-              </tr>
+              <>
+                <tr className="bench-divider-row">
+                  <td colSpan={BOX_COLS}>벤치</td>
+                </tr>
+                {/* 요청 4-3: "선수가 많아서 헷갈리니 벤치 위에도 헤더를 반복" - thead가 아니라
+                    tbody 안 tr(th 셀)로 그대로 반복. 위 boxHeaderRow와 완전히 같은 셀 구성. */}
+                {boxHeaderRow("bench")}
+              </>
             )}
             {bench.map(playerRow)}
           </tbody>
@@ -501,11 +892,32 @@ export default function GameReplay({
 
   return (
     <div className="panel replay-panel">
+      {/* 푸시 알림 스택(요청 3) - position:fixed로 항상 문서 최상단에 떠서 어디에
+          렌더링되든 상관없음. pushToast가 최근 3개까지만 유지, ~4.7초 후 자동 제거. */}
+      <div className="replay-push-stack" aria-live="polite">
+        {toasts.map((t) => (
+          <div className="replay-push-toast" key={t.id}>
+            <div className="replay-push-icon">{t.icon}</div>
+            <div className="replay-push-body-wrap">
+              <div className="replay-push-top-row">
+                <span className="replay-push-app">코트사이드</span>
+                <span className="replay-push-time">지금</span>
+              </div>
+              <div className="replay-push-title">{t.title}</div>
+              <div className="replay-push-msg">{t.msg}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <div className="panel-title">인터랙티브 리플레이</div>
 
       {/* 요청: "스크롤을 내리면 상단에 점수/팀/예상승률/현재 쿼터 시간등을 작게 틀 고정" -
-          순수 CSS position:sticky라 스크롤 리스너 JS 불필요. */}
-      <div className="replay-sticky-bar">
+          position:sticky가 아니라 항상 존재하는 별개의 position:fixed 요소를 show 클래스로
+          등장/퇴장시킴(문서 레이아웃에 영향 없음 - 위 useEffect의 IntersectionObserver/scroll
+          폴백이 stickySentinelRef를 지켜보다가 켬/끔). 아래 .replay-scoreboard는 이제 완전히
+          평범한 카드 - 이 컴포넌트 안 어디서도 sticky를 쓰지 않음. */}
+      <div className={`replay-sticky-bar${stickyVisible ? " show" : ""}`}>
         <span className="replay-sticky-team" style={{ color: homeTeam.color }}>
           {homeTeam.abbr} {row.home_score}
         </span>
@@ -605,6 +1017,11 @@ export default function GameReplay({
         </div>
       </div>
 
+      {/* sentinel - 전체 스코어보드가 끝나는 지점. 이게 화면 밖으로 나가는 순간을
+          IntersectionObserver가 감지해서 위 .replay-sticky-bar를 켬(내용 없는 1px 높이 - 그
+          자체는 레이아웃에 영향 없음). */}
+      <div className="replay-sticky-sentinel" ref={stickySentinelRef} />
+
       <div className="replay-now-line">{row.pcode ? `${row.player_name} · ` : ""}{row.action_label ?? "-"}</div>
 
       {flowChips.length > 0 && (
@@ -618,18 +1035,25 @@ export default function GameReplay({
       )}
 
       <div className="replay-leaders">
-        {LEADER_STATS.map(({ key, label }) => {
+        <div className="panel-title">GAME LEADERS</div>
+        <div className="replay-leaders-teams">
+          <div className="replay-leaders-team-tag home" style={{ color: homeTeam.color }}>
+            <TeamBadge team={homeTeam} size={18} />
+            {homeTeam.name}
+          </div>
+          <div className="replay-leaders-team-tag away" style={{ color: awayTeam.color }}>
+            {awayTeam.name}
+            <TeamBadge team={awayTeam} size={18} />
+          </div>
+        </div>
+        {LEADER_STATS.map(({ key, label, sub }) => {
           const home = leaderOf(homeTeam.tcode, key);
           const away = leaderOf(awayTeam.tcode, key);
           return (
             <div className="replay-leaders-row" key={key}>
-              <span className="replay-leaders-val" style={{ color: homeTeam.color }}>
-                {home ? `${home.v} · ${home.p.name}` : "-"}
-              </span>
-              <span className="replay-leaders-label">{label}</span>
-              <span className="replay-leaders-val away" style={{ color: awayTeam.color }}>
-                {away ? `${away.v} · ${away.p.name}` : "-"}
-              </span>
+              {leaderBlock(home, "home", homeTeam.color, sub)}
+              <div className="replay-leaders-cat">{label}</div>
+              {leaderBlock(away, "away", awayTeam.color, sub)}
             </div>
           );
         })}
@@ -662,12 +1086,20 @@ export default function GameReplay({
         <button
           type="button"
           className="replay-btn"
-          onClick={() => setIdx((i) => Math.min(events.length - 1, i + 1))}
+          onClick={advanceForward}
           aria-label="다음"
         >
           ▶
         </button>
-        <button type="button" className="replay-btn" onClick={() => setIdx(events.length - 1)} aria-label="끝으로">
+        <button
+          type="button"
+          className="replay-btn"
+          onClick={() => {
+            setPlaying(false);
+            setIdx(events.length - 1);
+          }}
+          aria-label="끝으로"
+        >
           ⏭
         </button>
         <select value={speedMs} onChange={(e) => setSpeedMs(Number(e.target.value))} className="replay-speed">
@@ -740,19 +1172,12 @@ export default function GameReplay({
         </div>
         <div>
           <div className="report-section-title">플레이 바이 플레이</div>
-          <div className="replay-feed-cols">
-            <div>
-              <div className="replay-feed-team-title" style={{ color: homeTeam.color }}>
-                {homeTeam.abbr}
-              </div>
-              <div className="replay-feed">{homeFeedRows.map(feedRow)}</div>
-            </div>
-            <div>
-              <div className="replay-feed-team-title" style={{ color: awayTeam.color }}>
-                {awayTeam.abbr}
-              </div>
-              <div className="replay-feed">{awayFeedRows.map(feedRow)}</div>
-            </div>
+          <div className="replay-poss-feed">
+            {recentFeed.length === 0 ? (
+              <div className="empty-note">재생을 시작하면 여기에 플레이가 표시됩니다.</div>
+            ) : (
+              recentFeed.map((item) => (item.type === "divider" ? possDivider(item) : possessionCard(item)))
+            )}
           </div>
         </div>
       </div>

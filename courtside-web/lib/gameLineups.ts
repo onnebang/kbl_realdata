@@ -66,3 +66,44 @@ export function subComboKeys(lineup: Set<string>): string[] {
   }
   return keys;
 }
+
+// 요청: "박스스코어에 +/- 컬럼 추가" - game_player_stats엔 plus_minus 컬럼 자체가 없어서
+// game_events를 끝까지 훑어 직접 계산(표준 정의: 이 선수가 코트 위에 있는 동안 난 모든
+// 득점에서 "자기 팀 득점 - 상대 팀 득점"을 누적). currentOnCourt(uptoIdx 하나만 재구성)와
+// 달리 여기는 경기 시작부터 끝까지 한 번에 훑으면서 매 득점 이벤트마다 그 순간의 온코트
+// 5인 전원에게 델타를 더해야 해서 별도 함수로 분리 - GameReplay.tsx가 게임당 한 번만
+// (useMemo) 호출하는 정적 계산(스크럽 위치와 무관, 경기 최종 +/-).
+export function computeFinalPlusMinus(
+  events: GameEvent[],
+  players: PlayerStartInfo[],
+  homeTcode: string,
+  awayTcode: string
+): Map<string, number> {
+  const pm = new Map<string, number>();
+  for (const p of players) pm.set(p.pcode, 0);
+  const homeOn = startingFive(players, homeTcode);
+  const awayOn = startingFive(players, awayTcode);
+  let prevHome = events.length ? events[0].home_score : 0;
+  let prevAway = events.length ? events[0].away_score : 0;
+  for (const row of events) {
+    // 교체(101 IN/102 OUT) - 두 팀 다 같은 이벤트 로그에 섞여 있어서 tcode로 어느 팀
+    // 온코트 집합을 건드릴지 구분(currentOnCourt와 같은 판정 방식).
+    if (row.pcode && row.action_code === "101") {
+      if (row.tcode === homeTcode) homeOn.add(row.pcode);
+      else if (row.tcode === awayTcode) awayOn.add(row.pcode);
+    } else if (row.pcode && row.action_code === "102") {
+      if (row.tcode === homeTcode) homeOn.delete(row.pcode);
+      else if (row.tcode === awayTcode) awayOn.delete(row.pcode);
+    }
+    const dHome = row.home_score - prevHome;
+    const dAway = row.away_score - prevAway;
+    if (dHome !== 0 || dAway !== 0) {
+      const netHome = dHome - dAway; // 홈 관점 순변화 - 온코트 홈 선수는 +netHome, 원정은 -netHome
+      for (const pcode of homeOn) pm.set(pcode, (pm.get(pcode) ?? 0) + netHome);
+      for (const pcode of awayOn) pm.set(pcode, (pm.get(pcode) ?? 0) - netHome);
+    }
+    prevHome = row.home_score;
+    prevAway = row.away_score;
+  }
+  return pm;
+}

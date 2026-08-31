@@ -1042,24 +1042,44 @@ table.data-table td:nth-child(2) {
   margin-top: 18px;
 }
 
-/* 요청: "스크롤을 내리면 상단에 점수/팀/예상승률/현재 쿼터 시간등을 작게 틀 고정" - 순수
-   CSS sticky(스크롤 리스너 JS 없음). 리플레이 패널 자체가 스크럽/박스스코어/플레이피드로
-   길어서, 아래쪽까지 내려가도 지금 스코어를 계속 볼 수 있게. */
+/* 요청: "스크롤을 내리면 상단에 점수/팀/예상승률/현재 쿼터 시간등을 작게 틀 고정" - 처음엔
+   순수 CSS position:sticky였는데, 실측으로 잡은 진짜 버그가 있었음: "지금 sticky로 붙어있는
+   요소 자신의 높이가 줄어들거나(또는 사라지면) 브라우저가 scrollY를 0으로 되돌려버린다"
+   (레퍼런스 courtside_template.html이 "gamePicker가 스크롤할 때마다 통통통통 튕김" 제보로
+   먼저 실측 재현한 것과 같은 버그 - sticky 요소 자신이 사라진다는 사실 자체가 원인이라 DOM
+   구조를 어떻게 바꿔도 그 요소를 안 건드리는 것 말곤 답이 없었음). 그래서 이 바는 이제
+   sticky가 아니라 처음부터 끝까지 항상 DOM에 존재하는 별개의 position:fixed 요소 - "붙었다
+   떨어졌다"는 상태 계산 자체가 없어서 위 버그가 원천적으로 발생 안 함. display가 아니라
+   transform(translateY)+"show" 클래스로만 등장/퇴장시켜서 문서 레이아웃/스크롤 높이에 전혀
+   영향을 안 줌(스크롤 위치가 흔들릴 메커니즘 자체가 없어짐) - GameReplay.tsx의
+   IntersectionObserver(+scroll 폴백)가 .replay-sticky-sentinel을 보고 show를 토글. */
 .replay-sticky-bar {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 5;
+  left: 0;
+  right: 0;
+  z-index: 40;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 14px;
+  max-width: 900px;
+  margin: 0 auto;
   background: var(--surface);
   border-bottom: 1px solid rgba(var(--line-rgb), 0.1);
-  padding: 8px 10px;
-  margin: -16px -18px 14px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  padding: 8px 18px;
   font-family: "IBM Plex Mono", monospace;
   font-size: 12px;
   font-weight: 700;
+  transform: translateY(-100%);
+  transition: transform 0.15s ease-out;
+}
+.replay-sticky-bar.show {
+  transform: translateY(0);
+}
+.replay-sticky-sentinel {
+  height: 1px;
 }
 .replay-sticky-team {
   white-space: nowrap;
@@ -1222,33 +1242,207 @@ table.data-table td:nth-child(2) {
   white-space: nowrap;
 }
 
-/* 요청: "현 시점 game leaders를 보여줌" */
+/* 요청: "현 시점 game leaders를 보여줌" - 팀별 최고 득점/리바운드/어시스트를 단순 텍스트
+   줄이 아니라 사진 카드로(레퍼런스 courtside_template.html의 leaderBlock/leaderPhotoHtml/
+   renderGameLeaders, 3256~3380행 포팅). 사진은 GameReplay.tsx의 playerPhoto 헬퍼를 그대로
+   재사용(있으면 img, 없으면 등번호/이니셜 폴백 div) - 그 헬퍼가 이미 만드는
+   "{cls}"/"{cls}-fallback" 클래스명 짝을 그대로 따라감. */
 .replay-leaders {
-  max-width: 420px;
+  max-width: 480px;
   margin: 0 auto 16px;
   border-top: 1px solid rgba(var(--line-rgb), 0.1);
-  padding-top: 10px;
+  padding-top: 12px;
+}
+.replay-leaders-teams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 4px;
+}
+.replay-leaders-team-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.replay-leaders-team-tag.away {
+  justify-content: flex-end;
 }
 .replay-leaders-row {
   display: grid;
-  grid-template-columns: 1fr 70px 1fr;
+  grid-template-columns: 1fr 76px 1fr;
   align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  padding: 3px 0;
+  padding: 10px 0;
+  border-top: 1px solid rgba(var(--line-rgb), 0.08);
 }
-.replay-leaders-val {
-  font-family: "IBM Plex Mono", monospace;
+.replay-leaders-row:first-of-type {
+  border-top: none;
+}
+.replay-leaders-cat {
+  text-align: center;
+  font-size: 10.5px;
   font-weight: 700;
+  color: var(--ink-soft);
+  letter-spacing: 0.02em;
 }
-.replay-leaders-val.away {
+.replay-leaders-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.replay-leaders-player.away {
+  flex-direction: row-reverse;
   text-align: right;
 }
-.replay-leaders-label {
-  text-align: center;
-  font-size: 9px;
-  letter-spacing: 0.05em;
+.replay-leaders-photo,
+.replay-leaders-photo-fallback {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.replay-leaders-photo {
+  object-fit: cover;
+  background: var(--surface-soft);
+  border: 1px solid rgba(var(--line-rgb), 0.1);
+}
+.replay-leaders-photo-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-soft);
   color: var(--ink-faint);
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  font-size: 12px;
+  border: 1px solid rgba(var(--line-rgb), 0.1);
+}
+.replay-leaders-info {
+  min-width: 0;
+}
+.replay-leaders-val {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1;
+}
+.replay-leaders-name {
+  font-size: 11.5px;
+  font-weight: 700;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.replay-leaders-sub {
+  font-size: 10px;
+  color: var(--ink-faint);
+  font-family: "IBM Plex Mono", monospace;
+  margin-top: 1px;
+}
+
+/* 모바일 푸시 알림(요청 3, 레퍼런스 courtside_template.html의 .push-* 그대로 이식) - 실제
+   브라우저 Notification API가 아니라 OS 푸시처럼 보이게 꾸민 순수 인페이지 DOM 토스트(권한
+   요청 없음). GameReplay.tsx의 advanceForward(순방향 스크럽 전용 경로)에서만 pushToast가
+   호출됨. */
+.replay-push-stack {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(94vw, 380px);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.replay-push-toast {
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: 16px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  padding: 11px 13px;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(-16px);
+  /* 애니메이션 지속시간이 GameReplay.tsx의 setTimeout(4700ms) 제거 타이밍과 맞물림 - 페이드
+     아웃이 먼저 끝난 뒤(4.6초) React가 DOM에서 실제로 제거(4.7초)하는 순서. */
+  animation:
+    replay-push-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3) forwards,
+    replay-push-out 0.4s ease forwards 4.2s;
+  pointer-events: auto;
+}
+@keyframes replay-push-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes replay-push-out {
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+}
+.replay-push-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--home);
+  color: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+.replay-push-body-wrap {
+  min-width: 0;
+}
+.replay-push-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+}
+.replay-push-app {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.replay-push-time {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  flex-shrink: 0;
+}
+.replay-push-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+.replay-push-msg {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 1px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+@media (max-width: 640px) {
+  .replay-push-stack {
+    top: 6px;
+    width: 94vw;
+  }
 }
 
 /* 요청: "왜 해당승률이 나오는지, 예상대로라면 그 흐름을 보여주고, 예상이 깨졌다면 이유를
@@ -1407,74 +1601,199 @@ table.data-table td:nth-child(2) {
   margin-top: 16px;
   align-items: start;
 }
-.replay-feed {
-  max-height: 420px;
+/* 요청: "실시간 중계에서 팀별로 묶어서 보여주고, 누가 어시를 했는지, 승률이 어떻게
+   변화됐는지 표시" - "한 공격(포제션)" 단위 섹션(.replay-poss-group)으로 구성한 플레이
+   피드(components/GameReplay.tsx, 로직은 lib/possessionFeed.ts). 레퍼런스 아티팩트
+   courtside_template.html의 .poss-group 계열 스타일을 그대로 이식하되 두 가지는 이
+   프로젝트 컨벤션에 맞춤 - (1) 팀 식별 컬러는 CSS 변수 role(--home/--away)이 아니라
+   실제 팀 컬러를 인라인 --pg-color로 받음(이 프로젝트의 다른 코트 다이어그램들 -
+   zoneCompare.ts의 buildCourtDotsSvg 등 - 과 같은 컨벤션), (2) 승률 델타 색상은 "이
+   포제션을 한 팀에게 좋았는지"만 나타내면 되므로 팀마다 다른 --home/--away 대신
+   --positive/--negative(이미 .replay-lineup-line 등에서 쓰는 톤)를 사용 - 원본
+   아티팩트가 이 자리에 남겨뒀던 home-signed 표기(이 프로젝트가 postgameReport.ts
+   "결정적 장면들"에서 이미 고친 문제)를 그대로 이식하지 않기 위함. */
+.replay-poss-feed {
+  max-height: 640px;
   overflow-y: auto;
-  border: 1px solid rgba(var(--line-rgb), 0.1);
-  border-radius: 10px;
+  padding-right: 2px;
 }
-.replay-feed-row {
+.replay-poss-group {
+  border-radius: 10px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--line-rgb), 0.08);
+}
+.replay-poss-banner {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  font-size: 12px;
-  border-bottom: 1px solid rgba(var(--line-rgb), 0.06);
+  background: color-mix(in srgb, var(--pg-color, var(--ink-faint)) 12%, var(--surface));
 }
-.replay-feed-row:last-child {
-  border-bottom: none;
-}
-.replay-feed-clock {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
-  color: var(--ink-faint);
-  width: 68px;
-  flex-shrink: 0;
-}
-.replay-feed-text {
-  flex: 1;
-  color: var(--ink-soft);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.replay-feed-score {
-  font-family: "IBM Plex Mono", monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 11px;
-  color: var(--ink-faint);
-  flex-shrink: 0;
-}
-
-/* 요청: "실시간 중계에서 팀별로 묶어서 보여주고... 승률이 어떻게 변화가 되었는지 표시" */
-.replay-feed-cols {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.replay-feed-team-title {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
-  font-weight: 800;
-  margin-bottom: 4px;
-}
-.replay-feed-assist {
-  color: var(--ink-faint);
-  font-size: 10.5px;
-}
-.replay-feed-delta {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+.replay-poss-team-name {
+  font-size: 11.5px;
   font-weight: 700;
-  flex-shrink: 0;
-  width: 34px;
-  text-align: right;
 }
-.replay-feed-delta.up {
+.replay-poss-vs-tag {
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  font-family: "IBM Plex Mono", monospace;
+}
+.replay-poss-result {
+  margin-left: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.replay-poss-body {
+  padding: 8px 10px 10px;
+  background: var(--surface);
+}
+.replay-poss-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.replay-poss-line b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.replay-pl-clock {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.replay-pl-miss {
+  color: var(--negative);
+  font-weight: 700;
+}
+.replay-pl-wpa {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  font-size: 10.5px;
+}
+.replay-pl-wpa.up {
   color: var(--positive);
 }
-.replay-feed-delta.down {
+.replay-pl-wpa.down {
   color: var(--negative);
+}
+
+/* 요청: "골대 사이즈/공과 로고 확대", "카메라 중계뷰처럼 원근을 줘서" - SVG 자체엔 3D가
+   없어서 CSS 3D transform으로 살짝 기울임(.zc-court-tilt와 같은 원리, 전코트라 좀 더
+   넓게 잡음 - 양쪽 골대가 다 보여야 해서). */
+.replay-mini-court-tilt {
+  margin: 10px auto 4px;
+  max-width: 340px;
+  perspective: 700px;
+}
+.replay-mini-court {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+  overflow: hidden;
+  transform: rotateX(28deg);
+  transform-origin: center bottom;
+  box-shadow: 0 14px 20px -8px rgba(0, 0, 0, 0.35);
+}
+.replay-poss-score-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.replay-poss-score-card.single {
+  grid-template-columns: 1fr;
+}
+.replay-psc-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-soft);
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+.replay-psc-photo {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.1);
+}
+.replay-psc-photo-fallback {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  color: var(--ink-faint);
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  font-size: 10px;
+  border: 1px solid rgba(var(--line-rgb), 0.1);
+}
+.replay-psc-name {
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.replay-psc-star {
+  margin-right: 2px;
+}
+.replay-psc-tag {
+  font-size: 10px;
+  color: var(--ink-faint);
+  font-family: "IBM Plex Mono", monospace;
+}
+.replay-poss-scoreline {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px dashed rgba(var(--line-rgb), 0.12);
+}
+.replay-feed-score {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.replay-poss-winpct {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.replay-poss-wpa {
+  font-weight: 700;
+  margin-left: 3px;
+}
+.replay-poss-wpa.up {
+  color: var(--positive);
+}
+.replay-poss-wpa.down {
+  color: var(--negative);
+}
+.replay-poss-divider {
+  text-align: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  padding: 6px 0;
 }
 
 /* 커스텀 지표(components/CustomMetricBuilder.tsx) - 슬라이더가 핵심 상호작용이라
@@ -1562,6 +1881,29 @@ table.data-table td:nth-child(2) {
   border-radius: 0 4px 4px 0;
 }
 
+/* tsPctRow 전용 이중 막대(요청: "같은 40%라도 시도 수 다르면 다르게 보이도록") - 세그먼트
+   폭(.ts-bar-seg)은 두 팀의 시도(attempts) 비중, 그 안의 채움(.ts-bar-seg-fill)만 성공률.
+   세그먼트 배경은 "시도했지만 못 넣은" 부분을 옅게 보여주는 트랙 역할. */
+.ts-bar-seg {
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: rgba(var(--line-rgb), 0.1);
+}
+.ts-bar-seg-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.ts-bar-seg.home .ts-bar-seg-fill {
+  right: 0;
+  background: var(--home);
+}
+.ts-bar-seg.away .ts-bar-seg-fill {
+  left: 0;
+  background: var(--away);
+}
+
 /* 박스스코어 선발/벤치 구분행(courtside_template.html의 .bench-divider, 201행을 테이블
    행 형태로 이식 - 원본은 코트 위 패널의 div 리스트용이라 그대로 못 쓰고, <tr><td colSpan>
    으로 테이블 컨텍스트에 맞게 변형). */
@@ -1574,6 +1916,33 @@ tr.bench-divider-row td {
   color: var(--ink-faint);
   letter-spacing: 0.05em;
   border-bottom: none;
+}
+
+/* 박스스코어 등번호(요청 4-1) - 이름 옆 작은 회색 숫자. */
+.replay-jersey-num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+
+/* DNP 행(요청 4-2) - 스탯 칸 전부를 하나의 라벨 셀로 접음(td colSpan). 이름 링크는 그대로
+   눌러서 선수 페이지로 갈 수 있게 살려둠. */
+tr.replay-dnp-row td {
+  color: var(--ink-faint);
+}
+.replay-dnp-label {
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
+/* +/- 컬럼(요청 4-4, lib/gameLineups.ts의 computeFinalPlusMinus) - 승률 델타 등 이 프로젝트
+   다른 곳과 같은 --positive/--negative 톤(팀 컬러가 아니라 "그 선수에게 좋았는지"만
+   나타내면 되므로 - .replay-pl-wpa.up/down과 같은 컨벤션). */
+.replay-pm.pos {
+  color: var(--positive);
+}
+.replay-pm.neg {
+  color: var(--negative);
 }
 
 footer.foot {

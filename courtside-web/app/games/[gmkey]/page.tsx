@@ -61,8 +61,13 @@ type PlayerStatRow = {
   tpa: number | null;
   ftm: number | null;
   fta: number | null;
-  player: { name: string } | null;
+  back_num: string | null;
+  player: { name: string; photo_url: string | null } | null;
 };
+
+// min_played는 이미 위 select에 들어있던 필드(실측 - game_player_stats 100,921행 중
+// null은 0건, "0.00"이 곧 DNP) - GameReplay.tsx의 박스스코어 테이블이 "DNP-COACH'S
+// DECISION" 행을 그리는 데 필요해서 replayPlayers 매핑에만 새로 얹음(아래).
 
 type EventRow = {
   event_order: number;
@@ -108,10 +113,16 @@ async function getTeamStats(gmkey: string) {
 }
 
 async function getPlayerStats(gmkey: string) {
+  // player:players(name, photo_url) - 새 포제션 피드(components/GameReplay.tsx의
+  // PlayerPhoto)가 득점자/어시스트/스틸-블록-리바운드 카드에 선수 사진을 보여주려면
+  // photo_url이 이 경기 로스터 전체에 필요함. lib/playerProfile.ts의 getPlayerInfo가
+  // 이미 players.photo_url을 쓰는 것과 같은 필드 - 선수별로 따로 조회(N+1)하는 대신 이미
+  // 있는 이 쿼리(경기당 한 번, 로스터 전체 포함)에 열만 얹어서 해결. back_num도 사진이
+  // 없는 선수의 폴백 표시(#등번호)에 필요해서 같이 받음.
   const { data } = await supabase
     .from("game_player_stats")
     .select(
-      "pcode, tcode, pts, reb, ast, stl, blk, turnovers, fouls, is_starter, min_played, fgm, fga, tpm, tpa, ftm, fta, player:players(name)"
+      "pcode, tcode, pts, reb, ast, stl, blk, turnovers, fouls, is_starter, min_played, fgm, fga, tpm, tpa, ftm, fta, back_num, player:players(name, photo_url)"
     )
     .eq("gmkey", gmkey)
     .order("pts", { ascending: false });
@@ -140,11 +151,14 @@ async function getPregameFeatures(gmkey: string): Promise<PregameFeatures | null
 }
 
 // GameReplay(인터랙티브 리플레이)가 "현재 쿼터까지" 슛만 필터링하는 데 quarter가 필요해서
-// 같이 받아둠 - zoneCompareSvg(전체 경기 요약, 하단 고정 패널)는 quarter 필드를 무시하고
-// 그대로 씀(ShotRow의 상위 집합이라 타입 호환).
-async function getShots(gmkey: string): Promise<(ShotRow & { quarter: string })[]> {
-  const { data } = await supabase.from("shot_log").select("x, y, d, made, tcode, quarter").eq("gmkey", gmkey);
-  return (data ?? []) as (ShotRow & { quarter: string })[];
+// 같이 받아둠 - zoneCompareSvg(전체 경기 요약, 하단 고정 패널)는 quarter/pcode 필드를
+// 무시하고 그대로 씀(ShotRow의 상위 집합이라 타입 호환). pcode는 lib/possessionFeed.ts의
+// buildShotReliability/findShotForScoreRow가 (선수,쿼터) 단위로 문자중계 타임라인과
+// shot_log를 대조하는 데 필요해서 추가(이 대조 없이는 어느 슛 로그 행이 어느 포제션
+// 카드의 득점인지 알 방법이 없음).
+async function getShots(gmkey: string): Promise<(ShotRow & { quarter: string; pcode: string | null })[]> {
+  const { data } = await supabase.from("shot_log").select("x, y, d, made, tcode, quarter, pcode").eq("gmkey", gmkey);
+  return (data ?? []) as (ShotRow & { quarter: string; pcode: string | null })[];
 }
 
 // 팀 스탯 바 비교 - courtside_template.html의 tsBarHtml/tsPctRow/tsCountRow(3387~3400행)를
@@ -168,19 +182,36 @@ function tsBarRow(label: string, hVal: number, aVal: number, hDisp: ReactNode, a
     </div>
   );
 }
-// 템플릿의 tsPctRow와 동일하게, 막대 길이는 성공/시도 개수가 아니라 두 팀의 "성공률(%)"
-// 값 자체를 서로 비교해 나눔(예: 45% vs 38% → 45:38 비율로 막대 분할).
-function tsPctRow(label: string, hPct: number, aPct: number, hRaw: string, aRaw: string) {
-  return tsBarRow(
-    label,
-    hPct,
-    aPct,
-    <>
-      {hPct}% <span className="ts-raw">{hRaw}</span>
-    </>,
-    <>
-      <span className="ts-raw">{aRaw}</span> {aPct}%
-    </>
+// 요청: "같은 40%라도 3점 10개 들어간 40%랑 3개 들어간 40%는 다른 느낌을 주도록" - 예전엔
+// 성공률(%) 값 자체를 45:38처럼 나눠서, 시도 수가 아무리 달라도 같은 %면 항상 반반으로
+// 보였음. 이제 막대 "길이"는 두 팀의 시도(attempts) 합계 대비 비중으로 나누고, 그 안에서
+// "채워진 정도"만 성공률을 나타내도록 이중 구조로 변경 - 시도가 많은 쪽은 막대 자체가 길어져
+// 볼륨 차이가 먼저 눈에 들어오고, 그 안의 채움 비율로 효율을 따로 읽음.
+function tsPctRow(label: string, hMade: number, hAtt: number, aMade: number, aAtt: number) {
+  const hPct = fgPct(hMade, hAtt);
+  const aPct = fgPct(aMade, aAtt);
+  const totalAtt = hAtt + aAtt;
+  const hShare = totalAtt > 0 ? (hAtt / totalAtt) * 100 : 50;
+  return (
+    <div className="ts-row" key={label}>
+      <div className="ts-nums">
+        <span className="ts-home">
+          {hPct}% <span className="ts-raw">{hMade}-{hAtt}</span>
+        </span>
+        <span className="ts-label">{label}</span>
+        <span className="ts-away">
+          <span className="ts-raw">{aMade}-{aAtt}</span> {aPct}%
+        </span>
+      </div>
+      <div className="ts-bar">
+        <div className="ts-bar-seg home" style={{ width: `${hShare}%` }}>
+          <div className="ts-bar-seg-fill" style={{ width: `${hPct}%` }} />
+        </div>
+        <div className="ts-bar-seg away" style={{ width: `${100 - hShare}%` }}>
+          <div className="ts-bar-seg-fill" style={{ width: `${aPct}%` }} />
+        </div>
+      </div>
+    </div>
   );
 }
 function tsCountRow(label: string, hVal: number, aVal: number) {
@@ -324,7 +355,15 @@ export default async function GamePage({
   // 요청: "선수 기록과 인터랙티브 리플레이의 선수기록이 중복" - 독립 선수기록 패널을
   // 없애고 GameReplay의 boxTable로 흡수시키면서, 그쪽에서도 선발/벤치 구분선을 그리려면
   // is_starter가 필요해서 같이 넘김.
-  const replayPlayers = playerStats.map((p) => ({ pcode: p.pcode, name: p.player?.name ?? p.pcode, tcode: p.tcode, isStarter: p.is_starter }));
+  const replayPlayers = playerStats.map((p) => ({
+    pcode: p.pcode,
+    name: p.player?.name ?? p.pcode,
+    tcode: p.tcode,
+    isStarter: p.is_starter,
+    photoUrl: p.player?.photo_url ?? null,
+    backNum: p.back_num,
+    minPlayed: p.min_played,
+  }));
 
   // 요청: "라인업 조합별(1~5인) 넷레이팅 표시" - tools/build_synergy_matchup.py가 이미
   // 계산해둔 lineup_combo 테이블을 조회하되, 로스터 전체 조합(수백~수천 개)이 아니라 이
@@ -578,27 +617,9 @@ export default async function GamePage({
         <div className="panel-title">팀 스탯</div>
         {homeTeam && awayTeam ? (
           <>
-            {tsPctRow(
-              "FG%",
-              fgPct(homeTeam.fgm, homeTeam.fga),
-              fgPct(awayTeam.fgm, awayTeam.fga),
-              `${homeTeam.fgm ?? 0}-${homeTeam.fga ?? 0}`,
-              `${awayTeam.fgm ?? 0}-${awayTeam.fga ?? 0}`
-            )}
-            {tsPctRow(
-              "3PT%",
-              fgPct(homeTeam.tpm, homeTeam.tpa),
-              fgPct(awayTeam.tpm, awayTeam.tpa),
-              `${homeTeam.tpm ?? 0}-${homeTeam.tpa ?? 0}`,
-              `${awayTeam.tpm ?? 0}-${awayTeam.tpa ?? 0}`
-            )}
-            {tsPctRow(
-              "FT%",
-              fgPct(homeTeam.ftm, homeTeam.fta),
-              fgPct(awayTeam.ftm, awayTeam.fta),
-              `${homeTeam.ftm ?? 0}-${homeTeam.fta ?? 0}`,
-              `${awayTeam.ftm ?? 0}-${awayTeam.fta ?? 0}`
-            )}
+            {tsPctRow("FG%", homeTeam.fgm ?? 0, homeTeam.fga ?? 0, awayTeam.fgm ?? 0, awayTeam.fga ?? 0)}
+            {tsPctRow("3PT%", homeTeam.tpm ?? 0, homeTeam.tpa ?? 0, awayTeam.tpm ?? 0, awayTeam.tpa ?? 0)}
+            {tsPctRow("FT%", homeTeam.ftm ?? 0, homeTeam.fta ?? 0, awayTeam.ftm ?? 0, awayTeam.fta ?? 0)}
             {tsCountRow("턴오버", homeTeam.turnovers ?? 0, awayTeam.turnovers ?? 0)}
             {tsCountRow("리바운드", homeTeam.reb ?? 0, awayTeam.reb ?? 0)}
             {tsCountRow("어시스트", homeTeam.ast ?? 0, awayTeam.ast ?? 0)}
