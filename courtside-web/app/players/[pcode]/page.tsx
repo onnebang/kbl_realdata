@@ -10,6 +10,7 @@ import {
   type GameLogRow,
 } from "@/lib/playerProfile";
 import { getShotGrid, buildHeatmapSvg } from "@/lib/scoringExplorer";
+import { displayTeamName } from "@/lib/teamNames";
 import { TeamBadge } from "@/components/TeamBadge";
 import styles from "./player-profile.module.css";
 
@@ -104,6 +105,9 @@ export default async function PlayerPage({
   const headerTcode = latest?.tcode ?? seasons[0]?.tcode;
   const headerTeam = headerTcode ? teamByTcode.get(headerTcode) : undefined;
   const latestSeason = seasons.length ? seasons[0].seasonName : null;
+  // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - headerTeam은 배지용 정적
+  // 색상/로고 조회라 그대로 두고, 표시 텍스트만 최신 시즌 기준으로 덮어씀.
+  const headerTeamName = headerTeam ? displayTeamName(headerTeam.tcode, headerTeam.name, latestSeason) : null;
 
   const shotSeason = season ?? seasons[0]?.seasonName;
   const shotGrid = shotSeason ? await getShotGrid("player", pcode, shotSeason) : null;
@@ -121,7 +125,7 @@ export default async function PlayerPage({
           <div className={styles.name}>{info.name}</div>
           <div className={styles.meta}>
             <TeamBadge team={headerTeam ?? null} size={20} />
-            <span>{headerTeam?.name ?? "-"}</span>
+            <span>{headerTeamName ?? "-"}</span>
             <span>·</span>
             <span>{latest?.pos ?? "-"}</span>
           </div>
@@ -221,7 +225,7 @@ export default async function PlayerPage({
                         <span className={styles.glOpp}>
                           {g.isHome ? "vs" : "@"}
                           <TeamBadge team={oppTeam ?? null} size={16} />
-                          {oppTeam?.name ?? g.oppTcode}
+                          {g.oppName}
                         </span>
                       </td>
                       <td>

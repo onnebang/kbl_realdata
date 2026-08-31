@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { displayTeamName } from "./teamNames";
 
 // "커스텀 지표 빌더"(perthirtysix.com의 create-advanced-metric 페이지 레퍼런스) - 원본은
 // "얼마나 중요한 스탯인지" 슬라이더로 가중치를 조절하면 실시간으로 순위가 바뀌는 CUSTOM
@@ -174,7 +175,9 @@ export async function getSeasonPlayerMetrics(seasonName: string): Promise<Metric
       pcode: p.pcode,
       name: p.name,
       tcode: p.tcode,
-      teamName: team?.name ?? p.tcode,
+      // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - seasonName은 이 함수의
+      // 인자로 이미 고정돼있어 그대로 재사용.
+      teamName: displayTeamName(p.tcode, team?.name ?? p.tcode, seasonName),
       teamAbbr: team?.abbr ?? p.tcode,
       teamColor: team?.color ?? "#888888",
       teamLogoUrl: team?.logo_url ?? null,

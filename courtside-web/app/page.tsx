@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
-import { getSeasons, getTeamsForSeason, getGames, getPregameWinProbs, getGameMvps, getGameTags } from "@/lib/homeGames";
+import { getSeasons, getTeamsForSeason, getGames, getPregameWinProbs, getGameMvps, getGameTags, getSeasonWinPcts } from "@/lib/homeGames";
+
+// 실측(라이브 검증 중 발견) - 기본 진입(팀 필터 없음, 최근 시즌)이 최대 200경기 x
+// 선수당 ~24행짜리 MVP 조회까지 겹쳐서 병렬화 전엔 20~30초 가까이 걸림(lib/homeGames.ts의
+// getGameMvps 청크 병렬화로 크게 줄였지만, Vercel 기본 서버리스 제한을 넘기지 않도록
+// leaderboards/scoring-explorer와 같은 안전장치를 여기도 둠).
+export const maxDuration = 60;
 
 function fmtDate(d: string) {
   const [y, m, day] = d.split("-");
@@ -18,7 +24,12 @@ export default async function HomePage({
   const [teamOptions, games] = await Promise.all([getTeamsForSeason(activeSeason), getGames(activeSeason, team)]);
 
   const gmkeys = games.map((g) => g.gmkey);
-  const [winProbs, mvps, tags] = await Promise.all([getPregameWinProbs(gmkeys), getGameMvps(games), getGameTags(gmkeys)]);
+  const [winProbs, mvps, tags, seasonWinPcts] = await Promise.all([
+    getPregameWinProbs(gmkeys),
+    getGameMvps(games),
+    getGameTags(gmkeys),
+    getSeasonWinPcts(activeSeason),
+  ]);
 
   return (
     <div className="wrap">
@@ -59,6 +70,8 @@ export default async function HomePage({
           const homeProb = winProbs.get(g.gmkey);
           const mvp = mvps.get(g.gmkey);
           const tag = tags.get(g.gmkey);
+          const homeWinPct = g.home_team ? seasonWinPcts.get(g.home_team.tcode) : undefined;
+          const awayWinPct = g.away_team ? seasonWinPcts.get(g.away_team.tcode) : undefined;
           return (
             <div key={g.gmkey} className="game-card">
               <div className="game-card-row">
@@ -116,13 +129,34 @@ export default async function HomePage({
                     예상 승률 {g.home_team?.abbr} {Math.round(homeProb * 100)}% · {g.away_team?.abbr} {Math.round((1 - homeProb) * 100)}%
                   </span>
                 )}
-                {mvp && (
+                {(homeWinPct || awayWinPct) && (
                   <span className="game-card-meta-item">
-                    <Link href={`/players/${mvp.pcode}`} className="game-card-mvp">
-                      MVP {mvp.name} {mvp.pts}점
-                    </Link>
+                    실제 시즌 승률 {g.home_team?.abbr} {homeWinPct ? `${Math.round(homeWinPct.pct * 100)}%` : "-"} ·{" "}
+                    {g.away_team?.abbr} {awayWinPct ? `${Math.round(awayWinPct.pct * 100)}%` : "-"}
                   </span>
                 )}
+                {(mvp?.winnerTop || mvp?.loserTop || mvp?.sixthMan) && (
+                  <span className="game-card-meta-item game-card-meta-mvps">
+                    {mvp?.winnerTop && (
+                      <Link href={`/players/${mvp.winnerTop.pcode}`} className="game-card-mvp game-card-mvp-winner">
+                        MVP {mvp.winnerTop.name} {mvp.winnerTop.pts}점
+                      </Link>
+                    )}
+                    {mvp?.loserTop && (
+                      <Link href={`/players/${mvp.loserTop.pcode}`} className="game-card-mvp game-card-mvp-loser">
+                        분전 {mvp.loserTop.name} {mvp.loserTop.pts}점
+                      </Link>
+                    )}
+                    {mvp?.sixthMan && (
+                      <Link href={`/players/${mvp.sixthMan.pcode}`} className="game-card-mvp game-card-mvp-sixthman">
+                        🔋 {mvp.sixthMan.name} {mvp.sixthMan.pts}점
+                      </Link>
+                    )}
+                  </span>
+                )}
+                <Link href={`/games/${g.gmkey}`} className="game-card-detail-btn">
+                  경기 상세보기 →
+                </Link>
               </div>
             </div>
           );

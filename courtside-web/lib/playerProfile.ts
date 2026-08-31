@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { displayTeamName } from "./teamNames";
 
 // 선수 프로필(README "다음 단계" 세 번째, 새 /players/[pcode] 라우트) - 커리어 스탯을
 // 시즌별로 집계. PostgREST가 GROUP BY 집계를 직접 지원하지 않아서(단순 select라)
@@ -146,7 +147,9 @@ export async function getPlayerCareerBySeason(pcode: string): Promise<{ seasons:
       return {
         seasonName,
         tcode,
-        teamName: teamNameByTcode.get(tcode) ?? tcode,
+        // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - 이 시즌 라인 자체의
+        // seasonName 기준으로 표시 이름을 덮어씀.
+        teamName: displayTeamName(tcode, teamNameByTcode.get(tcode) ?? tcode, seasonName),
         gp,
         minPg: sum((r) => r.min_played ?? 0) / gp,
         ppg: sum((r) => r.pts ?? 0) / gp,
@@ -206,7 +209,7 @@ export async function getPlayerRecentGames(pcode: string, limit = MAX_GAME_LOG):
   const { data } = await supabase
     .from("games")
     .select(
-      `gmkey, game_date, home_tcode, away_tcode, home_score, away_score,
+      `gmkey, game_date, season_name, home_tcode, away_tcode, home_score, away_score,
        home_team:teams!games_home_tcode_fkey(tcode, name),
        away_team:teams!games_away_tcode_fkey(tcode, name),
        game_player_stats!inner(pcode, tcode, back_num, pos, min_played, pts, reb, ast, stl, blk, turnovers, fgm, fga, tpm, tpa, ftm, fta)`
@@ -220,14 +223,18 @@ export async function getPlayerRecentGames(pcode: string, limit = MAX_GAME_LOG):
     const homeTeam = row.home_team as unknown as { tcode: string; name: string } | null;
     const awayTeam = row.away_team as unknown as { tcode: string; name: string } | null;
     const isHome = stat.tcode === row.home_tcode;
+    const oppTcode = isHome ? (row.away_tcode as string) : (row.home_tcode as string);
+    const oppRawName = (isHome ? awayTeam?.name : homeTeam?.name) ?? oppTcode;
     return {
       gmkey: row.gmkey as string,
       gameDate: row.game_date as string,
       tcode: stat.tcode,
       backNum: stat.back_num,
       pos: stat.pos,
-      oppTcode: isHome ? (row.away_tcode as string) : (row.home_tcode as string),
-      oppName: (isHome ? awayTeam?.name : homeTeam?.name) ?? (isHome ? (row.away_tcode as string) : (row.home_tcode as string)),
+      oppTcode,
+      // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - 이 경기 자체의
+      // season_name 기준.
+      oppName: displayTeamName(oppTcode, oppRawName, row.season_name as string),
       isHome,
       min: stat.min_played ?? 0,
       pts: stat.pts ?? 0,

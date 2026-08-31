@@ -1,5 +1,7 @@
 import { supabase } from "./supabase";
-import { gameWideTopPerformer, type PlayerBox } from "./postgameReport";
+import { teamTopPerformer, bestBenchPerformer, type PlayerBox } from "./postgameReport";
+import { getStandingsAsOf, type StandingsRow } from "./matchups";
+import { displayTeamName } from "./teamNames";
 
 // 홈 화면 경기 목록(app/page.tsx) 데이터 레이어 - 원래 page.tsx 안에 다 있었는데, 사용자
 // 요청("예상 승률/MVP/AI 분석 배지 추가, 팀 목록은 시즌에 맞게")으로 쿼리가 늘어나서 분리.
@@ -34,8 +36,8 @@ export async function getTeamsForSeason(seasonName: string): Promise<{ tcode: st
   for (const g of data ?? []) {
     const h = g.home_team as unknown as { tcode: string; name: string } | null;
     const a = g.away_team as unknown as { tcode: string; name: string } | null;
-    if (h) seen.set(h.tcode, h.name);
-    if (a) seen.set(a.tcode, a.name);
+    if (h) seen.set(h.tcode, displayTeamName(h.tcode, h.name, seasonName));
+    if (a) seen.set(a.tcode, displayTeamName(a.tcode, a.name, seasonName));
   }
   return Array.from(seen.entries())
     .map(([tcode, name]) => ({ tcode, name }))
@@ -59,7 +61,14 @@ export async function getGames(seasonName: string | undefined, tcode: string | u
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []) as unknown as GameRow[];
+  const rows = (data ?? []) as unknown as GameRow[];
+  // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - 경기 자체의 season_name
+  // 기준으로 표시 이름을 덮어씀(팀 필터 드롭다운은 getTeamsForSeason에서 따로 처리).
+  for (const g of rows) {
+    if (g.home_team) g.home_team.name = displayTeamName(g.home_team.tcode, g.home_team.name, g.season_name);
+    if (g.away_team) g.away_team.name = displayTeamName(g.away_team.tcode, g.away_team.name, g.season_name);
+  }
+  return rows;
 }
 
 // 예상 승률(요청: "양 팀의 예상 승률도 제공") - game_events의 첫 행(event_order=0,
@@ -79,66 +88,99 @@ export async function getPregameWinProbs(gmkeys: string[]): Promise<Map<string, 
   return map;
 }
 
-// MVP(요청: "MVP도 같이 표시") - lib/postgameReport.ts의 gameWideTopPerformer를 그대로
-// 재사용(블로아웃 가드 포함, 새로 만들지 않음). game_player_stats.fgm/fga는 2점 전용이라
-// (3점은 tpm/tpa) games/[gmkey]/page.tsx와 같은 방식으로 합산해서 넘김.
+// MVP(요청: "mvp는 이긴팀 선수와 진팀의 선수, 그리고 식스맨 조커 선수까지 표시" - 원래
+// gameWideTopPerformer 하나만 쓰던 걸 승리팀/패배팀 스포트라이트 + 벤치 조커 3인으로
+// 확장). game_player_stats.fgm/fga는 2점 전용이라(3점은 tpm/tpa) games/[gmkey]/page.tsx와
+// 같은 방식으로 합산해서 넘김. is_starter도 이제 같이 조회(식스맨 판별에 필요 - 예전엔
+// 이 화면에서 안 써서 null로 하드코딩했었음).
 // 실측 버그(이 세션에서 다섯 번째로 걸림 - rarity/winContribution/scoringExplorer/
 // formIndex에 이어) - 200경기 x 선수당 ~24행 ≈ 4800행인데 gmkey를 200개씩 묶기만 하고
 // 응답 자체는 페이지네이션 안 해서 Supabase 기본 1000행 cap에 조용히 잘림(MVP가 200경기
 // 중 42경기에서만 나타남). PAGE 단위로 .range() 페이지네이션 필수.
 const PAGE = 1000;
 export type GameMvp = { pcode: string; name: string; pts: number };
-export async function getGameMvps(games: GameRow[]): Promise<Map<string, GameMvp>> {
+export type GameMvps = { winnerTop: GameMvp | null; loserTop: GameMvp | null; sixthMan: GameMvp | null };
+export async function getGameMvps(games: GameRow[]): Promise<Map<string, GameMvps>> {
   const gmkeys = games.map((g) => g.gmkey);
   if (!gmkeys.length) return new Map();
 
-  const rowsByGmkey = new Map<string, PlayerBox[]>();
-  for (let i = 0; i < gmkeys.length; i += 40) {
-    const chunk = gmkeys.slice(i, i + 40);
-    for (let from = 0; ; from += PAGE) {
-      const { data, error } = await supabase
-        .from("game_player_stats")
-        .select(
-          "gmkey, pcode, tcode, pts, reb, ast, stl, blk, turnovers, fouls, fgm, fga, tpm, tpa, ftm, fta, player:players(name)"
-        )
-        .in("gmkey", chunk)
-        .range(from, from + PAGE - 1);
-      if (error || !data || !data.length) break;
-      for (const p of data) {
-        const box: PlayerBox = {
-          pcode: p.pcode,
-          tcode: p.tcode,
-          name: (p.player as unknown as { name: string } | null)?.name ?? p.pcode,
-          is_starter: null,
-          pts: p.pts ?? 0,
-          fgm: (p.fgm ?? 0) + (p.tpm ?? 0),
-          fga: (p.fga ?? 0) + (p.tpa ?? 0),
-          ftm: p.ftm ?? 0,
-          fta: p.fta ?? 0,
-          reb: p.reb ?? 0,
-          ast: p.ast ?? 0,
-          stl: p.stl ?? 0,
-          blk: p.blk ?? 0,
-          fouls: p.fouls ?? 0,
-          turnovers: p.turnovers ?? 0,
-        };
-        const list = rowsByGmkey.get(p.gmkey) ?? [];
-        list.push(box);
-        rowsByGmkey.set(p.gmkey, list);
-      }
-      if (data.length < PAGE) break;
-    }
-  }
+  // 실측(이번 요청 검증 중 발견) - 청크를 순차 for-loop로 돌리면(200경기 ÷ 40 = 5개
+  // 청크, 매번 await로 하나씩) Supabase 왕복 지연이 그대로 누적돼 홈 화면 전체가
+  // 20~30초 가까이 걸림(is_starter 추가와 무관하게 기존 순차 구조 자체가 원인이었음).
+  // 청크끼리는 서로 다른 gmkey를 겨냥해 완전히 독립적이라 Promise.all로 병렬 처리.
+  const chunks: string[][] = [];
+  for (let i = 0; i < gmkeys.length; i += 40) chunks.push(gmkeys.slice(i, i + 40));
 
-  const result = new Map<string, GameMvp>();
+  const rowsByGmkey = new Map<string, PlayerBox[]>();
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from("game_player_stats")
+          .select(
+            "gmkey, pcode, tcode, pts, reb, ast, stl, blk, turnovers, fouls, is_starter, fgm, fga, tpm, tpa, ftm, fta, player:players(name)"
+          )
+          .in("gmkey", chunk)
+          .range(from, from + PAGE - 1);
+        if (error || !data || !data.length) break;
+        for (const p of data) {
+          const box: PlayerBox = {
+            pcode: p.pcode,
+            tcode: p.tcode,
+            name: (p.player as unknown as { name: string } | null)?.name ?? p.pcode,
+            is_starter: p.is_starter,
+            pts: p.pts ?? 0,
+            fgm: (p.fgm ?? 0) + (p.tpm ?? 0),
+            fga: (p.fga ?? 0) + (p.tpa ?? 0),
+            ftm: p.ftm ?? 0,
+            fta: p.fta ?? 0,
+            reb: p.reb ?? 0,
+            ast: p.ast ?? 0,
+            stl: p.stl ?? 0,
+            blk: p.blk ?? 0,
+            fouls: p.fouls ?? 0,
+            turnovers: p.turnovers ?? 0,
+          };
+          const list = rowsByGmkey.get(p.gmkey) ?? [];
+          list.push(box);
+          rowsByGmkey.set(p.gmkey, list);
+        }
+        if (data.length < PAGE) break;
+      }
+    })
+  );
+
+  const toMvp = (b: PlayerBox): GameMvp => ({ pcode: b.pcode, name: b.name, pts: b.pts });
+  const result = new Map<string, GameMvps>();
   for (const g of games) {
     if (!g.home_team || !g.away_team || g.home_score == null || g.away_score == null) continue;
     const box = rowsByGmkey.get(g.gmkey);
     if (!box || !box.length) continue;
-    const top = gameWideTopPerformer(box, g.home_score, g.away_score, g.home_team.tcode, g.away_team.tcode);
-    if (top) result.set(g.gmkey, { pcode: top.pcode, name: top.name, pts: top.pts });
+    const homeWon = g.home_score > g.away_score;
+    const winnerTcode = homeWon ? g.home_team.tcode : g.away_team.tcode;
+    const loserTcode = homeWon ? g.away_team.tcode : g.home_team.tcode;
+    const winnerTop = teamTopPerformer(box, winnerTcode);
+    const loserTop = teamTopPerformer(box, loserTcode);
+    const exclude = new Set([winnerTop?.pcode, loserTop?.pcode].filter((x): x is string => !!x));
+    const sixthMan = bestBenchPerformer(box, exclude);
+    result.set(g.gmkey, {
+      winnerTop: winnerTop ? toMvp(winnerTop) : null,
+      loserTop: loserTop ? toMvp(loserTop) : null,
+      sixthMan: sixthMan ? toMvp(sixthMan) : null,
+    });
   }
   return result;
+}
+
+// 실제 시즌 승률(요청: "예상 승률과 실제 흘러간 승률, 표시") - 모델의 경기 전 예측
+// (getPregameWinProbs)과 대조할 "이 시즌 실제 승률". 경기마다 그 시점까지의 승률을
+// 따로 계산하면(lib/matchups.ts의 getStandingsAsOf를 최대 200번 호출) 너무 무거우니
+// 시즌 전체 최종 승률 하나로 단순화 - beforeDate를 시즌 종료 이후로 넉넉히 잡아서
+// getStandingsAsOf를 딱 한 번만 호출(팀 페이지 순위 계산과 같은 함수 재사용, 정규시즌만
+// 집계하는 규칙도 그대로 따라감).
+export async function getSeasonWinPcts(seasonName: string): Promise<Map<string, StandingsRow>> {
+  const rows = await getStandingsAsOf(seasonName, "9999-12-31");
+  return new Map(rows.map((r) => [r.tcode, r]));
 }
 
 // AI 분석 배지(요청: "짜릿한 역전승, 압도적 승리, 통한의 패배 등등") - 라이브로 계산하면

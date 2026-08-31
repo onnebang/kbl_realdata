@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { displayTeamName } from "./teamNames";
 
 // "폼 지수" 리더보드(claude.ai/code/artifact 폼지수 리더보드) 포팅 - tools/build_form_index.py의
 // 로직을 그대로 라이브 쿼리로 옮김. 원본은 "2025-2026 시즌 마지막 5경기"로 고정이었지만,
@@ -189,7 +190,9 @@ export async function getFormIndexLeaderboard(
       pcode,
       playerName: nameByPcode.get(pcode) ?? pcode,
       tcode,
-      teamName: team?.name ?? tcode,
+      // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - seasonName은 이 함수의
+      // 인자로 이미 고정돼있어 그대로 재사용.
+      teamName: displayTeamName(tcode, team?.name ?? tcode, seasonName),
       teamAbbr: team?.abbr ?? tcode,
       teamColor: team?.color ?? "#888888",
       teamLogoUrl: team?.logo_url ?? null,

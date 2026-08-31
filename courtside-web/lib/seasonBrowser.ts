@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { displayTeamName } from "./teamNames";
 
 // 시즌 브라우저(app/season-browser) 데이터 레이어 - web/season_browser_template.html 포팅.
 // 원본 정적 템플릿은 한 시즌(283경기) 전체의 게임목록+박스스코어를 미리 구운 JSON
@@ -53,7 +54,14 @@ export async function getSeasonGames(seasonName: string): Promise<SeasonGameRow[
     .order("gmkey", { ascending: true })
     .limit(1000);
   if (error) throw error;
-  return (data ?? []) as unknown as SeasonGameRow[];
+  const rows = (data ?? []) as unknown as SeasonGameRow[];
+  // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - seasonName은 이미 이 함수의
+  // 인자로 알고 있으니 그대로 덮어씀.
+  for (const g of rows) {
+    if (g.home_team) g.home_team.name = displayTeamName(g.home_team.tcode, g.home_team.name, seasonName);
+    if (g.away_team) g.away_team.name = displayTeamName(g.away_team.tcode, g.away_team.name, seasonName);
+  }
+  return rows;
 }
 
 // "2025-2026" -> "2025-26" (템플릿 타이틀 "2025-26 시즌 브라우저" 형식 그대로).

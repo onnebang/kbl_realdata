@@ -123,22 +123,25 @@ export function attachDerivedFields(rawEvents: RawGameEvent[]): GameEvent[] {
   return events;
 }
 
-function marginRefAt(events: GameEvent[], targetElapsed: number): { margin: number; elapsed: number } {
+function marginRefAt(
+  events: GameEvent[],
+  targetElapsed: number
+): { margin: number; elapsed: number; homeScore: number; awayScore: number } {
   let best: GameEvent | null = null;
   for (const row of events) {
     if (row.quarter === "PRE") continue;
     if (row.elapsed <= targetElapsed) best = row;
     else break;
   }
-  if (!best) return { margin: 0, elapsed: 0 };
-  return { margin: best.home_score - best.away_score, elapsed: best.elapsed };
+  if (!best) return { margin: 0, elapsed: 0, homeScore: 0, awayScore: 0 };
+  return { margin: best.home_score - best.away_score, elapsed: best.elapsed, homeScore: best.home_score, awayScore: best.away_score };
 }
 
 function computeSubSpark(
   events: GameEvent[],
   row: GameEvent,
   homeTcode: string
-): { delta: number; beforeDur: number; afterDur: number } | null {
+): { delta: number; beforeDur: number; afterDur: number; homeGain: number; awayGain: number } | null {
   const t0 = row.elapsed;
   const lastElapsed = events[events.length - 1].elapsed;
   if (t0 >= lastElapsed) return null;
@@ -152,17 +155,26 @@ function computeSubSpark(
   const sign = row.tcode === homeTcode ? 1 : -1;
   const before = sign * netRtg(atSub.margin - beforeRef.margin, beforeDur);
   const after = sign * netRtg(afterRef.margin - atSub.margin, afterDur);
-  return { delta: after - before, beforeDur, afterDur };
+  // 요청: "이 투입 이후 상황이 어떻게 흘러갔는지" - 넷레이팅 델타 숫자 하나만으론 실감이 안 나서,
+  // 교체 후 3분(afterDur초) 동안 실제로 각 팀이 몇 점을 냈는지도 같이 반환.
+  return {
+    delta: after - before,
+    beforeDur,
+    afterDur,
+    homeGain: afterRef.homeScore - atSub.homeScore,
+    awayGain: afterRef.awayScore - atSub.awayScore,
+  };
 }
 
 const MAKE_CODES = new Set(["201", "205", "207"]);
+const MISS_CODES = new Set(["202", "206", "208"]);
 const REB_CODES = new Set(["209", "210"]);
 const PERSONAL_FOUL_CODES = new Set(["215", "216", "224"]);
 const SUB_IN_CODE = "101";
 
-type Burst = { key: string; count: number; startIdx: number; endIdx: number; startRow: GameEvent; endRow: GameEvent; durationSec: number };
+export type Burst = { key: string; count: number; startIdx: number; endIdx: number; startRow: GameEvent; endRow: GameEvent; durationSec: number };
 
-function findStatBursts(events: GameEvent[], codes: Set<string>, windowSec: number, minCount: number): Burst[] {
+export function findStatBursts(events: GameEvent[], codes: Set<string>, windowSec: number, minCount: number): Burst[] {
   const queues: Record<string, { elapsed: number; idx: number; row: GameEvent }[]> = {};
   const active: Record<string, boolean> = {};
   const bursts: Burst[] = [];
@@ -198,12 +210,54 @@ const STAT_BURST_DEFS = [
   { key: "assist", label: "어시스트", codes: new Set(["211"]), minCount: 4, windowSec: 300 },
   { key: "block", label: "블록", codes: new Set(["213"]), minCount: 3, windowSec: 300 },
 ];
-function computeStatBursts(events: GameEvent[]): (Burst & { label: string })[] {
+export function computeStatBursts(events: GameEvent[]): (Burst & { label: string })[] {
   const out: (Burst & { label: string })[] = [];
   for (const def of STAT_BURST_DEFS) {
     for (const b of findStatBursts(events, def.codes, def.windowSec, def.minCount)) out.push({ ...b, label: def.label });
   }
   return out;
+}
+
+// 요청: "핫/콜드 스트릭" - 슛 성공/실패가 연속되는 구간 감지(참고 아티팩트의
+// computeHotStreakEvents 포팅, 임계값 3연속). findStatBursts는 "N초 윈도우 안에 N개"가
+// 기준이라 여기 안 맞음(그 사이 다른 게 껴도 됨) - 이건 "연속으로"(중간에 반대 결과가
+// 끼면 리셋)가 기준이라 별도 로직. 양수=연속 성공, 음수=연속 실패.
+const HOT_STREAK_THRESHOLD = 3;
+export type StreakEvent = { pcode: string; idx: number; len: number; row: GameEvent };
+export function findShootingStreaks(events: GameEvent[]): StreakEvent[] {
+  const streaks: Record<string, number> = {};
+  const out: StreakEvent[] = [];
+  for (let i = 1; i < events.length; i++) {
+    const row = events[i];
+    if (!row.pcode || !row.action_code) continue;
+    if (!MAKE_CODES.has(row.action_code) && !MISS_CODES.has(row.action_code)) continue;
+    const prev = streaks[row.pcode] || 0;
+    const cur = MAKE_CODES.has(row.action_code) ? (prev >= 0 ? prev + 1 : 1) : prev <= 0 ? prev - 1 : -1;
+    streaks[row.pcode] = cur;
+    if (Math.abs(prev) < HOT_STREAK_THRESHOLD && Math.abs(cur) >= HOT_STREAK_THRESHOLD) {
+      out.push({ pcode: row.pcode, idx: i, len: cur, row });
+    }
+  }
+  return out;
+}
+
+// 요청: "팀 전체 무득점 기간" - 각 팀이 마지막으로 득점한 시점부터 지금(넘겨받은 events의
+// 마지막 행)까지 몇 초 지났는지. 호출 쪽에서 events.slice(0, idx+1)을 넘기면 "현재 스크럽
+// 시점 기준" 드라우트가 됨.
+export function computeCurrentDroughts(events: GameEvent[]): { homeSec: number; awaySec: number } {
+  if (!events.length) return { homeSec: 0, awaySec: 0 };
+  const last = events[events.length - 1];
+  let lastHomeScoreElapsed = 0,
+    lastAwayScoreElapsed = 0;
+  let prevHome = events[0].home_score,
+    prevAway = events[0].away_score;
+  for (const row of events) {
+    if (row.home_score > prevHome) lastHomeScoreElapsed = row.elapsed;
+    if (row.away_score > prevAway) lastAwayScoreElapsed = row.elapsed;
+    prevHome = row.home_score;
+    prevAway = row.away_score;
+  }
+  return { homeSec: last.elapsed - lastHomeScoreElapsed, awaySec: last.elapsed - lastAwayScoreElapsed };
 }
 
 const FOUL_TROUBLE_WINDOW_SEC = 360,
@@ -309,10 +363,26 @@ function involved(b: PlayerBox): boolean {
   return b.fga + b.fta + b.ast + b.reb > 0;
 }
 
-function teamTopPerformer(box: PlayerBox[], tcode: string): PlayerBox | null {
+// export - 홈 화면(app/page.tsx)의 "이긴팀 선수와 진팀의 선수" 요청에서도 그대로 재사용.
+export function teamTopPerformer(box: PlayerBox[], tcode: string): PlayerBox | null {
   let top: PlayerBox | null = null;
   for (const b of box) {
     if (b.tcode !== tcode || !involved(b)) continue;
+    if (!top || gameScore(b) > gameScore(top)) top = b;
+  }
+  return top;
+}
+
+// 홈 화면 "식스맨 조커" 표시(요청: "식스맨 조커 선수까지 표시") - 경기상세 페이지의
+// findBestSixthManSpark(교체 후 3분간 넷레이팅 변화)는 game_events 전체를 훑어야 해서
+// (경기당 500~800행) 200경기짜리 홈 목록에 쓰기엔 너무 무거움. 대신 홈 화면이 이미
+// 불러오는 박스스코어만으로 계산되는 약식 지표(벤치 선수 중 gameScore 최고)로 대체 -
+// 정확히 같은 정의는 아니지만(넷레이팅 스윙이 아니라 순수 활약도) "이 경기 벤치에서
+// 제일 잘한 선수"라는 취지는 동일. winnerTop/loserTop과 겹치지 않도록 exclude로 제외.
+export function bestBenchPerformer(box: PlayerBox[], excludePcodes: Set<string>): PlayerBox | null {
+  let top: PlayerBox | null = null;
+  for (const b of box) {
+    if (b.is_starter !== false || excludePcodes.has(b.pcode) || !involved(b)) continue;
     if (!top || gameScore(b) > gameScore(top)) top = b;
   }
   return top;
@@ -407,13 +477,15 @@ function explainLosingDespiteTopPerformer(
 const SUB_SPARK_MIN_SAMPLE_SEC = 120;
 const SUB_SPARK_NOTABLE_THRESHOLD = 120; // courtside_template.html 실측(120초+ 표본 784건 중앙값 52, 상위10% 148)과 동일 기준
 
+type SubSpark = NonNullable<ReturnType<typeof computeSubSpark>>;
+
 function findBestSixthManSpark(
   events: GameEvent[],
   box: PlayerBox[],
   homeTcode: string
-): { row: GameEvent; pcode: string; spark: { delta: number } } | null {
+): { row: GameEvent; pcode: string; spark: SubSpark } | null {
   const boxByPcode = new Map(box.map((b) => [b.pcode, b]));
-  let best: { row: GameEvent; pcode: string; spark: { delta: number } } | null = null;
+  let best: { row: GameEvent; pcode: string; spark: SubSpark } | null = null;
   for (let i = 1; i < events.length; i++) {
     const row = events[i];
     if (row.action_code !== SUB_IN_CODE || !row.pcode) continue;
@@ -427,8 +499,8 @@ function findBestSixthManSpark(
   return best;
 }
 
-function findNotableSubSparks(events: GameEvent[], homeTcode: string): { row: GameEvent; pcode: string; spark: { delta: number } }[] {
-  const out: { row: GameEvent; pcode: string; spark: { delta: number } }[] = [];
+function findNotableSubSparks(events: GameEvent[], homeTcode: string): { row: GameEvent; pcode: string; spark: SubSpark }[] {
+  const out: { row: GameEvent; pcode: string; spark: SubSpark }[] = [];
   for (let i = 1; i < events.length; i++) {
     const row = events[i];
     if (row.action_code !== SUB_IN_CODE || !row.pcode) continue;
@@ -487,16 +559,20 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     sections.push({ title: "경기 결과", html });
   }
 
-  // 2. 팀별 스포트라이트 + 최고 활약이 패배로 이어진 이유
+  // 2. 팀별 스포트라이트 + 최고 활약이 패배로 이어진 이유 - 요청: "팀별 스포트라이트 선수를
+  // 더 자세히(나노분석)" - gameScore 계산엔 이미 쓰이지만 화면엔 안 보여주던 필드(자유투/
+  // 스틸/블록/턴오버/파울)까지 한 줄에 담음.
+  const spotlightLine = (p: PlayerBox) =>
+    `${p.pts}점 (FG ${p.fgm}/${p.fga}, FT ${p.ftm}/${p.fta}) · ${p.ast}AST ${p.reb}REB ${p.stl}STL ${p.blk}BLK ${p.turnovers}TO ${p.fouls}PF`;
   {
     const winnerTop = teamTopPerformer(box, winnerTcode);
     const loserTop = teamTopPerformer(box, loserTcode);
     let html = "";
     if (winnerTop) {
-      html += `<p class="report-text">🏆 <b>${winnerTname}</b> 스포트라이트 - ${winnerTop.name} ${winnerTop.pts}점 ${winnerTop.fgm}/${winnerTop.fga}, ${winnerTop.ast}AST ${winnerTop.reb}REB.</p>`;
+      html += `<p class="report-text">🏆 <b>${winnerTname}</b> 스포트라이트 - ${winnerTop.name} ${spotlightLine(winnerTop)}.</p>`;
     }
     if (loserTop) {
-      html += `<p class="report-text">🥈 <b>${loserTname}</b> 스포트라이트 - ${loserTop.name} ${loserTop.pts}점 ${loserTop.fgm}/${loserTop.fga}, ${loserTop.ast}AST ${loserTop.reb}REB.</p>`;
+      html += `<p class="report-text">🥈 <b>${loserTname}</b> 스포트라이트 - ${loserTop.name} ${spotlightLine(loserTop)}.</p>`;
     }
     const overallMvp = gameWideTopPerformer(box, homeScore, awayScore, homeTcode, awayTcode);
     if (overallMvp && overallMvp.tcode === loserTcode) {
@@ -508,16 +584,22 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     if (html) sections.push({ title: "팀별 스포트라이트", html });
   }
 
-  // 3. 결정적 장면들
+  // 3. 결정적 장면들 - 요청: "승률 60%→48%인데 정관장이 유리해졌다는 표현이 이상하다" -
+  // 항상 홈팀 승률만 보여주면서 "유리해짐" 문구를 붙이면, 원정팀이 유리해질 때 숫자가
+  // 거꾸로 떨어지는 것처럼 읽힘. 유리해지는 팀 자신의 승률(원정팀이면 100-확률)로 보여줘서
+  // 숫자가 항상 그 팀 쪽으로 오르게 함.
   const topSwings = findTopWpaSwings(events, 3);
   if (topSwings.length) {
     const items = topSwings
       .map((s) => {
         const row = s.row;
-        const beforeProb = s.idx > 0 ? Math.round((events[s.idx - 1].home_win_prob ?? 0.5) * 100) : preActPct;
-        const afterProb = Math.round((row.home_win_prob ?? 0.5) * 100);
-        const beneficiary = (row.wpa_home ?? 0) > 0 ? homeTname : awayTname;
-        return `<li>${clockStr(row)}, ${row.home_score}-${row.away_score} 상황 ${row.player_name}의 ${row.action_label} - 승률 ${beforeProb}%→${afterProb}%, ${beneficiary}${eunNeun(beneficiary)} 유리해짐.</li>`;
+        const beforeHomeProb = s.idx > 0 ? (events[s.idx - 1].home_win_prob ?? 0.5) : preActPct / 100;
+        const afterHomeProb = row.home_win_prob ?? 0.5;
+        const homeBenefits = (row.wpa_home ?? 0) > 0;
+        const beneficiary = homeBenefits ? homeTname : awayTname;
+        const beforeProb = Math.round((homeBenefits ? beforeHomeProb : 1 - beforeHomeProb) * 100);
+        const afterProb = Math.round((homeBenefits ? afterHomeProb : 1 - afterHomeProb) * 100);
+        return `<li>${clockStr(row)}, ${row.home_score}-${row.away_score} 상황 ${row.player_name}의 ${row.action_label} - ${beneficiary} 승률 ${beforeProb}%→${afterProb}%로 상승.</li>`;
       })
       .join("");
     sections.push({ title: "결정적 장면들", html: `<ul class="report-list">${items}</ul>` });
@@ -535,32 +617,40 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     }
   }
 
-  // 5. 극적인 흐름
+  // 5. 극적인 흐름 - 요청: "왜 요동치게 되었는지, 승률 상승 포인트와 실제 스탯을 제공" - 이
+  // 구간에 각 팀이 실제로 몇 점을 냈는지(누적 home_score/away_score 델타, 새 쿼리 불필요)를
+  // 같이 보여줌. 승률 표기도 위 3번과 같은 이유로 유리해지는 팀 기준으로.
   {
     const dramatic = findDramaticProbSwing(events);
     if (dramatic) {
       const fromRow = events[dramatic.startIdx],
         toRow = events[dramatic.endIdx];
-      const fromPct = Math.round((fromRow.home_win_prob ?? 0.5) * 100),
-        toPct = Math.round((toRow.home_win_prob ?? 0.5) * 100);
-      const beneficiary = dramatic.delta > 0 ? homeTname : awayTname;
+      const homeBenefits = dramatic.delta > 0;
+      const beneficiary = homeBenefits ? homeTname : awayTname;
+      const fromPct = Math.round((homeBenefits ? (fromRow.home_win_prob ?? 0.5) : 1 - (fromRow.home_win_prob ?? 0.5)) * 100);
+      const toPct = Math.round((homeBenefits ? (toRow.home_win_prob ?? 0.5) : 1 - (toRow.home_win_prob ?? 0.5)) * 100);
+      const homeGain = toRow.home_score - fromRow.home_score;
+      const awayGain = toRow.away_score - fromRow.away_score;
       sections.push({
         title: "극적인 흐름",
         html:
-          `<p class="report-text">⚡ ${clockStr(fromRow)}부터 ${clockStr(toRow)}까지, 단 ${fmtDuration(dramatic.durationSec)} 만에 승률이 ${fromPct}%에서 ${toPct}%로 요동침 - ` +
+          `<p class="report-text">⚡ ${clockStr(fromRow)}부터 ${clockStr(toRow)}까지, 단 ${fmtDuration(dramatic.durationSec)} 만에 ${beneficiary} 승률이 ${fromPct}%에서 ${toPct}%로 요동침` +
+          `(이 구간 ${homeTname} ${homeGain}점, ${awayTname} ${awayGain}점) - ` +
           `${beneficiary}${iGa(beneficiary)} 이 짧은 구간에 경기 흐름을 완전히 뒤집어놓음.</p>`,
       });
     }
   }
 
-  // 6. 이 경기의 식스맨
+  // 6. 이 경기의 식스맨 - 요청: "그래서 이 투입 이후 상황이 어떻게 흘러갔는지" - 넷레이팅
+  // 변화 숫자만이 아니라 투입 후 실제 관찰 구간 동안 양 팀이 각각 몇 점을 냈는지도 표시.
   {
     const sixthMan = findBestSixthManSpark(events, box, homeTcode);
     if (sixthMan) {
       const p = box.find((b) => b.pcode === sixthMan.pcode);
+      const { delta, afterDur, homeGain, awayGain } = sixthMan.spark;
       sections.push({
         title: "이 경기의 식스맨",
-        html: `<p class="report-text">🔋 <b>${p?.name ?? ""}</b>${iGa(p?.name ?? "")} ${clockStr(sixthMan.row)} 투입된 뒤 팀 흐름이 확실히 좋아짐(넷레이팅 변화 ${fmtRating(sixthMan.spark.delta)}) - 이 경기 최고의 벤치 임팩트.</p>`,
+        html: `<p class="report-text">🔋 <b>${p?.name ?? ""}</b>${iGa(p?.name ?? "")} ${clockStr(sixthMan.row)} 투입된 뒤 팀 흐름이 확실히 좋아짐(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${homeTname} ${homeGain}점 · ${awayTname} ${awayGain}점) - 이 경기 최고의 벤치 임팩트.</p>`,
       });
     }
   }
@@ -591,7 +681,10 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     for (const s of notableSubs) {
       const name = boxByPcode.get(s.pcode)?.name ?? "";
       const dir = s.spark.delta > 0 ? "좋아짐" : "나빠짐";
-      items.push(`<li>${name}${iGa(name)} ${clockStr(s.row)} 투입된 뒤 팀 흐름이 뚜렷하게 ${dir}(넷레이팅 변화 ${fmtRating(s.spark.delta)}).</li>`);
+      const { delta, afterDur, homeGain, awayGain } = s.spark;
+      items.push(
+        `<li>${name}${iGa(name)} ${clockStr(s.row)} 투입된 뒤 팀 흐름이 뚜렷하게 ${dir}(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${homeTname} ${homeGain}점 · ${awayTname} ${awayGain}점).</li>`
+      );
     }
     for (const fe of findFoulTroubleEvents(events)) {
       const runInfo = checkOpponentRunAfterFoulTrouble(events, fe, homeTcode);

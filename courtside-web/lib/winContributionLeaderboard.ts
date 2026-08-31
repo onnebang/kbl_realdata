@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { displayTeamName } from "./teamNames";
 
 // "승리 기여도 리더보드" 아티팩트(claude.ai/code/artifact/97168d9d...) 포팅. 원본은
 // Python으로 미리 계산해 정적 HTML에 박아넣은 스냅샷(LB_DATA.bySeason)이었지만, 여기는
@@ -62,7 +63,9 @@ export async function getWinContributionLeaderboard(seasonName: string, sortKey:
       pcode: r.pcode,
       playerName: player?.name ?? r.pcode,
       tcode: r.tcode,
-      teamName: team?.name ?? r.tcode,
+      // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - 이 리더보드는 이미
+      // seasonName 인자로 시즌이 고정돼있어 그대로 재사용.
+      teamName: displayTeamName(r.tcode, team?.name ?? r.tcode, seasonName),
       teamAbbr: team?.abbr ?? r.tcode,
       teamColor: team?.color ?? "#5b5f6e",
       teamLogoUrl: team?.logo_url ?? null,

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getTeamSeasonSchedule } from "@/lib/matchups";
+import { displayTeamName } from "@/lib/teamNames";
 
 // 팀 시즌 스케줄 페이지(요청: "팀별, 시즌별 보기를 좀더 세분화" - ESPN 팀 스케줄 페이지
 // 참고) - 홈 화면 경기 목록의 팀 이름/배지를 누르면 여기로. 팀 컬러를 배너에 그대로 써서
@@ -42,7 +43,13 @@ export default async function TeamPage({
     getTeamSeasonSchedule(tcode, activeSeason),
     supabase.from("teams").select("tcode, name, abbr, color, logo_url").then((r) => r.data ?? []),
   ]);
-  const oppByTcode = new Map(opponents.map((t) => [t.tcode, t]));
+  // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - opponents는 teams 전체를
+  // 시즌 문맥 없이 한 번에 가져온 정적 목록이라, 이 페이지가 보고 있는 activeSeason
+  // 기준으로 표시 이름만 덮어씀(배지 색상/로고는 그대로).
+  const oppByTcode = new Map(
+    opponents.map((t) => [t.tcode, { ...t, name: displayTeamName(t.tcode, t.name, activeSeason) }])
+  );
+  const teamName = displayTeamName(team.tcode, team.name, activeSeason);
 
   const wins = schedule.filter((g) => g.teamScore > g.oppScore).length;
   const losses = schedule.length - wins;
@@ -54,9 +61,9 @@ export default async function TeamPage({
       </Link>
 
       <div className="team-page-banner" style={{ background: team.color }}>
-        <TeamBadge team={{ name: team.name, abbr: team.abbr, color: "#ffffff33", logoUrl: team.logo_url }} size={56} />
+        <TeamBadge team={{ name: teamName, abbr: team.abbr, color: "#ffffff33", logoUrl: team.logo_url }} size={56} />
         <div>
-          <div className="team-page-name">{team.name}</div>
+          <div className="team-page-name">{teamName}</div>
           <div className="team-page-record">
             {activeSeason} 시즌 · {wins}승 {losses}패
             {schedule.length > 0 ? ` (${((wins / schedule.length) * 100).toFixed(1)}%)` : ""}
@@ -122,7 +129,7 @@ export default async function TeamPage({
       </div>
 
       <footer className="foot">
-        {team.name} · {activeSeason} 시즌 · Supabase에서 실시간 조회
+        {teamName} · {activeSeason} 시즌 · Supabase에서 실시간 조회
       </footer>
     </div>
   );

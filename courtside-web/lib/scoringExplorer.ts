@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { drawCourtMarkings } from "./zoneCompare";
+import { currentTeamName } from "./teamNames";
 
 // "득점 분포 탐색기" 아티팩트(claude.ai 원본, web/scoring_distribution_template.html) 리디자인
 // 2차 포팅 - 원본은 Python이 미리 구운 DATA blob(팀/선수/감독/리그 x 전체 15시즌의 15x15 격자를
@@ -105,8 +106,10 @@ export async function getAllEntityOptions(dim: Dimension): Promise<EntityOption[
 
   if (dim === "team") {
     const { data } = await supabase.from("teams").select("tcode, name");
+    // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - 이 드롭다운은 팀 하나를
+    // 전체 이력(15시즌) 통틀어 한 엔티티로 다루므로 시즌 무관하게 현재 정식 명칭 사용.
     return (data ?? [])
-      .map((t) => ({ id: t.tcode as string, label: t.name as string }))
+      .map((t) => ({ id: t.tcode as string, label: currentTeamName(t.tcode as string, t.name as string) }))
       .sort((a, b) => a.label.localeCompare(b.label, "ko"));
   }
 

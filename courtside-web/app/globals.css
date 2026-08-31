@@ -16,6 +16,8 @@
   --away-soft: #1f6fd61a;
   --gold: #9a6b00;
   --gold-soft: #9a6b0022;
+  --positive: #1a8633;
+  --negative: #cd2054;
   --line-rgb: 20, 22, 28;
 }
 
@@ -33,6 +35,8 @@
     --away-soft: #3ea6ff26;
     --gold: #ffd166;
     --gold-soft: #ffd16626;
+    --positive: #32d74b;
+    --negative: #ff2c56;
     --line-rgb: 242, 243, 247;
   }
 }
@@ -211,11 +215,16 @@ select {
      브랜드 색이 달라서 CSS 클래스로는 표현이 안 됨(예전엔 홈=주황/원정=파랑
      고정 2색이었는데, 사용자 요청으로 팀별 실제 색상으로 교체). */
 }
+/* 요청: "승리 표시를 팀에 조금 더 가깝게, 너무 멀리있어서 가시성 떨어짐" - 이전엔
+   팀이름 칸(minmax(0,1fr))이 로고 쪽(칸 안쪽)으로 정렬돼서, 실제 텍스트와 그 왼쪽의
+   승/패 배지 사이에 칸 여유폭만큼 빈 공간이 생겨 배지-팀이름이 시각적으로 멀어 보였음.
+   정렬 방향을 배지 쪽(칸 바깥쪽)으로 뒤집어서 배지+팀이름이 붙어 보이게 함(스코어를
+   정중앙 고정시키는 1fr 트릭 자체는 유지 - 위 .game-card-row 주석 참고).*/
 .team-name.home {
-  text-align: right;
+  text-align: left;
 }
 .team-name.away {
-  text-align: left;
+  text-align: right;
 }
 .team-name.win {
   opacity: 1;
@@ -299,11 +308,14 @@ select {
   color: var(--away);
 }
 
-/* 하단 메타 줄(예상 승률/MVP) - 요청 반영, 메인 매치업 줄과는 시각적 위계를 낮춰서
-   작은 보조 정보로. */
+/* 하단 메타 줄(예상 승률/실제 승률/MVP 3인/상세보기) - 요청 반영, 메인 매치업 줄과는
+   시각적 위계를 낮춰서 작은 보조 정보로. 항목이 늘어나서(요청: "실제 흘러간 승률",
+   "식스맨 조커", "경기 상세보기 버튼") 좁은 화면에서 줄바꿈되도록 flex-wrap 추가. */
 .game-card-meta {
   display: flex;
-  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid rgba(var(--line-rgb), 0.06);
@@ -311,11 +323,40 @@ select {
   color: var(--ink-faint);
   font-family: "IBM Plex Mono", monospace;
 }
+
+/* MVP/분전/식스맨 3인 - 한 줄에 이어붙임(요청: "이긴팀 선수와 진팀의 선수, 그리고
+   식스맨 조커 선수까지 표시"). 승리팀=강조, 패배팀=톤 낮춤, 식스맨=골드(다른 AI 분석
+   배지와 같은 팔레트 재사용 - .ai-tag-comeback과 동일 톤). */
+.game-card-meta-mvps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
 .game-card-mvp {
   color: var(--ink-soft);
 }
 .game-card-mvp:hover {
   color: var(--home);
+}
+.game-card-mvp-loser {
+  opacity: 0.7;
+}
+.game-card-mvp-sixthman {
+  color: var(--gold);
+}
+.game-card-mvp-sixthman:hover {
+  opacity: 0.8;
+}
+
+/* 경기 상세보기 버튼(요청: "경기 상세보기 버튼 추가") - 메타 줄 맨 끝으로 밀어붙임. */
+.game-card-detail-btn {
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--home);
+  white-space: nowrap;
+}
+.game-card-detail-btn:hover {
+  text-decoration: underline;
 }
 
 /* 매치업 배너 - courtside_template.html의 .matchup-banner와 동일 패턴 */
@@ -424,6 +465,54 @@ select {
   color: var(--ink-faint);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  margin-bottom: 10px;
+}
+
+/* 요청: "프리뷰 인사이트 자세히 보기를 누르면 펼쳐서 보여줌" - 순수 <details>/<summary>라
+   클라이언트 JS 없이 접고 펼침. 브라우저 기본 마커(세모) 대신 화살표 아이콘을 직접 그려서
+   열림/닫힘 상태를 명확히 표시. */
+.preview-details-summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+.preview-details-summary::-webkit-details-marker {
+  display: none;
+}
+.preview-details-summary::before {
+  content: "▸";
+  color: var(--home);
+  font-size: 11px;
+  transition: transform 0.15s;
+}
+details[open] > .preview-details-summary::before {
+  transform: rotate(90deg);
+}
+.preview-details-summary:hover {
+  color: var(--home);
+}
+.preview-details-body {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.1);
+}
+.preview-subsection {
+  margin-bottom: 22px;
+}
+.preview-subsection:last-child {
+  margin-bottom: 0;
+}
+.ts-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
   margin-bottom: 10px;
 }
 
@@ -947,6 +1036,46 @@ table.data-table td:nth-child(2) {
 .replay-panel {
   margin-top: 18px;
 }
+
+/* 요청: "스크롤을 내리면 상단에 점수/팀/예상승률/현재 쿼터 시간등을 작게 틀 고정" - 순수
+   CSS sticky(스크롤 리스너 JS 없음). 리플레이 패널 자체가 스크럽/박스스코어/플레이피드로
+   길어서, 아래쪽까지 내려가도 지금 스코어를 계속 볼 수 있게. */
+.replay-sticky-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--surface);
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.1);
+  padding: 8px 10px;
+  margin: -16px -18px 14px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+.replay-sticky-team {
+  white-space: nowrap;
+}
+.replay-sticky-clock {
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+.replay-sticky-prob {
+  color: var(--ink-faint);
+  font-size: 10.5px;
+}
+
+/* 요청: "슛 차트와 슛 차트가 중복" - 독립 패널에 있던 필터 폼을 여기로 흡수. */
+.replay-shot-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
 /* 스코어보드(요청: "경기 세부는 courtside_template을 참고해서 개발") - 원본
    web/courtside_template.html의 #stickyBar(.sb-main/.team-badge/.team-score/.prob-pct/
    .split-bar/.quarter-table)를 그대로 이식. 원본은 --home/--away 전역 CSS 변수를 이
@@ -1068,6 +1197,127 @@ table.data-table td:nth-child(2) {
   margin-bottom: 12px;
   min-height: 1.4em;
 }
+
+/* 요청: "연속 성공(핫핸드), 연속실패(콜드핸드), 팀 전체 무득점 기간, 20-6 런 등등을
+   보여줌" - 최근 3분 안의 흐름을 작은 칩으로. */
+.replay-flow-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.replay-flow-chip {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--gold-soft);
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+/* 요청: "현 시점 game leaders를 보여줌" */
+.replay-leaders {
+  max-width: 420px;
+  margin: 0 auto 16px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.1);
+  padding-top: 10px;
+}
+.replay-leaders-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 1fr;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  padding: 3px 0;
+}
+.replay-leaders-val {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+}
+.replay-leaders-val.away {
+  text-align: right;
+}
+.replay-leaders-label {
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+}
+
+/* 요청: "왜 해당승률이 나오는지, 예상대로라면 그 흐름을 보여주고, 예상이 깨졌다면 이유를
+   표기" - objective_prob(점수·시간만) vs home_win_prob(시즌 전력 반영) 두 바 비교. */
+.replay-explain {
+  margin-bottom: 16px;
+}
+.replay-explain-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.replay-explain-label {
+  flex: 0 0 92px;
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+.replay-explain-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(var(--line-rgb), 0.1);
+  overflow: hidden;
+}
+.replay-explain-fill {
+  height: 100%;
+  background: var(--ink-faint);
+  border-radius: 999px;
+}
+.replay-explain-fill.actual {
+  background: var(--gold);
+}
+.replay-explain-val {
+  flex: 0 0 36px;
+  text-align: right;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+.replay-explain-text {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 8px;
+}
+
+/* 요청: "현재 라인업 1인,2인,3인,4인,5인 조합과 넷레이팅을 보여줌" */
+.replay-lineups {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  max-width: 640px;
+  margin: 0 auto 16px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.1);
+  padding-top: 10px;
+}
+.replay-lineup-team {
+  font-size: 11.5px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.replay-lineup-line {
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+.replay-lineup-sample {
+  color: var(--ink-faint);
+}
+.replay-lineup-empty {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
 .replay-controls {
   display: flex;
   align-items: center;
@@ -1117,20 +1367,33 @@ table.data-table td:nth-child(2) {
   gap: 5px;
   margin-bottom: 14px;
 }
+/* 요청: "쿼터 버튼 좀더 가시성 좋게" - 클릭 가능한 이동 버튼이라는 게 잘 안 드러나서
+   (쿼터 시작으로 스크럽 이동) 크기·대비·호버 상태를 강화. */
 .replay-quarter-btn {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 7px;
   color: var(--ink-soft);
-  border: 1px solid rgba(var(--line-rgb), 0.14);
-  background: none;
+  border: 1px solid rgba(var(--line-rgb), 0.22);
+  background: rgba(var(--line-rgb), 0.04);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+.replay-quarter-btn:hover {
+  border-color: var(--home);
+  color: var(--home);
+  background: rgba(var(--line-rgb), 0.08);
 }
 .replay-quarter-btn.active {
   color: #fff;
   background: var(--home);
   border-color: var(--home);
+}
+.replay-quarter-btn.active:hover {
+  color: #fff;
+  opacity: 0.9;
 }
 .replay-cols {
   display: grid;
@@ -1163,12 +1426,6 @@ table.data-table td:nth-child(2) {
   width: 68px;
   flex-shrink: 0;
 }
-.replay-feed-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
 .replay-feed-text {
   flex: 1;
   color: var(--ink-soft);
@@ -1182,6 +1439,37 @@ table.data-table td:nth-child(2) {
   font-size: 11px;
   color: var(--ink-faint);
   flex-shrink: 0;
+}
+
+/* 요청: "실시간 중계에서 팀별로 묶어서 보여주고... 승률이 어떻게 변화가 되었는지 표시" */
+.replay-feed-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.replay-feed-team-title {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.replay-feed-assist {
+  color: var(--ink-faint);
+  font-size: 10.5px;
+}
+.replay-feed-delta {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+  width: 34px;
+  text-align: right;
+}
+.replay-feed-delta.up {
+  color: var(--positive);
+}
+.replay-feed-delta.down {
+  color: var(--negative);
 }
 
 /* 커스텀 지표(components/CustomMetricBuilder.tsx) - 슬라이더가 핵심 상호작용이라

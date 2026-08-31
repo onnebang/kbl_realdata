@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { displayTeamName } from "./teamNames";
 
 // courtside_template.html의 renderMatchups()/renderStandings()가 쓰던 pregameDetail(h2h/
 // seasonStats/schedule/standings)을 courtside-web에도 - 그쪽은 Python 빌드타임에 미리
@@ -90,7 +91,7 @@ export async function getRecentSchedule(tcode: string, beforeDate: string, limit
   const { data } = await supabase
     .from("games")
     .select(
-      `gmkey, game_date, home_tcode, away_tcode, home_score, away_score,
+      `gmkey, game_date, season_name, home_tcode, away_tcode, home_score, away_score,
        home_team:teams!games_home_tcode_fkey(tcode, name),
        away_team:teams!games_away_tcode_fkey(tcode, name)`
     )
@@ -104,11 +105,16 @@ export async function getRecentSchedule(tcode: string, beforeDate: string, limit
     const isHome = g.home_tcode === tcode;
     const homeTeam = g.home_team as unknown as { tcode: string; name: string } | null;
     const awayTeam = g.away_team as unknown as { tcode: string; name: string } | null;
+    const oppTcode = isHome ? (g.away_tcode as string) : (g.home_tcode as string);
+    const oppRawName = (isHome ? awayTeam?.name : homeTeam?.name) ?? oppTcode;
     return {
       gmkey: g.gmkey as string,
       gameDate: g.game_date as string,
-      oppTcode: isHome ? (g.away_tcode as string) : (g.home_tcode as string),
-      oppName: (isHome ? awayTeam?.name : homeTeam?.name) ?? (isHome ? (g.away_tcode as string) : (g.home_tcode as string)),
+      oppTcode,
+      // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - 이 경기 자체의
+      // season_name 기준(조회 중인 경기의 시즌이 아니라, 이 상대전적이 실제로 열린
+      // 그 시즌 기준이라야 정확함).
+      oppName: displayTeamName(oppTcode, oppRawName, g.season_name as string),
       isHome,
       teamScore: (isHome ? g.home_score : g.away_score) as number,
       oppScore: (isHome ? g.away_score : g.home_score) as number,
@@ -137,12 +143,16 @@ export async function getTeamSeasonSchedule(tcode: string, seasonName: string): 
     const isHome = g.home_tcode === tcode;
     const homeTeam = g.home_team as unknown as { tcode: string; name: string } | null;
     const awayTeam = g.away_team as unknown as { tcode: string; name: string } | null;
+    const oppTcode = isHome ? (g.away_tcode as string) : (g.home_tcode as string);
+    const oppRawName = (isHome ? awayTeam?.name : homeTeam?.name) ?? oppTcode;
     return {
       gmkey: g.gmkey as string,
       gameDate: g.game_date as string,
       seasonCategory: g.season_category as string,
-      oppTcode: isHome ? (g.away_tcode as string) : (g.home_tcode as string),
-      oppName: (isHome ? awayTeam?.name : homeTeam?.name) ?? (isHome ? (g.away_tcode as string) : (g.home_tcode as string)),
+      oppTcode,
+      // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - 이 함수는 seasonName을
+      // 인자로 이미 받고 있어서 그대로 재사용.
+      oppName: displayTeamName(oppTcode, oppRawName, seasonName),
       isHome,
       teamScore: (isHome ? g.home_score : g.away_score) as number,
       oppScore: (isHome ? g.away_score : g.home_score) as number,
