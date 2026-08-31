@@ -624,56 +624,122 @@ export default function GameReplay({
   // 그대로 재사용 - 별도 추적 로직을 새로 만들지 않음. 스트릭 배지도 위 flowChips가 이미 쓰는
   // liveStreaks(findShootingStreaks, 최근 3분 이내 임계값 교차 이벤트)를 그대로 재사용 - 같은
   // 선수가 최근 3분 안에 여러 번 교차했으면 마지막(가장 최근) 것만 배지에 반영.
+  //
+  // 요청: "replay-court와 replay-cols(선수 기록 박스스코어)의 내용이 겹치니 합쳐서 replay-court만
+  // 나오도록" - 아래 예전 박스스코어(PTS/REB/AST/STL/BLK/TO/FG/3P/FT/+-, DNP 처리)를 여기
+  // 흡수해서 온/오프 컬럼까지 더한 표로 만들고, 그룹 기준은 그대로 온코트(라이브)/벤치 유지
+  // (예전 박스스코어의 선발/벤치 기준과는 다름 - 지금 코트에 있는지가 이 패널의 정체성이라
+  // 그 기준을 살림). isDnp/jerseyNum/plusMinusCell은 예전 boxTable이 쓰던 것 그대로 재사용.
   const streakByPcode = useMemo(() => {
     const m = new Map<string, StreakEvent>();
     for (const s of liveStreaks) m.set(s.pcode, s);
     return m;
   }, [liveStreaks]);
+  const isDnp = (p: PlayerMeta) => p.minPlayed == null || Number(p.minPlayed) === 0;
+  const jerseyNum = (p: PlayerMeta) => (p.backNum ? <span className="replay-jersey-num">#{p.backNum}</span> : null);
+  const plusMinusCell = (p: PlayerMeta) => {
+    const pm = finalPlusMinus.get(p.pcode) ?? 0;
+    return <td className={pm > 0 ? "replay-pm pos" : pm < 0 ? "replay-pm neg" : "replay-pm"}>{pm > 0 ? `+${pm}` : pm}</td>;
+  };
+  const COURT_COLS = 12; // 선수 1 + PTS/REB/AST/STL/BLK/TO/FG/3P/FT/+- 10 + 온/오프 1
+  const courtHeaderRow = (key: string) => (
+    <tr key={key}>
+      <th>선수</th>
+      <th>PTS</th>
+      <th>REB</th>
+      <th>AST</th>
+      <th>STL</th>
+      <th>BLK</th>
+      <th>TO</th>
+      <th>FG</th>
+      <th>3P</th>
+      <th>FT</th>
+      <th>+/-</th>
+      <th>온/오프</th>
+    </tr>
+  );
   const onCourtRow = (p: PlayerMeta, isOnCourt: boolean) => {
-    const b = box.get(p.pcode) ?? emptyBoxLine();
     const streak = streakByPcode.get(p.pcode);
     const onoff = playerOnOff?.[p.pcode];
     const isTop = p.pcode === topPcode;
     // 표본 부족(player_onoff에 이 pcode 행 자체가 없음) - 위 M7 라인업 넷레이팅의
     // "표본 부족" 폴백과 같은 취지로 "-" 표시.
     const onoffCls = onoff == null ? "" : onoff.netRatingPer40 > 0 ? "pos" : onoff.netRatingPer40 < 0 ? "neg" : "";
-    return (
-      <div className={`replay-court-row ${isOnCourt ? "on-court" : "bench"}${isTop ? " top" : ""}`} key={p.pcode}>
-        <span className="replay-court-pname">
-          {p.backNum && <span className="replay-jersey-num">#{p.backNum}</span>}
-          <span className="replay-court-pname-text">{p.name}</span>
-          {streak && (
-            <span className="replay-court-streak" title={`${Math.abs(streak.len)}연속 ${streak.len > 0 ? "성공" : "실패"}`}>
-              {streak.len > 0 ? "🔥" : "🧊"}×{Math.abs(streak.len)}
-            </span>
-          )}
-          {isTop && (
-            <span className="replay-court-mvp" title="이 경기 최고 활약">
-              ⭐
-            </span>
-          )}
-        </span>
-        <span className="replay-court-stat-col">
-          <span className="replay-court-stat">
-            {b.pts}점 {b.fgm}/{b.fga}
+    const nameCell = (
+      <span className="replay-court-pname">
+        {jerseyNum(p)}
+        <Link href={`/players/${p.pcode}`} className="replay-court-pname-text">
+          {p.name}
+        </Link>
+        {streak && (
+          <span className="replay-court-streak" title={`${Math.abs(streak.len)}연속 ${streak.len > 0 ? "성공" : "실패"}`}>
+            {streak.len > 0 ? "🔥" : "🧊"}×{Math.abs(streak.len)}
           </span>
-          <span className={`replay-court-onoff ${onoffCls}`}>온/오프 {onoff ? fmtRating(onoff.netRatingPer40) : "-"}</span>
-        </span>
-      </div>
+        )}
+        {isTop && (
+          <span className="replay-court-mvp" title="이 경기 최고 활약">
+            ⭐
+          </span>
+        )}
+      </span>
+    );
+    if (isDnp(p)) {
+      return (
+        <tr className={`replay-court-row ${isOnCourt ? "on-court" : "bench"}`} key={p.pcode}>
+          <td>{nameCell}</td>
+          <td colSpan={COURT_COLS - 1} className="replay-dnp-label">
+            DNP - 감독 결정
+          </td>
+        </tr>
+      );
+    }
+    const b = box.get(p.pcode) ?? emptyBoxLine();
+    return (
+      <tr className={`replay-court-row ${isOnCourt ? "on-court" : "bench"}${isTop ? " top" : ""}`} key={p.pcode}>
+        <td>{nameCell}</td>
+        <td>{b.pts}</td>
+        <td>{b.reb}</td>
+        <td>{b.ast}</td>
+        <td>{b.stl}</td>
+        <td>{b.blk}</td>
+        <td>{b.to}</td>
+        <td>
+          {b.fgm}/{b.fga}
+        </td>
+        <td>
+          {b.threePM}/{b.threePA}
+        </td>
+        <td>
+          {b.ftm}/{b.fta}
+        </td>
+        {plusMinusCell(p)}
+        <td className={`replay-court-onoff ${onoffCls}`}>{onoff ? fmtRating(onoff.netRatingPer40) : "-"}</td>
+      </tr>
     );
   };
-  const onCourtColumn = (team: TeamMeta, onCourt: Set<string>) => {
-    const roster = players.filter((p) => p.tcode === team.tcode);
-    const onCourtList = roster.filter((p) => onCourt.has(p.pcode));
-    const bench = roster.filter((p) => !onCourt.has(p.pcode));
+  const byLivePts = (a: PlayerMeta, b: PlayerMeta) => (box.get(b.pcode)?.pts ?? 0) - (box.get(a.pcode)?.pts ?? 0);
+  const onCourtColumn = (team: TeamMeta, roster: PlayerMeta[], onCourt: Set<string>) => {
+    const onCourtList = roster.filter((p) => onCourt.has(p.pcode)).sort(byLivePts);
+    const bench = roster.filter((p) => !onCourt.has(p.pcode)).sort(byLivePts);
     return (
       <div className="replay-court-col" key={team.tcode}>
         <div className="replay-court-col-label" style={{ color: team.color }}>
           {team.name}
         </div>
-        {onCourtList.map((p) => onCourtRow(p, true))}
-        {bench.length > 0 && <div className="replay-court-bench-divider">벤치</div>}
-        {bench.map((p) => onCourtRow(p, false))}
+        <div className="table-scroll">
+          <table className="data-table replay-court-table">
+            <thead>{courtHeaderRow("top")}</thead>
+            <tbody>
+              {onCourtList.map((p) => onCourtRow(p, true))}
+              {bench.length > 0 && (
+                <tr className="bench-divider-row">
+                  <td colSpan={COURT_COLS}>벤치</td>
+                </tr>
+              )}
+              {bench.map((p) => onCourtRow(p, false))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
@@ -859,100 +925,6 @@ export default function GameReplay({
     );
   };
 
-  // 요청: "선수 기록과 인터랙티브 리플레이의 선수기록이 중복" - 독립 선수기록 패널(선발/벤치
-  // 구분선 있던)을 없애고 여기로 흡수시키면서 그 구분선도 같이 옮김.
-  //
-  // DNP 판정(요청 4-2) - 실측(Supabase game_player_stats 전체 100,921행): min_played는 null이
-  // 0건, 뛰지 않은 선수는 예외 없이 "0.00"으로 채워짐(S47G03N18 등 여러 경기로 재확인). 즉
-  // 새 로스터 조회가 필요한 "데이터 누락" 문제가 아니라 이미 있는 값을 다르게 렌더링하는
-  // 문제 - min_played가 0(또는 방어적으로 null)이면 스탯 칸 대신 DNP 행 하나로.
-  const isDnp = (p: PlayerMeta) => p.minPlayed == null || Number(p.minPlayed) === 0;
-  const jerseyNum = (p: PlayerMeta) => (p.backNum ? <span className="replay-jersey-num">#{p.backNum}</span> : null);
-  const plusMinusCell = (p: PlayerMeta) => {
-    const pm = finalPlusMinus.get(p.pcode) ?? 0;
-    return <td className={pm > 0 ? "replay-pm pos" : pm < 0 ? "replay-pm neg" : "replay-pm"}>{pm > 0 ? `+${pm}` : pm}</td>;
-  };
-  const BOX_COLS = 11; // 선수 1 + PTS/REB/AST/STL/BLK/TO/FG/3P/FT 9 + +/- 1
-  const boxHeaderRow = (key: string) => (
-    <tr key={key}>
-      <th>선수</th>
-      <th>PTS</th>
-      <th>REB</th>
-      <th>AST</th>
-      <th>STL</th>
-      <th>BLK</th>
-      <th>TO</th>
-      <th>FG</th>
-      <th>3P</th>
-      <th>FT</th>
-      <th>+/-</th>
-    </tr>
-  );
-  const playerRow = (p: PlayerMeta) => {
-    if (isDnp(p)) {
-      return (
-        <tr key={p.pcode} className="replay-dnp-row">
-          <td>
-            <Link href={`/players/${p.pcode}`}>{p.name}</Link> {jerseyNum(p)}
-          </td>
-          <td colSpan={BOX_COLS - 1} className="replay-dnp-label">
-            DNP - 감독 결정
-          </td>
-        </tr>
-      );
-    }
-    const b = box.get(p.pcode) ?? emptyBoxLine();
-    return (
-      <tr key={p.pcode}>
-        <td>
-          <Link href={`/players/${p.pcode}`}>{p.name}</Link> {jerseyNum(p)}
-        </td>
-        <td>{b.pts}</td>
-        <td>{b.reb}</td>
-        <td>{b.ast}</td>
-        <td>{b.stl}</td>
-        <td>{b.blk}</td>
-        <td>{b.to}</td>
-        <td>
-          {b.fgm}/{b.fga}
-        </td>
-        <td>
-          {b.threePM}/{b.threePA}
-        </td>
-        <td>
-          {b.ftm}/{b.fta}
-        </td>
-        {plusMinusCell(p)}
-      </tr>
-    );
-  };
-  const byLivePts = (a: PlayerMeta, b: PlayerMeta) => (box.get(b.pcode)?.pts ?? 0) - (box.get(a.pcode)?.pts ?? 0);
-  const boxTable = (list: PlayerMeta[]) => {
-    const starters = list.filter((p) => p.isStarter).sort(byLivePts);
-    const bench = list.filter((p) => !p.isStarter).sort(byLivePts);
-    return (
-      <div className="table-scroll">
-        <table className="data-table">
-          <thead>{boxHeaderRow("top")}</thead>
-          <tbody>
-            {starters.map(playerRow)}
-            {starters.length > 0 && bench.length > 0 && (
-              <>
-                <tr className="bench-divider-row">
-                  <td colSpan={BOX_COLS}>벤치</td>
-                </tr>
-                {/* 요청 4-3: "선수가 많아서 헷갈리니 벤치 위에도 헤더를 반복" - thead가 아니라
-                    tbody 안 tr(th 셀)로 그대로 반복. 위 boxHeaderRow와 완전히 같은 셀 구성. */}
-                {boxHeaderRow("bench")}
-              </>
-            )}
-            {bench.map(playerRow)}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
-
   return (
     <div className="panel replay-panel">
       {/* 푸시 알림 스택(요청 3) - position:fixed로 항상 문서 최상단에 떠서 어디에
@@ -1134,8 +1106,8 @@ export default function GameReplay({
       <div className="replay-court">
         <div className="panel-title">코트 위</div>
         <div className="replay-court-grid">
-          {onCourtColumn(homeTeam, homeOnCourt)}
-          {onCourtColumn(awayTeam, awayOnCourt)}
+          {onCourtColumn(homeTeam, homePlayers, homeOnCourt)}
+          {onCourtColumn(awayTeam, awayPlayers, awayOnCourt)}
         </div>
       </div>
 
@@ -1242,14 +1214,6 @@ export default function GameReplay({
       <WinProbLiveChart events={events} idx={idx} homeColor={homeTeam.color} />
 
       <div className="replay-cols">
-        <div>
-          <div className="report-section-title">홈 - {homeTeam.name}</div>
-          {boxTable(homePlayers)}
-          <div className="report-section-title" style={{ marginTop: 14 }}>
-            원정 - {awayTeam.name}
-          </div>
-          {boxTable(awayPlayers)}
-        </div>
         <div>
           <div className="report-section-title">플레이 바이 플레이</div>
           <div className="replay-poss-feed">

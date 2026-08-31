@@ -1537,53 +1537,57 @@ table.data-table td:nth-child(2) {
 }
 
 /* "코트 위" 패널(요청 - 지금 스크럽 시점 온코트 5인 + 벤치, 레퍼런스 courtside_template.html의
-   .player-row/.court-grid 이식). 위 .replay-lineups(M7 라인업 넷레이팅) 바로 위에 붙어 한
-   섹션처럼 읽히도록 같은 폭(640px, 2열 그리드) 컨벤션을 그대로 따름. */
+   .player-row/.court-grid 이식) - 위 .replay-lineups(M7 라인업 넷레이팅) 바로 위에 붙어 한
+   섹션처럼 읽히도록 같은 구분선/여백 컨벤션을 따름.
+   요청: "replay-court와 replay-cols(박스스코어)의 내용이 겹치니 합쳐서 replay-court만
+   나오도록" - 예전엔 이 패널이 "PTS FG만 보여주는 좁은 요약 리스트"(2열 그리드, max-width
+   640px)였는데, 박스스코어 표(PTS/REB/AST/STL/BLK/TO/FG/3P/FT/+-)를 흡수해서 온/오프까지
+   더한 12열 표가 됐음 - 좁은 640px 2열 그리드에 넣으면 열이 너무 빽빽해져서, 예전
+   박스스코어처럼 폭 제한 없이 팀별로 위아래(전체 폭)로 쌓는 레이아웃으로 전환.*/
 .replay-court {
-  max-width: 640px;
-  margin: 0 auto;
+  border-top: 1px solid rgba(var(--line-rgb), 0.1);
+  padding-top: 10px;
+  margin-top: 8px;
 }
 .replay-court-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 .replay-court-col-label {
   font-size: 11.5px;
   font-weight: 800;
   margin-bottom: 6px;
 }
-.replay-court-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 4px 4px;
-  border-radius: 6px;
+/* .data-table의 기본 "1·2번째 칸 왼쪽 정렬" 규칙(다른 표의 2열짜리 이름 칸 대응)은 여기선
+   2번째 칸이 PTS 숫자라 맞지 않음 - 이 표에서만 오른쪽 정렬로 되돌림. */
+.replay-court-table th:nth-child(2),
+.replay-court-table td:nth-child(2) {
+  text-align: right;
 }
 .replay-court-row.bench {
-  opacity: 0.5;
+  opacity: 0.55;
 }
 .replay-court-row.on-court .replay-court-pname-text {
-  font-weight: 600;
+  font-weight: 700;
 }
 /* MVP(⭐) 행 강조 - GAME LEADERS 등 이 컴포넌트 다른 곳과 같은 --gold/--gold-soft 톤. */
 .replay-court-row.top {
   background: var(--gold-soft);
-  border-left: 2px solid var(--gold);
 }
 .replay-court-row.top.bench {
-  opacity: 0.8;
+  opacity: 0.85;
 }
 .replay-court-pname {
   display: flex;
   align-items: center;
   gap: 4px;
   min-width: 0;
-  flex: 1 1 auto;
 }
 .replay-court-pname-text {
+  color: inherit;
   min-width: 0;
+  max-width: 120px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -1593,23 +1597,10 @@ table.data-table td:nth-child(2) {
   font-size: 10px;
   flex-shrink: 0;
 }
-.replay-court-stat-col {
-  text-align: right;
-  flex-shrink: 0;
-}
-.replay-court-stat {
-  display: block;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
-  color: var(--ink-soft);
-}
 /* 온/오프 넷레이팅(요청, player_onoff) - +/- 박스스코어 컬럼과 같은 --positive/--negative
    톤(팀 컬러가 아니라 "이 선수에게 좋았는지"만 나타내면 되므로 - .replay-pm.pos/neg와 같은
    컨벤션). 값이 없으면(표본 부족) 중립 --ink-faint로 "-" 표시. */
 .replay-court-onoff {
-  display: block;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
   color: var(--ink-faint);
 }
 .replay-court-onoff.pos {
@@ -1617,14 +1608,6 @@ table.data-table td:nth-child(2) {
 }
 .replay-court-onoff.neg {
   color: var(--negative);
-}
-.replay-court-bench-divider {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  letter-spacing: 0.05em;
-  padding: 8px 4px 4px;
 }
 
 .replay-controls {
