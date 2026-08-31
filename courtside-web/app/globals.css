@@ -189,13 +189,16 @@ select {
 
 /* 경기 카드 - 요청: "점수판 위치는 고정시키고 양 옆으로 대칭이 되도록(승패-팀이름-로고-
    점수-로고-팀이름-승패)". flex 레이아웃은 팀 이름 길이에 따라 스코어 위치가 흔들려서
-   (예: "안양 정관장" vs "DB") CSS Grid로 전환 - 이름 칸(minmax(0,1fr))이 양쪽 대칭이라
-   스코어 칸이 항상 정중앙 고정. */
+   (예: "안양 정관장" vs "DB") CSS Grid로 전환 - 이름 칸이 양쪽 대칭이라 스코어 칸이 항상
+   정중앙 고정. 요청: "간격이 너무 멀어, 더 작게 가운데 정렬로 붙여줘" - 이름 칸을 1fr(카드
+   전체 너비까지 늘어남)에서 고정폭으로 바꾸고 justify-content:center로 카드 안에서 행
+   자체를 가운데로 - 대칭 트릭(양쪽 칸 폭이 항상 같아야 스코어가 중앙 고정)은 그대로 유지. */
 .game-card-row {
   display: grid;
-  grid-template-columns: 52px 24px minmax(0, 1fr) 30px 76px 30px minmax(0, 1fr) 24px 64px;
+  grid-template-columns: 48px 22px minmax(0, 104px) 28px 72px 28px minmax(0, 104px) 22px 58px;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 4px;
 }
 
 .game-card-date {
@@ -324,12 +327,14 @@ select {
   font-family: "IBM Plex Mono", monospace;
 }
 
-/* MVP/분전/식스맨 3인 - 한 줄에 이어붙임(요청: "이긴팀 선수와 진팀의 선수, 그리고
-   식스맨 조커 선수까지 표시"). 승리팀=강조, 패배팀=톤 낮춤, 식스맨=골드(다른 AI 분석
-   배지와 같은 팔레트 재사용 - .ai-tag-comeback과 동일 톤). */
+/* MVP/분전/식스맨 3인 - 승리팀=강조, 패배팀=톤 낮춤, 식스맨=골드(다른 AI 분석 배지와
+   같은 팔레트 재사용 - .ai-tag-comeback과 동일 톤). 요청: "MVP를 길게 보여주지 말고
+   가시성 좋게 줄바꿈" - 예상/실제 승률 줄과 한 줄에 이어붙어 너무 길어지던 걸
+   flex-basis:100%로 강제 개행, 승률 줄과 분리된 자기 줄로. */
 .game-card-meta-mvps {
   display: flex;
   flex-wrap: wrap;
+  flex-basis: 100%;
   gap: 10px;
 }
 .game-card-mvp {

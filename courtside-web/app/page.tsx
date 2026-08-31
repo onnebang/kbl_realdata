@@ -135,6 +135,9 @@ export default async function HomePage({
                     {g.away_team?.abbr} {awayWinPct ? `${Math.round(awayWinPct.pct * 100)}%` : "-"}
                   </span>
                 )}
+                <Link href={`/games/${g.gmkey}`} className="game-card-detail-btn">
+                  경기 상세보기 →
+                </Link>
                 {(mvp?.winnerTop || mvp?.loserTop || mvp?.sixthMan) && (
                   <span className="game-card-meta-item game-card-meta-mvps">
                     {mvp?.winnerTop && (
@@ -154,9 +157,6 @@ export default async function HomePage({
                     )}
                   </span>
                 )}
-                <Link href={`/games/${g.gmkey}`} className="game-card-detail-btn">
-                  경기 상세보기 →
-                </Link>
               </div>
             </div>
           );

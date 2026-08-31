@@ -269,6 +269,53 @@
   margin-top: 8px;
 }
 
+/* 슛 임팩트 리포트 헤더 스탯 라인(PTS/TSA/PSA/USG%/MOREY%) - .statGrid/.statTile을 그대로
+   재사용(새 스타일 시스템 만들지 않음), 이 줄만 별도 클래스로 감싸서 아래 코트 차트와 간격만
+   다르게 줌. */
+.impactHeaderRow {
+  margin-bottom: 12px;
+}
+
+/* 유발 파울/어시스트/턴오버 - 좌표 데이터가 없어 코트 차트 대신 텍스트 카드로(패널 설명에
+   이유 기록). 카드 자체는 .statTile과 같은 톤(--surface-soft, Big Shoulders 숫자)을 쓰되,
+   숫자 하나가 아니라 "카운트 + 비율" 두 줄이라 레이아웃만 따로 둠. */
+.miniStatGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.miniStatCard {
+  background: var(--surface-soft);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.miniStatLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+}
+.miniStatMain {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.miniStatSub {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 3px;
+}
+.miniStatNote {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
 @media (max-width: 620px) {
   .header {
     flex-wrap: wrap;

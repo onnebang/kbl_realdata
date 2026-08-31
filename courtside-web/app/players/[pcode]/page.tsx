@@ -9,7 +9,16 @@ import {
   WINDOWS,
   type GameLogRow,
 } from "@/lib/playerProfile";
-import { getShotGrid, buildHeatmapSvg } from "@/lib/scoringExplorer";
+import {
+  fetchPlayerSeasonShots,
+  getZoneExpectedPts,
+  getPlayerSeasonBoxTotals,
+  countRimAndThreeFga,
+  buildHeaderStats,
+  buildImpactDots,
+  buildImpactCourtSvg,
+  computeDrawnFoulProxy,
+} from "@/lib/shotImpactChart";
 import { displayTeamName } from "@/lib/teamNames";
 import { TeamBadge } from "@/components/TeamBadge";
 import styles from "./player-profile.module.css";
@@ -110,8 +119,24 @@ export default async function PlayerPage({
   const headerTeamName = headerTeam ? displayTeamName(headerTeam.tcode, headerTeam.name, latestSeason) : null;
 
   const shotSeason = season ?? seasons[0]?.seasonName;
-  const shotGrid = shotSeason ? await getShotGrid("player", pcode, shotSeason) : null;
-  const shotSvg = shotGrid && shotGrid.totalAtt > 0 ? buildHeatmapSvg(shotGrid) : null;
+  let seasonShots: Awaited<ReturnType<typeof fetchPlayerSeasonShots>> = [];
+  let zoneExpectedPts: Awaited<ReturnType<typeof getZoneExpectedPts>> = new Map();
+  let boxTotals: Awaited<ReturnType<typeof getPlayerSeasonBoxTotals>> | null = null;
+  if (shotSeason) {
+    [seasonShots, zoneExpectedPts, boxTotals] = await Promise.all([
+      fetchPlayerSeasonShots(pcode, shotSeason),
+      getZoneExpectedPts(),
+      getPlayerSeasonBoxTotals(pcode, shotSeason),
+    ]);
+  }
+  const { rimFga, threeFga } = countRimAndThreeFga(seasonShots);
+  const headerStats = boxTotals ? buildHeaderStats(boxTotals, rimFga, threeFga) : null;
+  const impactDots = buildImpactDots(seasonShots, zoneExpectedPts);
+  const impactSvg = impactDots.length > 0 ? buildImpactCourtSvg(impactDots) : null;
+  const totalMade = seasonShots.filter((s) => s.made).length;
+  const drawnFoulProxy = boxTotals ? computeDrawnFoulProxy(boxTotals.fta, boxTotals.fga) : null;
+  const astPerGame = boxTotals && boxTotals.gp > 0 ? boxTotals.ast / boxTotals.gp : null;
+  const tovPerGame = boxTotals && boxTotals.gp > 0 ? boxTotals.tov / boxTotals.gp : null;
 
   return (
     <div className={`wrap ${styles.pageRoot}`}>
@@ -317,7 +342,7 @@ export default async function PlayerPage({
       </div>
 
       <div className={styles.panel}>
-        <div className={styles.panelTitle}>슛 분포</div>
+        <div className={styles.panelTitle}>슛 임팩트 리포트</div>
         <form className={styles.heatRow}>
           <label>시즌</label>
           <select name="season" defaultValue={shotSeason} className={styles.heatSelect} disabled={!seasons.length}>
@@ -335,20 +360,72 @@ export default async function PlayerPage({
             조회
           </button>
         </form>
+        {headerStats && (
+          <div className={`${styles.statGrid} ${styles.impactHeaderRow}`}>
+            {(
+              [
+                ["PTS", headerStats.pts.toLocaleString()],
+                ["TSA", headerStats.tsa.toFixed(1)],
+                ["PSA", headerStats.psa != null ? headerStats.psa.toFixed(2) : "-"],
+                ["USG%", headerStats.usgPct != null ? `${headerStats.usgPct.toFixed(1)}%` : "-"],
+                ["MOREY%", headerStats.moreyPct != null ? `${(headerStats.moreyPct * 100).toFixed(1)}%` : "-"],
+              ] as const
+            ).map(([label, val]) => (
+              <div className={styles.statTile} key={label}>
+                <div className={styles.sv}>{val}</div>
+                <div className={styles.sl}>{label}</div>
+              </div>
+            ))}
+          </div>
+        )}
         <div className={styles.courtTilt}>
+          {/* 점 하나 = 슛 하나(성공=채운 원/실패=테두리만, zoneCompare.ts 관례), 색은 그 슛이
+              존 기대값보다 이득(--positive)인지 손해(--negative)인지, 크기·불투명도는 그
+              잔차 크기 - lib/shotImpactChart.ts 참고. */}
           <svg
             className={styles.courtSvg}
             viewBox="345 27 375 357"
-            dangerouslySetInnerHTML={{ __html: shotSvg ?? "" }}
+            dangerouslySetInnerHTML={{ __html: impactSvg ?? "" }}
           />
         </div>
         <div className={styles.heatStat}>
-          {shotSvg && shotGrid
-            ? `${shotGrid.totalAtt.toLocaleString()}회 시도 · ${shotGrid.totalMade.toLocaleString()}회 성공 (${Math.round(
-                (shotGrid.totalMade / shotGrid.totalAtt) * 100
+          {impactSvg
+            ? `${seasonShots.length.toLocaleString()}회 시도 · ${totalMade.toLocaleString()}회 성공 (${Math.round(
+                (totalMade / seasonShots.length) * 100
               )}%)`
-            : "이 시즌 슛 표본 부족(30회 미만) 또는 데이터 없음"}
+            : "이 시즌 슛 데이터 없음"}
         </div>
+      </div>
+
+      <div className={styles.panel}>
+        <div className={styles.panelTitle}>유발 파울 · 어시스트 · 턴오버</div>
+        {boxTotals ? (
+          <div className={styles.miniStatGrid}>
+            <div className={styles.miniStatCard}>
+              <div className={styles.miniStatLabel}>유발 파울(추정)</div>
+              <div className={styles.miniStatMain}>{drawnFoulProxy!.fta.toLocaleString()}</div>
+              <div className={styles.miniStatSub}>
+                FTr {drawnFoulProxy!.ftr != null ? drawnFoulProxy!.ftr.toFixed(2) : "-"}
+              </div>
+              <div className={styles.miniStatNote}>
+                이벤트 로그(파울자유투)에는 "파울을 당한" 선수가 아니라 "파울을 범한" 선수만 기록돼
+                있어, 정확한 유발 파울 횟수 대신 자유투 시도 수(FTA)를 근사치로 표시 · FTr = FTA/FGA
+              </div>
+            </div>
+            <div className={styles.miniStatCard}>
+              <div className={styles.miniStatLabel}>어시스트</div>
+              <div className={styles.miniStatMain}>{boxTotals.ast.toLocaleString()}</div>
+              <div className={styles.miniStatSub}>{astPerGame != null ? `${astPerGame.toFixed(1)} / 경기` : "-"}</div>
+            </div>
+            <div className={styles.miniStatCard}>
+              <div className={styles.miniStatLabel}>턴오버</div>
+              <div className={styles.miniStatMain}>{boxTotals.tov.toLocaleString()}</div>
+              <div className={styles.miniStatSub}>{tovPerGame != null ? `${tovPerGame.toFixed(1)} / 경기` : "-"}</div>
+            </div>
+          </div>
+        ) : (
+          <div className="empty-note">이 시즌 기록 없음</div>
+        )}
       </div>
 
       <footer className="foot">

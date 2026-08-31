@@ -17,7 +17,9 @@ export const GRID = { cols: 15, rows: 15, xMin: 345, xMax: 720, yMin: 27, yMax: 
 // 스크립트가 DATA JSON을 구울 때 적용했던 것과 동일한 기준(minAttempts:30). 원본은 이 기준
 // 미달 시즌을 아예 DATA.entity.seasons에서 빼버려서 클라이언트가 그 시즌을 목록에서 볼 일이
 // 없었는데, 여기서도 같은 효과를 내려고 getEntitySeasonGrids가 미달 시즌을 결과에서 제외.
-const MIN_SAMPLE = 30;
+// export: lib/shotValueScatter.ts(리그 전체 슛 가치 산점도)도 같은 "표본 부족 컷오프"가
+// 필요해서 새로 정의하지 않고 그대로 재사용(기준을 사이트 전체에서 하나로 유지).
+export const MIN_SAMPLE = 30;
 
 export type GridCell = { row: number; col: number; att: number; made: number };
 export type GridResult = { cells: GridCell[]; totalAtt: number; totalMade: number };
@@ -58,7 +60,10 @@ async function fetchPageWithRetry<T>(
   throw new Error(`scoring-explorer: shot_log 페이지 조회 실패(range ${from}-${to}) - ${String(lastErr)}`);
 }
 
-async function fetchAllPagesBounded<T>(
+// export: lib/shotValueScatter.ts도 시즌 전체(전 선수) shot_log/game_player_stats를 한 번에
+// 끌어와야 해서(그 파일 상단 주석) 이 병렬 페이지네이션이 그대로 필요 - 같은 문제를 겪은 이
+// 파일의 해법을 재사용(중복 구현 금지).
+export async function fetchAllPagesBounded<T>(
   makeQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown; count?: number | null }>
 ): Promise<T[]> {
   const first = await fetchPageWithRetry(makeQuery, 0, PAGE - 1);

@@ -24,7 +24,9 @@ const ZONE_BOUNDS: [string, number, number][] = [
   ["three", THREE_PT_M, 999],
 ];
 
-function classifyShot(x: number, y: number, d: string): { zone: string; value: number } {
+// export: lib/shotImpactChart.ts(선수 슛 임팩트 리포트)가 존 분류를 그대로 재사용 - 존 경계가
+// 사이트 전체에서 하나로 유지되게(중복 정의 금지).
+export function classifyShot(x: number, y: number, d: string): { zone: string; value: number } {
   const [hx, hy] = d === "1" ? HOOP_RIGHT : HOOP_LEFT;
   const dist = Math.hypot(x - hx, y - hy) * SCALE_M_PER_UNIT;
   const value = dist >= THREE_PT_M ? 3 : 2;
