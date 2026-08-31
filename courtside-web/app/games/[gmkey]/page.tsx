@@ -9,7 +9,7 @@ import { getSeasonStatsAsOf, getRecentSchedule, getHeadToHead, getStandingsAsOf 
 import { type ShotRow } from "@/lib/zoneCompare";
 import { displayTeamName } from "@/lib/teamNames";
 import { collectAllOnCourtLineups, subComboKeys } from "@/lib/gameLineups";
-import { getLineupRatings, type LineupRating } from "@/lib/lineupNetRating";
+import { getLineupRatings, getPlayerOnOffRatings, type LineupRating, type PlayerOnOff } from "@/lib/lineupNetRating";
 import { TeamBadge } from "@/components/TeamBadge";
 import GameReplay from "@/components/GameReplay";
 
@@ -161,23 +161,62 @@ async function getShots(gmkey: string): Promise<(ShotRow & { quarter: string; pc
   return (data ?? []) as (ShotRow & { quarter: string; pcode: string | null })[];
 }
 
+// 요청: "팀별 색상을 해놨듯이, 스탯표에도 색상으로 비교" - 이 아래 바 차트들은 전부
+// --home/--away(고정 주황/파랑) 토큰을 썼는데, 팀 이름/스코어보드처럼 실제 팀 브랜드 색을
+// 쓰도록 변경. 다만 "색상이 비슷한 팀일 경우, 줄무늬로 다르다는 걸 체크" 요청 반영 - redmean
+// 색상거리 공식(단순 유클리드보다 사람 눈 인지에 가까움)으로 두 팀 색이 너무 가까우면
+// 원정 쪽만 대각선 줄무늬로 텍스처를 줘서 구분(예: 서울 SK #E4002B vs 안양 정관장 #C8102E는
+// 둘 다 빨강이라 거리 ~57로 트리거됨 - threshold는 실측 KBL 팀 색상표 기준으로 잡음).
+function hexToRgb(hex: string): [number, number, number] {
+  const clean = hex.replace("#", "");
+  return [parseInt(clean.slice(0, 2), 16) || 0, parseInt(clean.slice(2, 4), 16) || 0, parseInt(clean.slice(4, 6), 16) || 0];
+}
+function colorDistance(hex1: string, hex2: string): number {
+  const [r1, g1, b1] = hexToRgb(hex1);
+  const [r2, g2, b2] = hexToRgb(hex2);
+  const rMean = (r1 + r2) / 2;
+  const dr = r1 - r2,
+    dg = g1 - g2,
+    db = b1 - b2;
+  return Math.sqrt((2 + rMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rMean) / 256) * db * db);
+}
+const SIMILAR_COLOR_THRESHOLD = 90;
+// 원정 막대 배경 - 색이 비슷하면 팀 색 그대로 위에 흰색 대각선 줄무늬를 겹쳐서(그 팀 색 자체는
+// 유지한 채 질감만 다르게) 홈과 눈으로 구분되게. 안 비슷하면 그냥 단색.
+function awayFillBackground(homeColor: string, awayColor: string): string {
+  if (colorDistance(homeColor, awayColor) >= SIMILAR_COLOR_THRESHOLD) return awayColor;
+  return `repeating-linear-gradient(45deg, transparent 0 4px, rgba(255,255,255,0.45) 4px 8px), ${awayColor}`;
+}
+
 // 팀 스탯 바 비교 - courtside_template.html의 tsBarHtml/tsPctRow/tsCountRow(3387~3400행)를
 // 그대로 이식. 정밀 대조 전에는 이 자리가 그냥 숫자만 나열한 data-table이었는데, 원본은
 // 스탯마다 홈 막대(오른쪽 끝에서 왼쪽으로 자람)와 원정 막대(왼쪽 끝에서 오른쪽으로 자람)가
 // 가운데서 마주보는 형태 - .ts-row/.ts-nums/.ts-bar(globals.css)에 그 스타일을 그대로 추가.
-function tsBarRow(label: string, hVal: number, aVal: number, hDisp: ReactNode, aDisp: ReactNode) {
+function tsBarRow(
+  label: string,
+  hVal: number,
+  aVal: number,
+  hDisp: ReactNode,
+  aDisp: ReactNode,
+  hColor: string,
+  aColor: string
+) {
   const total = hVal + aVal;
   const hPct = total > 0 ? (hVal / total) * 100 : 50;
   return (
     <div className="ts-row" key={label}>
       <div className="ts-nums">
-        <span className="ts-home">{hDisp}</span>
+        <span className="ts-home" style={{ color: hColor }}>
+          {hDisp}
+        </span>
         <span className="ts-label">{label}</span>
-        <span className="ts-away">{aDisp}</span>
+        <span className="ts-away" style={{ color: aColor }}>
+          {aDisp}
+        </span>
       </div>
       <div className="ts-bar">
-        <div className="ts-bar-fill home" style={{ width: `${hPct}%` }} />
-        <div className="ts-bar-fill away" style={{ width: `${100 - hPct}%` }} />
+        <div className="ts-bar-fill" style={{ width: `${hPct}%`, background: hColor }} />
+        <div className="ts-bar-fill" style={{ width: `${100 - hPct}%`, background: awayFillBackground(hColor, aColor) }} />
       </div>
     </div>
   );
@@ -187,7 +226,7 @@ function tsBarRow(label: string, hVal: number, aVal: number, hDisp: ReactNode, a
 // 보였음. 이제 막대 "길이"는 두 팀의 시도(attempts) 합계 대비 비중으로 나누고, 그 안에서
 // "채워진 정도"만 성공률을 나타내도록 이중 구조로 변경 - 시도가 많은 쪽은 막대 자체가 길어져
 // 볼륨 차이가 먼저 눈에 들어오고, 그 안의 채움 비율로 효율을 따로 읽음.
-function tsPctRow(label: string, hMade: number, hAtt: number, aMade: number, aAtt: number) {
+function tsPctRow(label: string, hMade: number, hAtt: number, aMade: number, aAtt: number, hColor: string, aColor: string) {
   const hPct = fgPct(hMade, hAtt);
   const aPct = fgPct(aMade, aAtt);
   const totalAtt = hAtt + aAtt;
@@ -195,32 +234,35 @@ function tsPctRow(label: string, hMade: number, hAtt: number, aMade: number, aAt
   return (
     <div className="ts-row" key={label}>
       <div className="ts-nums">
-        <span className="ts-home">
+        <span className="ts-home" style={{ color: hColor }}>
           {hPct}% <span className="ts-raw">{hMade}-{hAtt}</span>
         </span>
         <span className="ts-label">{label}</span>
-        <span className="ts-away">
+        <span className="ts-away" style={{ color: aColor }}>
           <span className="ts-raw">{aMade}-{aAtt}</span> {aPct}%
         </span>
       </div>
       <div className="ts-bar">
-        <div className="ts-bar-seg home" style={{ width: `${hShare}%` }}>
-          <div className="ts-bar-seg-fill" style={{ width: `${hPct}%` }} />
+        <div className="ts-bar-seg" style={{ width: `${hShare}%` }}>
+          <div className="ts-bar-seg-fill" style={{ width: `${hPct}%`, right: 0, background: hColor }} />
         </div>
-        <div className="ts-bar-seg away" style={{ width: `${100 - hShare}%` }}>
-          <div className="ts-bar-seg-fill" style={{ width: `${aPct}%` }} />
+        <div className="ts-bar-seg" style={{ width: `${100 - hShare}%` }}>
+          <div
+            className="ts-bar-seg-fill"
+            style={{ width: `${aPct}%`, left: 0, background: awayFillBackground(hColor, aColor) }}
+          />
         </div>
       </div>
     </div>
   );
 }
-function tsCountRow(label: string, hVal: number, aVal: number) {
-  return tsBarRow(label, hVal, aVal, hVal, aVal);
+function tsCountRow(label: string, hVal: number, aVal: number, hColor: string, aColor: string) {
+  return tsBarRow(label, hVal, aVal, hVal, aVal, hColor, aColor);
 }
 // 요청: "시즌평균 비교를 그래프를 통해서 비교" - 표 대신 위 tsBarRow와 같은 다이버징 바.
 // 시즌 평균은 소수 1자리라 tsCountRow처럼 정수 그대로 쓰지 않고 toFixed(1) 문자열로 표시.
-function tsAvgRow(label: string, hVal: number, aVal: number) {
-  return tsBarRow(label, hVal, aVal, hVal.toFixed(1), aVal.toFixed(1));
+function tsAvgRow(label: string, hVal: number, aVal: number, hColor: string, aColor: string) {
+  return tsBarRow(label, hVal, aVal, hVal.toFixed(1), aVal.toFixed(1), hColor, aColor);
 }
 function fgPct(m: number | null | undefined, a: number | null | undefined) {
   const mm = m ?? 0,
@@ -248,6 +290,10 @@ export default async function GamePage({
 
   const homeTeam = teamStats.find((t) => t.tcode === game.home_team?.tcode);
   const awayTeam = teamStats.find((t) => t.tcode === game.away_team?.tcode);
+  // tsPctRow/tsCountRow/tsAvgRow(팀 스탯·시즌 평균 비교 바)에 공통으로 넘길 팀 색상 - 색이
+  // null인 경우는 사실상 없지만 타입상 대비.
+  const hColor = game.home_team?.color ?? "#888888";
+  const aColor = game.away_team?.color ?? "#888888";
 
   // 최대 리드(팀 스탯 바의 마지막 행) - courtside_template.html의 renderTeamStats()가
   // timeline을 훑어 계산하던 것과 동일하게 game_events 전체를 훑음.
@@ -379,6 +425,14 @@ export default async function GamePage({
     lineupRatings = Object.fromEntries(ratingsMap);
   }
 
+  // "코트 위" 패널의 온/오프 넷레이팅(요청) - 라인업 조합과 달리 이 경기 로스터 전원 pcode로
+  // 바로 조회(부분조합 전개 불필요). 스크럽 위치와 무관한 정적 값이라 서버에서 한 번만.
+  let playerOnOff: Record<string, PlayerOnOff> = {};
+  if (replayPlayers.length > 0) {
+    const onOffMap = await getPlayerOnOffRatings(replayPlayers.map((p) => p.pcode));
+    playerOnOff = Object.fromEntries(onOffMap);
+  }
+
   return (
     <div className="wrap">
       <Link href="/" className="back-link">
@@ -438,6 +492,7 @@ export default async function GamePage({
           homeNetRating={homeSeasonStats ? homeSeasonStats.ppg - homeSeasonStats.oppPpg : null}
           awayNetRating={awaySeasonStats ? awaySeasonStats.ppg - awaySeasonStats.oppPpg : null}
           lineupRatings={lineupRatings}
+          playerOnOff={playerOnOff}
         />
       )}
 
@@ -473,14 +528,14 @@ export default async function GamePage({
                   <span style={{ color: game.home_team?.color }}>{game.home_team?.name}</span>
                   <span style={{ color: game.away_team?.color }}>{game.away_team?.name}</span>
                 </div>
-                {tsAvgRow("경기당 득점", homeSeasonStats?.ppg ?? 0, awaySeasonStats?.ppg ?? 0)}
-                {tsAvgRow("경기당 실점", homeSeasonStats?.oppPpg ?? 0, awaySeasonStats?.oppPpg ?? 0)}
-                {tsAvgRow("3점 성공", homeSeasonStats?.threePg ?? 0, awaySeasonStats?.threePg ?? 0)}
-                {tsAvgRow("어시스트", homeSeasonStats?.astPg ?? 0, awaySeasonStats?.astPg ?? 0)}
-                {tsAvgRow("리바운드", homeSeasonStats?.rebPg ?? 0, awaySeasonStats?.rebPg ?? 0)}
-                {tsAvgRow("스틸", homeSeasonStats?.stlPg ?? 0, awaySeasonStats?.stlPg ?? 0)}
-                {tsAvgRow("블록", homeSeasonStats?.blkPg ?? 0, awaySeasonStats?.blkPg ?? 0)}
-                {tsAvgRow("턴오버", homeSeasonStats?.tovPg ?? 0, awaySeasonStats?.tovPg ?? 0)}
+                {tsAvgRow("경기당 득점", homeSeasonStats?.ppg ?? 0, awaySeasonStats?.ppg ?? 0, hColor, aColor)}
+                {tsAvgRow("경기당 실점", homeSeasonStats?.oppPpg ?? 0, awaySeasonStats?.oppPpg ?? 0, hColor, aColor)}
+                {tsAvgRow("3점 성공", homeSeasonStats?.threePg ?? 0, awaySeasonStats?.threePg ?? 0, hColor, aColor)}
+                {tsAvgRow("어시스트", homeSeasonStats?.astPg ?? 0, awaySeasonStats?.astPg ?? 0, hColor, aColor)}
+                {tsAvgRow("리바운드", homeSeasonStats?.rebPg ?? 0, awaySeasonStats?.rebPg ?? 0, hColor, aColor)}
+                {tsAvgRow("스틸", homeSeasonStats?.stlPg ?? 0, awaySeasonStats?.stlPg ?? 0, hColor, aColor)}
+                {tsAvgRow("블록", homeSeasonStats?.blkPg ?? 0, awaySeasonStats?.blkPg ?? 0, hColor, aColor)}
+                {tsAvgRow("턴오버", homeSeasonStats?.tovPg ?? 0, awaySeasonStats?.tovPg ?? 0, hColor, aColor)}
               </div>
             )}
 
@@ -617,16 +672,16 @@ export default async function GamePage({
         <div className="panel-title">팀 스탯</div>
         {homeTeam && awayTeam ? (
           <>
-            {tsPctRow("FG%", homeTeam.fgm ?? 0, homeTeam.fga ?? 0, awayTeam.fgm ?? 0, awayTeam.fga ?? 0)}
-            {tsPctRow("3PT%", homeTeam.tpm ?? 0, homeTeam.tpa ?? 0, awayTeam.tpm ?? 0, awayTeam.tpa ?? 0)}
-            {tsPctRow("FT%", homeTeam.ftm ?? 0, homeTeam.fta ?? 0, awayTeam.ftm ?? 0, awayTeam.fta ?? 0)}
-            {tsCountRow("턴오버", homeTeam.turnovers ?? 0, awayTeam.turnovers ?? 0)}
-            {tsCountRow("리바운드", homeTeam.reb ?? 0, awayTeam.reb ?? 0)}
-            {tsCountRow("어시스트", homeTeam.ast ?? 0, awayTeam.ast ?? 0)}
-            {tsCountRow("스틸", homeTeam.stl ?? 0, awayTeam.stl ?? 0)}
-            {tsCountRow("블록", homeTeam.blk ?? 0, awayTeam.blk ?? 0)}
-            {tsCountRow("파울", homeTeam.fouls ?? 0, awayTeam.fouls ?? 0)}
-            {tsCountRow("최대 리드", largestLeadHome, largestLeadAway)}
+            {tsPctRow("FG%", homeTeam.fgm ?? 0, homeTeam.fga ?? 0, awayTeam.fgm ?? 0, awayTeam.fga ?? 0, hColor, aColor)}
+            {tsPctRow("3PT%", homeTeam.tpm ?? 0, homeTeam.tpa ?? 0, awayTeam.tpm ?? 0, awayTeam.tpa ?? 0, hColor, aColor)}
+            {tsPctRow("FT%", homeTeam.ftm ?? 0, homeTeam.fta ?? 0, awayTeam.ftm ?? 0, awayTeam.fta ?? 0, hColor, aColor)}
+            {tsCountRow("턴오버", homeTeam.turnovers ?? 0, awayTeam.turnovers ?? 0, hColor, aColor)}
+            {tsCountRow("리바운드", homeTeam.reb ?? 0, awayTeam.reb ?? 0, hColor, aColor)}
+            {tsCountRow("어시스트", homeTeam.ast ?? 0, awayTeam.ast ?? 0, hColor, aColor)}
+            {tsCountRow("스틸", homeTeam.stl ?? 0, awayTeam.stl ?? 0, hColor, aColor)}
+            {tsCountRow("블록", homeTeam.blk ?? 0, awayTeam.blk ?? 0, hColor, aColor)}
+            {tsCountRow("파울", homeTeam.fouls ?? 0, awayTeam.fouls ?? 0, hColor, aColor)}
+            {tsCountRow("최대 리드", largestLeadHome, largestLeadAway, hColor, aColor)}
           </>
         ) : (
           <div className="empty-note">팀 스탯 데이터 없음</div>

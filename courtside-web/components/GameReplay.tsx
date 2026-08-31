@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import Link from "next/link";
 import { TeamBadge } from "./TeamBadge";
 import { buildCourtDotsSvg, shotValue, COURT_X, COURT_Y } from "@/lib/zoneCompare";
-import { findShootingStreaks, computeStatBursts, computeCurrentDroughts, fmtRating, gameWideTopPerformer, type GameEvent, type PlayerBox } from "@/lib/postgameReport";
+import { findShootingStreaks, computeStatBursts, computeCurrentDroughts, fmtRating, gameWideTopPerformer, type GameEvent, type PlayerBox, type StreakEvent } from "@/lib/postgameReport";
 import {
   buildRecentFeed,
   buildShotReliability,
@@ -18,7 +18,7 @@ import {
 } from "@/lib/possessionFeed";
 import { iGa } from "@/lib/josa";
 import { currentOnCourt, comboKey, computeFinalPlusMinus } from "@/lib/gameLineups";
-import type { LineupRating } from "@/lib/lineupNetRating";
+import type { LineupRating, PlayerOnOff } from "@/lib/lineupNetRating";
 
 // "코트사이드" 시그니처 기능(인터랙티브 리플레이/스크럽) 포팅 - courtside_template.html의
 // render(idx)/computeBoxScore/renderFeedGroups/renderCourt 등 약 90개 함수 중 핵심 스크럽
@@ -256,6 +256,7 @@ export default function GameReplay({
   homeNetRating,
   awayNetRating,
   lineupRatings,
+  playerOnOff,
 }: {
   events: GameEvent[];
   players: PlayerMeta[];
@@ -269,6 +270,9 @@ export default function GameReplay({
   // 요청: "현재 라인업 1~5인 조합과 넷레이팅" - page.tsx가 이 경기에서 실제로 나온 조합만
   // 미리 Supabase lineup_combo에서 조회해 넘김(combo_key -> rating, 서버 1회 조회).
   lineupRatings?: Record<string, LineupRating>;
+  // 요청: "코트 위 패널에 온/오프 넷레이팅" - lineupRatings와 같은 이유로 스크럽 위치와
+  // 무관한 정적 값이라 page.tsx가 player_onoff를 서버에서 한 번만 조회해 넘김.
+  playerOnOff?: Record<string, PlayerOnOff>;
 }) {
   const [idx, setIdx] = useState(events.length - 1);
   const [playing, setPlaying] = useState(false);
@@ -615,6 +619,65 @@ export default function GameReplay({
     return gameWideTopPerformer(asPlayerBox, finalRow.home_score, finalRow.away_score, homeTeam.tcode, awayTeam.tcode)?.pcode ?? null;
   }, [finalBox, players, events, homeTeam.tcode, awayTeam.tcode]);
 
+  // "코트 위" 패널(요청 - 지금 스크럽 시점 온코트 5인 + 벤치, 레퍼런스 courtside_template.html의
+  // renderCourt/playerRowHtml 이식). 온코트 판정은 위 homeOnCourt/awayOnCourt(currentOnCourt)를
+  // 그대로 재사용 - 별도 추적 로직을 새로 만들지 않음. 스트릭 배지도 위 flowChips가 이미 쓰는
+  // liveStreaks(findShootingStreaks, 최근 3분 이내 임계값 교차 이벤트)를 그대로 재사용 - 같은
+  // 선수가 최근 3분 안에 여러 번 교차했으면 마지막(가장 최근) 것만 배지에 반영.
+  const streakByPcode = useMemo(() => {
+    const m = new Map<string, StreakEvent>();
+    for (const s of liveStreaks) m.set(s.pcode, s);
+    return m;
+  }, [liveStreaks]);
+  const onCourtRow = (p: PlayerMeta, isOnCourt: boolean) => {
+    const b = box.get(p.pcode) ?? emptyBoxLine();
+    const streak = streakByPcode.get(p.pcode);
+    const onoff = playerOnOff?.[p.pcode];
+    const isTop = p.pcode === topPcode;
+    // 표본 부족(player_onoff에 이 pcode 행 자체가 없음) - 위 M7 라인업 넷레이팅의
+    // "표본 부족" 폴백과 같은 취지로 "-" 표시.
+    const onoffCls = onoff == null ? "" : onoff.netRatingPer40 > 0 ? "pos" : onoff.netRatingPer40 < 0 ? "neg" : "";
+    return (
+      <div className={`replay-court-row ${isOnCourt ? "on-court" : "bench"}${isTop ? " top" : ""}`} key={p.pcode}>
+        <span className="replay-court-pname">
+          {p.backNum && <span className="replay-jersey-num">#{p.backNum}</span>}
+          <span className="replay-court-pname-text">{p.name}</span>
+          {streak && (
+            <span className="replay-court-streak" title={`${Math.abs(streak.len)}연속 ${streak.len > 0 ? "성공" : "실패"}`}>
+              {streak.len > 0 ? "🔥" : "🧊"}×{Math.abs(streak.len)}
+            </span>
+          )}
+          {isTop && (
+            <span className="replay-court-mvp" title="이 경기 최고 활약">
+              ⭐
+            </span>
+          )}
+        </span>
+        <span className="replay-court-stat-col">
+          <span className="replay-court-stat">
+            {b.pts}점 {b.fgm}/{b.fga}
+          </span>
+          <span className={`replay-court-onoff ${onoffCls}`}>온/오프 {onoff ? fmtRating(onoff.netRatingPer40) : "-"}</span>
+        </span>
+      </div>
+    );
+  };
+  const onCourtColumn = (team: TeamMeta, onCourt: Set<string>) => {
+    const roster = players.filter((p) => p.tcode === team.tcode);
+    const onCourtList = roster.filter((p) => onCourt.has(p.pcode));
+    const bench = roster.filter((p) => !onCourt.has(p.pcode));
+    return (
+      <div className="replay-court-col" key={team.tcode}>
+        <div className="replay-court-col-label" style={{ color: team.color }}>
+          {team.name}
+        </div>
+        {onCourtList.map((p) => onCourtRow(p, true))}
+        {bench.length > 0 && <div className="replay-court-bench-divider">벤치</div>}
+        {bench.map((p) => onCourtRow(p, false))}
+      </div>
+    );
+  };
+
   const playerPhoto = (pcode: string | null, cls: string) => {
     const p = pcode ? playerByPcode.get(pcode) : undefined;
     if (!p) return <div className={`${cls}-fallback`}>?</div>;
@@ -918,18 +981,25 @@ export default function GameReplay({
           폴백이 stickySentinelRef를 지켜보다가 켬/끔). 아래 .replay-scoreboard는 이제 완전히
           평범한 카드 - 이 컴포넌트 안 어디서도 sticky를 쓰지 않음. */}
       <div className={`replay-sticky-bar${stickyVisible ? " show" : ""}`}>
-        <span className="replay-sticky-team" style={{ color: homeTeam.color }}>
-          {homeTeam.abbr} {row.home_score}
-        </span>
         {row.home_win_prob != null && (
-          <span className="replay-sticky-prob">
-            {Math.round(row.home_win_prob * 100)}% - {Math.round((1 - row.home_win_prob) * 100)}%
+          <span className="replay-sticky-prob" style={{ color: homeTeam.color }}>
+            {Math.round(row.home_win_prob * 100)}%
           </span>
         )}
-        <span className="replay-sticky-clock">{clockStr(row)}</span>
-        <span className="replay-sticky-team away" style={{ color: awayTeam.color }}>
-          {row.away_score} {awayTeam.abbr}
+        <span className="replay-sticky-team" style={{ color: homeTeam.color }}>
+          {homeTeam.abbr}
         </span>
+        <span className="replay-sticky-score">{row.home_score}</span>
+        <span className="replay-sticky-clock">{clockStr(row)}</span>
+        <span className="replay-sticky-score">{row.away_score}</span>
+        <span className="replay-sticky-team" style={{ color: awayTeam.color }}>
+          {awayTeam.abbr}
+        </span>
+        {row.home_win_prob != null && (
+          <span className="replay-sticky-prob" style={{ color: awayTeam.color }}>
+            {Math.round((1 - row.home_win_prob) * 100)}%
+          </span>
+        )}
       </div>
 
       <div className="replay-scoreboard">
@@ -1057,6 +1127,16 @@ export default function GameReplay({
             </div>
           );
         })}
+      </div>
+
+      {/* "코트 위" 패널을 M7 라인업 넷레이팅 바로 위에 붙여서 "지금 누가 뛰고 있고, 이 조합이
+          통산 얼마나 잘했는지"를 한 섹션처럼 읽히게 배치(요청). */}
+      <div className="replay-court">
+        <div className="panel-title">코트 위</div>
+        <div className="replay-court-grid">
+          {onCourtColumn(homeTeam, homeOnCourt)}
+          {onCourtColumn(awayTeam, awayOnCourt)}
+        </div>
       </div>
 
       {lineupRatings && (

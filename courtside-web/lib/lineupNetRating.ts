@@ -22,3 +22,32 @@ export async function getLineupRatings(comboKeys: string[]): Promise<Map<string,
   }
   return map;
 }
+
+// player_onoff - "코트 위" 패널의 선수별 온/오프 넷레이팅(요청, GameReplay.tsx). lineup_combo와
+// 달리 조합이 아니라 선수 1인당 한 행(스키마는 Supabase MCP로 직접 확인: pcode, seconds,
+// minutes, stints, pts_for, pts_against, net_rating_per40 - combo_key/n/pcodes 배열 없음).
+// 스크럽 위치와 무관한 정적 값이라 page.tsx가 한 번만 조회해 prop으로 내려줌.
+export type PlayerOnOff = { seconds: number; minutes: number; stints: number; ptsFor: number; ptsAgainst: number; netRatingPer40: number };
+
+export async function getPlayerOnOffRatings(pcodes: string[]): Promise<Map<string, PlayerOnOff>> {
+  if (!pcodes.length) return new Map();
+  const map = new Map<string, PlayerOnOff>();
+  for (let i = 0; i < pcodes.length; i += 200) {
+    const chunk = pcodes.slice(i, i + 200);
+    const { data } = await supabase
+      .from("player_onoff")
+      .select("pcode, seconds, minutes, stints, pts_for, pts_against, net_rating_per40")
+      .in("pcode", chunk);
+    for (const r of data ?? []) {
+      map.set(r.pcode, {
+        seconds: r.seconds,
+        minutes: r.minutes,
+        stints: r.stints,
+        ptsFor: r.pts_for,
+        ptsAgainst: r.pts_against,
+        netRatingPer40: r.net_rating_per40,
+      });
+    }
+  }
+  return map;
+}
