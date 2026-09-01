@@ -55,57 +55,129 @@
   --line-rgb: 242, 243, 247;
 }
 
-/* 선수 헤더 */
-.header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 16px;
-  padding: 18px 20px;
+/* ── 히어로: "데이터가 곧 아트" 포스터 밴드(sportsjobs.online 레퍼런스 적응) ──────────
+   테마와 무관한 위임적 다크 - 라이트/다크 모두에서 동일하게 보이도록 모든 색을 여기서
+   직접 칠함(테마 토큰 var(--ink) 등을 히어로 안에서 쓰지 않음). --hero-team은 page.tsx가
+   인라인 스타일로 주입하는 팀 컬러. */
+.hero {
+  --hero-team: #d9640a;
+  --hero-ink: #f4f5f8;
+  --hero-ink-soft: rgba(244, 245, 248, 0.72);
+  --hero-ink-faint: rgba(244, 245, 248, 0.42);
+  /* 별자리 점 색 - color-mix 미지원 브라우저 폴백을 먼저 선언(성공=팀색+흰색, 실패=팀색). */
+  --hero-dot: #d9640a;
+  --hero-dot: color-mix(in srgb, var(--hero-team) 80%, #ffffff);
+  --hero-dot-made: #ffc9a3;
+  --hero-dot-made: color-mix(in srgb, var(--hero-team) 45%, #ffffff);
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
   margin-top: 18px;
-}
-.numBox {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  background: var(--surface-soft);
+  min-height: 320px;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-end;
+  background: #0b0d12;
+  background: linear-gradient(
+    128deg,
+    color-mix(in srgb, var(--hero-team) 24%, #0b0d12) 0%,
+    #0b0d12 52%,
+    color-mix(in srgb, var(--hero-team) 10%, #0b0d12) 100%
+  );
+  color: var(--hero-ink);
+}
+/* 배경 아트: 커리어 슛 별자리(오른쪽 반코트) - 콘텐츠 뒤 레이어. */
+.heroArt {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.9;
+}
+/* 두 번째 모티프: 시즌 PPG 궤적 폴리라인(아주 옅게, 밴드 하단). */
+.heroArc {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 90px;
+  height: 72px;
+  width: 100%;
+  opacity: 0.16;
+  pointer-events: none;
+}
+/* 텍스트 가독성용 스크림 - 왼쪽 아래로 갈수록 어둡게. */
+.heroScrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(78deg, rgba(6, 8, 12, 0.88) 0%, rgba(6, 8, 12, 0.44) 46%, rgba(6, 8, 12, 0.05) 78%);
+}
+/* 등번호 - Big Shoulders Display는 한글 글리프가 없지만 숫자 전용이라 안전(사이트 관례). */
+.heroNum {
+  position: absolute;
+  top: -14px;
+  right: 12px;
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 22px;
   font-weight: 800;
-  color: var(--ink-faint);
-  flex-shrink: 0;
+  font-size: clamp(110px, 22vw, 200px);
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 2px rgba(244, 245, 248, 0.22);
+  letter-spacing: -0.02em;
+  pointer-events: none;
+  user-select: none;
 }
-.nameBlock {
-  flex: 1;
-  min-width: 0;
+.heroContent {
+  position: relative;
+  padding: 30px 28px 24px;
+  width: 100%;
 }
-.name {
-  /* 템플릿 원본은 .p-name에 Big Shoulders Display를 쓰지만, 이 값은 선수의 한글 이름
-     (예: "허훈")이라 그 폰트엔 한글 글리프가 없어 조용히 sans-serif로 폴백되는 실측
-     버그가 있음 - Pretendard로 교체하고 굵기/크기로 동일한 무게감만 재현. */
+.heroKicker {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--hero-ink-faint);
+  margin-bottom: 8px;
+}
+.heroName {
+  /* 한글 이름 - Big Shoulders에 한글 글리프가 없어(실측 버그 이력) Pretendard 800으로. */
   font-family: "Pretendard", system-ui, -apple-system, sans-serif;
   font-weight: 800;
-  font-size: 22px;
-  line-height: 1.1;
+  font-size: clamp(34px, 6vw, 54px);
+  line-height: 1.02;
+  margin: 0 0 10px;
+  letter-spacing: -0.01em;
 }
-.meta {
+.heroMeta {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 5px;
-  font-size: 12px;
-  color: var(--ink-soft);
+  flex-wrap: wrap;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--hero-ink-soft);
 }
-.gp {
+.heroMetaDot {
+  color: var(--hero-ink-faint);
+}
+.heroStatRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(244, 245, 248, 0.14);
+}
+.heroStatVal {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 34px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.heroStatLabel {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11.5px;
-  color: var(--ink-faint);
-  flex-shrink: 0;
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--hero-ink-faint);
+  margin-top: 4px;
 }
 
 /* 윈도우 토글 */
@@ -316,8 +388,159 @@
   line-height: 1.4;
 }
 
+/* ── 리그 퍼센타일 프로필(NBA.com식 가로 바) ─────────────────────────────────────── */
+.pctGrid {
+  display: grid;
+  gap: 8px;
+}
+.pctRow {
+  display: grid;
+  grid-template-columns: 44px 1fr 58px 30px;
+  align-items: center;
+  gap: 10px;
+}
+.pctLabel {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.pctTrack {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+.pctFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  opacity: 0.9;
+}
+/* 리그 중앙값(50) 눈금 - 바가 어디쯤인지 즉시 읽히게. */
+.pctMid {
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  bottom: -1px;
+  width: 1px;
+  background: rgba(var(--line-rgb), 0.28);
+}
+.pctValue {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  text-align: right;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.pctNum {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pctNote {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+/* ── 슈팅 DNA ─────────────────────────────────────────────────────────────────── */
+.dnaSvg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.dnaSingleBar {
+  display: flex;
+  height: 26px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dnaLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 8px;
+}
+.dnaLegend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ── 클러치 시그니처 순간 카드 ────────────────────────────────────────────────── */
+.momentList {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.momentCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  text-decoration: none;
+  color: var(--ink);
+  border: 1px solid transparent;
+}
+.momentCard:hover {
+  border-color: rgba(var(--line-rgb), 0.2);
+}
+.momentWpa {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  flex-shrink: 0;
+  min-width: 74px;
+  font-variant-numeric: tabular-nums;
+}
+.momentText {
+  flex: 1;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.momentGo {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  flex-shrink: 0;
+}
+
+/* ── 시너지 - 2인 조합 카드는 miniStatCard를 링크로 재사용 ─────────────────────── */
+.comboCard {
+  text-decoration: none;
+  color: var(--ink);
+  border: 1px solid transparent;
+  display: block;
+}
+.comboCard:hover {
+  border-color: rgba(var(--line-rgb), 0.2);
+}
+
+/* ── 커리어 아크 ─────────────────────────────────────────────────────────────── */
+.arcSvg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
 @media (max-width: 620px) {
-  .header {
-    flex-wrap: wrap;
+  .heroStatRow {
+    gap: 18px;
+  }
+  .heroContent {
+    padding: 24px 18px 18px;
+  }
+  .pctRow {
+    grid-template-columns: 40px 1fr 52px 26px;
+    gap: 7px;
   }
 }

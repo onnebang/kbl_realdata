@@ -39,6 +39,11 @@ export type SeasonLine = {
   fgPct: number | null;
   tpPct: number | null;
   ftPct: number | null;
+  // 히어로 헤드라인 TS% 계산용 - TS% = PPG / (2*(FGA/G + TPA/G + 0.44*FTA/G)). 이 DB의
+  // fga는 "2점 시도만"(프로젝트 관례, lib/shotImpactChart.ts 주석)이라 3점(tpa)을 따로 합산.
+  fgaPg: number;
+  tpaPg: number;
+  ftaPg: number;
 };
 
 export type GameLogRow = {
@@ -161,6 +166,9 @@ export async function getPlayerCareerBySeason(pcode: string): Promise<{ seasons:
         fgPct: fga > 0 ? fgm / fga : null,
         tpPct: tpa > 0 ? tpm / tpa : null,
         ftPct: fta > 0 ? ftm / fta : null,
+        fgaPg: fga / gp,
+        tpaPg: tpa / gp,
+        ftaPg: fta / gp,
       };
     })
     .sort((a, b) => (a.seasonName < b.seasonName ? 1 : -1));

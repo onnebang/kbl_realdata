@@ -1,0 +1,485 @@
+/* 팀 프로필 대개편 - app/players/[pcode]/player-profile.module.css와 같은 디자인 언어를
+   페이지 스코프 CSS Module로(전역 globals.css는 건드리지 않음). 토큰 중복 정의 이유도
+   동일: 문서 전체 :root를 건드리지 않기 위해 이 페이지 래퍼(.pageRoot)에 스코프. */
+.pageRoot {
+  --bg: #f4f5f8;
+  --surface: #ffffff;
+  --surface-soft: #eceef3;
+  --ink: #14161c;
+  --ink-soft: #5b5f6e;
+  --ink-faint: #9297a880;
+  --home: #d9640a;
+  --home-soft: #d9640a1a;
+  --away: #1f6fd6;
+  --away-soft: #1f6fd61a;
+  --gold: #9a6b00;
+  --gold-soft: #9a6b0022;
+  --positive: #1a7f37;
+  --negative: #c0392b;
+  --line-rgb: 20, 22, 28;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pageRoot {
+    --bg: #0f1115;
+    --surface: #1a1d24;
+    --surface-soft: #23272f;
+    --ink: #f2f3f7;
+    --ink-soft: #9297a8;
+    --ink-faint: #6a6f7f90;
+    --home: #ff8a3d;
+    --home-soft: #ff8a3d26;
+    --away: #3ea6ff;
+    --away-soft: #3ea6ff26;
+    --gold: #ffd166;
+    --gold-soft: #ffd16626;
+    --positive: #4ade80;
+    --negative: #f87171;
+    --line-rgb: 242, 243, 247;
+  }
+}
+:root[data-theme="dark"] .pageRoot {
+  --bg: #0f1115;
+  --surface: #1a1d24;
+  --surface-soft: #23272f;
+  --ink: #f2f3f7;
+  --ink-soft: #9297a8;
+  --ink-faint: #6a6f7f90;
+  --home: #ff8a3d;
+  --home-soft: #ff8a3d26;
+  --away: #3ea6ff;
+  --away-soft: #3ea6ff26;
+  --gold: #ffd166;
+  --gold-soft: #ffd16626;
+  --positive: #4ade80;
+  --negative: #f87171;
+  --line-rgb: 242, 243, 247;
+}
+
+/* ── 히어로: 팀 시즌 슛 별자리 포스터(위임적 다크 - 선수 프로필 히어로와 동일 원칙:
+   라이트/다크 모두에서 같은 모습, 모든 색을 직접 칠함). --hero-team은 page.tsx가 인라인
+   스타일로 주입하는 팀 컬러. */
+.hero {
+  --hero-team: #d9640a;
+  --hero-ink: #f4f5f8;
+  --hero-ink-soft: rgba(244, 245, 248, 0.72);
+  --hero-ink-faint: rgba(244, 245, 248, 0.42);
+  --hero-dot: #d9640a;
+  --hero-dot: color-mix(in srgb, var(--hero-team) 80%, #ffffff);
+  --hero-dot-made: #ffc9a3;
+  --hero-dot-made: color-mix(in srgb, var(--hero-team) 45%, #ffffff);
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  margin-top: 18px;
+  min-height: 320px;
+  display: flex;
+  align-items: flex-end;
+  background: #0b0d12;
+  background: linear-gradient(
+    128deg,
+    color-mix(in srgb, var(--hero-team) 24%, #0b0d12) 0%,
+    #0b0d12 52%,
+    color-mix(in srgb, var(--hero-team) 10%, #0b0d12) 100%
+  );
+  color: var(--hero-ink);
+}
+.heroArt {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.9;
+}
+.heroScrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(78deg, rgba(6, 8, 12, 0.88) 0%, rgba(6, 8, 12, 0.44) 46%, rgba(6, 8, 12, 0.05) 78%);
+}
+/* 거대 팀 약어 - Big Shoulders Display는 라틴/숫자 전용 폰트라 약어(LG/KCC 등)는 안전
+   (한글 팀명은 아래 .heroName에서 Pretendard로). */
+.heroAbbr {
+  position: absolute;
+  top: -14px;
+  right: 12px;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: clamp(96px, 20vw, 190px);
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 2px rgba(244, 245, 248, 0.22);
+  letter-spacing: -0.02em;
+  pointer-events: none;
+  user-select: none;
+}
+.heroContent {
+  position: relative;
+  padding: 30px 28px 24px;
+  width: 100%;
+}
+.heroKicker {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--hero-ink-faint);
+  margin-bottom: 8px;
+}
+.heroName {
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-weight: 800;
+  font-size: clamp(32px, 6vw, 52px);
+  line-height: 1.02;
+  margin: 0 0 10px;
+  letter-spacing: -0.01em;
+}
+.heroMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--hero-ink-soft);
+}
+.heroMetaDot {
+  color: var(--hero-ink-faint);
+}
+.heroStatRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(244, 245, 248, 0.14);
+}
+.heroStatVal {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 34px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.heroStatLabel {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--hero-ink-faint);
+  margin-top: 4px;
+}
+
+/* 시즌 셀렉터(기존 기능 유지 - 쿼리 파라미터 관례) */
+.seasonForm {
+  margin-top: 18px;
+  display: flex;
+  gap: 8px;
+}
+.seasonSelect {
+  font-family: "Pretendard", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.panel {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+.panelTitle {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 10px;
+}
+.pctNote {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  margin-top: 10px;
+  line-height: 1.5;
+}
+.sw {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* ── 4팩터 vs 리그 - 선수 퍼센타일 바와 같은 시각 언어(가로 바 + 리그 평균 눈금).
+   값 컬럼이 "값 (리그평균)"까지 담느라 선수판보다 넓음. */
+.ffSideTitle {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+  margin: 12px 0 6px;
+}
+.ffSideTitle:first-of-type {
+  margin-top: 0;
+}
+.pctGrid {
+  display: grid;
+  gap: 8px;
+}
+.pctRow {
+  display: grid;
+  grid-template-columns: 48px 1fr 108px 34px;
+  align-items: center;
+  gap: 10px;
+}
+.pctLabel {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.pctTrack {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+.pctFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  opacity: 0.9;
+}
+.pctMid {
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  bottom: -1px;
+  width: 1px;
+  background: rgba(var(--line-rgb), 0.28);
+}
+.pctValue {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  text-align: right;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pctValueAvg {
+  color: var(--ink-faint);
+}
+.pctNum {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── 시즌 여정 차트 ────────────────────────────────────────────────────────────── */
+.journeySvg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.journeyLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
+.journeyLegend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ── 로스터 기여도 ─────────────────────────────────────────────────────────────── */
+.rosterGrid {
+  display: grid;
+  gap: 6px;
+}
+.rosterRow {
+  display: grid;
+  grid-template-columns: minmax(96px, 150px) 1fr 44px 44px 58px;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.rosterRow:hover {
+  background: var(--surface-soft);
+}
+.rosterHead {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.rosterHead:hover {
+  background: none;
+}
+.rosterName {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.rosterNameMain {
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rosterPos {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  flex-shrink: 0;
+}
+.rosterBarTrack {
+  position: relative;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+.rosterBarFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--home);
+  opacity: 0.85;
+}
+.rosterCell {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.rosterWpa {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 베스트 유닛 카드 ──────────────────────────────────────────────────────────── */
+.unitGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+.unitCard {
+  background: var(--surface-soft);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.unitLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+}
+.unitNames {
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.unitSub {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 5px;
+}
+
+/* ── 슛 프로필(존 구성비 vs 리그) ──────────────────────────────────────────────── */
+.zoneGrid {
+  display: grid;
+  gap: 10px;
+}
+.zoneRow {
+  display: grid;
+  grid-template-columns: 44px 1fr 96px;
+  align-items: center;
+  gap: 10px;
+}
+.zoneLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.zoneBars {
+  display: grid;
+  gap: 3px;
+}
+.zoneBarTrack {
+  position: relative;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+.zoneBarTeam {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--home);
+  opacity: 0.9;
+}
+.zoneBarLeague {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--ink-faint);
+  opacity: 0.55;
+}
+.zoneValue {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.zoneDelta {
+  font-weight: 700;
+}
+
+/* 스케줄 테이블 보조(기존 전역 클래스 sched-result 재사용) */
+.schedOppCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 620px) {
+  .heroStatRow {
+    gap: 18px;
+  }
+  .heroContent {
+    padding: 24px 18px 18px;
+  }
+  .pctRow {
+    grid-template-columns: 42px 1fr 92px 30px;
+    gap: 7px;
+  }
+  .rosterRow {
+    grid-template-columns: minmax(80px, 120px) 1fr 40px 52px;
+  }
+  .rosterRpgHide {
+    display: none;
+  }
+}
