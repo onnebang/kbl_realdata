@@ -89,6 +89,17 @@ export function fmtDuration(sec: number): string {
 export function clockStr(e: Pick<GameEvent, "quarter" | "clock_min" | "clock_sec">): string {
   return `${e.quarter} ${e.clock_min}:${String(e.clock_sec).padStart(2, "0")}`;
 }
+
+// Feature("AI 코트사이드 리포트에서 시간 언급을 클릭하면 리플레이가 그 순간으로 이동") - 이
+// 파일이 만드는 문장은 거의 전부 특정 game_events 행(row)에서 나온 것이라(호출부가 이미 그
+// 행/인덱스를 들고 있음), clockStr()로 시간 텍스트를 만드는 자리마다 이 헬퍼로 감싸기만 하면
+// 됨. 결과는 순수 HTML 문자열(이 파일 전체가 dangerouslySetInnerHTML로 렌더되는 문자열 빌더라
+// React 이벤트를 못 붙임) - components/GameReplay.tsx가 document 클릭 위임으로 이 idx를
+// 읽어 setIdx()를 호출(zoneCompare.ts의 buildCourtDotsSvg가 슛 차트 점에 붙이는
+// data-jump-idx와 동일한 컨벤션을 공유 - 리스너 하나로 두 기능 다 처리).
+function jumpLink(idx: number, text: string): string {
+  return `<a href="#" class="report-jump-link" data-jump-idx="${idx}">${text}</a>`;
+}
 export function fmtRating(r: number): string {
   return `${r > 0 ? "+" : ""}${r.toFixed(1)}`;
 }
@@ -483,9 +494,9 @@ function findBestSixthManSpark(
   events: GameEvent[],
   box: PlayerBox[],
   homeTcode: string
-): { row: GameEvent; pcode: string; spark: SubSpark } | null {
+): { idx: number; row: GameEvent; pcode: string; spark: SubSpark } | null {
   const boxByPcode = new Map(box.map((b) => [b.pcode, b]));
-  let best: { row: GameEvent; pcode: string; spark: SubSpark } | null = null;
+  let best: { idx: number; row: GameEvent; pcode: string; spark: SubSpark } | null = null;
   for (let i = 1; i < events.length; i++) {
     const row = events[i];
     if (row.action_code !== SUB_IN_CODE || !row.pcode) continue;
@@ -494,20 +505,20 @@ function findBestSixthManSpark(
     const spark = computeSubSpark(events, row, homeTcode);
     if (!spark || spark.delta <= 0) continue;
     if (spark.beforeDur < SUB_SPARK_MIN_SAMPLE_SEC || spark.afterDur < SUB_SPARK_MIN_SAMPLE_SEC) continue;
-    if (!best || spark.delta > best.spark.delta) best = { row, pcode: row.pcode, spark };
+    if (!best || spark.delta > best.spark.delta) best = { idx: i, row, pcode: row.pcode, spark };
   }
   return best;
 }
 
-function findNotableSubSparks(events: GameEvent[], homeTcode: string): { row: GameEvent; pcode: string; spark: SubSpark }[] {
-  const out: { row: GameEvent; pcode: string; spark: SubSpark }[] = [];
+function findNotableSubSparks(events: GameEvent[], homeTcode: string): { idx: number; row: GameEvent; pcode: string; spark: SubSpark }[] {
+  const out: { idx: number; row: GameEvent; pcode: string; spark: SubSpark }[] = [];
   for (let i = 1; i < events.length; i++) {
     const row = events[i];
     if (row.action_code !== SUB_IN_CODE || !row.pcode) continue;
     const spark = computeSubSpark(events, row, homeTcode);
     if (!spark) continue;
     if (spark.beforeDur < SUB_SPARK_MIN_SAMPLE_SEC || spark.afterDur < SUB_SPARK_MIN_SAMPLE_SEC) continue;
-    if (Math.abs(spark.delta) >= SUB_SPARK_NOTABLE_THRESHOLD) out.push({ row, pcode: row.pcode, spark });
+    if (Math.abs(spark.delta) >= SUB_SPARK_NOTABLE_THRESHOLD) out.push({ idx: i, row, pcode: row.pcode, spark });
   }
   return out;
 }
@@ -599,7 +610,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
         const beneficiary = homeBenefits ? homeTname : awayTname;
         const beforeProb = Math.round((homeBenefits ? beforeHomeProb : 1 - beforeHomeProb) * 100);
         const afterProb = Math.round((homeBenefits ? afterHomeProb : 1 - afterHomeProb) * 100);
-        return `<li>${clockStr(row)}, ${row.home_score}-${row.away_score} 상황 ${row.player_name}의 ${row.action_label} - ${beneficiary} 승률 ${beforeProb}%→${afterProb}%로 상승.</li>`;
+        return `<li>${jumpLink(s.idx, clockStr(row))}, ${row.home_score}-${row.away_score} 상황 ${row.player_name}의 ${row.action_label} - ${beneficiary} 승률 ${beforeProb}%→${afterProb}%로 상승.</li>`;
       })
       .join("");
     sections.push({ title: "결정적 장면들", html: `<ul class="report-list">${items}</ul>` });
@@ -612,7 +623,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     if (best) {
       sections.push({
         title: "AI 선정 베스트 장면",
-        html: `<p class="report-text">✨ ${clockStr(best.row)}, ${best.row.player_name}의 ${best.row.action_label} - 이 경기에서 가장 짜릿했던 순간.</p>`,
+        html: `<p class="report-text">✨ ${jumpLink(best.idx, clockStr(best.row))}, ${best.row.player_name}의 ${best.row.action_label} - 이 경기에서 가장 짜릿했던 순간.</p>`,
       });
     }
   }
@@ -634,7 +645,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       sections.push({
         title: "극적인 흐름",
         html:
-          `<p class="report-text">⚡ ${clockStr(fromRow)}부터 ${clockStr(toRow)}까지, 단 ${fmtDuration(dramatic.durationSec)} 만에 ${beneficiary} 승률이 ${fromPct}%에서 ${toPct}%로 요동침` +
+          `<p class="report-text">⚡ ${jumpLink(dramatic.startIdx, clockStr(fromRow))}부터 ${jumpLink(dramatic.endIdx, clockStr(toRow))}까지, 단 ${fmtDuration(dramatic.durationSec)} 만에 ${beneficiary} 승률이 ${fromPct}%에서 ${toPct}%로 요동침` +
           `(이 구간 ${homeTname} ${homeGain}점, ${awayTname} ${awayGain}점) - ` +
           `${beneficiary}${iGa(beneficiary)} 이 짧은 구간에 경기 흐름을 완전히 뒤집어놓음.</p>`,
       });
@@ -650,7 +661,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       const { delta, afterDur, homeGain, awayGain } = sixthMan.spark;
       sections.push({
         title: "이 경기의 식스맨",
-        html: `<p class="report-text">🔋 <b>${p?.name ?? ""}</b>${iGa(p?.name ?? "")} ${clockStr(sixthMan.row)} 투입된 뒤 팀 흐름이 확실히 좋아짐(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${homeTname} ${homeGain}점 · ${awayTname} ${awayGain}점) - 이 경기 최고의 벤치 임팩트.</p>`,
+        html: `<p class="report-text">🔋 <b>${p?.name ?? ""}</b>${iGa(p?.name ?? "")} ${jumpLink(sixthMan.idx, clockStr(sixthMan.row))} 투입된 뒤 팀 흐름이 확실히 좋아짐(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${homeTname} ${homeGain}점 · ${awayTname} ${awayGain}점) - 이 경기 최고의 벤치 임팩트.</p>`,
       });
     }
   }
@@ -664,7 +675,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
         .map((b) => {
           const p = boxByPcode.get(b.key);
           const name = p?.name ?? b.key;
-          return `<li>${name}${iGa(name)} ${b.label} ${b.count}개를 ${fmtDuration(b.durationSec)} 만에 몰아침(${clockStr(b.startRow)}~${clockStr(b.endRow)}).</li>`;
+          return `<li>${name}${iGa(name)} ${b.label} ${b.count}개를 ${fmtDuration(b.durationSec)} 만에 몰아침(${jumpLink(b.startIdx, clockStr(b.startRow))}~${jumpLink(b.endIdx, clockStr(b.endRow))}).</li>`;
         })
         .join("");
       sections.push({ title: "스탯 폭발", html: `<ul class="report-list">${items}</ul>` });
@@ -683,14 +694,14 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       const dir = s.spark.delta > 0 ? "좋아짐" : "나빠짐";
       const { delta, afterDur, homeGain, awayGain } = s.spark;
       items.push(
-        `<li>${name}${iGa(name)} ${clockStr(s.row)} 투입된 뒤 팀 흐름이 뚜렷하게 ${dir}(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${homeTname} ${homeGain}점 · ${awayTname} ${awayGain}점).</li>`
+        `<li>${name}${iGa(name)} ${jumpLink(s.idx, clockStr(s.row))} 투입된 뒤 팀 흐름이 뚜렷하게 ${dir}(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${homeTname} ${homeGain}점 · ${awayTname} ${awayGain}점).</li>`
       );
     }
     for (const fe of findFoulTroubleEvents(events)) {
       const runInfo = checkOpponentRunAfterFoulTrouble(events, fe, homeTcode);
       if (!runInfo) continue;
       const name = boxByPcode.get(fe.key)?.name ?? "";
-      items.push(`<li>${name}${iGa(name)} ${clockStr(fe.endRow)} 무렵 파울트러블(${fmtDuration(fe.durationSec)} 만에 파울 ${fe.count}개)에 걸린 뒤, 상대가 ${runInfo.maxOppRun}점 런을 탐.</li>`);
+      items.push(`<li>${name}${iGa(name)} ${jumpLink(fe.endIdx, clockStr(fe.endRow))} 무렵 파울트러블(${fmtDuration(fe.durationSec)} 만에 파울 ${fe.count}개)에 걸린 뒤, 상대가 ${runInfo.maxOppRun}점 런을 탐.</li>`);
     }
     if (items.length) sections.push({ title: "교체·파울트러블 연관 분석", html: `<ul class="report-list">${items.join("")}</ul>` });
   }

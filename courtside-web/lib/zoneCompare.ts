@@ -84,6 +84,29 @@ export function drawHoop(hx: number, hy: number, onLeftSide: boolean): string {
   return svg;
 }
 
+// 프리뷰 인사이트("코너 3점을 막을 것") - "코너 3"은 3점 중에서도 베이스라인 옆(사이드라인
+// 근처)에서 직선 구간으로 쏘는 슛만 가리킴(그 바깥쪽 호(arc) 구간은 코너가 아니라 윙/탑).
+// 새 좌표를 임의로 추측하지 않고, drawCourtMarkings()가 3점 라인을 그릴 때 실제로 쓰는 것과
+// 정확히 같은 기하학(THREE_SIDE_MARGIN_M로 정한 topY/botY 사이드라인 밴드, 그 지점에서
+// 골대까지의 반지름 R=THREE_PT_M로 구한 호(arc) 시작 x좌표 archX)을 그대로 재계산해서 판정 -
+// 화면에 그려지는 라인과 항상 같은 기준을 공유(이중 정의 금지).
+const topY = COURT_Y[0] + THREE_SIDE_MARGIN_M / SCALE_M_PER_UNIT;
+const botY = COURT_Y[1] - THREE_SIDE_MARGIN_M / SCALE_M_PER_UNIT;
+const cornerArchX = (() => {
+  const midY = (COURT_Y[0] + COURT_Y[1]) / 2;
+  const dy = midY - topY;
+  const R = THREE_PT_M / SCALE_M_PER_UNIT;
+  const dx = Math.sqrt(Math.max(0, R * R - dy * dy));
+  return HOOP_RIGHT[0] - dx; // dir=-1(오른쪽 골대 기준, baselineX=COURT_X[1])과 동일한 부호
+})();
+
+export function isCornerThree(x: number, y: number, d: string): boolean {
+  const mx = mirrorShotX(x, d);
+  const inSideBand = y <= topY || y >= botY; // 사이드라인에서 THREE_SIDE_MARGIN_M 안쪽
+  const inStraightSeg = mx >= cornerArchX; // 호가 아니라 베이스라인까지 이어지는 직선 구간
+  return inSideBand && inStraightSeg && shotValue(x, y, d) === 3;
+}
+
 export type ShotRow = { x: number; y: number; d: string; made: boolean; tcode: string };
 export type ZoneStats = Record<string, { att: number; made: number }>;
 
@@ -144,7 +167,20 @@ export function buildZoneCompareSvg(home: ZoneStats, away: ZoneStats): string {
 // 수준이라 hexbin으로 뭉개는 것보다 슛 하나하나를 점으로 찍는 게 더 정보량이 많고
 // 구현도 단순함 - "Make/Miss" 뷰를 팀별로 분리한 버전. 성공=팀컬러 채운 원,
 // 실패=옅은 링(테두리만). 2점/3점 반지름 차이로 살짝 구분.
-export function buildCourtDotsSvg(shots: ShotRow[], color: string): string {
+//
+// getMeta(요청 - "슛 차트 호버로 누가/언제, 클릭하면 그 순간으로 이동") - 이 함수의 기존
+// 호출부(components/GameReplay.tsx 하나뿐, 실측 확인됨)를 깨지 않도록 3번째 인자를
+// 완전히 선택적으로 추가: 안 넘기면 예전과 바이트 단위로 동일한 <circle .../> 자체닫힘
+// 태그만 나옴. 넘기면 각 점에 네이티브 <title>(호버 툴팁, 클라이언트 JS 불필요 - 이
+// 프로젝트 컨벤션)과 data-jump-idx(components/GameReplay.tsx의 document 클릭 위임
+// 리스너가 읽음 - lib/postgameReport.ts의 report-jump-link와 같은 컨벤션 공유)를 얹음.
+export type ShotDotMeta = { title: string; jumpIdx: number | null };
+
+function escapeSvgText(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+export function buildCourtDotsSvg<T extends ShotRow>(shots: T[], color: string, getMeta?: (shot: T) => ShotDotMeta | null): string {
   const HX = HOOP_RIGHT[0],
     HY = HOOP_RIGHT[1];
   let svg = `<rect x="${COURT_X[0]}" y="${COURT_Y[0]}" width="${COURT_X[1] - COURT_X[0]}" height="${COURT_Y[1] - COURT_Y[0]}" fill="#d9b98a" stroke="var(--ink-faint)" stroke-width="2"/>`;
@@ -153,10 +189,14 @@ export function buildCourtDotsSvg(shots: ShotRow[], color: string): string {
   for (const s of shots) {
     const x = mirrorShotX(s.x, s.d);
     const r = shotValue(s.x, s.y, s.d) === 3 ? 4.2 : 3.4;
-    if (s.made) {
-      svg += `<circle cx="${x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="${r}" fill="${color}" opacity="0.88"/>`;
+    const meta = getMeta ? getMeta(s) : null;
+    const extraAttrs = meta?.jumpIdx != null ? ` class="zc-dot-jump" data-jump-idx="${meta.jumpIdx}"` : "";
+    const titleEl = meta?.title ? `<title>${escapeSvgText(meta.title)}</title>` : "";
+    const fillAttrs = s.made ? `fill="${color}" opacity="0.88"` : `fill="none" stroke="${color}" stroke-width="1.3" opacity="0.4"`;
+    if (titleEl || extraAttrs) {
+      svg += `<circle cx="${x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="${r}" ${fillAttrs}${extraAttrs}>${titleEl}</circle>`;
     } else {
-      svg += `<circle cx="${x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="${r}" fill="none" stroke="${color}" stroke-width="1.3" opacity="0.4"/>`;
+      svg += `<circle cx="${x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="${r}" ${fillAttrs}/>`;
     }
   }
 

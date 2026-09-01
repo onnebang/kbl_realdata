@@ -113,7 +113,15 @@ export function buildRecentFeed(events: GameEvent[], idx: number): PossessionIte
   return segmented.slice(sliceFrom).reverse();
 }
 
-export type ShotWithMeta = ShotRow & { quarter: string; pcode: string | null };
+// shot_order - Feature("슛 차트 클릭 -> 그 순간으로 이동")의 역방향 매칭(아래
+// buildShotToEventIndex)에 필요해서 추가. shot_log 테이블 자체엔 있었지만 이 타입/
+// getShots(app/games/[gmkey]/page.tsx)엔 지금까지 안 실려 있었음 - 실측(Supabase
+// 550,000+행 전체, gmkey+pcode로 partition해 shot_id 순서와 대조) shot_id 오름차순과
+// shot_order 오름차순이 예외 없이 100% 일치해서(0건 위반), findShotForScoreRow가 이미
+// 기대고 있는 "쿼리 반환 순서 = 슛 시간 순서" 가정과 완전히 같은 사실을 shot_order
+// 필드로 명시적으로 만듦(페이지가 .order("shot_order")로 조회 - findShotForScoreRow의
+// 기존 동작은 바이트 단위로 그대로 유지됨).
+export type ShotWithMeta = ShotRow & { quarter: string; pcode: string | null; shot_order: number };
 
 // (선수, 쿼터) 조합별로 문자중계 타임라인의 성공/실패 "개수"와 shot_log의 "개수"를 비교 -
 // 정확히 일치할 때만(그리고 0보다 클 때만) 그 조합을 신뢰. 두 로그는 서로 다른 소스라 조인
@@ -169,6 +177,48 @@ export function findShotForScoreRow(
     }
   }
   return shotsInQ[count - 1] ?? null;
+}
+
+// findShotForScoreRow의 반대 방향(요청 - "슛 차트에서 점을 클릭하면 그 슛이 실제로 벌어진
+// game_events 행으로 리플레이를 이동") - "이 game_events 행이 몇 번째 슛인가"가 아니라
+// "이 shot_log 행이 (선수,쿼터) 안에서 몇 번째 슛인가"에서 시작해 같은 순번의
+// MAKE/MISS 이벤트를 타임라인에서 찾음. 신뢰도 게이트(reliability)는 여기서 새로 만들지
+// 않고 buildShotReliability가 계산한 값을 그대로 받아 재사용 - "카운트가 안 맞는 조합은
+// 순서 매칭 자체가 틀렸다는 뜻"이라는 findShotForScoreRow와 같은 원칙이 두 방향 모두에
+// 동일하게 적용돼야 함(한쪽만 신뢰도를 걸면 반대 방향에서 조용히 틀린 매칭이 나올 수 있음).
+// shot_order로 명시적으로 정렬(위 ShotWithMeta 주석 참고 - 이미 검증된 순서라 findShotForScoreRow
+// 쪽 동작엔 영향 없음, 이 함수만 방어적으로 사용).
+export function buildShotToEventIndex(
+  events: GameEvent[],
+  shots: ShotWithMeta[],
+  reliability: Map<string, boolean>
+): Map<ShotWithMeta, number> {
+  const byKey = new Map<string, ShotWithMeta[]>();
+  for (const s of shots) {
+    if (!s.pcode) continue;
+    const key = `${s.pcode}|${s.quarter}`;
+    if (!reliability.get(key)) continue;
+    let arr = byKey.get(key);
+    if (!arr) byKey.set(key, (arr = []));
+    arr.push(s);
+  }
+  for (const arr of byKey.values()) arr.sort((a, b) => a.shot_order - b.shot_order);
+
+  const result = new Map<ShotWithMeta, number>();
+  const ordinal = new Map<string, number>();
+  for (let i = 0; i < events.length; i++) {
+    const r = events[i];
+    if (r.quarter === "PRE" || !r.pcode || !r.action_code) continue;
+    if (!MAKE_CODES.has(r.action_code) && !MISS_CODES.has(r.action_code)) continue;
+    const key = `${r.pcode}|${r.quarter}`;
+    const arr = byKey.get(key);
+    if (!arr) continue;
+    const n = (ordinal.get(key) ?? 0) + 1;
+    ordinal.set(key, n);
+    const shot = arr[n - 1];
+    if (shot) result.set(shot, i);
+  }
+  return result;
 }
 
 // shot_log의 d 필드("어느 쪽 골대에 가까운 슛인지")를 이 카드가 보여줄 타겟 골대

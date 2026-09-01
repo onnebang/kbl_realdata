@@ -18,6 +18,11 @@ export type SeasonStats = {
   stlPg: number;
   blkPg: number;
   tovPg: number;
+  // 프리뷰 인사이트("오펜스 리바운드 조심") - game_team_stats.oreb(원시 리바운드 개수)는
+  // 전량 NULL이지만(실측 - lib/postgameReport.ts의 PlayerBox 주석과 같은 결측), oreb_pct
+  // (공격리바운드율, 0~100 스케일)는 100% 채워져 있어서 그걸로 대체. lib/matchupInsights.ts가
+  // 리그 평균과 비교해 "genuinely notable"할 때만 오펜스 리바운드 인사이트를 띄우는 데 씀.
+  orebPct: number;
 };
 
 export type ScheduleGame = {
@@ -56,7 +61,7 @@ export async function getSeasonStatsAsOf(tcode: string, seasonName: string, befo
   const gmkeys = games.map((g) => g.gmkey);
   const { data: stats } = await supabase
     .from("game_team_stats")
-    .select("gmkey, tpm, ast, reb, stl, blk, turnovers")
+    .select("gmkey, tpm, ast, reb, stl, blk, turnovers, oreb_pct")
     .eq("tcode", tcode)
     .in("gmkey", gmkeys);
   if (!stats || !stats.length) return null;
@@ -83,7 +88,27 @@ export async function getSeasonStatsAsOf(tcode: string, seasonName: string, befo
     stlPg: sum((s) => s.stl ?? 0) / gp,
     blkPg: sum((s) => s.blk ?? 0) / gp,
     tovPg: sum((s) => s.turnovers ?? 0) / gp,
+    orebPct: sum((s) => s.oreb_pct ?? 0) / gp,
   };
+}
+
+// 프리뷰 인사이트("오펜스 리바운드 조심") 임계값 기준 - 이 시즌, 이 날짜 이전(리크프리)
+// 정규시즌 전체 팀-경기의 oreb_pct 단순 평균(팀별 평균의 평균이 아니라 경기 단위 평균 -
+// 표본이 큰 팀에 가중치가 실리는 걸 피하려 게임 단위로 통일, getStandingsAsOf와 같은 로우
+// 레벨 집계 관례). lib/matchupInsights.ts가 이 값 + 몇 %p 이상인 팀에게만 인사이트를 띄움.
+export async function getLeagueAvgOrebPct(seasonName: string, beforeDate: string): Promise<number | null> {
+  const { data: games } = await supabase
+    .from("games")
+    .select("gmkey")
+    .eq("season_name", seasonName)
+    .eq("season_category", "정규시즌")
+    .lt("game_date", beforeDate)
+    .not("home_score", "is", null);
+  if (!games || !games.length) return null;
+  const gmkeys = games.map((g) => g.gmkey);
+  const { data: stats } = await supabase.from("game_team_stats").select("oreb_pct").in("gmkey", gmkeys);
+  if (!stats || !stats.length) return null;
+  return stats.reduce((s, r) => s + (r.oreb_pct ?? 0), 0) / stats.length;
 }
 
 // 최근 결과만(예정 경기는 DB에 없음 - 완료된 경기만 이관됐음, README 28차 참고).

@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { TeamBadge } from "./TeamBadge";
-import { buildCourtDotsSvg, shotValue, COURT_X, COURT_Y } from "@/lib/zoneCompare";
+import { buildCourtDotsSvg, shotValue, COURT_X, COURT_Y, type ShotDotMeta } from "@/lib/zoneCompare";
 import { findShootingStreaks, computeStatBursts, computeCurrentDroughts, fmtRating, gameWideTopPerformer, type GameEvent, type PlayerBox, type StreakEvent } from "@/lib/postgameReport";
 import {
   buildRecentFeed,
   buildShotReliability,
+  buildShotToEventIndex,
   drawMiniShotSpot,
   findShotForScoreRow,
   KEY_FLOW_CODES,
@@ -362,6 +363,30 @@ export default function GameReplay({
     };
   }, []);
 
+  // Feature("AI 코트사이드 리포트/슛 차트에서 특정 순간을 클릭하면 리플레이가 그 시점으로
+  // 이동") - lib/postgameReport.ts가 dangerouslySetInnerHTML로 박아 넣는 report-jump-link
+  // 앵커와, 아래 슛 차트 SVG(dangerouslySetInnerHTML)의 data-jump-idx 원(circle) 둘 다 순수
+  // 문자열/raw DOM이라 React 이벤트 핸들러를 못 붙임 - 이 idx 상태를 쥐고 있는 이
+  // 컴포넌트가 document 레벨 클릭 위임(delegation)으로 한 곳에서 처리(두 기능이 같은
+  // data-jump-idx 컨벤션을 공유하므로 리스너도 하나만).
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    function handleJumpClick(e: MouseEvent) {
+      const target = e.target as Element | null;
+      const link = target?.closest?.("[data-jump-idx]");
+      if (!link) return;
+      const raw = link.getAttribute("data-jump-idx");
+      const jumpIdx = raw == null ? NaN : Number(raw);
+      if (!Number.isFinite(jumpIdx)) return;
+      e.preventDefault();
+      setPlaying(false);
+      setIdx(Math.max(0, Math.min(events.length - 1, jumpIdx)));
+      panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    document.addEventListener("click", handleJumpClick);
+    return () => document.removeEventListener("click", handleJumpClick);
+  }, [events.length]);
+
   const quarterOrder = useMemo(() => {
     const seen: string[] = [];
     for (const e of events) if (e.quarter !== "PRE" && !seen.includes(e.quarter)) seen.push(e.quarter);
@@ -563,12 +588,42 @@ export default function GameReplay({
       }),
     [shots, curQRank, quarterRank, shotOutcome, shotVal]
   );
+  // (선수,쿼터) 조합별 신뢰도 - 경기 전체를 대상으로 하는 정적 결과라 스크럽 위치(idx)와
+  // 무관, shots/events가 바뀔 때만 다시 계산. findShotForScoreRow(포제션 카드, 아래)와
+  // shotToEventIdx(슛 차트 클릭, 바로 다음)가 이 하나의 계산을 공유(같은 신뢰도 게이트
+  // 중복 금지 - 두 방향 모두 findShotForScoreRow/buildShotToEventIndex 쪽에서 온 원칙).
+  const shotReliability = useMemo(() => buildShotReliability(events, shots), [events, shots]);
+
   // 실제 슛 점 차트(app/games/[gmkey]/page.tsx와 같은 lib/zoneCompare.ts의
   // buildCourtDotsSvg) - 스크럽할수록 점이 하나씩 채워지는 느낌을 그대로 살림.
   const homeQuarterShots = useMemo(() => filteredShots.filter((s) => s.tcode === homeTeam.tcode), [filteredShots, homeTeam.tcode]);
   const awayQuarterShots = useMemo(() => filteredShots.filter((s) => s.tcode === awayTeam.tcode), [filteredShots, awayTeam.tcode]);
-  const homeDotsSvg = homeQuarterShots.length > 0 ? buildCourtDotsSvg(homeQuarterShots, homeTeam.color) : null;
-  const awayDotsSvg = awayQuarterShots.length > 0 ? buildCourtDotsSvg(awayQuarterShots, awayTeam.color) : null;
+
+  // Feature("슛 차트 호버로 누가/언제, 클릭하면 그 순간으로 이동") - lib/possessionFeed.ts의
+  // buildShotToEventIndex(findShotForScoreRow의 반대 방향, 같은 shotReliability 게이트
+  // 재사용)로 신뢰 가능한 (선수,쿼터) 조합의 슛만 정확한 game_events 인덱스를 앎. 이 맵은
+  // 스크럽 위치(idx)와 무관 - shots/events가 바뀔 때만 재계산.
+  const shotToEventIdx = useMemo(() => buildShotToEventIndex(events, shots, shotReliability), [events, shots, shotReliability]);
+  const shotDotMeta = useCallback(
+    (s: ShotWithQuarter): ShotDotMeta => {
+      const name = (s.pcode && nameByPcode.get(s.pcode)) || "선수 불명";
+      const exactIdx = shotToEventIdx.get(s);
+      if (exactIdx != null) {
+        return { title: `${name} · ${clockStr(events[exactIdx])}`, jumpIdx: exactIdx };
+      }
+      // 정확한 이벤트 매칭이 안 되는 조합(신뢰도 게이트 탈락)은 정확한 시각을 지어내지
+      // 않고 쿼터만 보여줌 - 클릭은 그 쿼터 "시작"으로만 이동(항상 100% 정확 - 요청의
+      // "honest" 폴백). 쿼터 시작 인덱스조차 없으면(사실상 없음) 클릭 불가.
+      const fallbackIdx = firstIdxByQuarter.get(s.quarter) ?? null;
+      return {
+        title: fallbackIdx != null ? `${name} · ${s.quarter} (정확한 시점 불명 - 클릭 시 쿼터 시작으로 이동)` : `${name} · ${s.quarter}`,
+        jumpIdx: fallbackIdx,
+      };
+    },
+    [nameByPcode, shotToEventIdx, events, firstIdxByQuarter]
+  );
+  const homeDotsSvg = homeQuarterShots.length > 0 ? buildCourtDotsSvg(homeQuarterShots, homeTeam.color, shotDotMeta) : null;
+  const awayDotsSvg = awayQuarterShots.length > 0 ? buildCourtDotsSvg(awayQuarterShots, awayTeam.color, shotDotMeta) : null;
 
   // 요청: "실시간 중계에서 팀별로 묶어서 보여주고, 누가 어시를 했는지, 승률이 어떻게
   // 변화됐는지 표시" - "한 공격(포제션)" 단위로 이벤트를 묶어(스틸-어시-득점처럼) 시간
@@ -578,9 +633,6 @@ export default function GameReplay({
   // "두경민 3점 실패 - 공격리바운드 - 유기상 3점" 같은 실제 흐름을 훨씬 잘 보여줌.
   const recentFeed = useMemo(() => buildRecentFeed(events, idx), [events, idx]);
   const playerByPcode = useMemo(() => new Map(players.map((p) => [p.pcode, p])), [players]);
-  // (선수,쿼터) 조합별 신뢰도 - 경기 전체를 대상으로 하는 정적 결과라 스크럽 위치(idx)와
-  // 무관, shots/events가 바뀔 때만 다시 계산.
-  const shotReliability = useMemo(() => buildShotReliability(events, shots), [events, shots]);
 
   // 박스스코어 +/- 컬럼 - game_player_stats엔 plus_minus 컬럼이 없어서 game_events 전체를
   // 훑어 직접 계산(lib/gameLineups.ts의 computeFinalPlusMinus, currentOnCourt와 같은 IN=101/
@@ -804,7 +856,15 @@ export default function GameReplay({
     const veryLast = rows[rows.length - 1];
     // 득점 바로 뒤에 어시스트가 같은 그룹에 묶여 있으면(요청) 마지막 줄이 어시스트가 되므로,
     // "득점으로 끝났는가"는 어시스트를 건너뛰고 그 앞의 득점 이벤트로 판정해야 함.
-    const isAssistLast = veryLast.action_code === "211";
+    // 단, buildRecentFeed는 FEED_WINDOW로 이벤트를 잘라서 segmentPossessions에 넘기는데,
+    // 그 절단 경계가 하필 "득점 -> 어시스트" 쌍의 어시스트 행 바로 앞이면(예: idx로 직접
+    // 점프하는 report-jump-link/슛차트 클릭이 이런 idx에 정확히 떨어질 수 있음 - 실사용
+    // 중 크래시로 발견됨) segmentPossessions은 윈도우의 첫 행(그 어시스트)부터 새 그룹을
+    // 시작하므로 "어시스트 1행짜리" 그룹이 만들어짐 - 짝이 되는 득점 행은 윈도우 밖으로
+    // 잘려나가 존재하지 않는다. 이럴 땐 rows.length가 2 미만이라 rows[rows.length-2]가
+    // undefined이므로, "어시스트로 끝남" 취급을 하지 않고(실제 득점 행을 볼 수 없으므로)
+    // 이 어시스트 행 자체를 마지막 행으로 취급해 일반 텍스트 줄로만 보여줌.
+    const isAssistLast = veryLast.action_code === "211" && rows.length >= 2;
     const scoreRow = isAssistLast ? rows[rows.length - 2] : veryLast;
     const assistRow = isAssistLast ? veryLast : null;
     const endedInScore = !!scoreRow.action_code && SCORING_CODES.has(scoreRow.action_code);
@@ -926,7 +986,7 @@ export default function GameReplay({
   };
 
   return (
-    <div className="panel replay-panel">
+    <div className="panel replay-panel" ref={panelRef}>
       {/* 푸시 알림 스택(요청 3) - position:fixed로 항상 문서 최상단에 떠서 어디에
           렌더링되든 상관없음. pushToast가 최근 3개까지만 유지, ~4.7초 후 자동 제거. */}
       <div className="replay-push-stack" aria-live="polite">

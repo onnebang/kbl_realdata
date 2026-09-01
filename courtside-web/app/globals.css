@@ -473,6 +473,48 @@ select {
   margin-bottom: 10px;
 }
 
+/* 요청: "경기전 프리뷰/경기중 인터랙티브 문자중계/경기후 AI리포트로 명확한 3막 구조" - 경기
+   상세 페이지 전체를 나누는 섹션 헤더로, .panel-title(패널 하나 안의 작은 라벨)보다 한 단계
+   더 눈에 띄어야 해서 새로 추가. .title(Big Shoulders Display)은 한글 글리프가 없어 한글
+   제목엔 못 씀(위 player-hero 주석의 실측 버그와 같은 이유) - Pretendard 볼드로 대체. */
+.game-act {
+  margin-top: 32px;
+}
+.game-act:first-child {
+  margin-top: 0;
+}
+.game-act-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.game-act-num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--surface);
+  background: var(--home);
+  border-radius: 999px;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.game-act-title {
+  font-weight: 800;
+  font-size: 16.5px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.game-act-rule {
+  flex: 1;
+  height: 1px;
+  background: rgba(var(--line-rgb), 0.14);
+}
+
 /* 요청: "프리뷰 인사이트 자세히 보기를 누르면 펼쳐서 보여줌" - 순수 <details>/<summary>라
    클라이언트 JS 없이 접고 펼침. 브라우저 기본 마커(세모) 대신 화살표 아이콘을 직접 그려서
    열림/닫힘 상태를 명확히 표시. */
@@ -606,6 +648,22 @@ table.data-table td:nth-child(2) {
 .report-text b {
   color: var(--gold);
 }
+/* Feature("AI 코트사이드 리포트에서 시간 언급을 클릭하면 리플레이가 그 순간으로 이동") -
+   lib/postgameReport.ts가 dangerouslySetInnerHTML로 심는 앵커(components/GameReplay.tsx의
+   document 클릭 위임이 처리). .back-link 등 이 사이트 다른 링크들과 같이 --home 토큰으로
+   색을 주되, 문장 중간에 박히는 인라인 링크라 항상 밑줄(점선)로 클릭 가능함을 표시하고
+   호버 시 실선으로 강조 - 클릭 전엔 안 보이는 .back-link 컨벤션보다 한 단계 더 명확하게. */
+.report-jump-link {
+  color: var(--home);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+.report-jump-link:hover {
+  text-decoration-style: solid;
+}
 .report-list {
   margin: 0;
   padding-left: 20px;
@@ -620,6 +678,56 @@ table.data-table td:nth-child(2) {
 }
 .report-list b {
   color: var(--ink);
+}
+
+/* 프리뷰 스카우팅 인사이트 카드(요청 항목 1~7, lib/matchupInsights.ts) - 기존
+   .report-text/.report-list(문자열 HTML)와 달리 타입이 있는 구조화 데이터를 렌더하는 자리라
+   .panel 안 리스트로 살짝 구분되게 카드화. 어느 팀 얘기인지 왼쪽 보더를 그 팀의 실제 브랜드
+   컬러로 칠함(.ts-bar-fill 등 이 페이지 다른 곳과 같은 "실제 팀 색" 컨벤션). */
+.insight-card {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  border-left: 3px solid var(--ink-faint);
+  margin-bottom: 8px;
+}
+.insight-card:last-child {
+  margin-bottom: 0;
+}
+.insight-card-icon {
+  font-size: 15px;
+  flex: none;
+  line-height: 1.6;
+}
+.insight-card-body {
+  flex: 1;
+  min-width: 0;
+}
+.insight-card-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 3px;
+}
+.insight-card-text {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+}
+.insight-card-text b {
+  color: var(--ink);
+}
+/* 경기 후 채점(요청 항목 7) - 같은 카드 안, 점선 구분선 아래 "실제" 값. --gold(이 사이트에서
+   이미 report-text b 강조에 쓰는 톤)로 "이건 사후 검증 값"이라는 신호를 줌. */
+.insight-grade {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(var(--line-rgb), 0.15);
+  font-size: 11.5px;
+  color: var(--gold);
+  font-weight: 600;
 }
 
 /* 매치업 패널(최근 결과) - lib/matchups.ts */
@@ -684,6 +792,16 @@ table.data-table td:nth-child(2) {
   transform: rotateX(24deg);
   transform-origin: center bottom;
   box-shadow: 0 10px 16px -8px rgba(0, 0, 0, 0.32);
+}
+/* Feature("슛 차트 호버로 누가/언제, 클릭하면 그 순간으로 이동") - zoneCompare.ts의
+   buildCourtDotsSvg가 신뢰도 게이트를 통과한 슛(정확한 game_events 인덱스를 아는 슛)에만
+   이 클래스를 붙임. 호버 시 opacity를 끝까지 올려서(실패 슛은 기본 0.4로 옅게 그려짐) 이
+   점이 다른 점들과 달리 반응한다는 걸 알림 - 클릭 가능 여부를 시각적으로 구분. */
+.zc-dot-jump {
+  cursor: pointer;
+}
+.zc-dot-jump:hover {
+  opacity: 1 !important;
 }
 .zone-compare-legend {
   display: flex;

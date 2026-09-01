@@ -5,13 +5,15 @@ import { supabase } from "@/lib/supabase";
 import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBox } from "@/lib/postgameReport";
 import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights";
 import { getGameRarity } from "@/lib/rarity";
-import { getSeasonStatsAsOf, getRecentSchedule, getHeadToHead, getStandingsAsOf } from "@/lib/matchups";
+import { getSeasonStatsAsOf, getRecentSchedule, getHeadToHead, getStandingsAsOf, getLeagueAvgOrebPct } from "@/lib/matchups";
 import { type ShotRow } from "@/lib/zoneCompare";
 import { displayTeamName } from "@/lib/teamNames";
-import { collectAllOnCourtLineups, subComboKeys } from "@/lib/gameLineups";
+import { collectAllOnCourtLineups, subComboKeys, type PlayerStartInfo } from "@/lib/gameLineups";
 import { getLineupRatings, getPlayerOnOffRatings, type LineupRating, type PlayerOnOff } from "@/lib/lineupNetRating";
+import { buildMatchupInsights, gradeMatchupInsights, type PreviewInsight, type PriorGameData } from "@/lib/matchupInsights";
 import { TeamBadge } from "@/components/TeamBadge";
 import GameReplay from "@/components/GameReplay";
+import { InsightCard } from "@/components/InsightCard";
 
 type TeamRef = { tcode: string; name: string; abbr: string; color: string; logo_url: string | null } | null;
 
@@ -62,6 +64,10 @@ type PlayerStatRow = {
   ftm: number | null;
   fta: number | null;
   back_num: string | null;
+  // 프리뷰 인사이트("수비가 약했던 선수가 나오면 우리팀의 000이 노릴 것") - lib/matchupInsights.ts가
+  // 직전 경기 로스터에서 "우리팀 usage_rtg 최고 선수"를 타깃으로 고르는 데 씀. 이미 이 쿼리(선수당
+  // 한 행)에 열만 얹어서 해결 - N+1 쿼리 방지.
+  usage_rtg: number | null;
   player: { name: string; photo_url: string | null } | null;
 };
 
@@ -122,7 +128,7 @@ async function getPlayerStats(gmkey: string) {
   const { data } = await supabase
     .from("game_player_stats")
     .select(
-      "pcode, tcode, pts, reb, ast, stl, blk, turnovers, fouls, is_starter, min_played, fgm, fga, tpm, tpa, ftm, fta, back_num, player:players(name, photo_url)"
+      "pcode, tcode, pts, reb, ast, stl, blk, turnovers, fouls, is_starter, min_played, fgm, fga, tpm, tpa, ftm, fta, back_num, usage_rtg, player:players(name, photo_url)"
     )
     .eq("gmkey", gmkey)
     .order("pts", { ascending: false });
@@ -155,10 +161,90 @@ async function getPregameFeatures(gmkey: string): Promise<PregameFeatures | null
 // 무시하고 그대로 씀(ShotRow의 상위 집합이라 타입 호환). pcode는 lib/possessionFeed.ts의
 // buildShotReliability/findShotForScoreRow가 (선수,쿼터) 단위로 문자중계 타임라인과
 // shot_log를 대조하는 데 필요해서 추가(이 대조 없이는 어느 슛 로그 행이 어느 포제션
-// 카드의 득점인지 알 방법이 없음).
-async function getShots(gmkey: string): Promise<(ShotRow & { quarter: string; pcode: string | null })[]> {
-  const { data } = await supabase.from("shot_log").select("x, y, d, made, tcode, quarter, pcode").eq("gmkey", gmkey);
-  return (data ?? []) as (ShotRow & { quarter: string; pcode: string | null })[];
+// 카드의 득점인지 알 방법이 없음). shot_order - 슛 차트 클릭→리플레이 이동(요청)의 역방향
+// 매칭(lib/possessionFeed.ts의 buildShotToEventIndex)이 (선수,쿼터) 안에서 슛 순서를
+// 명시적으로 정렬하는 데 씀 - .order()로 실어서 findShotForScoreRow가 기대는 "쿼리 반환
+// 순서 = 슛 시간 순서"와 동일한 순서를 명시적으로 보장(ShotWithMeta 주석 참고).
+async function getShots(gmkey: string): Promise<(ShotRow & { quarter: string; pcode: string | null; shot_order: number })[]> {
+  const { data } = await supabase
+    .from("shot_log")
+    .select("x, y, d, made, tcode, quarter, pcode, shot_order")
+    .eq("gmkey", gmkey)
+    .order("shot_order", { ascending: true });
+  return (data ?? []) as (ShotRow & { quarter: string; pcode: string | null; shot_order: number })[];
+}
+
+// 프리뷰 인사이트(lib/matchupInsights.ts) - "직전 경기 전체(양 팀)"를 이 경기와 정확히 같은
+// 규칙으로 GameEvent[]/PlayerBox[]로 조립해야 해서, 아래 컴포넌트 본문에 있던 rawEvents/box
+// 매핑 로직을 재사용 가능한 함수로 뽑음(이 경기 자체에도, 직전 경기 두 판에도 동일하게 씀 -
+// 셋 다 다른 로직을 쓰면 프리뷰와 채점이 서로 다른 기준으로 계산되는 부정직한 결과가 됨).
+function buildGameData(
+  playerStats: PlayerStatRow[],
+  events: EventRow[],
+  actionLabels: Map<string, string>
+): {
+  box: PlayerBox[];
+  derivedEvents: GameEvent[];
+  players: PlayerStartInfo[];
+  minutesByPcode: Map<string, number>;
+  usageByPcode: Map<string, number>;
+} {
+  const nameMap = new Map(playerStats.map((p) => [p.pcode, p.player?.name ?? p.pcode]));
+  const rawEvents = events.map((e) => ({
+    event_order: e.event_order,
+    quarter: e.quarter,
+    clock_min: e.clock_min,
+    clock_sec: e.clock_sec,
+    action_code: e.action_code,
+    action_label: e.action_code ? actionLabels.get(e.action_code) ?? e.action_code : null,
+    pcode: e.pcode,
+    player_name: e.pcode ? nameMap.get(e.pcode) ?? null : null,
+    tcode: e.tcode,
+    home_score: e.home_score,
+    away_score: e.away_score,
+    home_win_prob: e.home_win_prob,
+    wpa_home: e.wpa_home,
+    objective_prob: e.objective_prob,
+  }));
+  const derivedEvents = attachDerivedFields(rawEvents);
+  const box: PlayerBox[] = playerStats.map((p) => ({
+    pcode: p.pcode,
+    tcode: p.tcode,
+    name: p.player?.name ?? p.pcode,
+    is_starter: p.is_starter,
+    pts: p.pts ?? 0,
+    fgm: (p.fgm ?? 0) + (p.tpm ?? 0),
+    fga: (p.fga ?? 0) + (p.tpa ?? 0),
+    ftm: p.ftm ?? 0,
+    fta: p.fta ?? 0,
+    reb: p.reb ?? 0,
+    ast: p.ast ?? 0,
+    stl: p.stl ?? 0,
+    blk: p.blk ?? 0,
+    fouls: p.fouls ?? 0,
+    turnovers: p.turnovers ?? 0,
+  }));
+  const players: PlayerStartInfo[] = playerStats.map((p) => ({ pcode: p.pcode, tcode: p.tcode, isStarter: p.is_starter }));
+  const minutesByPcode = new Map(playerStats.map((p) => [p.pcode, p.min_played ?? 0]));
+  const usageByPcode = new Map(playerStats.map((p) => [p.pcode, p.usage_rtg ?? 0]));
+  return { box, derivedEvents, players, minutesByPcode, usageByPcode };
+}
+
+// 위 buildGameData 하나로 "직전 경기" 전체(양 팀 box/events/players)를 PriorGameData로 조립.
+// 스펙 요구대로 getPlayerStats(gmkey)/getEvents(gmkey)를 그 직전 경기의 gmkey로 그대로
+// 재호출 - 이 경기 자체를 위한 쿼리와 완전히 같은 함수.
+async function buildPriorGameData(
+  gmkey: string | null,
+  gameDate: string | null,
+  priorHomeTcode: string | null,
+  priorAwayTcode: string | null,
+  actionLabels: Map<string, string>
+): Promise<PriorGameData | null> {
+  if (!gmkey || !gameDate || !priorHomeTcode || !priorAwayTcode) return null;
+  const [pStats, pEvents] = await Promise.all([getPlayerStats(gmkey), getEvents(gmkey)]);
+  if (!pStats.length || !pEvents.length) return null;
+  const { box, derivedEvents, players, minutesByPcode, usageByPcode } = buildGameData(pStats, pEvents, actionLabels);
+  return { gmkey, gameDate, homeTcode: priorHomeTcode, awayTcode: priorAwayTcode, box, events: derivedEvents, players, minutesByPcode, usageByPcode };
 }
 
 // 요청: "팀별 색상을 해놨듯이, 스탯표에도 색상으로 비교" - 이 아래 바 차트들은 전부
@@ -270,6 +356,24 @@ function fgPct(m: number | null | undefined, a: number | null | undefined) {
   return aa > 0 ? Math.round((mm / aa) * 100) : 0;
 }
 
+// 요청: "경기전 프리뷰/경기중 인터랙티브 문자중계/경기후 AI리포트로 명확한 3막 구조" - 경기의
+// 자연스러운 타임라인(경기 전 → 경기 중 → 경기 후) 순서로 페이지를 재배치하면서, 세 구간을
+// "의도된 3막"으로 읽히게 각 구간 시작에 번호 배지 + 제목 + 구분선을 붙임(globals.css의
+// .game-act*). 예전엔 "인터랙티브 리플레이가 메인이 되도록" 리플레이를 배너 바로 다음(맨
+// 위)으로 올리고 프리뷰 정보를 그 아래 접이식으로 묶었었는데(아래 두 번째 act 직전 주석
+// 참고), 이번 요청은 그 우선순위 배치보다 "경기 타임라인을 그대로 읽는" 서사 구조를 명시적으로
+// 요구해서 순서를 되돌림 - 리플레이 자체의 내용/동작은 전혀 안 바꾸고 페이지 안에서의 위치와
+// 라벨만 바뀜.
+function ActHeader({ num, title }: { num: number; title: string }) {
+  return (
+    <div className="game-act-header">
+      <span className="game-act-num">{num}</span>
+      <span className="game-act-title">{title}</span>
+      <span className="game-act-rule" />
+    </div>
+  );
+}
+
 export default async function GamePage({
   params,
 }: {
@@ -309,45 +413,9 @@ export default async function GamePage({
   // 코트사이드 리포트/프리뷰 인사이트를 그대로 포팅. 정적 페이지는 미리 구운 timeline
   // 배열을 클라이언트에서 훑었지만, 여기는 Supabase game_events를 서버에서 한 번에
   // 불러와 lib/postgameReport.ts(A1-A8 그대로 이식)가 같은 계산을 함.
-  const playerNameMap = new Map(playerStats.map((p) => [p.pcode, p.player?.name ?? p.pcode]));
-  const rawEvents = events.map((e) => ({
-    event_order: e.event_order,
-    quarter: e.quarter,
-    clock_min: e.clock_min,
-    clock_sec: e.clock_sec,
-    action_code: e.action_code,
-    action_label: e.action_code ? actionLabels.get(e.action_code) ?? e.action_code : null,
-    pcode: e.pcode,
-    player_name: e.pcode ? playerNameMap.get(e.pcode) ?? null : null,
-    tcode: e.tcode,
-    home_score: e.home_score,
-    away_score: e.away_score,
-    home_win_prob: e.home_win_prob,
-    wpa_home: e.wpa_home,
-    objective_prob: e.objective_prob,
-  }));
-  const derivedEvents: GameEvent[] = attachDerivedFields(rawEvents);
-
-  const box: PlayerBox[] = playerStats.map((p) => ({
-    pcode: p.pcode,
-    tcode: p.tcode,
-    name: p.player?.name ?? p.pcode,
-    is_starter: p.is_starter,
-    pts: p.pts ?? 0,
-    // game_player_stats.fgm/fga는 원본 소스가 2점슛만 따로 셈(3점은 tpm/tpa) - 리포트
-    // 엔진(gameScore 등)은 정적 페이지처럼 합산 FG를 기대해서 여기서 더해서 넘김(실측
-    // 확인 - lib/postgameReport.ts의 PlayerBox 주석 참고).
-    fgm: (p.fgm ?? 0) + (p.tpm ?? 0),
-    fga: (p.fga ?? 0) + (p.tpa ?? 0),
-    ftm: p.ftm ?? 0,
-    fta: p.fta ?? 0,
-    reb: p.reb ?? 0,
-    ast: p.ast ?? 0,
-    stl: p.stl ?? 0,
-    blk: p.blk ?? 0,
-    fouls: p.fouls ?? 0,
-    turnovers: p.turnovers ?? 0,
-  }));
+  // buildGameData - 이 경기 자체와 "직전 경기"(lib/matchupInsights.ts)에 완전히 동일한 규칙으로
+  // GameEvent[]/PlayerBox[]를 조립(중복 로직 제거, 위 buildGameData 정의부 주석 참고).
+  const { box, derivedEvents, players: currentGamePlayers } = buildGameData(playerStats, events, actionLabels);
 
   let reportSections: { title: string; html: string }[] = [];
   if (game.home_score != null && game.away_score != null && derivedEvents.length > 0 && game.home_team && game.away_team) {
@@ -433,259 +501,389 @@ export default async function GamePage({
     playerOnOff = Object.fromEntries(onOffMap);
   }
 
+  // 프리뷰 스카우팅 인사이트(lib/matchupInsights.ts, 요청 항목 1~6) + 경기 후 예측 정확도
+  // 채점(항목 7) - "직전 경기"는 homeSchedule[0]/awaySchedule[0](이미 위에서 getRecentSchedule로
+  // 가져온 것, date desc 정렬이라 [0]이 가장 최근)을 그대로 재사용(새 쿼리 없음). 그 직전
+  // 경기 자체의 gmkey로 getPlayerStats/getEvents를 다시 호출(스펙 요구 - "같은 쿼리 함수
+  // 재사용")해 완전한 박스스코어/이벤트 로그를 얻고, buildGameData로 이 경기와 동일한 규칙
+  // 으로 조립.
+  let previewInsights: PreviewInsight[] = [];
+  let insightGrades: (string | null)[] = [];
+  if (game.home_team && game.away_team) {
+    const homeSched0 = homeSchedule[0] ?? null;
+    const awaySched0 = awaySchedule[0] ?? null;
+    const [homePriorGame, awayPriorGame, leagueAvgOrebPct] = await Promise.all([
+      buildPriorGameData(
+        homeSched0?.gmkey ?? null,
+        homeSched0?.gameDate ?? null,
+        homeSched0 ? (homeSched0.isHome ? game.home_team.tcode : homeSched0.oppTcode) : null,
+        homeSched0 ? (homeSched0.isHome ? homeSched0.oppTcode : game.home_team.tcode) : null,
+        actionLabels
+      ),
+      buildPriorGameData(
+        awaySched0?.gmkey ?? null,
+        awaySched0?.gameDate ?? null,
+        awaySched0 ? (awaySched0.isHome ? game.away_team.tcode : awaySched0.oppTcode) : null,
+        awaySched0 ? (awaySched0.isHome ? awaySched0.oppTcode : game.away_team.tcode) : null,
+        actionLabels
+      ),
+      getLeagueAvgOrebPct(game.season_name, game.game_date),
+    ]);
+
+    previewInsights = await buildMatchupInsights({
+      homeTcode: game.home_team.tcode,
+      awayTcode: game.away_team.tcode,
+      seasonName: game.season_name,
+      gameDate: game.game_date,
+      homeSchedule,
+      awaySchedule,
+      homeSeasonStats,
+      awaySeasonStats,
+      leagueAvgOrebPct,
+      homeWinProb: derivedEvents[0]?.home_win_prob ?? null,
+      homePriorGame,
+      awayPriorGame,
+    });
+
+    // 경기 후 채점 - "이 경기"가 이미 끝난 경우에만(진행 예정/미기록 경기는 채점 대상 없음).
+    if (previewInsights.length > 0 && game.home_score != null && game.away_score != null && derivedEvents.length > 0) {
+      insightGrades = gradeMatchupInsights(previewInsights, {
+        box,
+        events: derivedEvents,
+        players: currentGamePlayers,
+        homeTcode: game.home_team.tcode,
+        awayTcode: game.away_team.tcode,
+        homeScore: game.home_score,
+        awayScore: game.away_score,
+        homeTname: game.home_team.name,
+        awayTname: game.away_team.name,
+      });
+    }
+  }
+
   return (
     <div className="wrap">
       <Link href="/" className="back-link">
         ← 경기 목록
       </Link>
 
-      <div
-        className="matchup-banner"
-        style={{
-          background: `linear-gradient(to right, ${game.home_team?.color ?? "#888"} 50%, ${game.away_team?.color ?? "#888"} 50%)`,
-        }}
-      >
-        <div className="matchup-banner-side home" style={{ background: game.home_team?.color ?? "#888" }}>
-          <TeamBadge
-            team={game.home_team ? { name: game.home_team.name, abbr: game.home_team.abbr, color: "#ffffff33", logoUrl: game.home_team.logo_url } : null}
-            size={36}
-          />
-          <span className="matchup-banner-name">{game.home_team?.name ?? game.gmkey}</span>
-          <span className="matchup-banner-score">{game.home_score}</span>
-        </div>
-        <div className="matchup-banner-vs">VS</div>
-        <div className="matchup-banner-side away" style={{ background: game.away_team?.color ?? "#888" }}>
-          <span className="matchup-banner-score">{game.away_score}</span>
-          <span className="matchup-banner-name">{game.away_team?.name ?? ""}</span>
-          <TeamBadge
-            team={game.away_team ? { name: game.away_team.name, abbr: game.away_team.abbr, color: "#ffffff33", logoUrl: game.away_team.logo_url } : null}
-            size={36}
-          />
-        </div>
-      </div>
-      <div className="subtitle">
-        {game.game_date} · {game.season_name} {game.season_category} · {game.gmkey}
-      </div>
-
-      {/* 요청: "인터랙티브 리플레이가 메인이 되도록" - 예전엔 프리뷰/매치업/순위 패널들을
-          다 읽은 다음에야 나왔는데, 이제 리플레이를 배너 바로 다음(메인)으로 올리고 그
-          프리뷰 정보들은 아래 접이식 하나로 묶음. */}
-      {game.home_team && game.away_team && derivedEvents.length > 0 && (
-        <GameReplay
-          events={derivedEvents}
-          players={replayPlayers}
-          homeTeam={{
-            tcode: game.home_team.tcode,
-            name: game.home_team.name,
-            abbr: game.home_team.abbr,
-            color: game.home_team.color,
-            logoUrl: game.home_team.logo_url,
+      {/* Act 1/3 - 경기전. 매치업 배너(항상 표시)와, 더 깊은 프리뷰 인사이트/시즌 평균
+          비교/최근 결과/역대 맞대결/리그 순위를 담은 접이식 패널. */}
+      <div className="game-act">
+        <ActHeader num={1} title="경기전 프리뷰 인사이트" />
+        <div
+          className="matchup-banner"
+          style={{
+            background: `linear-gradient(to right, ${game.home_team?.color ?? "#888"} 50%, ${game.away_team?.color ?? "#888"} 50%)`,
           }}
-          awayTeam={{
-            tcode: game.away_team.tcode,
-            name: game.away_team.name,
-            abbr: game.away_team.abbr,
-            color: game.away_team.color,
-            logoUrl: game.away_team.logo_url,
-          }}
-          shots={shots}
-          homeNetRating={homeSeasonStats ? homeSeasonStats.ppg - homeSeasonStats.oppPpg : null}
-          awayNetRating={awaySeasonStats ? awaySeasonStats.ppg - awaySeasonStats.oppPpg : null}
-          lineupRatings={lineupRatings}
-          playerOnOff={playerOnOff}
-        />
-      )}
-
-      {/* 요청: "프리뷰 인사이트 자세히 보기를 누르면 펼쳐서 보여줌" - 5개 패널(더 깊은
-          프리뷰 인사이트/시즌 평균 비교/최근 결과/역대 맞대결/리그 순위)을 하나의 접이식
-          안으로. 순수 CSS <details>라 클라이언트 JS 불필요(이 사이트 컨벤션 - "정말 필요할
-          때만 client component"), 기본은 접힘. */}
-      {(pregameLines.length > 0 ||
-        homeSeasonStats ||
-        awaySeasonStats ||
-        homeSchedule.length > 0 ||
-        awaySchedule.length > 0 ||
-        h2h ||
-        standings.length > 0) && (
-        <details className="panel preview-details">
-          <summary className="preview-details-summary">프리뷰 인사이트 자세히 보기</summary>
-          <div className="preview-details-body">
-            {pregameLines.length > 0 && (
-              <div className="preview-subsection">
-                <div className="panel-title">더 깊은 프리뷰 인사이트</div>
-                <ul className="report-list">
-                  {pregameLines.map((line, i) => (
-                    <li key={i} dangerouslySetInnerHTML={{ __html: line }} />
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {(homeSeasonStats || awaySeasonStats) && (
-              <div className="preview-subsection">
-                <div className="panel-title">시즌 평균 비교 ({(homeSeasonStats ?? awaySeasonStats)?.gp}경기 기준, 이 경기 이전)</div>
-                <div className="ts-header">
-                  <span style={{ color: game.home_team?.color }}>{game.home_team?.name}</span>
-                  <span style={{ color: game.away_team?.color }}>{game.away_team?.name}</span>
-                </div>
-                {tsAvgRow("경기당 득점", homeSeasonStats?.ppg ?? 0, awaySeasonStats?.ppg ?? 0, hColor, aColor)}
-                {tsAvgRow("경기당 실점", homeSeasonStats?.oppPpg ?? 0, awaySeasonStats?.oppPpg ?? 0, hColor, aColor)}
-                {tsAvgRow("3점 성공", homeSeasonStats?.threePg ?? 0, awaySeasonStats?.threePg ?? 0, hColor, aColor)}
-                {tsAvgRow("어시스트", homeSeasonStats?.astPg ?? 0, awaySeasonStats?.astPg ?? 0, hColor, aColor)}
-                {tsAvgRow("리바운드", homeSeasonStats?.rebPg ?? 0, awaySeasonStats?.rebPg ?? 0, hColor, aColor)}
-                {tsAvgRow("스틸", homeSeasonStats?.stlPg ?? 0, awaySeasonStats?.stlPg ?? 0, hColor, aColor)}
-                {tsAvgRow("블록", homeSeasonStats?.blkPg ?? 0, awaySeasonStats?.blkPg ?? 0, hColor, aColor)}
-                {tsAvgRow("턴오버", homeSeasonStats?.tovPg ?? 0, awaySeasonStats?.tovPg ?? 0, hColor, aColor)}
-              </div>
-            )}
-
-            {(homeSchedule.length > 0 || awaySchedule.length > 0) && (
-              <div className="preview-subsection">
-                <div className="panel-title">최근 결과 (이 경기 이전 5경기)</div>
-                <div className="matchup-schedule-grid">
-                  {[
-                    [game.home_team, homeSchedule],
-                    [game.away_team, awaySchedule],
-                  ].map(([team, sched], i) => (
-                    <div className="sched-col" key={i}>
-                      <div className="sched-col-title">{(team as TeamRef)?.name}</div>
-                      {(sched as typeof homeSchedule).map((g) => (
-                        <div className="sched-row" key={g.gmkey}>
-                          <span className={`sched-result ${g.teamScore > g.oppScore ? "win" : "loss"}`}>
-                            {g.teamScore > g.oppScore ? "W" : "L"}
-                          </span>
-                          <span className="sched-opp">
-                            {g.isHome ? "vs" : "@"} <TeamBadge team={teamMetaByTcode.get(g.oppTcode) ? { ...teamMetaByTcode.get(g.oppTcode)!, logoUrl: teamMetaByTcode.get(g.oppTcode)!.logo_url } : null} size={16} /> {g.oppName}
-                          </span>
-                          <span className="sched-score">
-                            {g.teamScore}-{g.oppScore}
-                          </span>
-                        </div>
-                      ))}
-                      {(sched as typeof homeSchedule).length === 0 && <div className="empty-note">기록 없음</div>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {h2h && (
-              <div className="preview-subsection">
-                <div className="panel-title">역대 맞대결</div>
-                {h2h.meetings > 0 ? (
-                  <>
-                    <p className="report-text">
-                      역대 맞대결 {h2h.meetings}경기 - {game.home_team?.name} {h2h.homeWins}승, {game.away_team?.name} {h2h.awayWins}승
-                    </p>
-                    <div className="table-scroll">
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>날짜</th>
-                            <th>홈</th>
-                            <th>스코어</th>
-                            <th>원정</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {h2h.recentMeetings.map((m) => (
-                            <tr key={m.gmkey}>
-                              <td>{m.gameDate}</td>
-                              <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <TeamBadge team={teamMetaByTcode.get(m.homeTcode) ? { ...teamMetaByTcode.get(m.homeTcode)!, logoUrl: teamMetaByTcode.get(m.homeTcode)!.logo_url } : null} size={16} />
-                                {teamMetaByTcode.get(m.homeTcode)?.name ?? m.homeTcode}
-                              </td>
-                              <td>
-                                {m.homeScore}-{m.awayScore}
-                              </td>
-                              <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <TeamBadge team={teamMetaByTcode.get(m.awayTcode) ? { ...teamMetaByTcode.get(m.awayTcode)!, logoUrl: teamMetaByTcode.get(m.awayTcode)!.logo_url } : null} size={16} />
-                                {teamMetaByTcode.get(m.awayTcode)?.name ?? m.awayTcode}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
-                ) : (
-                  <div className="empty-note">이 경기 이전 맞대결 기록 없음(첫 대결 또는 신생팀)</div>
-                )}
-              </div>
-            )}
-
-            {standings.length > 0 && (
-              <div className="preview-subsection">
-                <div className="panel-title">
-                  리그 순위 ({game.season_name} 정규시즌, 이 경기 시점 기준)
-                </div>
-                <div className="table-scroll">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>팀</th>
-                        <th>W</th>
-                        <th>L</th>
-                        <th>PCT</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {standings.map((r, i) => {
-                        const tm = teamMetaByTcode.get(r.tcode);
-                        const isCurrent = r.tcode === game.home_team?.tcode || r.tcode === game.away_team?.tcode;
-                        return (
-                          <tr key={r.tcode} style={isCurrent ? { color: tm?.color } : undefined}>
-                            <td>{i + 1}</td>
-                            <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              <TeamBadge team={tm ? { ...tm, logoUrl: tm.logo_url } : null} size={18} />
-                              {tm?.name ?? r.tcode}
-                            </td>
-                            <td>{r.wins}</td>
-                            <td>{r.losses}</td>
-                            <td>{(r.pct * 100).toFixed(1)}%</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+        >
+          <div className="matchup-banner-side home" style={{ background: game.home_team?.color ?? "#888" }}>
+            <TeamBadge
+              team={game.home_team ? { name: game.home_team.name, abbr: game.home_team.abbr, color: "#ffffff33", logoUrl: game.home_team.logo_url } : null}
+              size={36}
+            />
+            <span className="matchup-banner-name">{game.home_team?.name ?? game.gmkey}</span>
+            <span className="matchup-banner-score">{game.home_score}</span>
           </div>
-        </details>
-      )}
+          <div className="matchup-banner-vs">VS</div>
+          <div className="matchup-banner-side away" style={{ background: game.away_team?.color ?? "#888" }}>
+            <span className="matchup-banner-score">{game.away_score}</span>
+            <span className="matchup-banner-name">{game.away_team?.name ?? ""}</span>
+            <TeamBadge
+              team={game.away_team ? { name: game.away_team.name, abbr: game.away_team.abbr, color: "#ffffff33", logoUrl: game.away_team.logo_url } : null}
+              size={36}
+            />
+          </div>
+        </div>
+        <div className="subtitle">
+          {game.game_date} · {game.season_name} {game.season_category} · {game.gmkey}
+        </div>
 
-      {reportSections.length > 0 && (
-        <div className="panel">
-          <div className="panel-title">🏀 AI 코트사이드 리포트</div>
-          {reportSections.map((s) => (
-            <div className="report-section" key={s.title}>
-              <div className="report-section-title">{s.title}</div>
-              <div dangerouslySetInnerHTML={{ __html: s.html }} />
+        {/* 요청 항목 1~6("직전 경기 활약 선수 주의/수비 약점/조합 시너지/최근 추세/오펜스
+            리바운드·블록 주의/코트사이드 최종 승률") - lib/matchupInsights.ts가 만드는 구조화된
+            PreviewInsight[]를 카드로. 접이식 "프리뷰 인사이트 자세히 보기"(아래, 시즌 평균/역대
+            전적 등 심화 수치 자료) 안이 아니라 배너 바로 아래 항상 보이는 자리에 둔 이유 - 이
+            인사이트들이 이번 요청의 핵심 신규 기능이라, 시즌 평균 비교 같은 부가 자료와 달리
+            "펼쳐야만 보이는" 자리에 묻으면 안 된다고 판단(데이터가 뒷받침하지 않는 항목은
+            lib/matchupInsights.ts가 애초에 생성하지 않으므로 - 예: 시즌 첫 경기라 "직전 경기"가
+            없는 팀 - 이 블록 자체가 자연스럽게 비거나 줄어듦, 자리만 비워두는 플레이스홀더 없음). */}
+        {previewInsights.length > 0 && (
+          <div className="panel">
+            <div className="panel-title">📋 스카우팅 인사이트 (직전 경기 · 시즌 데이터 기반)</div>
+            {previewInsights.map((insight, i) => (
+              <InsightCard
+                key={i}
+                insight={insight}
+                hColor={hColor}
+                aColor={aColor}
+                homeTname={game.home_team?.name ?? ""}
+                awayTname={game.away_team?.name ?? ""}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* 요청: "프리뷰 인사이트 자세히 보기를 누르면 펼쳐서 보여줌" - 5개 패널(더 깊은
+            프리뷰 인사이트/시즌 평균 비교/최근 결과/역대 맞대결/리그 순위)을 하나의 접이식
+            안으로. 순수 CSS <details>라 클라이언트 JS 불필요(이 사이트 컨벤션 - "정말 필요할
+            때만 client component"), 기본은 접힘. 요청("3막 구조")으로 이 accordion이 이제
+            독립된 최상위 act(제목까지 붙은)가 됐지만, 접힘/펼침 자체는 그대로 유지 - 매치업
+            배너가 이미 핵심 정보(팀·스코어)를 보여주고, 시즌 평균/역대 전적 같은 심화 자료는
+            원래도 "필요할 때만 펼쳐 보는" 성격이라 top-level act가 됐다고 항상 펼쳐 보여줄
+            이유는 아님(오히려 접힌 상태 + 뚜렷한 act 제목 조합이 "여기 더 볼 게 있다"를
+            더 명확히 알려줌). */}
+        {(pregameLines.length > 0 ||
+          homeSeasonStats ||
+          awaySeasonStats ||
+          homeSchedule.length > 0 ||
+          awaySchedule.length > 0 ||
+          h2h ||
+          standings.length > 0) && (
+          <details className="panel preview-details">
+            <summary className="preview-details-summary">프리뷰 인사이트 자세히 보기</summary>
+            <div className="preview-details-body">
+              {pregameLines.length > 0 && (
+                <div className="preview-subsection">
+                  <div className="panel-title">더 깊은 프리뷰 인사이트</div>
+                  <ul className="report-list">
+                    {pregameLines.map((line, i) => (
+                      <li key={i} dangerouslySetInnerHTML={{ __html: line }} />
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {(homeSeasonStats || awaySeasonStats) && (
+                <div className="preview-subsection">
+                  <div className="panel-title">시즌 평균 비교 ({(homeSeasonStats ?? awaySeasonStats)?.gp}경기 기준, 이 경기 이전)</div>
+                  <div className="ts-header">
+                    <span style={{ color: game.home_team?.color }}>{game.home_team?.name}</span>
+                    <span style={{ color: game.away_team?.color }}>{game.away_team?.name}</span>
+                  </div>
+                  {tsAvgRow("경기당 득점", homeSeasonStats?.ppg ?? 0, awaySeasonStats?.ppg ?? 0, hColor, aColor)}
+                  {tsAvgRow("경기당 실점", homeSeasonStats?.oppPpg ?? 0, awaySeasonStats?.oppPpg ?? 0, hColor, aColor)}
+                  {tsAvgRow("3점 성공", homeSeasonStats?.threePg ?? 0, awaySeasonStats?.threePg ?? 0, hColor, aColor)}
+                  {tsAvgRow("어시스트", homeSeasonStats?.astPg ?? 0, awaySeasonStats?.astPg ?? 0, hColor, aColor)}
+                  {tsAvgRow("리바운드", homeSeasonStats?.rebPg ?? 0, awaySeasonStats?.rebPg ?? 0, hColor, aColor)}
+                  {tsAvgRow("스틸", homeSeasonStats?.stlPg ?? 0, awaySeasonStats?.stlPg ?? 0, hColor, aColor)}
+                  {tsAvgRow("블록", homeSeasonStats?.blkPg ?? 0, awaySeasonStats?.blkPg ?? 0, hColor, aColor)}
+                  {tsAvgRow("턴오버", homeSeasonStats?.tovPg ?? 0, awaySeasonStats?.tovPg ?? 0, hColor, aColor)}
+                </div>
+              )}
+
+              {(homeSchedule.length > 0 || awaySchedule.length > 0) && (
+                <div className="preview-subsection">
+                  <div className="panel-title">최근 결과 (이 경기 이전 5경기)</div>
+                  <div className="matchup-schedule-grid">
+                    {[
+                      [game.home_team, homeSchedule],
+                      [game.away_team, awaySchedule],
+                    ].map(([team, sched], i) => (
+                      <div className="sched-col" key={i}>
+                        <div className="sched-col-title">{(team as TeamRef)?.name}</div>
+                        {(sched as typeof homeSchedule).map((g) => (
+                          <div className="sched-row" key={g.gmkey}>
+                            <span className={`sched-result ${g.teamScore > g.oppScore ? "win" : "loss"}`}>
+                              {g.teamScore > g.oppScore ? "W" : "L"}
+                            </span>
+                            <span className="sched-opp">
+                              {g.isHome ? "vs" : "@"} <TeamBadge team={teamMetaByTcode.get(g.oppTcode) ? { ...teamMetaByTcode.get(g.oppTcode)!, logoUrl: teamMetaByTcode.get(g.oppTcode)!.logo_url } : null} size={16} /> {g.oppName}
+                            </span>
+                            <span className="sched-score">
+                              {g.teamScore}-{g.oppScore}
+                            </span>
+                          </div>
+                        ))}
+                        {(sched as typeof homeSchedule).length === 0 && <div className="empty-note">기록 없음</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {h2h && (
+                <div className="preview-subsection">
+                  <div className="panel-title">역대 맞대결</div>
+                  {h2h.meetings > 0 ? (
+                    <>
+                      <p className="report-text">
+                        역대 맞대결 {h2h.meetings}경기 - {game.home_team?.name} {h2h.homeWins}승, {game.away_team?.name} {h2h.awayWins}승
+                      </p>
+                      <div className="table-scroll">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>날짜</th>
+                              <th>홈</th>
+                              <th>스코어</th>
+                              <th>원정</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {h2h.recentMeetings.map((m) => (
+                              <tr key={m.gmkey}>
+                                <td>{m.gameDate}</td>
+                                <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <TeamBadge team={teamMetaByTcode.get(m.homeTcode) ? { ...teamMetaByTcode.get(m.homeTcode)!, logoUrl: teamMetaByTcode.get(m.homeTcode)!.logo_url } : null} size={16} />
+                                  {teamMetaByTcode.get(m.homeTcode)?.name ?? m.homeTcode}
+                                </td>
+                                <td>
+                                  {m.homeScore}-{m.awayScore}
+                                </td>
+                                <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <TeamBadge team={teamMetaByTcode.get(m.awayTcode) ? { ...teamMetaByTcode.get(m.awayTcode)!, logoUrl: teamMetaByTcode.get(m.awayTcode)!.logo_url } : null} size={16} />
+                                  {teamMetaByTcode.get(m.awayTcode)?.name ?? m.awayTcode}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="empty-note">이 경기 이전 맞대결 기록 없음(첫 대결 또는 신생팀)</div>
+                  )}
+                </div>
+              )}
+
+              {standings.length > 0 && (
+                <div className="preview-subsection">
+                  <div className="panel-title">
+                    리그 순위 ({game.season_name} 정규시즌, 이 경기 시점 기준)
+                  </div>
+                  <div className="table-scroll">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>팀</th>
+                          <th>W</th>
+                          <th>L</th>
+                          <th>PCT</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {standings.map((r, i) => {
+                          const tm = teamMetaByTcode.get(r.tcode);
+                          const isCurrent = r.tcode === game.home_team?.tcode || r.tcode === game.away_team?.tcode;
+                          return (
+                            <tr key={r.tcode} style={isCurrent ? { color: tm?.color } : undefined}>
+                              <td>{i + 1}</td>
+                              <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <TeamBadge team={tm ? { ...tm, logoUrl: tm.logo_url } : null} size={18} />
+                                {tm?.name ?? r.tcode}
+                              </td>
+                              <td>{r.wins}</td>
+                              <td>{r.losses}</td>
+                              <td>{(r.pct * 100).toFixed(1)}%</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
+          </details>
+        )}
+      </div>
+
+      {/* Act 2/3 - 경기중. 인터랙티브 리플레이(스코어보드/코트 위/플레이바이플레이/슛차트
+          등) 전체를 그대로 담되, 이제 명시적으로 "경기 중" 구간으로 라벨링. 예전엔("요청:
+          인터랙티브 리플레이가 메인이 되도록") 이 컴포넌트를 배너 바로 다음(페이지 맨
+          위/최우선)으로 올렸었는데, 이번 3막 구조 요청은 그 우선순위 배치보다 "경기 전 →
+          경기 중 → 경기 후"라는 시간 순서를 그대로 따르길 원해서 순서를 되돌림 - GameReplay
+          내부 동작/데이터는 전혀 안 바뀜, 페이지 안에서의 위치와 섹션 라벨만 바뀜. */}
+      {game.home_team && game.away_team && derivedEvents.length > 0 && (
+        <div className="game-act">
+          <ActHeader num={2} title="경기중 인터랙티브 문자중계" />
+          <GameReplay
+            events={derivedEvents}
+            players={replayPlayers}
+            homeTeam={{
+              tcode: game.home_team.tcode,
+              name: game.home_team.name,
+              abbr: game.home_team.abbr,
+              color: game.home_team.color,
+              logoUrl: game.home_team.logo_url,
+            }}
+            awayTeam={{
+              tcode: game.away_team.tcode,
+              name: game.away_team.name,
+              abbr: game.away_team.abbr,
+              color: game.away_team.color,
+              logoUrl: game.away_team.logo_url,
+            }}
+            shots={shots}
+            homeNetRating={homeSeasonStats ? homeSeasonStats.ppg - homeSeasonStats.oppPpg : null}
+            awayNetRating={awaySeasonStats ? awaySeasonStats.ppg - awaySeasonStats.oppPpg : null}
+            lineupRatings={lineupRatings}
+            playerOnOff={playerOnOff}
+          />
         </div>
       )}
 
-      <div className="panel">
-        <div className="panel-title">팀 스탯</div>
-        {homeTeam && awayTeam ? (
-          <>
-            {tsPctRow("FG%", homeTeam.fgm ?? 0, homeTeam.fga ?? 0, awayTeam.fgm ?? 0, awayTeam.fga ?? 0, hColor, aColor)}
-            {tsPctRow("3PT%", homeTeam.tpm ?? 0, homeTeam.tpa ?? 0, awayTeam.tpm ?? 0, awayTeam.tpa ?? 0, hColor, aColor)}
-            {tsPctRow("FT%", homeTeam.ftm ?? 0, homeTeam.fta ?? 0, awayTeam.ftm ?? 0, awayTeam.fta ?? 0, hColor, aColor)}
-            {tsCountRow("턴오버", homeTeam.turnovers ?? 0, awayTeam.turnovers ?? 0, hColor, aColor)}
-            {tsCountRow("리바운드", homeTeam.reb ?? 0, awayTeam.reb ?? 0, hColor, aColor)}
-            {tsCountRow("어시스트", homeTeam.ast ?? 0, awayTeam.ast ?? 0, hColor, aColor)}
-            {tsCountRow("스틸", homeTeam.stl ?? 0, awayTeam.stl ?? 0, hColor, aColor)}
-            {tsCountRow("블록", homeTeam.blk ?? 0, awayTeam.blk ?? 0, hColor, aColor)}
-            {tsCountRow("파울", homeTeam.fouls ?? 0, awayTeam.fouls ?? 0, hColor, aColor)}
-            {tsCountRow("최대 리드", largestLeadHome, largestLeadAway, hColor, aColor)}
-          </>
-        ) : (
-          <div className="empty-note">팀 스탯 데이터 없음</div>
+      {/* Act 3/3 - 경기후. AI 코트사이드 리포트(요청 - 시간 언급 클릭 시 위 Act 2 리플레이로
+          스크롤+이동, lib/postgameReport.ts의 report-jump-link) + 팀 스탯. */}
+      <div className="game-act">
+        <ActHeader num={3} title="경기후 AI코트사이드 리포트" />
+        {reportSections.length > 0 && (
+          <div className="panel">
+            <div className="panel-title">🏀 AI 코트사이드 리포트</div>
+            {reportSections.map((s) => (
+              <div className="report-section" key={s.title}>
+                <div className="report-section-title">{s.title}</div>
+                <div dangerouslySetInnerHTML={{ __html: s.html }} />
+              </div>
+            ))}
+          </div>
         )}
+
+        {/* 요청 항목 7("예측값이 얼마나 맞았는지") - Act 1에서 만든 것과 정확히 같은
+            PreviewInsight 배열(previewInsights)을 그대로 다시 순회하며, 각 항목 옆에 이번 경기
+            실제 값을 나란히 보여줌(lib/matchupInsights.ts의 gradeMatchupInsights). win_prob만
+            "적중/빗나감"을 명시적으로 판정(postgameReport.ts의 "경기 결과" 문장과 같은
+            preActPct 기준이라 서로 모순되지 않음) - 나머지는 예측-실제를 나란히 보여주기만 하고
+            자동으로 "맞았다/틀렸다"를 억지로 판정하지 않음(이 프로젝트의 정직성 원칙 - 성급한
+            확신 대신 근거를 그대로 노출). trend는 채점 대상에서 제외(gradeMatchupInsights가
+            null 반환) - 참고 정보로만 카드가 남음. */}
+        {previewInsights.length > 0 && insightGrades.length > 0 && (
+          <div className="panel">
+            <div className="panel-title">🎯 예측 정확도 (프리뷰 인사이트 vs 실제 결과)</div>
+            {previewInsights.map((insight, i) => (
+              <InsightCard
+                key={i}
+                insight={insight}
+                hColor={hColor}
+                aColor={aColor}
+                homeTname={game.home_team?.name ?? ""}
+                awayTname={game.away_team?.name ?? ""}
+                actual={insightGrades[i] ?? null}
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="panel">
+          <div className="panel-title">팀 스탯</div>
+          {homeTeam && awayTeam ? (
+            <>
+              {tsPctRow("FG%", homeTeam.fgm ?? 0, homeTeam.fga ?? 0, awayTeam.fgm ?? 0, awayTeam.fga ?? 0, hColor, aColor)}
+              {tsPctRow("3PT%", homeTeam.tpm ?? 0, homeTeam.tpa ?? 0, awayTeam.tpm ?? 0, awayTeam.tpa ?? 0, hColor, aColor)}
+              {tsPctRow("FT%", homeTeam.ftm ?? 0, homeTeam.fta ?? 0, awayTeam.ftm ?? 0, awayTeam.fta ?? 0, hColor, aColor)}
+              {tsCountRow("턴오버", homeTeam.turnovers ?? 0, awayTeam.turnovers ?? 0, hColor, aColor)}
+              {tsCountRow("리바운드", homeTeam.reb ?? 0, awayTeam.reb ?? 0, hColor, aColor)}
+              {tsCountRow("어시스트", homeTeam.ast ?? 0, awayTeam.ast ?? 0, hColor, aColor)}
+              {tsCountRow("스틸", homeTeam.stl ?? 0, awayTeam.stl ?? 0, hColor, aColor)}
+              {tsCountRow("블록", homeTeam.blk ?? 0, awayTeam.blk ?? 0, hColor, aColor)}
+              {tsCountRow("파울", homeTeam.fouls ?? 0, awayTeam.fouls ?? 0, hColor, aColor)}
+              {tsCountRow("최대 리드", largestLeadHome, largestLeadAway, hColor, aColor)}
+            </>
+          ) : (
+            <div className="empty-note">팀 스탯 데이터 없음</div>
+          )}
+        </div>
       </div>
 
       <footer className="foot">Supabase에서 실시간 조회 · {gmkey}</footer>
