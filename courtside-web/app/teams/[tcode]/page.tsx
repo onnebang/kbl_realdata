@@ -24,6 +24,8 @@ import {
   type TeamZoneProfile,
 } from "@/lib/teamDataScience";
 import styles from "./team-profile.module.css";
+import { ChangeLine } from "@/components/RosterChangeLine";
+import { getTeamRosterChanges, type TeamRosterChanges } from "@/lib/preseason";
 
 // 팀 프로필 "데이터 사이언스 + 데이터로 아름다움" 대개편(요청) - 선수 프로필과 같은 디자인
 // 언어: 히어로 배경 아트 = 이 팀의 이 시즌 슛 전체를 팀 컬러 별자리로(선수판은 커리어,
@@ -364,6 +366,28 @@ function ZoneProfilePanel({ zp, seasonName }: { zp: TeamZoneProfile | null; seas
   );
 }
 
+// ── 0. 로스터 변화(개막 전) - roster_changes(tools/build_roster_changes.py)에 이 시즌·이 팀 행이
+//    있을 때만 렌더(과거 시즌·로스터 미수신 시즌은 null이라 아무것도 안 나옴). 한 줄 렌더는
+//    /preseason과 같은 컴포넌트(components/RosterChangeLine.tsx)를 써서 표기가 갈라지지 않게.
+function RosterChangesPanel({ rc, abbrOf }: { rc: TeamRosterChanges; abbrOf: (tcode: string | null) => string | null }) {
+  const rows = [...rc.in, ...rc.new, ...rc.stay, ...rc.out];
+  if (!rows.length) return null;
+  return (
+    <div className={styles.panel}>
+      <div className={styles.panelTitle}>
+        이번 시즌 로스터 변화 · 영입 {rc.in.length} · 신입 {rc.new.length} · 잔류 {rc.stay.length} · 이탈 {rc.out.length}
+      </div>
+      {rows.map((r) => (
+        <ChangeLine key={`${r.change}-${r.name}`} r={r} abbrOf={abbrOf} />
+      ))}
+      <div className={styles.pctNote}>
+        확정 로스터를 지난 시즌 출전 기록과 대조한 결과 · 성적은 그 선수의 마지막 KBL 시즌 기준 · 국내 선수 로스터가 들어오면 자동 반영 ·{" "}
+        <Link href="/preseason">리그 전체 이동 지도와 시즌 전망 →</Link>
+      </div>
+    </div>
+  );
+}
+
 export default async function TeamPage({
   params,
   searchParams,
@@ -380,7 +404,7 @@ export default async function TeamPage({
 
   // 1차 병렬: 시즌만 정해지면 되는 조회 전부. 슛/프리게임 승률만 gmkey 목록(스케줄)이
   // 필요해 2차로(워터폴 1단).
-  const [schedule, opponents, fourFactors, roster, units, zoneProfile, standings] = await Promise.all([
+  const [schedule, opponents, fourFactors, roster, units, zoneProfile, standings, rosterChanges] = await Promise.all([
     getTeamSeasonSchedule(tcode, activeSeason),
     supabase.from("teams").select("tcode, name, abbr, color, logo_url").then((r) => r.data ?? []),
     getTeamFourFactors(tcode, activeSeason),
@@ -388,6 +412,7 @@ export default async function TeamPage({
     getBestUnits(tcode, activeSeason),
     getTeamZoneProfile(tcode, activeSeason),
     getStandingsAsOf(activeSeason, "9999-12-31"),
+    getTeamRosterChanges(activeSeason, tcode),
   ]);
   const gmkeys = schedule.map((g) => g.gmkey);
   const [shots, homeProbs] = await Promise.all([getTeamSeasonShots(tcode, gmkeys), getPregameProbs(gmkeys)]);
@@ -476,6 +501,9 @@ export default async function TeamPage({
           시즌 보기
         </button>
       </form>
+
+      {/* ── 0. 로스터 변화(개막 전에만 - 아래 조회가 null이면 렌더 안 함) ── */}
+      {rosterChanges && <RosterChangesPanel rc={rosterChanges} abbrOf={(t) => (t ? (oppByTcode.get(t)?.abbr ?? t) : null)} />}
 
       {/* ── 1. 4팩터 vs 리그 ── */}
       <div className={styles.panel}>

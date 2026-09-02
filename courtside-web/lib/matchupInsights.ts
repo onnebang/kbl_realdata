@@ -51,6 +51,7 @@ export type PreviewInsight =
       reb: number;
       sharedSeconds: number;
       gameDate: string;
+      priorLabel?: string; // "직전 경기(날짜)" 또는 개막 전 "지난 시즌(25-26) 마지막 경기(날짜)" - 카드 문구용
     }
   | { kind: "trend"; team: "home" | "away"; text: string; wins: number; losses: number; avgMargin: number }
   | { kind: "oreb_watch"; team: "home" | "away"; orebPct: number; leagueAvgOrebPct: number; reason: string }
@@ -63,6 +64,7 @@ export type PreviewInsight =
 export type PriorGameData = {
   gmkey: string;
   gameDate: string;
+  seasonName?: string; // 이 직전 경기가 열린 시즌 - 지금 보는 경기와 다르면(개막 전) 문구에 명시
   homeTcode: string; // 이 직전 경기 자체의 홈팀(지금 보고 있는 이 경기의 홈/원정과는 다른 개념)
   awayTcode: string;
   box: PlayerBox[];
@@ -93,6 +95,20 @@ const ZONE_LABEL_KO: Record<string, string> = {
   midLong: "롱2(미드~3점 사이)",
   three: "3점",
 };
+
+// "직전 경기(날짜)" 라벨 - 개막 전엔 같은 시즌 경기가 아직 없어서 그 직전 경기가 지난 시즌 경기다.
+// 그 사실을 문구에 그대로 드러낸다(시즌 중엔 기존 문구 그대로). 게이트 자체(이미 팀을 떠난 선수
+// 제외)는 각 빌더가 departed(roster_changes 'out' pcode)로 처리.
+function shortSeasonLabel(season: string): string {
+  const [a, b] = season.split("-");
+  return `${a.slice(2)}-${b.slice(2)}`;
+}
+function priorGameLabel(priorGame: PriorGameData, seasonName: string): string {
+  if (priorGame.seasonName && priorGame.seasonName !== seasonName) {
+    return `지난 시즌(${shortSeasonLabel(priorGame.seasonName)}) 마지막 경기(${priorGame.gameDate})`;
+  }
+  return `직전 경기(${priorGame.gameDate})`;
+}
 
 // ---------------------------------------------------------------------------
 // Insight 1: watch_player - 직전 경기 스포트라이트(gameScore 기준, postgameReport.ts의
@@ -159,10 +175,14 @@ async function buildWatchPlayerInsight(
   theirTcode: string,
   priorGame: PriorGameData | null,
   seasonName: string,
-  gameDate: string
+  gameDate: string,
+  departed?: Set<string>
 ): Promise<PreviewInsight | null> {
   if (!priorGame) return null;
-  const standout = teamTopPerformer(priorGame.box, theirTcode);
+  // 개막 전: 직전 경기가 지난 시즌 경기라 이미 팀을 떠난 선수가 "막아야 할 선수"로 뽑힌다(실측 -
+  // 26-27 예정 경기 프리뷰가 25-26 소속 기준). 떠난 선수는 후보에서 빼고 남은 선수 중 최고 활약.
+  const box = departed?.size ? priorGame.box.filter((b) => !departed.has(b.pcode)) : priorGame.box;
+  const standout = teamTopPerformer(box, theirTcode);
   if (!standout) return null;
 
   const statLine = `${standout.pts}점 (FG ${standout.fgm}/${standout.fga}) ${standout.reb}REB ${standout.ast}AST ${standout.stl}STL ${standout.blk}BLK`;
@@ -176,7 +196,7 @@ async function buildWatchPlayerInsight(
   const tendency = buildShotTendencyNote(shots);
 
   const reason =
-    `직전 경기(${priorGame.gameDate}) 게임스코어 기준 팀 내 최고 활약` +
+    `${priorGameLabel(priorGame, seasonName)} 게임스코어 기준 팀 내 최고 활약` +
     (tendency ? ` - ${tendency.text}${usedSeasonFallback ? "(표본은 시즌 누적 슛 기준)" : ""}` : "");
 
   return {
@@ -199,14 +219,17 @@ function buildWeakDefenderInsight(
   theirTcode: string,
   theirPriorGame: PriorGameData | null,
   ourPriorGame: PriorGameData | null,
-  ourTcode: string
+  ourTcode: string,
+  seasonName: string,
+  theirDeparted?: Set<string>,
+  ourDeparted?: Set<string>
 ): PreviewInsight | null {
   if (!theirPriorGame) return null;
 
   const pm = computeFinalPlusMinus(theirPriorGame.events, theirPriorGame.players, theirPriorGame.homeTcode, theirPriorGame.awayTcode);
   let worst: { pcode: string; value: number } | null = null;
   for (const p of theirPriorGame.players) {
-    if (p.tcode !== theirTcode) continue;
+    if (p.tcode !== theirTcode || theirDeparted?.has(p.pcode)) continue;
     const minutes = theirPriorGame.minutesByPcode.get(p.pcode) ?? 0;
     if (minutes < MIN_MINUTES_FOR_WEAK_DEFENDER) continue;
     const value = pm.get(p.pcode) ?? 0;
@@ -221,7 +244,7 @@ function buildWeakDefenderInsight(
   if (!ourPriorGame) return null;
   let ourTarget: { pcode: string; name: string; usage: number } | null = null;
   for (const p of ourPriorGame.players) {
-    if (p.tcode !== ourTcode) continue;
+    if (p.tcode !== ourTcode || ourDeparted?.has(p.pcode)) continue;
     const usage = ourPriorGame.usageByPcode.get(p.pcode) ?? 0;
     if (!ourTarget || usage > ourTarget.usage) {
       ourTarget = { pcode: p.pcode, name: ourPriorGame.box.find((b) => b.pcode === p.pcode)?.name ?? p.pcode, usage };
@@ -230,7 +253,7 @@ function buildWeakDefenderInsight(
   if (!ourTarget) return null;
 
   const reason =
-    `${theirName} 지난 경기(${theirPriorGame.gameDate}) +/- ${worst.value > 0 ? "+" : ""}${worst.value} ` +
+    `${theirName} ${priorGameLabel(theirPriorGame, seasonName)} +/- ${worst.value > 0 ? "+" : ""}${worst.value} ` +
     `(${theirMinutes.toFixed(0)}분 출전) - 팀이 이 선수 출전 중 열세였음(직접적인 수비 기록이 아니라 온코트 득실차 프록시).`;
 
   return {
@@ -327,7 +350,13 @@ export function computeComboTotals(events: GameEvent[], players: PlayerStartInfo
   return totals;
 }
 
-function buildComboSynergyInsight(team: "home" | "away", tcode: string, priorGame: PriorGameData | null): PreviewInsight | null {
+function buildComboSynergyInsight(
+  team: "home" | "away",
+  tcode: string,
+  priorGame: PriorGameData | null,
+  seasonName: string,
+  departed?: Set<string>
+): PreviewInsight | null {
   if (!priorGame) return null;
   const totals = computeComboTotals(priorGame.events, priorGame.players, tcode);
 
@@ -336,6 +365,7 @@ function buildComboSynergyInsight(team: "home" | "away", tcode: string, priorGam
   let best: { agg: ComboTotal } | null = null;
   let bestPerPlayer = -1;
   for (const agg of totals.values()) {
+    if (departed?.size && agg.pcodes.some((p) => departed.has(p))) continue; // 떠난 선수가 낀 조합은 이번 시즌엔 재현 불가
     if (agg.seconds < MIN_COMBO_SECONDS_TOGETHER) continue;
     const total = agg.pts + agg.ast + agg.reb;
     if (total < MIN_COMBO_TOTAL_STAT) continue;
@@ -359,19 +389,23 @@ function buildComboSynergyInsight(team: "home" | "away", tcode: string, priorGam
     reb: best.agg.reb,
     sharedSeconds: best.agg.seconds,
     gameDate: priorGame.gameDate,
+    priorLabel: priorGameLabel(priorGame, seasonName),
   };
 }
 
 // ---------------------------------------------------------------------------
 // Insight 4: trend - getRecentSchedule(이미 fetch된 것) 기반 단순 W-L/평균 마진.
 // ---------------------------------------------------------------------------
-function buildTrendInsight(team: "home" | "away", schedule: ScheduleGame[]): PreviewInsight | null {
+function buildTrendInsight(team: "home" | "away", schedule: ScheduleGame[], seasonName?: string): PreviewInsight | null {
   if (!schedule.length) return null;
+  // 개막 전엔 "최근 N경기"가 전부 지난 시즌 경기 - 이번 시즌 성적처럼 읽히지 않도록 문구에 명시.
+  const crossSeason = seasonName != null && schedule[0].seasonName != null && schedule[0].seasonName !== seasonName;
+  const scope = crossSeason ? `지난 시즌(${shortSeasonLabel(schedule[0].seasonName!)}) 마지막` : "최근";
   const wins = schedule.filter((g) => g.teamScore > g.oppScore).length;
   const losses = schedule.length - wins;
   const avgMargin = schedule.reduce((s, g) => s + (g.teamScore - g.oppScore), 0) / schedule.length;
   const rounded = Math.round(avgMargin * 10) / 10;
-  const text = `최근 ${schedule.length}경기 ${wins}승 ${losses}패, 평균 마진 ${rounded >= 0 ? "+" : ""}${rounded.toFixed(1)}점.`;
+  const text = `${scope} ${schedule.length}경기 ${wins}승 ${losses}패, 평균 마진 ${rounded >= 0 ? "+" : ""}${rounded.toFixed(1)}점.`;
   return { kind: "trend", team, text, wins, losses, avgMargin: rounded };
 }
 
@@ -396,7 +430,8 @@ function buildOrebWatchInsight(team: "home" | "away", seasonStats: SeasonStats |
 async function getSeasonBlockLeader(
   tcode: string,
   seasonName: string,
-  beforeDate: string
+  beforeDate: string,
+  departed?: Set<string>
 ): Promise<{ pcode: string; name: string; blkPg: number; gp: number } | null> {
   const { data: games } = await supabase
     .from("games")
@@ -425,14 +460,21 @@ async function getSeasonBlockLeader(
   }
   let best: { pcode: string; name: string; blkPg: number; gp: number } | null = null;
   for (const [pcode, a] of agg) {
+    if (departed?.has(pcode)) continue;
     const blkPg = a.blkSum / a.gp;
     if (!best || blkPg > best.blkPg) best = { pcode, name: a.name, blkPg, gp: a.gp };
   }
   return best;
 }
 
-async function buildBlockWatchInsight(team: "home" | "away", tcode: string, seasonName: string, beforeDate: string): Promise<PreviewInsight | null> {
-  const leader = await getSeasonBlockLeader(tcode, seasonName, beforeDate);
+async function buildBlockWatchInsight(
+  team: "home" | "away",
+  tcode: string,
+  seasonName: string,
+  beforeDate: string,
+  departed?: Set<string>
+): Promise<PreviewInsight | null> {
+  const leader = await getSeasonBlockLeader(tcode, seasonName, beforeDate, departed);
   if (!leader || leader.gp < BLOCK_WATCH_MIN_GP || leader.blkPg < BLOCK_WATCH_MIN_BPG) return null;
   const reason = `시즌 평균 ${leader.blkPg.toFixed(1)}블록/경기로 팀 내 1위(${leader.gp}경기 기준) - 골밑 시도 때 이 선수의 블록을 조심.`;
   return { kind: "block_watch", team, pcode: leader.pcode, name: leader.name, blkPg: leader.blkPg, reason };
@@ -463,32 +505,35 @@ export type BuildInsightsInput = {
   homeWinProb: number | null;
   homePriorGame: PriorGameData | null;
   awayPriorGame: PriorGameData | null;
+  // 개막 전 게이트 - roster_changes 'out'(이미 팀을 떠난 선수) pcode. 없으면 게이트 없음(시즌 중 기존 동작).
+  homeDeparted?: Set<string>;
+  awayDeparted?: Set<string>;
 };
 
 export async function buildMatchupInsights(input: BuildInsightsInput): Promise<PreviewInsight[]> {
   const insights: PreviewInsight[] = [];
 
   const [homeWatch, awayWatch, homeBlock, awayBlock] = await Promise.all([
-    buildWatchPlayerInsight("home", input.homeTcode, input.homePriorGame, input.seasonName, input.gameDate),
-    buildWatchPlayerInsight("away", input.awayTcode, input.awayPriorGame, input.seasonName, input.gameDate),
-    buildBlockWatchInsight("home", input.homeTcode, input.seasonName, input.gameDate),
-    buildBlockWatchInsight("away", input.awayTcode, input.seasonName, input.gameDate),
+    buildWatchPlayerInsight("home", input.homeTcode, input.homePriorGame, input.seasonName, input.gameDate, input.homeDeparted),
+    buildWatchPlayerInsight("away", input.awayTcode, input.awayPriorGame, input.seasonName, input.gameDate, input.awayDeparted),
+    buildBlockWatchInsight("home", input.homeTcode, input.seasonName, input.gameDate, input.homeDeparted),
+    buildBlockWatchInsight("away", input.awayTcode, input.seasonName, input.gameDate, input.awayDeparted),
   ]);
   if (homeWatch) insights.push(homeWatch);
   if (awayWatch) insights.push(awayWatch);
 
-  const homeWeak = buildWeakDefenderInsight("home", input.homeTcode, input.homePriorGame, input.awayPriorGame, input.awayTcode);
-  const awayWeak = buildWeakDefenderInsight("away", input.awayTcode, input.awayPriorGame, input.homePriorGame, input.homeTcode);
+  const homeWeak = buildWeakDefenderInsight("home", input.homeTcode, input.homePriorGame, input.awayPriorGame, input.awayTcode, input.seasonName, input.homeDeparted, input.awayDeparted);
+  const awayWeak = buildWeakDefenderInsight("away", input.awayTcode, input.awayPriorGame, input.homePriorGame, input.homeTcode, input.seasonName, input.awayDeparted, input.homeDeparted);
   if (homeWeak) insights.push(homeWeak);
   if (awayWeak) insights.push(awayWeak);
 
-  const homeCombo = buildComboSynergyInsight("home", input.homeTcode, input.homePriorGame);
-  const awayCombo = buildComboSynergyInsight("away", input.awayTcode, input.awayPriorGame);
+  const homeCombo = buildComboSynergyInsight("home", input.homeTcode, input.homePriorGame, input.seasonName, input.homeDeparted);
+  const awayCombo = buildComboSynergyInsight("away", input.awayTcode, input.awayPriorGame, input.seasonName, input.awayDeparted);
   if (homeCombo) insights.push(homeCombo);
   if (awayCombo) insights.push(awayCombo);
 
-  const homeTrend = buildTrendInsight("home", input.homeSchedule);
-  const awayTrend = buildTrendInsight("away", input.awaySchedule);
+  const homeTrend = buildTrendInsight("home", input.homeSchedule, input.seasonName);
+  const awayTrend = buildTrendInsight("away", input.awaySchedule, input.seasonName);
   if (homeTrend) insights.push(homeTrend);
   if (awayTrend) insights.push(awayTrend);
 

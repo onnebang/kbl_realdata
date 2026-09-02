@@ -1,0 +1,558 @@
+/* 개막 리포트(/preseason) - 팀/선수 프로필과 같은 디자인 언어(Big Shoulders Display 숫자,
+   IBM Plex Mono 라벨, Pretendard 본문)를 페이지 스코프 CSS Module로. 토큰을 .pageRoot에
+   다시 정의하는 이유도 team-profile.module.css와 동일(전역 :root를 건드리지 않기 위해). */
+.pageRoot {
+  --bg: #f4f5f8;
+  --surface: #ffffff;
+  --surface-soft: #eceef3;
+  --ink: #14161c;
+  --ink-soft: #5b5f6e;
+  --ink-faint: #9297a880;
+  --gold: #9a6b00;
+  --gold-soft: #9a6b0022;
+  --positive: #1a7f37;
+  --positive-soft: #1a7f3722;
+  --negative: #c0392b;
+  --negative-soft: #c0392b22;
+  --line-rgb: 20, 22, 28;
+  color: var(--ink);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pageRoot {
+    --bg: #0f1115;
+    --surface: #1a1d24;
+    --surface-soft: #23272f;
+    --ink: #f2f3f7;
+    --ink-soft: #9297a8;
+    --ink-faint: #6a6f7f90;
+    --gold: #ffd166;
+    --gold-soft: #ffd16626;
+    --positive: #4ade80;
+    --positive-soft: #4ade8026;
+    --negative: #f87171;
+    --negative-soft: #f8717126;
+    --line-rgb: 242, 243, 247;
+  }
+}
+:root[data-theme="dark"] .pageRoot {
+  --bg: #0f1115;
+  --surface: #1a1d24;
+  --surface-soft: #23272f;
+  --ink: #f2f3f7;
+  --ink-soft: #9297a8;
+  --ink-faint: #6a6f7f90;
+  --gold: #ffd166;
+  --gold-soft: #ffd16626;
+  --positive: #4ade80;
+  --positive-soft: #4ade8026;
+  --negative: #f87171;
+  --negative-soft: #f8717126;
+  --line-rgb: 242, 243, 247;
+}
+
+/* ── 히어로: 위임적 다크 포스터(프로필 히어로와 같은 원칙 - 라이트/다크 동일, 색 직접 칠함) ── */
+.hero {
+  --hero-ink: #f4f5f8;
+  --hero-ink-soft: rgba(244, 245, 248, 0.72);
+  --hero-ink-faint: rgba(244, 245, 248, 0.42);
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  margin-top: 18px;
+  min-height: 300px;
+  display: flex;
+  align-items: flex-end;
+  background: #0b0d12;
+  background: linear-gradient(128deg, #2a1f05 0%, #0b0d12 48%, #101a2c 100%);
+  color: var(--hero-ink);
+}
+/* 배경 아트: 개막까지의 날짜를 세는 눈금 - 10월 3일까지 하루 = 눈금 하나(순수 CSS 반복 그라데이션,
+   JS 없음). 왼쪽 밀도가 높고 오른쪽으로 갈수록 옅어지는 마스크로 '카운트다운' 느낌. */
+.heroTicks {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, rgba(255, 209, 102, 0.22) 0 1px, transparent 1px 22px);
+  -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.35) 55%, transparent 100%);
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.35) 55%, transparent 100%);
+  pointer-events: none;
+}
+.heroScrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(6, 8, 12, 0.82) 0%, rgba(6, 8, 12, 0.2) 60%, rgba(6, 8, 12, 0) 100%);
+}
+.heroDday {
+  position: absolute;
+  top: -10px;
+  right: 16px;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: clamp(110px, 24vw, 220px);
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 2px rgba(255, 209, 102, 0.36);
+  letter-spacing: -0.02em;
+  pointer-events: none;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+.heroContent {
+  position: relative;
+  padding: 30px 28px 24px;
+  width: 100%;
+}
+.heroKicker {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--hero-ink-faint);
+  margin-bottom: 8px;
+}
+.heroTitle {
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-weight: 800;
+  font-size: clamp(30px, 6vw, 50px);
+  line-height: 1.04;
+  margin: 0 0 10px;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.heroLede {
+  max-width: 62ch;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--hero-ink-soft);
+  margin: 0;
+}
+.heroStatRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(244, 245, 248, 0.14);
+}
+.heroStatVal {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 34px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.heroStatLabel {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--hero-ink-faint);
+  margin-top: 4px;
+}
+
+/* ── 공통 패널 ── */
+.panel {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+.panelTitle {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+.panelLede {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin: 0 0 12px;
+  max-width: 70ch;
+}
+.note {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  margin-top: 10px;
+  line-height: 1.5;
+}
+.sectionNum {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--gold);
+  margin-right: 8px;
+  vertical-align: -2px;
+}
+
+/* ── 1. 시즌 전망 ── */
+.outlookGrid {
+  display: grid;
+  gap: 6px;
+}
+.outlookRow {
+  display: grid;
+  grid-template-columns: 28px minmax(84px, 130px) 1fr 132px 80px;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.outlookRow:hover {
+  background: var(--surface-soft);
+}
+.outlookHead {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.outlookHead:hover {
+  background: none;
+}
+.outlookRank {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--ink-faint);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.outlookTeam {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.outlookTrack {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+.outlookFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  opacity: 0.92;
+}
+.outlookMid {
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  bottom: -1px;
+  width: 1px;
+  background: rgba(var(--line-rgb), 0.32);
+}
+.outlookVal {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.outlookValBig {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  margin-right: 4px;
+}
+.outlookValSub {
+  color: var(--ink-faint);
+}
+.outlookPrev {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  text-align: right;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.delta {
+  display: inline-block;
+  min-width: 34px;
+  margin-left: 4px;
+  font-weight: 700;
+}
+.deltaUp {
+  color: var(--positive);
+}
+.deltaDown {
+  color: var(--negative);
+}
+.deltaFlat {
+  color: var(--ink-faint);
+}
+
+/* ── 2. 로스터 이동 지도 ── */
+.headlineRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.headlineTile {
+  background: var(--surface-soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.headlineLabel {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+}
+.headlineVal {
+  font-weight: 800;
+  font-size: 16px;
+  margin-top: 4px;
+  line-height: 1.25;
+}
+.headlineSub {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.moveList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.moveList li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.moveArrow {
+  color: var(--ink-faint);
+}
+.teamGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+.teamCard {
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 12px;
+  padding: 12px 14px 10px;
+  border-top-width: 3px;
+}
+.teamCardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 14px;
+  margin-bottom: 8px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.teamCardSum {
+  margin-left: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.changeRow {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 5px 0;
+  border-top: 1px dashed rgba(var(--line-rgb), 0.1);
+}
+.changeRow:first-of-type {
+  border-top: none;
+}
+.chip {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 0;
+  border-radius: 6px;
+  text-align: center;
+  margin-top: 2px;
+}
+.chipIn {
+  background: var(--positive-soft);
+  color: var(--positive);
+}
+.chipOut {
+  background: var(--negative-soft);
+  color: var(--negative);
+}
+.chipNew {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+.chipStay {
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+}
+.changeName {
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.changeName:hover {
+  text-decoration: underline;
+}
+.changeRole {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  margin-left: 5px;
+}
+.changeStat {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  margin-top: 1px;
+  font-variant-numeric: tabular-nums;
+}
+.changeFrom {
+  color: var(--ink-faint);
+}
+
+/* ── 3. 데모 경기 ── */
+.actRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.actCard {
+  background: var(--surface-soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.actNum {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  color: var(--gold);
+  line-height: 1;
+}
+.actTitle {
+  font-weight: 800;
+  font-size: 13.5px;
+  margin-top: 4px;
+}
+.actBody {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+.demoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+.demoCard {
+  display: block;
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 12px;
+  padding: 12px 14px;
+  text-decoration: none;
+  color: var(--ink);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.demoCard:hover {
+  transform: translateY(-1px);
+  border-color: rgba(var(--line-rgb), 0.28);
+}
+.demoTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+.demoTag {
+  margin-left: auto;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--gold-soft);
+  color: var(--gold);
+  white-space: nowrap;
+}
+.demoScore {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 6px;
+}
+.demoTeam {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 12.5px;
+  min-width: 0;
+}
+.demoTeam span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.demoTeamAway {
+  justify-content: flex-end;
+}
+.demoNum {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.demoNumLose {
+  color: var(--ink-faint);
+}
+.demoWhy {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.demoCta {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--gold);
+  margin-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .outlookRow {
+    grid-template-columns: 22px minmax(70px, 100px) 1fr 96px;
+  }
+  .outlookPrev {
+    display: none;
+  }
+  .heroDday {
+    font-size: 96px;
+    top: 6px;
+  }
+}

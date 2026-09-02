@@ -5,6 +5,7 @@ import Link from "next/link";
 // 대로 여기 추가(순서: 승리기여도 → 득점분포 → 선수프로필 → 폼지수 → 인터랙티브 리플레이).
 const LINKS = [
   { href: "/", label: "경기 목록" },
+  { href: "/preseason", label: "개막 리포트" },
   { href: "/season-browser", label: "시즌 브라우저" },
   { href: "/leaderboards/win-contribution", label: "승리 기여도" },
   { href: "/leaderboards/scoring-explorer", label: "득점 분포" },

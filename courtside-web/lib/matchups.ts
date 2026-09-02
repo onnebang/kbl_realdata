@@ -28,6 +28,7 @@ export type SeasonStats = {
 export type ScheduleGame = {
   gmkey: string;
   gameDate: string;
+  seasonName?: string; // 이 경기가 열린 시즌 - 개막 전 프리뷰가 지난 시즌 경기를 "직전 경기"로 쓸 때 문구에 명시하기 위해
   oppTcode: string;
   oppName: string;
   isHome: boolean;
@@ -135,6 +136,7 @@ export async function getRecentSchedule(tcode: string, beforeDate: string, limit
     return {
       gmkey: g.gmkey as string,
       gameDate: g.game_date as string,
+      seasonName: g.season_name as string,
       oppTcode,
       // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - 이 경기 자체의
       // season_name 기준(조회 중인 경기의 시즌이 아니라, 이 상대전적이 실제로 열린
@@ -174,6 +176,7 @@ export async function getTeamSeasonSchedule(tcode: string, seasonName: string): 
       gmkey: g.gmkey as string,
       gameDate: g.game_date as string,
       seasonCategory: g.season_category as string,
+      seasonName,
       oppTcode,
       // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - 이 함수는 seasonName을
       // 인자로 이미 받고 있어서 그대로 재사용.

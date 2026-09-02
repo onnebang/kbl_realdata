@@ -68,7 +68,7 @@ export function InsightCard({
       title = `${tname} - ${insight.names.join("+")} 조합`;
       body = (
         <>
-          직전 경기({insight.gameDate}) 이 조합이 함께 뛴 동안 {insight.pts}득점 {insight.ast}어시 {insight.reb}리바 합작
+          {insight.priorLabel ?? `직전 경기(${insight.gameDate})`} 이 조합이 함께 뛴 동안 {insight.pts}득점 {insight.ast}어시 {insight.reb}리바 합작
           (동반 출전 {Math.round(insight.sharedSeconds / 60)}분).
         </>
       );
