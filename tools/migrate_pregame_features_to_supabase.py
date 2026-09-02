@@ -32,6 +32,13 @@ FIELDS = [
     ("last10_netrtg", "last10_netrtg"),
     ("venue_netrtg", "venueNetRtg"),
     ("netrtg", "netrtg"),
+    # 2026-09-02 Phase 1 추가 - 라이브 승률 모델(live_winprob_model.joblib)의 5개 피처 중
+    # synergyDiff의 원천. 원래 이 목록은 "프리뷰 UI가 읽는 필드만" 스코프였는데, 라이브
+    # 수집기(live_collector.py)가 경기 중 매 이벤트마다 이 값을 필요로 함 - DB에 없으면
+    # 0으로 추론하게 되고 실측상 승률이 11~13%p 어긋남(경기 종료 후 배치 재계산 시 승률이
+    # 툭 튀어 보임). FIELDS 한 줄이 migrate/sync 양쪽 컬럼 목록을 동시에 결정하므로
+    # sync_upcoming_games.py(예정 경기)도 이 줄만으로 같이 채워짐.
+    ("synergy_onoff_rating", "synergyOnOffRating"),
     ("roster_continuity", "rosterContinuity"),
     ("run_vuln_big_runs", "runVulnBigRuns"),
     ("foreign_concentration", "foreignConcentration"),

@@ -186,15 +186,30 @@ def get_conn():
     return psycopg2.connect(url)
 
 
-def load_events(cur, rows):
+EVENT_COLS = ("quarter", "clock_min", "clock_sec", "action_code", "pcode", "tcode",
+              "home_score", "away_score", "home_lineup", "away_lineup",
+              "home_win_prob", "wpa_home", "objective_prob")
+
+
+def load_events(cur, rows, replace=False):
+    """replace=False(기본) - 지금까지의 동작 그대로 DO NOTHING. 전체 4182경기 재이관 시
+    이미 넣은 행을 다시 쓰지 않아 훨씬 빠르고, 백필은 어차피 같은 값이라 무의미한 쓰기다.
+
+    replace=True - Phase 1(라이브) 추가. 라이브 수집기가 경기 도중 넣어둔 값은 '잠정치'
+    (진행중엔 최종 경기 길이를 몰라 remainingSec을 규정시간으로 추정하고, 라인업/pcode도
+    아직 확정 박스스코어가 아님)이므로, 경기 종료 후 배치가 반드시 덮어써야 한다.
+    DO NOTHING이면 그 잠정치가 영구히 남는다 - 그래서 종료 정산 경로(live_collector.py의
+    reconcile_finished_game)만 이 플래그를 켠다."""
     from psycopg2.extras import execute_values
+    conflict = "do nothing" if not replace else (
+        "do update set " + ", ".join(f"{c}=excluded.{c}" for c in EVENT_COLS))
     for i in range(0, len(rows), BATCH_SIZE):
         chunk = rows[i:i + BATCH_SIZE]
-        execute_values(cur, """
+        execute_values(cur, f"""
             insert into game_events (gmkey, event_order, quarter, clock_min, clock_sec,
                 action_code, pcode, tcode, home_score, away_score, home_lineup, away_lineup,
                 home_win_prob, wpa_home, objective_prob) values %s
-            on conflict (gmkey, event_order) do nothing
+            on conflict (gmkey, event_order) {conflict}
         """, chunk)
 
 
@@ -245,6 +260,10 @@ def main():
     ap.add_argument("--predict-chunk-games", type=int, default=500,
                      help="predict_proba를 몇 경기치씩 묶어서 부를지(전체를 한 번에 하면 "
                           "메모리를 너무 많이 씀 - 500경기치씩 나눠서 여러 번 호출)")
+    ap.add_argument("--replace", action="store_true",
+                    help="이미 있는 (gmkey,event_order) 행을 덮어씀(기본은 건너뜀). 라이브 "
+                         "수집기가 넣어둔 잠정 이벤트를 경기 종료 후 공식 데이터로 정정하는 "
+                         "경로(live_collector.reconcile_finished_game)가 사용.")
     ap.add_argument("--max-retries", type=int, default=5,
                      help="DB 연결이 끊기면 재연결해서 재시도할 최대 횟수(Session Pooler로 "
                           "오래 연결을 들고 있으면 가끔 끊김 - 실제로 겪음)")
@@ -346,7 +365,7 @@ def main():
                     gk, meta_rows, probs_all[start:end], probs_neutral_all[start:end]))
 
             def do_insert(c, rows=chunk_event_rows):
-                load_events(c, rows)
+                load_events(c, rows, replace=args.replace)
                 conn.commit()
             with_retry("이벤트 적재", do_insert)
             total_events += len(chunk_event_rows)

@@ -276,6 +276,27 @@ def load_games(cur, games_rows, coach_name_to_id):
     # 넣어둔 "예정" 행(스코어 NULL, is_ended=false)을 경기 종료 후 이 스크립트가 실제
     # 결과(스코어/감독/관중/is_ended=true)로 채워야 함. 예전 DO NOTHING이면 예정 행이
     # 영원히 스코어 없이 남음. 이미 완료된 행에 다시 돌아도 같은 값으로 덮어쓸 뿐이라 멱등.
+    #
+    # !!! 2026-09-02 수정 - 비파괴 UPSERT !!!
+    # 예전엔 전부 `= excluded.<col>`로 무조건 덮어썼는데, scan_all()은 team-record.json이
+    # 없거나 records.score가 비어 있으면 home_score/away_score를 **None으로 만든다**(위
+    # 141~152행). 그리고 live_collector.reconcile_finished_game()은 경기 종료 신호가
+    # 뜨자마자 이 스크립트를 --gmkeys로 부른다 - 즉 "KBL이 isEnded를 막 세웠지만 공식
+    # 박스스코어는 아직 안 올라온" 바로 그 순간에 호출된다. 그때 이 UPSERT가
+    # 90-80/종료 였던 행을 NULL/NULL로 되돌리고, courtside-web/lib/gameStatus.ts는
+    # `home_score IS NULL`을 '예정'으로 정의하므로 **다 끝난 경기가 이벤트 579건을
+    # 그대로 달고 사이트에서 '예정'으로 되돌아간다**(실제로 재현됨).
+    #
+    # 그래서 "정보가 있을 때만 덮어쓴다"로 바꾼다:
+    #   - NULL이 될 수 있는 컬럼은 coalesce(excluded, games) - 새 값이 있으면 갱신,
+    #     없으면(파일이 아직 없거나 필드가 비었으면) 기존 값 유지.
+    #   - is_ended는 단조(games.is_ended or excluded.is_ended) - 한 번 종료로 확정된
+    #     경기가 반쪽 재수집 때문에 '진행중'으로 되돌아가지 않게. live_collector의
+    #     update_game_row도 같은 규칙을 쓴다.
+    #   - season_name/season_category/game_date/tcode는 NOT NULL이고 scan_all이 값이
+    #     없으면 애초에 그 경기를 건너뛰므로(121~122행) 그대로 덮어쓴다.
+    # 실제 스코어 정정(오심 정정 등)은 excluded 값이 NOT NULL이라 그대로 반영된다 -
+    # 이 변경이 막는 건 오직 "NULL로 지우기"뿐.
     for chunk in batched(rows):
         execute_values(cur, """
             insert into games (gmkey, season_name, season_category, game_date, game_start,
@@ -285,16 +306,16 @@ def load_games(cur, games_rows, coach_name_to_id):
                 season_name = excluded.season_name,
                 season_category = excluded.season_category,
                 game_date = excluded.game_date,
-                game_start = excluded.game_start,
+                game_start = coalesce(excluded.game_start, games.game_start),
                 home_tcode = excluded.home_tcode,
                 away_tcode = excluded.away_tcode,
-                home_coach_id = excluded.home_coach_id,
-                away_coach_id = excluded.away_coach_id,
-                home_score = excluded.home_score,
-                away_score = excluded.away_score,
-                is_ended = excluded.is_ended,
-                stadium = excluded.stadium,
-                attendance = excluded.attendance
+                home_coach_id = coalesce(excluded.home_coach_id, games.home_coach_id),
+                away_coach_id = coalesce(excluded.away_coach_id, games.away_coach_id),
+                home_score = coalesce(excluded.home_score, games.home_score),
+                away_score = coalesce(excluded.away_score, games.away_score),
+                is_ended = (games.is_ended or excluded.is_ended),
+                stadium = coalesce(excluded.stadium, games.stadium),
+                attendance = coalesce(excluded.attendance, games.attendance)
         """, chunk)
     print(f"games: {len(rows)}경기 적재")
 

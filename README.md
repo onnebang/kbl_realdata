@@ -2187,3 +2187,308 @@ sentinel을 지나가면 그 안에서 풀사이즈(`.sb-full`)를 숨기고 축
 크래시 없이 섹션째 생략되는지, 8시즌 276경기 커리어와 1경기짜리 커리어(0으로 나누기
 없이 "-" 표시) 양쪽 다 정상, 잘못된 pcode는 404. 새 탭 기준 콘솔 에러 0건(구탭에 남아있던
 직전 404 테스트 잔여 로그를 실제 에러로 착각할 뻔한 것도 새 탭으로 재확인해서 걸러냄).
+
+### 라이브 전환 Phase 1 - 라이브 수집기 + 드라이런 하네스 (2026-09-02, 39차)
+
+Phase 0에서 만든 3상태 모델(예정/진행중/종료)을 **실제로 넘겨주는 주체**를 만듦.
+`tools/live_collector.py`가 경기 당일 KBL 문자중계를 폴링해 `game_events`를 증분 적재하고
+`games`의 스코어/`is_ended`를 갱신한다. 개막 전에 전 구간을 증명하려고
+`tools/replay_dry_run.py`(끝난 경기를 같은 코드 경로로 재생하는 하네스)를 같이 만들었다.
+
+**왜 파이썬인가** - `backend/src/index.ts`(Cloudflare Worker, 미배포)에도 폴링 로직이 있지만
+승률 모델(joblib)·피처 정의·DB 자격증명·마이그레이션 스크립트가 전부 파이썬 쪽에 이미 있다.
+Worker는 푸시 알림 전용으로 두고 적재는 파이썬에서 한다(이번 작업에서 Worker는 읽기만 하고
+수정/배포하지 않음). 다만 `remainingSec` 추정 규칙(`regulationTotal`)은 Worker와 같은 정의를 쓴다.
+
+#### 경기 당일 운용 (CLI)
+
+> **실행 환경 주의** - 이 스크립트들은 **Python 3.11**로 돌려야 한다.
+> `raw/analysis/live_winprob_model.joblib`이 sklearn 1.9 / numpy 2.x로 저장돼 있어서,
+> 머신의 Anaconda(Python 3.8, sklearn 1.3, numpy 1.24)에서는 `joblib.load`가
+> `ModuleNotFoundError: No module named 'numpy._core'`로 죽는다. Python 3.11 쪽에는
+> psycopg2가 없었어서 이번에 `psycopg2-binary`를 설치했다(나머지 의존성은 이미 있었음).
+> 경로: `C:\Users\mwon0\AppData\Local\Programs\Python\Python311\python.exe`
+
+```bash
+cd tools
+
+# 켜두면 끝 - 오늘(KST) 열리는 예정/진행중 경기를 전부 60초 간격으로 따라가고,
+# 경기가 끝나면 정산 배치까지 자동으로 돌린 뒤 스스로 종료한다.
+python live_collector.py
+
+python live_collector.py --interval 30       # 폴링 간격
+python live_collector.py --gmkey S49G01N1    # 특정 경기만 강제(이미 끝난 경기는 거부 - 아래 참고)
+python live_collector.py --once              # 1주기만 실행하고 종료
+python live_collector.py --max-runtime 21600 --stall-timeout 5400
+                                             # 무인 운용 안전장치(기본 12시간 / 2시간)
+```
+
+**무인 실행이 영원히 돌지 않게 하는 장치 3개**(2026-09-02):
+
+| 장치 | 기본값 | 하는 일 |
+|---|---|---|
+| `--stall-timeout` | 2시간 | 그 시간 동안 새 문자중계 이벤트가 없는 경기(연기/취소/중계중단)를 폴링 대상에서 내림. `is_ended`는 건드리지 않음 - 정본은 다음날 배치가 넣는다 |
+| `--max-runtime` | 12시간 | 수집기 전체 수명 상한 |
+| KST 날짜 롤오버 | 항상 | 매 주기 KST 날짜를 다시 보고, 날짜가 바뀌면 이전 날짜의 미완 경기를 내리고 오늘 경기로 전환(`--date`/`--gmkey`/드라이런으로 고정한 실행은 예외) |
+
+예전에는 `while pending`에 시간 제한이 없고 날짜를 시작 시각에 한 번만 읽어서, 연기된 경기
+하나가 남으면 다음 날까지 60초마다 KBL API를 두드리면서 그날 경기는 쳐다보지도 않았다.
+
+**상시 서비스로 등록하지 않은 이유** - 작업 스케줄러에 항상 실행되는 서비스를 새로 심는 건
+사용자 환경에 대한 판단이 필요한 일이라 이번 범위에서 뺐다(기존 `KBL_DailyBatch`는 하루 1회
+배치라 성격이 다름). 대신 두 가지 운용 방식 모두 가능하게 해뒀다:
+
+1. **경기 있는 날 수동 실행(권장)** - `python live_collector.py` 한 번. 그날 경기가 다 끝나면
+   프로세스가 스스로 끝난다. 오프시즌/경기 없는 날엔 "폴링할 경기 없음"으로 즉시 종료.
+2. **작업 스케줄러에 1분 트리거** - `python live_collector.py --once`. 매 실행이 독립적이고
+   전부 UPSERT라 겹쳐 돌아도 안전(멱등). 대신 매번 모델을 로딩하는 비용이 있다.
+
+`DATABASE_URL`은 `tools/.env.supabase`에서 자동 로드된다(`sync_upcoming_games.load_env_supabase`
+재사용) - 스케줄러 환경에 환경변수가 없어도 동작.
+
+#### 미검증 API 리스크를 다룬 방법
+
+`fetch_kbl_data.py`는 지금까지 `isEnded==1`(끝난 경기)만 받아봤다. **진행 중인 경기에서
+api.kbl.or.kr이 뭘 주는지는 아무도 관측하지 못했다.** 그래서:
+
+- `load_target_games(..., is_ended=None)` 파라미터 추가 - HTTP 계층을 복제하지 않고 필터만 품.
+  `isEnded`가 `1`이 아니라 `"1"`/`true`로 와도 받아들이도록 정규화(`_ended_flag`).
+- **모든 원본 응답을 `raw/live_logs/<gmkey>/<타임스탬프>.json`에 그대로 저장** - 10월에 무슨
+  일이 벌어지든 나중에 오프라인 재현이 가능하게. 미검증 리스크에 대한 가장 실질적인 보험.
+  (경기당 폴링 150회 × ~60KB ≈ 10MB. `--no-raw-log`로 끌 수 있음)
+- 라이브 폴링은 `fetch_endpoint()`로 **메모리에서만** 읽는다. `fetch_one_game()`을 쓰면
+  `raw/games/<gmkey>/` 캐시가 생기고, 종료 후 배치가 그 반쪽짜리 문자중계를 공식 데이터로
+  착각한다(캐시가 있으면 건너뛰므로). 정산 시에는 `force=True`로 반드시 재수집.
+- 종료 판정은 긍정 신호(스케줄 `isEnded` / `meta.game.isEnded`)를 먼저 보되 **부정 증거가
+  그걸 거부할 수 있고**(`playingQuarter`가 진짜 쿼터 코드 / 문자중계 이벤트 증가 / Q1~Q3
+  진행 중), 거부가 없어도 **연속 2주기** 같은 신호가 유지돼야 `is_ended`를 세운다. 신호가
+  아예 없을 때만 `001`/`009` 휴리스틱. **시계가 Q4 0:00에 닿았다는 것만으로는 절대 끝으로
+  보지 않는다**(연장). 자세한 규칙과 오판 복구 절차는 아래 "수정한 판정 규칙" 참고.
+- `player-stat`이 경기 중엔 없을 수 있다고 보고 DB 로스터 폴백을 둠(최근 경기 박스스코어에서
+  (팀, 선수명)→pcode 복원, 선발 5인은 문자중계 맨 앞 `101` 이벤트로 자연히 채워짐).
+- `players`에 아직 없는 신인이 등장하면 FK 위반으로 죽는 대신 그 이벤트의 pcode만 NULL.
+- `poll_cycle()`은 **절대 예외를 밖으로 던지지 않는다.** 폴링 하나가 터지면 롤백 + 스택트레이스
+  로그만 남기고 다음 주기로. 매 주기가 "지금까지의 전체 스냅샷"을 다시 계산하므로 놓친 주기는
+  자동으로 따라잡힌다.
+
+#### 라이브는 잠정치, 배치가 정본
+
+경기 중에는 최종 경기 길이(연장 여부)를 알 수 없어 `remainingSec`을 규정시간 기준으로 추정하고
+(`total_elapsed_for`), 라인업/pcode도 확정 박스스코어가 아니다. 그래서 종료 감지 시
+`reconcile_finished_game()`이 기존 배치 경로를 그대로 호출한다:
+
+1. `fetch_kbl_data.fetch_one_game(gmkey, force=True)` - 공식 5개 엔드포인트 재수집
+2. `migrate_to_supabase.py --gmkeys` - 박스스코어/팀스탯/슛좌표/스코어/is_ended
+3. `migrate_game_events_to_supabase.py --gmkeys --replace` - 이벤트/WPA 재계산 후 덮어쓰기
+
+`--replace`는 이번에 추가한 플래그다. 기존 `load_events`는 `ON CONFLICT DO NOTHING`이라 라이브
+잠정 행이 영구히 남았을 것이다(전체 백필에서는 DO NOTHING이 맞으므로 기본값은 그대로 두고
+정산 경로만 opt-in). 세 단계 모두 UPSERT/force라 두 번 돌려도 안전.
+
+**'잠정 → 정본' 인계를 세 겹으로 막았다**(2026-09-02, Phase 1 검증 지적사항):
+
+1. **공식 박스스코어가 실제로 도착했을 때만 이관한다**(`official_box_ready`).
+   정산은 "KBL이 `isEnded`를 막 세운 순간"에 호출되는데 그때 `team-record.json`이 아직
+   없을 수 있다. 그 반쪽 입력으로 `migrate_to_supabase.py`를 돌리면 `scan_all`이
+   `home_score/away_score`를 `None`으로 만들어 **다 끝난 경기를 사이트에서 '예정'으로
+   되돌린다**(실제로 재현됨 - `gameStatus.ts`의 예정 = `home_score IS NULL`).
+   안 왔으면 `ok=False`로 반환하고 다음 주기에 재시도한다.
+2. **`load_games`의 UPSERT를 비파괴로 바꿨다** - `home_score = coalesce(excluded.home_score,
+   games.home_score)`(away/stadium/attendance/coach/game_start 동일), `is_ended =
+   (games.is_ended or excluded.is_ended)`. 1번을 뚫고 들어와도 스코어가 NULL로 지워지지
+   않는다. 예정 행이 나중에 진짜 최종 스코어를 받는 정상 경로는 그대로 동작하고(NULL이
+   실제 값을 덮지 못할 뿐), 오심 정정처럼 값→다른 값 갱신도 그대로 반영된다.
+   SQL 레벨에서 막았으므로 daily_batch·수동 실행·앞으로 추가될 호출자까지 전부 보호된다.
+3. **정산 서브프로세스의 종료코드를 확인한다.** `ok=False`면 `reconciled`를 세우지 않고
+   경기를 `pending`에 남겨 다음 주기에 재시도(최대 `RECONCILE_MAX_ATTEMPTS`=10회).
+   예전엔 호출 **전에** `reconciled=True`를 세우고 종료코드를 무시해서, 한 번의 일시적
+   실패가 곧 "라이브 잠정치의 영구 고착"이었다(`select_target_games`가 `is_ended=true`를
+   제외하므로 다시 볼 기회가 없다). 10회까지 실패하면 크게 로그를 남기고 포기하며,
+   그 경우의 복구 경로는 다음날 `daily_batch`(아래) 또는 수동
+   `python daily_batch.py --only-supabase-sync --gmkeys <gmkey>`다.
+
+#### daily_batch가 '진짜 복구 경로'가 되도록 고친 것
+
+Phase 1의 계약은 "라이브는 잠정, 배치가 정본"인데, 그 배치가 정작 정정을 못 하고 있었다:
+
+| 문제 | 고침 |
+|---|---|
+| `migrate_game_events_to_supabase.py`에 `--replace`가 없어 `DO NOTHING` - 라이브 잠정 이벤트가 그대로 남음 | `--replace` 추가(정산 경로와 동일) |
+| `fetch_one_game(gmkey)`에 `force=True`가 없어, 정산이 남긴 반쪽 캐시가 영원히 정본 행세 | `force=True`로 반드시 재수집 |
+| 서브프로세스를 `sys.executable` + `check=False`로 띄움 - Anaconda(3.8/sklearn 1.3)에서 돌리면 승률 모델 언피클이 `ModuleNotFoundError: numpy._core`로 죽는데 **로그 한 줄 없이 '완료'** | `tools/python_runtime.py`가 "모델을 실제로 로드해보고" 통과한 인터프리터를 고름 + **모든 단계의 종료코드 확인**, 실패가 있으면 프로세스 exit 1(작업 스케줄러 "마지막 실행 결과"에 노출) + 실행한 명령줄을 로그에 남김 |
+
+```bash
+python daily_batch.py --only-supabase-sync --gmkeys S49G01N7   # 수동 복구(그 경기만 재이관)
+KBL_PYTHON=D:\...\.venv\Scripts\python.exe python daily_batch.py   # 인터프리터 강제 지정
+```
+
+#### pregame_features에 synergy 컬럼 추가 (필요해서 한 스키마 변경)
+
+라이브 승률 모델의 피처는 5개(`scoreDiff`, `remainingSec`, `scaledScoreDiff`, `netrtgDiff`,
+`synergyDiff`)인데 **`synergyDiff`의 원천이 DB 어디에도 없었다.** 배치
+(`migrate_game_events_to_supabase.py`)는 `raw/analysis/pregame_training_table.json`에서 읽지만,
+그 테이블은 무거운 배치로만 재생성돼서 "오늘 열리는 경기"에는 없다. 없으면 0으로 추론하게 되는데
+실측상 그 차이가 크다:
+
+| 상황 (S47G03N16, net=+2.0 / syn=-1.1) | 홈 승률 |
+|---|---|
+| 정상(synergy 반영) | 0.4556 |
+| synergy만 0으로 | 0.5687 |
+| 완전 중립(net·syn 둘 다 0 = objective_prob) | 0.5746 |
+
+11%p 차이라 경기 종료 후 배치가 재계산하는 순간 승률이 툭 튀어 보인다. 그래서
+`pregame_features`에 `home/away_synergy_onoff_rating` 컬럼을 추가(마이그레이션
+`add_pregame_synergy_onoff_rating`)하고 `migrate_pregame_features_to_supabase.py`의 `FIELDS`에
+한 줄 넣었다. `FIELDS`가 `sync_upcoming_games.py`의 컬럼 목록도 결정하므로, 예정 경기 쪽은
+그 한 줄만으로 같이 채워진다(`predict_upcoming_games.team_features_now`가 이미 계산하던 값).
+과거 4,182경기 백필 + 예정 127경기 재동기화 완료.
+
+#### 시즌 극초반 폴백
+
+그 경기의 `pregame_features` 행이 없거나(표본 부족으로 예측 보류) netrtg/synergy가 NULL이면
+그 항목을 중립(0.0)으로 두고 추론한다 - `build_game_rows`가 None을 0.0으로 처리하던 기존 규칙과
+같다. 이때 `home_win_prob == objective_prob`이 되고, 사이트의 "왜 이 승률인가" 패널이 두 막대를
+같은 길이로 보여주며 격차 설명 문장도 붙지 않는다(임계값 3%p 미만). **별도 컬럼을 새로 만들지
+않아도 "아직 팀 전력 정보가 없어 점수·시간만 본 확률"이라는 사실이 화면에 정직하게 드러난다.**
+수집기는 시작 시 로그로도 명시한다(`경기 전 컨텍스트 없음 -> 중립(0/0)으로 추론`).
+
+#### 드라이런 하네스 (`tools/replay_dry_run.py`)
+
+끝난 진짜 경기를 `live_collector`의 **바로 그 코드 경로**(`ReplaySource` / `GameIngestor` /
+`poll_cycle` / `reconcile_finished_game`)로 재생한다. 새 시뮬레이터를 만들면 드라이런이 라이브
+경로를 증명하지 못하므로 일부러 같은 함수를 부른다.
+
+```bash
+python replay_dry_run.py --setup-only                    # 예정 상태 행만 만들고 종료
+python replay_dry_run.py --reuse --speed 1 --stop-after 240   # 실시간 배속 4분치
+python replay_dry_run.py --reuse --speed 60 --start-elapsed 240  # 이어서 빨리 감기 -> 종료
+python replay_dry_run.py --verify-only                   # 멱등성/승률대조/불량폴링 검증만
+python replay_dry_run.py --cleanup                       # 합성 행 삭제 + 재조회로 삭제 확인
+python replay_dry_run.py --counts                        # 전/후 비교용 테이블 행수
+```
+
+합성 경기는 `DRYRUN-<원본gmkey>`. 정산 배치는 `SYNTHETIC_PREFIX` 가드로 합성 gmkey를 절대
+받지 않는다(진짜 KBL 경기가 아니므로). `--keep`을 명시하지 않으면 끝나고 자동 정리 +
+**재조회로 삭제 확인**한다.
+
+**진짜 원본 경기는 기본적으로 건드리지 않는다**(2026-09-02). 정산 경로를 진짜 gmkey로
+실행해보려면 `--reconcile-source`를 명시해야 한다 - 그 경로는
+`fetch_one_game(source, force=True)`로 `raw/games/<source>/*.json` 5개를 **오늘 응답으로
+되돌릴 수 없게 덮어쓰고**, 두 이관 스크립트가 진짜 `games` 행에 UPSERT한다. 예전엔 백업도
+롤백도 없이 무조건 돌린 뒤 지문이 달라지면 "변경됨!"을 출력만 했다(= 탐지만 하고 복구는
+못 함). 지금은 (a) 기본 꺼짐, (b) 켜도 `raw/games/<source>/`를 먼저 백업, (c) 끝나면 복원.
+
+**정리(cleanup)는 `try/finally` 안에 있다.** 예전엔 성공 경로 맨 끝에만 있어서 재생/검증
+도중 예외가 하나라도 나면 합성 `games`/`game_events`/`pregame_features` 행이 프로덕션 DB에
+그대로 남았다(모듈 docstring의 "절대 남기지 않는다"와 정면으로 어긋남). `--keep`은 재생
+시작 전에 세워서 예외가 나도 존중하고, `--stop-after`로 중간에 멈춘 재생은 "이어서 재개"가
+전제라 남긴다.
+
+```bash
+python replay_dry_run.py --reconcile-source   # 진짜 정산 경로까지 검증(백업/복원 포함)
+```
+
+#### 드라이런이 실제로 잡은 것 - `009`는 '경기 종료'가 아니라 '피리어드 종료'
+
+이번 작업에서 가장 값어치 있는 결과. 처음엔 `backend/src/index.ts`와 `action_codes` 시드의
+라벨(`009`='경기 종료')을 그대로 믿고 "문자중계에 009가 보이면 경기 끝"으로 짰다. 드라이런
+1회차에서 **Q2 시작 시점(23-18)에 사이트가 '종료'로 넘어갔다.** 저장된 200경기를 세어보니:
+
+| 009 개수/경기 | 경기 수 |  | 009가 나온 쿼터 | 개수 |
+|---|---|---|---|---|
+| 4개 | 191 |  | Q1 / Q2 / Q3 / Q4 | 각 200 |
+| 5개 이상(연장) | 9 |  | X1 / X2 / X3 | 9 / 2 / 1 |
+
+즉 `009`(그리고 `001`='경기 시작')는 **쿼터마다 한 쌍씩** 나온다. 개막날 실제 경기에서
+이 버그가 터졌으면 Q1이 끝나는 순간 사이트가 종료로 넘어가고, `remainingSec` 추정이 무너져
+승률이 0.99로 튀고(실제로 재현됨), 정산 배치까지 조기 실행됐을 것이다.
+
+수정한 판정 규칙(`live_collector.detect_ended` + `end_gate`, 2026-09-02 재설계):
+
+1. 긍정 신호 수집: 스케줄 `isEnded==1` / `meta.game.isEnded==1`.
+2. **거부(veto) 증거** - 하나라도 있으면 그 주기엔 종료로 넘기지 않는다:
+   (a) `meta.game.playingQuarter`가 진짜 쿼터 코드(= 그 쿼터를 지금 뛰는 중),
+   (b) 직전 폴링보다 문자중계 이벤트가 늘어남(= 아직 이벤트를 뿜는 중),
+   (c) 문자중계상 Q1~Q3 진행 중.
+   거부가 `END_CONFIRM_POLLS`(3)주기 연속 유지되면서 이벤트가 전혀 늘지 않으면 그때는
+   API 말을 받아들인다(몰수/중단 탈출구).
+3. 거부 증거 없이 긍정 신호가 있으면 "이번 주기 판정 = 종료". 다만 **실제 `is_ended`
+   커밋은 `end_gate`가 `END_CONFIRM_MIN_POLLS`(2)주기 연속일 때만** 한다. 카운터는
+   `raw/live_state/<gmkey>.json`에 남아서 `--once`(매 실행이 새 프로세스)에서도 이어진다.
+4. 명시 신호가 **아예 없을 때만** 휴리스틱: 마지막 `009`가 마지막 `001`보다 뒤이고(= 지금
+   피리어드가 끝난 상태), 그 쿼터가 Q4 이후이고, 동점이 아니면(동점=연장) 종료.
+   `009`가 문자중계의 마지막 이벤트라는 보장은 없다 - S47G03N16은 Q4 `009`(인덱스 616)
+   뒤에 교체 OUT 이벤트가 11개 더 붙어 있다.
+
+**왜 단일 플래그에 베팅하지 않는가** - 예전 구현은 신호 리스트에서 1을 먼저 만나면 즉시
+종료를 반환해서, 애써 모아둔 부정 증거가 stale/premature한 `isEnded=1`을 거부하지
+못했다. 그리고 그 오판은 되돌릴 수 없다: `update_game_row`가 `is_ended`를 단조로 세우고
+(true→false 불가), `poll_cycle`이 그 경기를 pending에서 빼고, `select_target_games`는
+`is_ended=true`를 제외하므로 **남은 경기가 영영 수집되지 않는다**(사이트가 경기 중간에
+'종료'로 굳음). 라이브 API 거동이 한 번도 관측된 적 없는 상태에서 그쪽으로 기우는 건
+방향이 반대다. 지연 비용은 폴링 간격 1회분(기본 60초)뿐이다.
+
+저장된 250경기 일괄 검증(재실행 2026-09-02): `meta.json`의 실제 `isEnded`를 같이 준
+전체 스냅샷은 **250/250** 종료로 판정, 중간 피리어드 `009` prefix **761개 전부 오탐 0건**.
+`isEnded` 신호를 아예 빼고 휴리스틱만으로는 249/250 - 유일한 예외 `S19G01N171`은
+문자중계 합계가 72-72(동점)로 나오는데 공식 스코어는 77-74다. 즉 2019년 문자중계가
+불완전한 경기이고, 휴리스틱은 "동점이면 연장"으로 보고 **종료를 보류**한다(안전한 방향).
+`replay_dry_run.py --verify-only`의 [검증6 종료판정 15케이스] + [검증7 확정게이트 6케이스]로
+회귀 고정.
+
+#### 종료 오판 복구 (운용자용 탈출구)
+
+위 3중 방어에도 불구하고 경기 중간에 `종료`로 굳었다면(사이트가 진행 중인데 종료로 표시,
+수집기가 그 경기를 더는 안 봄) 순서는 이렇다:
+
+```bash
+# 1) DB에서 종료 표시를 되돌린다(is_ended는 코드에선 절대 false로 못 감 - 수동 SQL만 가능)
+#    Supabase SQL Editor:  update games set is_ended=false where gmkey='S49G01N7';
+# 2) 확정 카운터 초기화 - 안 지우면 다음 폴링에서 곧바로 다시 종료로 확정된다
+rm raw/live_state/S49G01N7.json
+# 3) 수집 재개(그 경기만)
+python live_collector.py --gmkey S49G01N7
+# 4) 경기가 진짜로 끝난 뒤 정본으로 덮어쓰기
+python daily_batch.py --only-supabase-sync --gmkeys S49G01N7
+```
+
+반대로 **이미 정산까지 끝난 경기를 라이브로 다시 적재하는 것은 기본적으로 거부**한다
+(`--gmkey`가 `is_ended=true` 경기를 가리키면 exit 2). 공식 `game_events`를 라이브
+잠정치로 덮어쓰기 때문 - 정말 필요하면 `--force-ended`를 명시해야 한다.
+
+> 참고: `action_codes` 테이블의 `001`/`009` 라벨(`경기 시작`/`경기 종료`)은 실제 의미와
+> 다르지만 사이트 문자중계 피드에 그대로 노출되는 값이라 이번엔 건드리지 않았다.
+> `피리어드 시작`/`피리어드 종료`로 고치는 건 별도 판단 사항.
+
+#### 실제 KBL API 관측 결과 (2026-09-02, 미래 경기)
+
+미검증 구간을 조금이나마 줄이려고 개막전(`S49G01N1`, 2026-10-03)에 수집기를 실제로 한 번
+돌려봤다(`live_collector.py --gmkey S49G01N1 --once --date 2026-10-03`). 결과:
+
+- 5개 엔드포인트 전부 정상 응답(에러 0건). `text-cast` = `[]`, `player-stat` = `[]`.
+- 수집기는 "아직 시작 전(문자중계 이벤트 0건)"으로 판정하고 **games 행을 건드리지 않음** -
+  사이트는 그대로 '예정' 유지. (여기서 스코어를 0-0으로 써버리면 개막 전날부터 모든 경기가
+  '진행중'으로 보였을 것이다.)
+- **`meta.game`에 `isStarted`와 `playingQuarter` 필드가 있다** - 이 코드베이스에서 지금까지
+  아무도 안 쓰던 필드. 실측 두 상태:
+
+  | 상태 | isEnded | isStarted | playingQuarter |
+  |---|---|---|---|
+  | 미래 경기 `S49G01N1` | 0 | 0 | `'X'` |
+  | 종료 경기 `S47G03N16` | 1 | 1 | `'X'` |
+
+  `'X'`는 경기 전/후 양쪽에서 나오므로 **종료 신호로 쓸 수 없다.** 반대로 값이 진짜 쿼터
+  코드(Q1~X4)면 "그 쿼터를 지금 뛰는 중"일 수밖에 없으므로, `detect_ended`가 이를
+  **'아직 안 끝남'의 강한 근거로만** 쓴다(긍정 신호로는 절대 안 씀 - 진행 중 실제 값은
+  여전히 미관측). 이 신호 하나만으로도 위의 009 버그는 독립적으로 막혔을 것이다.
+
+#### 알려진 한계
+
+- **경기 중 박스스코어는 안 채운다.** 라이브는 `game_events` + `games`만 갱신하므로, 진행 중
+  경기 페이지의 선수 표/GAME LEADERS는 비어 있고 라인업 패널이 이름 대신 pcode를 보여준다
+  (`game_player_stats`가 없어서). 경기 종료 후 정산 배치가 채운다. 라이브 박스스코어까지
+  원하면 `player-stat` 응답을 `game_player_stats`로 증분 UPSERT하는 단계를 추가하면 되는데,
+  경기 중 그 엔드포인트가 뭘 주는지 미관측이라 이번 범위에서 뺐다.
+- **연장 진입 시 과거 이벤트의 승률이 한 번 재계산된다.** `total_elapsed` 추정이 2400 →
+  2700으로 바뀌기 때문(`수정 N`으로 로그에 찍힘). 값이 더 정확해지는 방향이라 의도된 동작.
+- 원본 응답 로그(`raw/live_logs/`)는 `raw/`가 `.gitignore`에 있어 커밋되지 않는다.

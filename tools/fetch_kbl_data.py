@@ -64,7 +64,7 @@ def fetch_game_list(from_date, to_date):
     return api_get(f"/match/list?fromDate={from_date}&toDate={to_date}&tcodeList=all")
 
 
-def load_target_games(seasons, categories, from_date, to_date, use_cache=True):
+def load_target_games(seasons, categories, from_date, to_date, use_cache=True, is_ended=1):
     os.makedirs(SCHEDULE_DIR, exist_ok=True)
     cache_path = os.path.join(SCHEDULE_DIR, f"list_{from_date}_{to_date}.json")
     # 매일 돌리는 배치(daily_batch.py)는 "오늘" 범위를 반복 조회하는데, 하루 안에서도
@@ -80,13 +80,40 @@ def load_target_games(seasons, categories, from_date, to_date, use_cache=True):
                 json.dump(games, f, ensure_ascii=False, indent=2)
         time.sleep(DELAY_SEC)
 
+    # is_ended: 1(기본) = 지금까지의 동작 그대로 "끝난 경기만"(백필/daily_batch가 의존).
+    #           None    = isEnded로 거르지 않음 - 라이브 수집기(live_collector.py)가 "오늘
+    #                     열리는 경기"(아직 시작 전 0, 진행중 0, 방금 끝난 1)를 전부 봐야 해서
+    #                     추가. 별도 HTTP 계층을 복제하는 대신 여기 파라미터 하나로.
+    #           0       = 아직 안 끝난 경기만(sync_upcoming_games의 스코프와 같은 의미).
+    # 실제 라이브 경기에서 isEnded가 정수 1/0이 아니라 "1"/true로 올 가능성이 비시즌이라
+    # 검증이 안 됨 - 문자열/불린도 같이 받아들이도록 normalize.
+    def ended_flag(g):
+        v = g.get("isEnded")
+        if isinstance(v, bool):
+            return 1 if v else 0
+        if isinstance(v, str):
+            v = v.strip()
+            return 1 if v in ("1", "true", "True", "Y") else (0 if v in ("0", "false", "False", "N", "") else None)
+        return v
+
     target = [
         g for g in games
         if (not seasons or g.get("seasonCode") in seasons)
         and g.get("seasonCategory") in categories
-        and g.get("isEnded") == 1
+        and (is_ended is None or ended_flag(g) == is_ended)
     ]
     return target
+
+
+def fetch_endpoint(gmkey, name):
+    """엔드포인트 하나만 받아서 파싱된 JSON을 반환(파일로 저장하지 않음).
+
+    fetch_one_game()은 raw/games/<gmkey>/ 아래에 캐시 파일을 남기는데, 라이브 폴링이 그
+    캐시를 만들어버리면 경기 종료 후 배치(fetch_one_game은 force가 아니면 기존 파일을
+    건너뜀)가 "경기 도중에 찍힌 반쪽짜리 문자중계"를 공식 데이터로 착각한다. 그래서
+    라이브 경로는 이 함수로 메모리에서만 읽고, 원본 응답은 raw/live_logs/에 따로 남긴다
+    (live_collector.py 참고). 종료 후 재수집은 fetch_one_game(gmkey, force=True)."""
+    return api_get(ENDPOINTS[name].format(gmkey=gmkey))
 
 
 def fetch_one_game(gmkey, force=False):
