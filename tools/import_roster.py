@@ -128,20 +128,36 @@ TEAM_NAME_ALIASES = {
 
 
 def resolve_teams(cur):
-    """팀 풀네임/약어/tcode 어느 쪽으로 적어도 tcode로 찾을 수 있게."""
+    """팀 풀네임/약어/tcode 어느 쪽으로 적어도 tcode로 찾을 수 있게.
+
+    반환값은 callable - 정확 일치를 먼저 보고, 없으면 "부산 KCC 이지스"처럼 마스코트가 붙은
+    표기를 위해 알려진 팀 키가 입력에 포함되는지 본다(긴 키부터 - "부산kcc"가 "kcc"보다 먼저).
+    """
     cur.execute("select tcode, name, abbr from teams")
-    lookup = {}
+    exact = {}
     for tcode, name, abbr in cur.fetchall():
         keys = [tcode, name, abbr] + TEAM_NAME_ALIASES.get(tcode, [])
         for key in keys:
             if key:
-                lookup[norm_name(key)] = tcode
+                exact[norm_name(key)] = tcode
         # "창원 LG" -> "LG"처럼 도시명을 뗀 형태도 허용
         for candidate in [name] + TEAM_NAME_ALIASES.get(tcode, []):
             parts = (candidate or "").split()
             if len(parts) > 1:
-                lookup.setdefault(norm_name(parts[-1]), tcode)
-    return lookup
+                exact.setdefault(norm_name(parts[-1]), tcode)
+    # 포함 매칭용 - 2글자 이하 키(tcode "50" 같은 것)는 오탐 위험이 커서 제외
+    contains = sorted(((k, t) for k, t in exact.items() if len(k) >= 3), key=lambda kv: -len(kv[0]))
+
+    def resolve(raw):
+        key = norm_name(raw)
+        if key in exact:
+            return exact[key]
+        for k, t in contains:
+            if k in key:
+                return t
+        return None
+
+    return resolve
 
 
 def resolve_players(cur):
@@ -188,12 +204,12 @@ def main():
     rows = read_rows(args.csv_path)
     print("읽은 행: %d" % len(rows))
 
-    team_lookup = resolve_teams(cur)
+    resolve_team = resolve_teams(cur)
     player_lookup = resolve_players(cur)
 
     resolved, unknown_team, new_faces, ambiguous = [], [], [], []
     for r in rows:
-        tcode = team_lookup.get(norm_name(r["team"]))
+        tcode = resolve_team(r["team"])
         if not tcode:
             unknown_team.append(r)
             continue
