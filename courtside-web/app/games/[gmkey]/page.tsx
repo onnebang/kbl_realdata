@@ -14,14 +14,17 @@ import { buildMatchupInsights, gradeMatchupInsights, type PreviewInsight, type P
 import { TeamBadge } from "@/components/TeamBadge";
 import GameReplay from "@/components/GameReplay";
 import { InsightCard } from "@/components/InsightCard";
+import { deriveGameStatus } from "@/lib/gameStatus";
 
 type TeamRef = { tcode: string; name: string; abbr: string; color: string; logo_url: string | null } | null;
 
 type GameInfo = {
   gmkey: string;
   game_date: string;
+  game_start: string | null;
   home_score: number | null;
   away_score: number | null;
+  is_ended: boolean;
   season_name: string;
   season_category: string;
   home_team: TeamRef;
@@ -94,7 +97,7 @@ async function getGame(gmkey: string): Promise<GameInfo | null> {
   const { data, error } = await supabase
     .from("games")
     .select(
-      `gmkey, game_date, home_score, away_score, season_name, season_category,
+      `gmkey, game_date, game_start, home_score, away_score, is_ended, season_name, season_category,
        home_team:teams!games_home_tcode_fkey(tcode, name, abbr, color, logo_url),
        away_team:teams!games_away_tcode_fkey(tcode, name, abbr, color, logo_url)`
     )
@@ -383,6 +386,10 @@ export default async function GamePage({
   const game = await getGame(gmkey);
   if (!game) notFound();
 
+  // 예정/진행중/종료 판정 - 홈 목록과 같은 단일 정의(lib/gameStatus.ts). 이 아래의 3막
+  // 게이팅은 전부 이 status만 봄(예전의 home_score != null 개별 체크 대신).
+  const status = deriveGameStatus(game);
+
   const [teamStats, playerStats, events, pregameFeatures, actionLabels, shots] = await Promise.all([
     getTeamStats(gmkey),
     getPlayerStats(gmkey),
@@ -418,7 +425,7 @@ export default async function GamePage({
   const { box, derivedEvents, players: currentGamePlayers } = buildGameData(playerStats, events, actionLabels);
 
   let reportSections: { title: string; html: string }[] = [];
-  if (game.home_score != null && game.away_score != null && derivedEvents.length > 0 && game.home_team && game.away_team) {
+  if (status === "final" && game.home_score != null && game.away_score != null && derivedEvents.length > 0 && game.home_team && game.away_team) {
     const rarity = await getGameRarity(game.home_score, game.away_score);
     reportSections = buildPostgameReport({
       events: derivedEvents,
@@ -540,13 +547,16 @@ export default async function GamePage({
       homeSeasonStats,
       awaySeasonStats,
       leagueAvgOrebPct,
-      homeWinProb: derivedEvents[0]?.home_win_prob ?? null,
+      // 승률 인사이트 - 이벤트가 있으면 기존 그대로 첫 이벤트(경기 전 모델 예측)를,
+      // 예정 경기(이벤트 없음)는 tools/sync_upcoming_games.py가 pregame_features에 넣어둔
+      // 같은 모델의 예측(home_win_prob)을 사용.
+      homeWinProb: derivedEvents[0]?.home_win_prob ?? pregameFeatures?.home_win_prob ?? null,
       homePriorGame,
       awayPriorGame,
     });
 
-    // 경기 후 채점 - "이 경기"가 이미 끝난 경우에만(진행 예정/미기록 경기는 채점 대상 없음).
-    if (previewInsights.length > 0 && game.home_score != null && game.away_score != null && derivedEvents.length > 0) {
+    // 경기 후 채점 - "종료" 상태에서만(예정/진행중 경기는 채점 대상 없음).
+    if (status === "final" && previewInsights.length > 0 && game.home_score != null && game.away_score != null && derivedEvents.length > 0) {
       insightGrades = gradeMatchupInsights(previewInsights, {
         box,
         events: derivedEvents,
@@ -583,11 +593,12 @@ export default async function GamePage({
               size={36}
             />
             <span className="matchup-banner-name">{game.home_team?.name ?? game.gmkey}</span>
-            <span className="matchup-banner-score">{game.home_score}</span>
+            {/* 예정 경기는 스코어 자리를 아예 비움(0-0이나 빈칸처럼 보이는 것 방지) - 가운데 VS만 */}
+            {status !== "scheduled" && <span className="matchup-banner-score">{game.home_score}</span>}
           </div>
           <div className="matchup-banner-vs">VS</div>
           <div className="matchup-banner-side away" style={{ background: game.away_team?.color ?? "#888" }}>
-            <span className="matchup-banner-score">{game.away_score}</span>
+            {status !== "scheduled" && <span className="matchup-banner-score">{game.away_score}</span>}
             <span className="matchup-banner-name">{game.away_team?.name ?? ""}</span>
             <TeamBadge
               team={game.away_team ? { name: game.away_team.name, abbr: game.away_team.abbr, color: "#ffffff33", logoUrl: game.away_team.logo_url } : null}
@@ -596,7 +607,9 @@ export default async function GamePage({
           </div>
         </div>
         <div className="subtitle">
-          {game.game_date} · {game.season_name} {game.season_category} · {game.gmkey}
+          {game.game_date}
+          {status === "scheduled" && game.game_start ? ` ${game.game_start.slice(0, 5)} 예정` : ""} · {game.season_name}{" "}
+          {game.season_category} · {game.gmkey}
         </div>
 
         {/* 요청 항목 1~6("직전 경기 활약 선수 주의/수비 약점/조합 시너지/최근 추세/오펜스
@@ -795,7 +808,17 @@ export default async function GamePage({
           위/최우선)으로 올렸었는데, 이번 3막 구조 요청은 그 우선순위 배치보다 "경기 전 →
           경기 중 → 경기 후"라는 시간 순서를 그대로 따르길 원해서 순서를 되돌림 - GameReplay
           내부 동작/데이터는 전혀 안 바뀜, 페이지 안에서의 위치와 섹션 라벨만 바뀜. */}
-      {game.home_team && game.away_team && derivedEvents.length > 0 && (
+      {/* 예정 - Act 2/3 헤더 자체를 숨기고 작은 안내만(상태 게이팅은 위 deriveGameStatus). */}
+      {status === "scheduled" && (
+        <div className="act-locked-note">경기 시작 후 인터랙티브 문자중계가 열립니다</div>
+      )}
+      {status !== "scheduled" && game.home_team && game.away_team && derivedEvents.length === 0 && (
+        <div className="game-act">
+          <ActHeader num={2} title="경기중 인터랙티브 문자중계" />
+          <div className="act-locked-note">문자중계 데이터가 아직 수신되지 않았습니다 - 잠시 후 새로고침해 주세요.</div>
+        </div>
+      )}
+      {status !== "scheduled" && game.home_team && game.away_team && derivedEvents.length > 0 && (
         <div className="game-act">
           <ActHeader num={2} title="경기중 인터랙티브 문자중계" />
           <GameReplay
@@ -825,7 +848,12 @@ export default async function GamePage({
       )}
 
       {/* Act 3/3 - 경기후. AI 코트사이드 리포트(요청 - 시간 언급 클릭 시 위 Act 2 리플레이로
-          스크롤+이동, lib/postgameReport.ts의 report-jump-link) + 팀 스탯. */}
+          스크롤+이동, lib/postgameReport.ts의 report-jump-link) + 팀 스탯.
+          진행중 경기는 헤더까지 숨기고 안내만(종료 후 daily_batch가 데이터를 채우면 자동 표시). */}
+      {status === "live" && (
+        <div className="act-locked-note">경기 종료 후 AI 리포트가 생성됩니다</div>
+      )}
+      {status === "final" && (
       <div className="game-act">
         <ActHeader num={3} title="경기후 AI코트사이드 리포트" />
         {reportSections.length > 0 && (
@@ -885,6 +913,7 @@ export default async function GamePage({
           )}
         </div>
       </div>
+      )}
 
       <footer className="foot">Supabase에서 실시간 조회 · {gmkey}</footer>
     </div>

@@ -33,6 +33,9 @@ export type PregameFeatures = {
   away_avg_vertical_jump_cm: number | null;
   home_vertical_jump_coverage: number | null;
   away_vertical_jump_coverage: number | null;
+  // 예정 경기의 경기 전 모델 승률(tools/sync_upcoming_games.py가 적재) - 종료 경기는
+  // game_events의 event_order=0 행이 같은 역할이라 과거 행에선 null.
+  home_win_prob: number | null;
 };
 
 // courtside_template.html의 pregameInsightItems()를 그대로 포팅 - "차이가 유의미할 때만

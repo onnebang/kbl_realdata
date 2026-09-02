@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
-import { getSeasons, getTeamsForSeason, getGames, getPregameWinProbs, getGameMvps, getGameTags, getSeasonWinPcts } from "@/lib/homeGames";
+import { getSeasons, getTeamsForSeason, getGames, getPregameWinProbs, getLiveWinProbs, getGameMvps, getGameTags, getSeasonWinPcts } from "@/lib/homeGames";
+import { deriveGameStatus } from "@/lib/gameStatus";
 
 // 실측(라이브 검증 중 발견) - 기본 진입(팀 필터 없음, 최근 시즌)이 최대 200경기 x
 // 선수당 ~24행짜리 MVP 조회까지 겹쳐서 병렬화 전엔 20~30초 가까이 걸림(lib/homeGames.ts의
@@ -24,9 +25,14 @@ export default async function HomePage({
   const [teamOptions, games] = await Promise.all([getTeamsForSeason(activeSeason), getGames(activeSeason, team)]);
 
   const gmkeys = games.map((g) => g.gmkey);
-  const [winProbs, mvps, tags, seasonWinPcts] = await Promise.all([
+  // MVP는 승패가 확정된 종료 경기만(진행중 경기는 스코어가 있어도 승자가 아직 없음),
+  // 진행중 경기는 "현재" 승률(최신 이벤트)을 따로 조회.
+  const finalGames = games.filter((g) => deriveGameStatus(g) === "final");
+  const liveGmkeys = games.filter((g) => deriveGameStatus(g) === "live").map((g) => g.gmkey);
+  const [winProbs, liveProbs, mvps, tags, seasonWinPcts] = await Promise.all([
     getPregameWinProbs(gmkeys),
-    getGameMvps(games),
+    getLiveWinProbs(liveGmkeys),
+    getGameMvps(finalGames),
     getGameTags(gmkeys),
     getSeasonWinPcts(activeSeason),
   ]);
@@ -66,20 +72,29 @@ export default async function HomePage({
           <div className="empty-note">조건에 맞는 경기 데이터가 없음(마이그레이션 진행 중일 수 있음)</div>
         )}
         {games.map((g) => {
-          const homeWon = (g.home_score ?? 0) > (g.away_score ?? 0);
-          const homeProb = winProbs.get(g.gmkey);
+          // 상태(예정/진행중/종료)는 lib/gameStatus.ts 단일 정의로 판정 - 경기 페이지와
+          // 같은 규칙. 예정: 배지/스코어 없이 "예정"+시각, 진행중: LIVE 배지+진행 스코어,
+          // 종료: 기존 그대로.
+          const status = deriveGameStatus(g);
+          const homeWon = status === "final" && (g.home_score ?? 0) > (g.away_score ?? 0);
+          const homeProb = status === "live" ? liveProbs.get(g.gmkey) ?? winProbs.get(g.gmkey) : winProbs.get(g.gmkey);
           const mvp = mvps.get(g.gmkey);
           const tag = tags.get(g.gmkey);
           const homeWinPct = g.home_team ? seasonWinPcts.get(g.home_team.tcode) : undefined;
           const awayWinPct = g.away_team ? seasonWinPcts.get(g.away_team.tcode) : undefined;
+          const detailLabel = status === "scheduled" ? "미리보기 →" : status === "live" ? "라이브 보기 →" : "경기 상세보기 →";
           return (
             <div key={g.gmkey} className="game-card">
               <div className="game-card-row">
                 <span className="game-card-date">{fmtDate(g.game_date)}</span>
 
-                <span className={`result-badge ${homeWon ? "win" : "loss"}`} style={homeWon ? { background: g.home_team?.color } : undefined}>
-                  {homeWon ? "W" : "L"}
-                </span>
+                {status === "final" ? (
+                  <span className={`result-badge ${homeWon ? "win" : "loss"}`} style={homeWon ? { background: g.home_team?.color } : undefined}>
+                    {homeWon ? "W" : "L"}
+                  </span>
+                ) : (
+                  <span className="result-badge-placeholder" />
+                )}
                 <Link
                   href={`/teams/${g.home_team?.tcode}?season=${activeSeason}`}
                   className={`team-name home ${homeWon ? "win" : ""}`}
@@ -93,11 +108,18 @@ export default async function HomePage({
                   />
                 </Link>
 
-                <Link href={`/games/${g.gmkey}`} className="game-card-score">
-                  <span className={homeWon ? "win" : "lose"}>{g.home_score}</span>
-                  <span className="score-sep">-</span>
-                  <span className={!homeWon ? "win" : "lose"}>{g.away_score}</span>
-                </Link>
+                {status === "scheduled" ? (
+                  // 예정 - 스코어 대신 "예정"(0-0처럼 빈 스코어로 보이는 것 방지)
+                  <Link href={`/games/${g.gmkey}`} className="game-card-score">
+                    <span className="status-chip status-scheduled">예정</span>
+                  </Link>
+                ) : (
+                  <Link href={`/games/${g.gmkey}`} className="game-card-score">
+                    <span className={status === "final" ? (homeWon ? "win" : "lose") : undefined}>{g.home_score}</span>
+                    <span className="score-sep">-</span>
+                    <span className={status === "final" ? (!homeWon ? "win" : "lose") : undefined}>{g.away_score}</span>
+                  </Link>
+                )}
 
                 <Link href={`/teams/${g.away_team?.tcode}?season=${activeSeason}`}>
                   <TeamBadge
@@ -106,16 +128,26 @@ export default async function HomePage({
                 </Link>
                 <Link
                   href={`/teams/${g.away_team?.tcode}?season=${activeSeason}`}
-                  className={`team-name away ${!homeWon ? "win" : ""}`}
+                  className={`team-name away ${status === "final" && !homeWon ? "win" : ""}`}
                   style={{ color: g.away_team?.color }}
                 >
                   {g.away_team?.name ?? ""}
                 </Link>
-                <span className={`result-badge ${!homeWon ? "win" : "loss"}`} style={!homeWon ? { background: g.away_team?.color } : undefined}>
-                  {!homeWon ? "W" : "L"}
-                </span>
+                {status === "final" ? (
+                  <span className={`result-badge ${!homeWon ? "win" : "loss"}`} style={!homeWon ? { background: g.away_team?.color } : undefined}>
+                    {!homeWon ? "W" : "L"}
+                  </span>
+                ) : (
+                  <span className="result-badge-placeholder" />
+                )}
 
                 <span className="game-card-category-col">
+                  {status === "live" && (
+                    <span className="live-badge">
+                      <span className="live-dot" />
+                      LIVE
+                    </span>
+                  )}
                   <Link href={`/games/${g.gmkey}`} className="game-card-category">
                     {g.season_category}
                   </Link>
@@ -124,9 +156,17 @@ export default async function HomePage({
               </div>
 
               <div className="game-card-meta">
+                {status === "scheduled" && (
+                  <span className="game-card-meta-item">
+                    {fmtDate(g.game_date)}
+                    {g.game_start ? ` ${g.game_start.slice(0, 5)}` : ""} 경기 예정
+                  </span>
+                )}
                 {homeProb != null && (
                   <span className="game-card-meta-item">
-                    예상 승률 {g.home_team?.abbr} {Math.round(homeProb * 100)}% · {g.away_team?.abbr} {Math.round((1 - homeProb) * 100)}%
+                    {/* 원정 쪽은 100에서 홈 반올림값을 빼서 합이 항상 100 - 각자 반올림하면
+                        50%·51%처럼 101%가 되는 경우가 실제로 관측됨(검증 지적). */}
+                    예상 승률 {g.home_team?.abbr} {Math.round(homeProb * 100)}% · {g.away_team?.abbr} {100 - Math.round(homeProb * 100)}%
                   </span>
                 )}
                 {(homeWinPct || awayWinPct) && (
@@ -136,7 +176,7 @@ export default async function HomePage({
                   </span>
                 )}
                 <Link href={`/games/${g.gmkey}`} className="game-card-detail-btn">
-                  경기 상세보기 →
+                  {detailLabel}
                 </Link>
                 {(mvp?.winnerTop || mvp?.loserTop || mvp?.sixthMan) && (
                   <span className="game-card-meta-item game-card-meta-mvps">

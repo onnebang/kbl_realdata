@@ -85,8 +85,11 @@ def batched(rows, size=BATCH_SIZE):
 # (build_team_timelines_for_trend() 등에서 이미 쓰던 "한 번 스캔, 여러 결과" 패턴).
 # ---------------------------------------------------------------------------
 
-def scan_all(limit=None):
+def scan_all(limit=None, only_gmkeys=None):
     gmkeys = sorted(os.listdir(GAMES_DIR))
+    if only_gmkeys is not None:
+        wanted = set(only_gmkeys)
+        gmkeys = [g for g in gmkeys if g in wanted]
     if limit:
         gmkeys = gmkeys[:limit]
 
@@ -155,10 +158,15 @@ def scan_all(limit=None):
                     r.get("efgRt"), r.get("tsRt"), r.get("astRt"), r.get("orebRt"), r.get("drebRt"), r.get("tovRt"),
                 ))
 
+        # is_ended 정규화(2026-09-02) - 원본 meta.json에 최종 스코어가 있는데도 isEnded=0인
+        # 이상 데이터가 실제로 3건 있었음(S43G01N36/S45G01N127/S45G01N95, Supabase에서 수동
+        # 정정함). 상태 규칙("종료 = is_ended=true")이 재이관 때 다시 깨지지 않도록,
+        # 최종 스코어가 둘 다 있으면 종료로 간주.
+        is_ended = bool(g.get("isEnded")) or (home_score is not None and away_score is not None)
         games_rows.append((
             gk, season_name, g.get("seasonCategoryName"), game_date, game_start,
             home_tcode, away_tcode, home_coach, away_coach,
-            home_score, away_score, bool(g.get("isEnded")),
+            home_score, away_score, is_ended,
             g.get("stadiumname"), g.get("crowds"),
         ))
 
@@ -264,12 +272,29 @@ def load_games(cur, games_rows, coach_name_to_id):
             coach_name_to_id.get(home_coach), coach_name_to_id.get(away_coach),
             home_score, away_score, is_ended, stadium, attendance,
         ))
+    # ON CONFLICT DO UPDATE (2026-09-02, 예정 경기 지원) - sync_upcoming_games.py가 미리
+    # 넣어둔 "예정" 행(스코어 NULL, is_ended=false)을 경기 종료 후 이 스크립트가 실제
+    # 결과(스코어/감독/관중/is_ended=true)로 채워야 함. 예전 DO NOTHING이면 예정 행이
+    # 영원히 스코어 없이 남음. 이미 완료된 행에 다시 돌아도 같은 값으로 덮어쓸 뿐이라 멱등.
     for chunk in batched(rows):
         execute_values(cur, """
             insert into games (gmkey, season_name, season_category, game_date, game_start,
                 home_tcode, away_tcode, home_coach_id, away_coach_id, home_score, away_score,
                 is_ended, stadium, attendance) values %s
-            on conflict (gmkey) do nothing
+            on conflict (gmkey) do update set
+                season_name = excluded.season_name,
+                season_category = excluded.season_category,
+                game_date = excluded.game_date,
+                game_start = excluded.game_start,
+                home_tcode = excluded.home_tcode,
+                away_tcode = excluded.away_tcode,
+                home_coach_id = excluded.home_coach_id,
+                away_coach_id = excluded.away_coach_id,
+                home_score = excluded.home_score,
+                away_score = excluded.away_score,
+                is_ended = excluded.is_ended,
+                stadium = excluded.stadium,
+                attendance = excluded.attendance
         """, chunk)
     print(f"games: {len(rows)}경기 적재")
 
@@ -345,9 +370,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=None, help="테스트용 - 앞에서부터 N경기만 이관")
     ap.add_argument("--skip-lineups", action="store_true", help="lineup_stints 단계 건너뛰기(가장 큰 테이블 - 110K행)")
+    ap.add_argument("--gmkeys", default=None,
+                    help="증분 모드(daily_batch용) - 콤마로 구분한 gmkey 목록만 이관 "
+                         "(예: --gmkeys S49G01N1,S49G01N2). 전체 4207경기 재스캔 없이 그 경기만.")
     args = ap.parse_args()
 
-    data = scan_all(limit=args.limit)
+    only_gmkeys = [g.strip() for g in args.gmkeys.split(",") if g.strip()] if args.gmkeys else None
+    if only_gmkeys is not None and not only_gmkeys:
+        print("--gmkeys가 비어있음 - 할 일 없음.", flush=True)
+        return
+
+    data = scan_all(limit=args.limit, only_gmkeys=only_gmkeys)
+    if only_gmkeys is not None and not data["games_rows"]:
+        print("지정한 gmkey에 해당하는 raw/games 데이터가 없음 - 할 일 없음.", flush=True)
+        return
 
     conn = get_conn()
     conn.autocommit = False
@@ -362,7 +398,7 @@ def main():
             load_player_stats(cur, data["player_stats_rows"])
             load_shots(cur, data["shot_rows"])
             if not args.skip_lineups:
-                limit_gmkeys = [r[0] for r in data["games_rows"]] if args.limit else None
+                limit_gmkeys = [r[0] for r in data["games_rows"]] if (args.limit or only_gmkeys) else None
                 load_lineup_stints(cur, limit_gmkeys=limit_gmkeys)
         conn.commit()
         print("전체 커밋 완료.")

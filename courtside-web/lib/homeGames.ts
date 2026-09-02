@@ -10,8 +10,10 @@ export type TeamRef = { tcode: string; name: string; abbr: string; color: string
 export type GameRow = {
   gmkey: string;
   game_date: string;
+  game_start: string | null; // "HH:MM:SS" - 예정 경기 카드의 시작 시각 표시용
   home_score: number | null;
   away_score: number | null;
+  is_ended: boolean; // lib/gameStatus.ts의 deriveGameStatus가 예정/진행중/종료 판정에 사용
   season_category: string;
   season_name: string;
   home_team: TeamRef;
@@ -27,11 +29,13 @@ export async function getSeasons(): Promise<string[]> {
 // 고양 캐롯/오리온스처럼 개명·해체된 옛 이름 포함)를 항상 보여줬는데, 이 시즌에 실제로
 // 뛴 팀만. home_tcode/away_tcode 양쪽 다 훑어야 해서 두 쿼리 UNION.
 export async function getTeamsForSeason(seasonName: string): Promise<{ tcode: string; name: string }[]> {
+  // .not("home_score","is",null) 필터 제거(Phase 0) - 새 시즌은 개막 전엔 예정 경기(스코어
+  // NULL)뿐이라 필터가 남아있으면 팀 드롭다운이 텅 빔. 과거 시즌은 모든 행에 스코어가
+  // 있어서 결과가 동일 - "그 시즌에 실제로 뛴(또는 뛸) 팀만"이라는 원래 의도 유지.
   const { data } = await supabase
     .from("games")
     .select("home_tcode, away_tcode, home_team:teams!games_home_tcode_fkey(tcode, name), away_team:teams!games_away_tcode_fkey(tcode, name)")
-    .eq("season_name", seasonName)
-    .not("home_score", "is", null);
+    .eq("season_name", seasonName);
   const seen = new Map<string, string>();
   for (const g of data ?? []) {
     const h = g.home_team as unknown as { tcode: string; name: string } | null;
@@ -44,24 +48,54 @@ export async function getTeamsForSeason(seasonName: string): Promise<{ tcode: st
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 }
 
-export async function getGames(seasonName: string | undefined, tcode: string | undefined): Promise<GameRow[]> {
-  let query = supabase
-    .from("games")
-    .select(
-      `gmkey, game_date, home_score, away_score, season_category, season_name,
+const GAME_SELECT = `gmkey, game_date, game_start, home_score, away_score, is_ended, season_category, season_name,
        home_team:teams!games_home_tcode_fkey(tcode, name, abbr, color, logo_url),
-       away_team:teams!games_away_tcode_fkey(tcode, name, abbr, color, logo_url)`
-    )
+       away_team:teams!games_away_tcode_fkey(tcode, name, abbr, color, logo_url)`;
+
+// Phase 0(라이브 대비) - 예정/진행중 경기도 홈 목록에 포함. 쿼리를 둘로 나눔:
+//   1) 예정(home_score IS NULL, 오늘 이후) - 가까운 순(asc). 개막 직후엔 시즌 전체 일정이
+//      들어있어서 하나의 date desc 쿼리로 합치면 12월 예정 경기가 limit 200을 먼저
+//      잡아먹고 최근 종료 경기를 밀어내는 문제가 있어 분리.
+//   2) 스코어 있는 경기(진행중+종료) - 기존과 동일하게 최신순(desc) 최대 200.
+// 정렬은 상태 그룹 순: 진행중(지금 벌어지는 경기 - 최상단) -> 예정(가까운 날짜부터) ->
+// 종료(기존과 동일, 최신부터).
+export async function getGames(seasonName: string | undefined, tcode: string | undefined): Promise<GameRow[]> {
+  // KBL 경기 날짜는 한국 시간 기준 - UTC 그대로 자르면 KST 00:00~09:00 사이에 "오늘"이
+  // 하루 이르게 잡혀 어제 예정 경기가 잠깐 예정으로 남아 보임(검증 지적). +9h 보정.
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  let scheduledQ = supabase
+    .from("games")
+    .select(GAME_SELECT)
+    .is("home_score", null)
+    .gte("game_date", today)
+    .order("game_date", { ascending: true })
+    .order("game_start", { ascending: true })
+    .limit(200);
+  let playedQ = supabase
+    .from("games")
+    .select(GAME_SELECT)
     .not("home_score", "is", null)
     .order("game_date", { ascending: false })
     .limit(200);
 
-  if (seasonName) query = query.eq("season_name", seasonName);
-  if (tcode) query = query.or(`home_tcode.eq.${tcode},away_tcode.eq.${tcode}`);
+  if (seasonName) {
+    scheduledQ = scheduledQ.eq("season_name", seasonName);
+    playedQ = playedQ.eq("season_name", seasonName);
+  }
+  if (tcode) {
+    const teamFilter = `home_tcode.eq.${tcode},away_tcode.eq.${tcode}`;
+    scheduledQ = scheduledQ.or(teamFilter);
+    playedQ = playedQ.or(teamFilter);
+  }
 
-  const { data, error } = await query;
-  if (error) throw error;
-  const rows = (data ?? []) as unknown as GameRow[];
+  const [scheduledRes, playedRes] = await Promise.all([scheduledQ, playedQ]);
+  if (scheduledRes.error) throw scheduledRes.error;
+  if (playedRes.error) throw playedRes.error;
+  const scheduled = (scheduledRes.data ?? []) as unknown as GameRow[];
+  const played = (playedRes.data ?? []) as unknown as GameRow[];
+  const live = played.filter((g) => !g.is_ended);
+  const finals = played.filter((g) => g.is_ended);
+  const rows = [...live, ...scheduled, ...finals];
   // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - 경기 자체의 season_name
   // 기준으로 표시 이름을 덮어씀(팀 필터 드롭다운은 getTeamsForSeason에서 따로 처리).
   for (const g of rows) {
@@ -85,6 +119,37 @@ export async function getPregameWinProbs(gmkeys: string[]): Promise<Map<string, 
       if (r.home_win_prob != null) map.set(r.gmkey, r.home_win_prob);
     }
   }
+  // Phase 0 - 예정 경기는 game_events가 아직 없으므로(경기 전) 위 조회에서 안 잡힘.
+  // tools/sync_upcoming_games.py가 pregame_features.home_win_prob에 넣어둔 경기 전 모델
+  // 예측으로 폴백 - 종료 경기는 event_order=0 행이 항상 있어서 여기까지 안 내려옴(기존
+  // 표시값 불변).
+  const missing = gmkeys.filter((k) => !map.has(k));
+  for (let i = 0; i < missing.length; i += 200) {
+    const chunk = missing.slice(i, i + 200);
+    const { data } = await supabase.from("pregame_features").select("gmkey, home_win_prob").in("gmkey", chunk);
+    for (const r of data ?? []) {
+      if (r.home_win_prob != null) map.set(r.gmkey, r.home_win_prob);
+    }
+  }
+  return map;
+}
+
+// 진행중 경기의 "현재" 승률(Phase 0 - 수동 새로고침 기준) - 그 경기 game_events의 가장
+// 마지막(최신) 행 home_win_prob. 진행중 경기는 동시에 많아야 몇 개라 경기당 1쿼리로 충분.
+export async function getLiveWinProbs(gmkeys: string[]): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  await Promise.all(
+    gmkeys.map(async (gmkey) => {
+      const { data } = await supabase
+        .from("game_events")
+        .select("home_win_prob")
+        .eq("gmkey", gmkey)
+        .order("event_order", { ascending: false })
+        .limit(1);
+      const prob = data?.[0]?.home_win_prob;
+      if (prob != null) map.set(gmkey, prob);
+    })
+  );
   return map;
 }
 

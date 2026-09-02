@@ -364,6 +364,74 @@ select {
   text-decoration: underline;
 }
 
+/* 경기 상태(예정/진행중) 표시 - Phase 0 라이브 대비. 예정/진행중 카드는 W/L 배지가 없지만
+   .game-card-row 그리드의 칸 대칭(스코어 정중앙 고정 트릭)은 유지해야 해서 투명
+   자리표시자를 둠(칸 폭 22px는 그리드가 정하므로 내용 없는 빈 span으로 충분). */
+.result-badge-placeholder {
+  display: block;
+}
+
+/* 예정 배지 - 스코어 자리에 들어감(0-0이나 빈칸처럼 보이는 것 방지). */
+.status-chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.status-chip.status-scheduled {
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+}
+
+/* LIVE 배지 - 점멸 점(prefers-reduced-motion이면 정지). 시맨틱 컬러는 --negative(빨강 계열,
+   방송 중계의 LIVE 관례)를 재사용 - 팀컬러/홈원정 팔레트와 혼동되지 않게. */
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--negative);
+}
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--negative);
+  animation: live-pulse 1.4s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
+  }
+}
+
+/* 아직 열리지 않은 막(경기 페이지) - 예정 경기의 Act 2/3, 진행중 경기의 Act 3 자리에
+   헤더 대신 들어가는 작은 안내. */
+.act-locked-note {
+  margin-top: 28px;
+  padding: 14px 16px;
+  border: 1px dashed rgba(var(--line-rgb), 0.18);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
 /* 매치업 배너 - courtside_template.html의 .matchup-banner와 동일 패턴 */
 .matchup-banner {
   position: relative;

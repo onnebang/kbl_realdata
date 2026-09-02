@@ -237,6 +237,11 @@ def register_action_codes(cur, seen_codes):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=None, help="테스트용 - 앞에서부터 N경기만 이관")
+    ap.add_argument("--gmkeys", default=None,
+                    help="증분 모드(daily_batch용) - 콤마로 구분한 gmkey 목록만 이관. "
+                         "pregame_training_table.json에 아직 없는 경기(어제 막 끝난 경기 - "
+                         "테이블 재생성은 별도 무거운 작업)는 netrtg/synergy 컨텍스트를 중립(0)"
+                         "으로 두고 이벤트/승률만 계산함.")
     ap.add_argument("--predict-chunk-games", type=int, default=500,
                      help="predict_proba를 몇 경기치씩 묶어서 부를지(전체를 한 번에 하면 "
                           "메모리를 너무 많이 씀 - 500경기치씩 나눠서 여러 번 호출)")
@@ -250,7 +255,18 @@ def main():
     pregame_ctx = load_pregame_context()
     print(f"경기전 컨텍스트 있는 경기: {len(pregame_ctx)}개", flush=True)
 
-    gmkeys = sorted(pregame_ctx.keys())
+    if args.gmkeys:
+        # 증분 모드 - 지정한 경기만. pregame_ctx에 없어도 제외하지 않고(어제 경기는 테이블
+        # 재생성 전이라 없는 게 정상) 중립 컨텍스트로 진행 - build_game_rows가 None을
+        # 0.0으로 처리하는 기존 규칙 그대로.
+        gmkeys = sorted(g.strip() for g in args.gmkeys.split(",") if g.strip())
+        if not gmkeys:
+            print("--gmkeys가 비어있음 - 할 일 없음.", flush=True)
+            return
+        for gk in gmkeys:
+            pregame_ctx.setdefault(gk, {"netrtgDiff": None, "synergyDiff": None})
+    else:
+        gmkeys = sorted(pregame_ctx.keys())
     if args.limit:
         gmkeys = gmkeys[:args.limit]
 
