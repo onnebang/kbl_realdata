@@ -178,12 +178,10 @@ function RosterPanel({ roster }: { roster: RosterRow[] }) {
             </div>
             <div className={`${styles.rosterCell} ${styles.rosterRpgHide}`}>{r.gp}</div>
             <div className={styles.rosterCell}>{r.ppg.toFixed(1)}</div>
-            <div
-              className={styles.rosterWpa}
-              style={r.totalWpa != null ? { color: r.totalWpa >= 0 ? "var(--positive)" : "var(--negative)" } : undefined}
-            >
-              {r.totalWpa != null ? signed(r.totalWpa) : "-"}
-            </div>
+            {/* 부호 색(양수 초록 / 음수 빨강)을 쓰지 않는다 - player_season_wpa 2,591행 중 음수가
+                32행뿐이고 최솟값이 -0.057이라 빨간 분기가 사실상 한 번도 발화하지 않는다. 늘 초록인
+                색은 정보를 전혀 담지 않으면서 인코딩처럼 보이는 가짜 신호다(실측 지적). */}
+            <div className={styles.rosterWpa}>{r.totalWpa != null ? signed(r.totalWpa) : "-"}</div>
           </Link>
         ))}
       </div>

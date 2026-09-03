@@ -28,8 +28,18 @@ const NY = 26;
 const CW = (FIELD_X1 - FIELD_X0) / NX;
 const CH = (FIELD_Y1 - FIELD_Y0) / NY;
 
-/** 이보다 적으면 장이 뭉개져 형태가 안 나온다 - 점 구름으로 폴백(1시즌 선수·신입 보호). */
+/** 이보다 적으면 장이 뭉개져 형태가 안 나온다 - 점 구름으로 폴백(1시즌 선수·신입 보호).
+ *  실측(2026-09-04): 26-27 로스터 198명 중 151명이 이 하한을 넘고 47명은 점으로 그려진다. */
 export const FIELD_MIN_SHOTS = 60;
+
+/**
+ * 밝기 정규화의 공통 기준 - "한 칸이 전체 슛의 몇 %인가".
+ * 리그 전체 553,248슛을 이 파일과 같은 격자로 집계했을 때 가장 뜨거운 칸이 14,623개 = 2.64%
+ * (2026-09-04 실측). 그 값을 1.0으로 두면 선수·팀·리그의 장이 전부 같은 자에 놓여 서로 비교
+ * 가능해지고, 다음 단계에서 리그 등고선을 같은 분모로 겹칠 수 있다. 이 상수를 바꾸면 모든
+ * 히어로의 밝기가 함께 움직이므로, 격자(NX/NY/FIELD_*)를 고칠 때 반드시 같이 재측정할 것.
+ */
+export const DENSITY_SHARE_REF = 0.0264;
 
 export type FieldShot = { x: number; y: number; d: string; made: boolean };
 
@@ -80,21 +90,23 @@ export function buildDensityFieldSvg(shots: FieldShot[], opts: DensityFieldOptio
 
   // 격자 집계. 반코트 밖(백코트 장거리 슛 등)은 가장자리 셀로 클램프해 버리지 않고 흡수한다.
   const counts = new Float64Array(NX * NY);
-  let max = 0;
+  let total = 0;
   for (const s of shots) {
     const mx = mirrorShotX(s.x, s.d);
     let gx = Math.floor((mx - FIELD_X0) / CW);
     let gy = Math.floor((s.y - FIELD_Y0) / CH);
     gx = gx < 0 ? 0 : gx >= NX ? NX - 1 : gx;
     gy = gy < 0 ? 0 : gy >= NY ? NY - 1 : gy;
-    const i = gy * NX + gx;
-    counts[i] += 1;
-    if (counts[i] > max) max = counts[i];
+    counts[gy * NX + gx] += 1;
+    total += 1;
   }
 
   // 마스크용 원: 반지름은 셀 크기 고정(겹쳐서 연속면이 되도록), 불투명도만 밀도에 비례.
-  // 0.45 지수 = 감마 보정. 선형으로 하면 림 앞 한 셀만 하얗고 나머지가 전부 죽는다
-  // (실측: 최다 셀 366 vs 중앙값 5 - 두 자릿수 차이라 보정 없이는 장이 아니라 점이 된다).
+  //
+  // 정규화는 "자기 슛 중 이 칸의 비율"(share of own shots)이다. 처음엔 자기 최대 셀 기준
+  // (n/max)이었는데, 그러면 100슛짜리 림 러너와 7,215슛짜리 워니의 히어로가 똑같이 하얗게
+  // 포화돼 두 선수를 나란히 놓고 비교할 수 없다(검증 지적). 분모를 "자기 총 슛"으로 바꾸면
+  // 밝기가 선수·팀·리그에서 같은 뜻을 갖고, 다음 단계의 리그 등고선 층을 같은 분모로 겹칠 수 있다.
   const r = (CW * 1.3).toFixed(1);
   let circles = "";
   let cells = 0;
@@ -103,7 +115,8 @@ export function buildDensityFieldSvg(shots: FieldShot[], opts: DensityFieldOptio
       const n = counts[gy * NX + gx];
       if (n <= 0) continue;
       cells++;
-      const o = Math.min(1, Math.pow(n / max, 0.45));
+      const share = n / total;
+      const o = Math.min(1, Math.pow(share / DENSITY_SHARE_REF, 0.6));
       const cx = (FIELD_X0 + (gx + 0.5) * CW).toFixed(1);
       const cy = (FIELD_Y0 + (gy + 0.5) * CH).toFixed(1);
       circles += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#fff" opacity="${o.toFixed(3)}"/>`;
