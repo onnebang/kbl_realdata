@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import { classifyShot } from "./formIndex";
 import { fetchAllPagesBounded } from "./scoringExplorer";
-import { COURT_X, HOOP_RIGHT, drawCourtMarkings, mirrorShotX } from "./zoneCompare";
+import { buildDensityFieldSvg } from "./shotDensityField";
 
 // 선수 프로필 "데이터 사이언스" 대개편의 데이터 레이어 - 퍼센타일/클러치/시너지/슈팅 DNA/
 // 히어로 별자리(커리어 슛 전체). GROUP BY 집계가 필요한 두 가지(시즌 전체 선수 풀, 클러치
@@ -29,25 +29,26 @@ export async function getCareerShots(pcode: string): Promise<CareerShot[]> {
   });
 }
 
-// ── 히어로 "슛 별자리" - 커리어 슛 전부를 반코트에 옅은 점으로(배경 아트 레이어) ─────────
-// 점이 3천 개를 넘으면 균등 샘플링(렌더 무게 상한 - spec). 색은 CSS 변수(--hero-dot*)로
-// 넘겨서 팀 컬러를 페이지가 주입 - 성공은 밝게, 실패는 어둡고 더 옅게(밀도 텍스처).
-export const CONSTELLATION_MAX_DOTS = 3000;
+// ── 히어로 배경 아트 - 슛 "밀도 장(場)" ────────────────────────────────────────────
+// 요청("시각적으로 더 화려했으면")으로 점 구름을 밀도 장으로 교체(2026-09-04). 구현은
+// lib/shotDensityField.ts에 있고 여기는 기존 호출부(선수·팀 프로필 히어로 두 곳)를 그대로
+// 두기 위한 얇은 어댑터다 - 반환 타입도 string 그대로.
+//
+// 실측 근거(자밀 워니 커리어 7,173슛): 점 구름은 원 3,070개(약 250KB)인데 림 앞이 포화라
+// "많다"만 보이고 축이 안 읽혔다. 격자 밀도 + 흐림 마스크는 원 374개(약 30KB)로 88% 가벼우면서
+// 커리어의 무게중심이 드러난다. 즉 화려해지면서 동시에 빨라지는 교체.
+//
+// 표본이 얇으면(FIELD_MIN_SHOTS 미만) shotDensityField가 알아서 점 구름으로 폴백하므로
+// 1시즌 선수·신입·개막 직후 팀에서도 빈 그림이 되지 않는다.
+export { FIELD_MIN_SHOTS } from "./shotDensityField";
 
-export function buildConstellationSvg(shots: { x: number; y: number; d: string; made: boolean }[]): string {
-  const step = shots.length > CONSTELLATION_MAX_DOTS ? shots.length / CONSTELLATION_MAX_DOTS : 1;
-  // 히어로는 위임적 다크 - 테마 토큰(var(--ink-*)) 대신 흰색 라인을 아주 옅게 직접 칠함.
-  let svg = drawCourtMarkings(HOOP_RIGHT[0], COURT_X[1], -1, "rgba(255,255,255,0.09)", 1.3);
-  for (let i = 0; i < shots.length; i += step) {
-    const s = shots[Math.floor(i)];
-    const x = mirrorShotX(s.x, s.d);
-    if (s.made) {
-      svg += `<circle cx="${x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="2.1" fill="var(--hero-dot-made)" opacity="0.5"/>`;
-    } else {
-      svg += `<circle cx="${x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="1.6" fill="var(--hero-dot)" opacity="0.2"/>`;
-    }
-  }
-  return svg;
+export function buildConstellationSvg(
+  shots: { x: number; y: number; d: string; made: boolean }[],
+  // 한 문서에 히어로가 둘 이상 뜨는 경우(2단계 ?vs= 비교 뷰)를 위해 SVG id 접두어를 받는다.
+  // 지금 두 호출부는 페이지당 하나뿐이라 기본값으로 충분하다.
+  uid = "hero"
+): string {
+  return buildDensityFieldSvg(shots, { uid, contour: true }).svg;
 }
 
 // ── 리그 퍼센타일 프로필 ────────────────────────────────────────────────────────────
