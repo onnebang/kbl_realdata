@@ -263,3 +263,116 @@ export async function getPlayerRecentGames(pcode: string, limit = MAX_GAME_LOG):
     };
   });
 }
+
+// ── 커리어 전 경기 행(프로필 개편 1단계) ─────────────────────────────────────────────
+// 상태 스트립(lib/playerStatus.ts: 뛴 시즌 수·마지막 경기), 상대별 통산(lib/preseason.ts
+// getPlayerVsOpponentCareer), 마지막 장면 카드, 2단계 커리어 리본이 전부 같은 행을 쓰므로 한 번만
+// 받아 넘겨 쓴다(각 함수는 careerRows 인자를 받으면 재조회하지 않음). getPlayerRecentGames와 같은
+// 방향(games FROM + game_player_stats!inner 임베드)이라 game_date 정렬이 실제로 먹고, 커리어가
+// 긴 선수(김선형 639경기)도 1000행 cap을 넘길 수 있어 .range 페이지네이션.
+//
+// 주의: game_player_stats에는 출전 0분(DNP) 행도 있다(실측 25-26 6,792행 중 654행이 0분). 기존
+// getPlayerCareerBySeason의 GP가 행 수 기준이라 여기서도 걸러내지 않는다 - GP를 "출전"으로만
+// 세고 싶은 화면은 min > 0으로 직접 거른다.
+export type CareerGameRow = {
+  gmkey: string;
+  gameDate: string;
+  seasonName: string;
+  seasonCategory: string; // 정규시즌 / 플레이오프
+  tcode: string; // 이 경기에서 선수가 속한 팀
+  oppTcode: string;
+  isHome: boolean;
+  teamScore: number | null; // 예정·진행 중이면 null(lib/gameStatus.ts 규칙과 동일)
+  oppScore: number | null;
+  isEnded: boolean;
+  backNum: string | null;
+  pos: string | null; // 원문(C/FD/GD) - 표시 전 lib/playerStatus.ts normalizePos로 G/F/C 정규화
+  isStarter: boolean | null;
+  min: number;
+  pts: number;
+  reb: number;
+  ast: number;
+  stl: number;
+  blk: number;
+  tov: number;
+  fgm: number;
+  fga: number; // 2점 시도만(프로젝트 관례)
+  tpm: number;
+  tpa: number;
+  ftm: number;
+  fta: number;
+};
+
+export async function getPlayerCareerGames(pcode: string): Promise<CareerGameRow[]> {
+  type Stat = {
+    tcode: string;
+    back_num: string | null;
+    pos: string | null;
+    is_starter: boolean | null;
+    min_played: number | string | null;
+    pts: number | null;
+    reb: number | null;
+    ast: number | null;
+    stl: number | null;
+    blk: number | null;
+    turnovers: number | null;
+    fgm: number | null;
+    fga: number | null;
+    tpm: number | null;
+    tpa: number | null;
+    ftm: number | null;
+    fta: number | null;
+  };
+  const PAGE = 1000;
+  const rows: CareerGameRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("games")
+      .select(
+        `gmkey, game_date, season_name, season_category, home_tcode, away_tcode, home_score, away_score, is_ended,
+         game_player_stats!inner(tcode, back_num, pos, is_starter, min_played, pts, reb, ast, stl, blk, turnovers, fgm, fga, tpm, tpa, ftm, fta)`
+      )
+      .eq("game_player_stats.pcode", pcode)
+      .order("game_date", { ascending: false })
+      .order("gmkey", { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error || !data || !data.length) break;
+    for (const row of data) {
+      const stat = (row.game_player_stats as unknown as Stat[])[0];
+      if (!stat) continue;
+      const isHome = stat.tcode === row.home_tcode;
+      const homeScore = (row.home_score as number | null) ?? null;
+      const awayScore = (row.away_score as number | null) ?? null;
+      rows.push({
+        gmkey: row.gmkey as string,
+        gameDate: row.game_date as string,
+        seasonName: row.season_name as string,
+        seasonCategory: row.season_category as string,
+        tcode: stat.tcode,
+        oppTcode: isHome ? (row.away_tcode as string) : (row.home_tcode as string),
+        isHome,
+        teamScore: isHome ? homeScore : awayScore,
+        oppScore: isHome ? awayScore : homeScore,
+        isEnded: !!row.is_ended,
+        backNum: stat.back_num ?? null,
+        pos: stat.pos ?? null,
+        isStarter: stat.is_starter ?? null,
+        min: Number(stat.min_played ?? 0),
+        pts: stat.pts ?? 0,
+        reb: stat.reb ?? 0,
+        ast: stat.ast ?? 0,
+        stl: stat.stl ?? 0,
+        blk: stat.blk ?? 0,
+        tov: stat.turnovers ?? 0,
+        fgm: stat.fgm ?? 0,
+        fga: stat.fga ?? 0,
+        tpm: stat.tpm ?? 0,
+        tpa: stat.tpa ?? 0,
+        ftm: stat.ftm ?? 0,
+        fta: stat.fta ?? 0,
+      });
+    }
+    if (data.length < PAGE) break;
+  }
+  return rows;
+}

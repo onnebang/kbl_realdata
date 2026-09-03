@@ -1,5 +1,7 @@
 import { supabase } from "./supabase";
 import { displayTeamName } from "./teamNames";
+import { deriveGameStatus, type GameStatus } from "./gameStatus";
+import { PRESEASON_SEASON, isRealGmkey } from "./preseason";
 
 // courtside_template.html의 renderMatchups()/renderStandings()가 쓰던 pregameDetail(h2h/
 // seasonStats/schedule/standings)을 courtside-web에도 - 그쪽은 Python 빌드타임에 미리
@@ -242,4 +244,96 @@ export async function getStandingsAsOf(seasonName: string, beforeDate: string): 
   return Array.from(record.entries())
     .map(([tcode, r]) => ({ tcode, wins: r.wins, losses: r.losses, pct: r.wins / (r.wins + r.losses) }))
     .sort((a, b) => b.pct - a.pct);
+}
+
+// ── 팀 시즌 일정: 결과 + 예정 한 표(프로필 개편 1단계) ─────────────────────────────────
+// getTeamSeasonSchedule은 home_score가 있는(치른) 경기만 돌려주고 다른 페이지가 그 계약에
+// 의존하므로 손대지 않는다. 상태 스트립·고스트 리본·일정표는 예정 경기(home_score null)까지
+// 필요해서 이 함수를 따로 둔다. tools/sync_upcoming_games.py가 넣는 예정 행은 stadium·
+// game_start가 채워져 있고(실측 26-27 127경기 전부), 라이브 드라이런의 합성 gmkey(P2LIVE-/
+// DRYRUN-)는 isRealGmkey로 걸러 실제 경기처럼 보이지 않게 한다.
+export type TeamFixture = {
+  gmkey: string;
+  gameDate: string; // "2026-10-03"
+  gameStart: string | null; // "14:00:00" (time without time zone 원문)
+  stadium: string | null;
+  seasonName: string;
+  seasonCategory: string;
+  oppTcode: string;
+  oppName: string; // 그 시즌 기준 표기(displayTeamName)
+  isHome: boolean;
+  teamScore: number | null; // 예정이면 null
+  oppScore: number | null;
+  isEnded: boolean;
+  status: GameStatus; // scheduled / live / final (lib/gameStatus.ts 단일 정의)
+};
+
+const FIXTURE_SELECT = `gmkey, game_date, game_start, stadium, season_name, season_category, home_tcode, away_tcode, home_score, away_score, is_ended,
+       home_team:teams!games_home_tcode_fkey(tcode, name),
+       away_team:teams!games_away_tcode_fkey(tcode, name)`;
+
+function toFixture(g: Record<string, unknown>, tcode: string): TeamFixture {
+  const isHome = g.home_tcode === tcode;
+  const homeTeam = g.home_team as { tcode: string; name: string } | null;
+  const awayTeam = g.away_team as { tcode: string; name: string } | null;
+  const oppTcode = isHome ? (g.away_tcode as string) : (g.home_tcode as string);
+  const oppRawName = (isHome ? awayTeam?.name : homeTeam?.name) ?? oppTcode;
+  const homeScore = (g.home_score as number | null) ?? null;
+  const awayScore = (g.away_score as number | null) ?? null;
+  const seasonName = g.season_name as string;
+  return {
+    gmkey: g.gmkey as string,
+    gameDate: g.game_date as string,
+    gameStart: (g.game_start as string | null) ?? null,
+    stadium: (g.stadium as string | null) ?? null,
+    seasonName,
+    seasonCategory: g.season_category as string,
+    oppTcode,
+    oppName: displayTeamName(oppTcode, oppRawName, seasonName),
+    isHome,
+    teamScore: isHome ? homeScore : awayScore,
+    oppScore: isHome ? awayScore : homeScore,
+    isEnded: !!g.is_ended,
+    status: deriveGameStatus({ home_score: homeScore, is_ended: !!g.is_ended }),
+  };
+}
+
+/** 이 시즌 이 팀의 실제 경기 전부(치른 + 예정, 정규+PO), 날짜·시각 오름차순. */
+export async function getTeamSeasonFixtures(tcode: string, seasonName: string): Promise<TeamFixture[]> {
+  const { data } = await supabase
+    .from("games")
+    .select(FIXTURE_SELECT)
+    .eq("season_name", seasonName)
+    .or(`home_tcode.eq.${tcode},away_tcode.eq.${tcode}`)
+    .order("game_date", { ascending: true })
+    .order("game_start", { ascending: true, nullsFirst: false });
+  if (!data) return [];
+  return (data as unknown as Record<string, unknown>[]).filter((g) => isRealGmkey(g.gmkey as string)).map((g) => toFixture(g, tcode));
+}
+
+/** 이 팀의 아직 끝나지 않은(예정 또는 진행 중) 가장 이른 실제 경기. 없으면 null(시즌 종료·일정 미수록). */
+export async function getTeamNextGame(tcode: string, seasonName = PRESEASON_SEASON): Promise<TeamFixture | null> {
+  const { data } = await supabase
+    .from("games")
+    .select(FIXTURE_SELECT)
+    .eq("season_name", seasonName)
+    .eq("is_ended", false)
+    .or(`home_tcode.eq.${tcode},away_tcode.eq.${tcode}`)
+    .order("game_date", { ascending: true })
+    .order("game_start", { ascending: true, nullsFirst: false })
+    .limit(10); // 합성 gmkey가 앞에 섞여도 실제 경기 하나는 남도록 여유
+  const real = ((data ?? []) as unknown as Record<string, unknown>[]).filter((g) => isRealGmkey(g.gmkey as string));
+  return real.length ? toFixture(real[0], tcode) : null;
+}
+
+/** 이 시즌 이 팀이 치른(종료된) 정규시즌 실제 경기 수 - lib/seasonFocus.ts resolveTeamSeasons의 입력. */
+export async function getTeamPlayedRegCount(tcode: string, seasonName: string): Promise<number> {
+  const { data } = await supabase
+    .from("games")
+    .select("gmkey")
+    .eq("season_name", seasonName)
+    .eq("season_category", "정규시즌")
+    .eq("is_ended", true)
+    .or(`home_tcode.eq.${tcode},away_tcode.eq.${tcode}`);
+  return (data ?? []).filter((g) => isRealGmkey(g.gmkey as string)).length;
 }

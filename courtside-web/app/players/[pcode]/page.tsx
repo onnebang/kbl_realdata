@@ -3,13 +3,12 @@ import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import {
   getPlayerInfo,
-  getPlayerCareerBySeason,
+  getPlayerCareerGames,
   getPlayerRecentGames,
   getAllTeams,
   computeWindowAverages,
   WINDOWS,
   type GameLogRow,
-  type SeasonLine,
 } from "@/lib/playerProfile";
 import {
   getZoneExpectedPts,
@@ -34,10 +33,21 @@ import {
   PERCENTILE_MIN_MINUTES,
   COMBO_MIN_MINUTES,
   type SeasonZoneMix,
-  type ClutchProfile,
   type PercentileProfile,
 } from "@/lib/playerDataScience";
 import { getPlayerOnOffRatings } from "@/lib/lineupNetRating";
+import { getPlayerRosterStatus } from "@/lib/playerStatus";
+import {
+  resolvePlayerSeasons,
+  statSeasonChip,
+  progressChip,
+  basisChip,
+  emptyState,
+  seasonShort as shortSeason,
+  prevSeasonName,
+  PRESEASON_SEASON,
+} from "@/lib/seasonFocus";
+import { aggregateCareer, getPlayerWpaBySeason, type SeasonAgg } from "@/lib/playerPageData";
 import { displayTeamName } from "@/lib/teamNames";
 import { TeamBadge } from "@/components/TeamBadge";
 import styles from "./player-profile.module.css";
@@ -55,39 +65,9 @@ function signed(v: number, decimals = 1) {
   return `${v > 0 ? "+" : ""}${v.toFixed(decimals)}`;
 }
 
-// "2021-2022" -> "21-22" (차트 축 라벨용).
-function shortSeason(s: string) {
-  const m = s.match(/^(\d{4})-(\d{4})$/);
-  return m ? `${m[1].slice(2)}-${m[2].slice(2)}` : s;
-}
-
-// 시즌 중 트레이드로 (시즌, 팀) 라인이 2개인 선수는 경기수 가중 평균으로 시즌 하나로 합침 -
-// 히어로 헤드라인/커리어 아크는 "시즌" 단위 서사라서(팀 단위 분리는 시즌별 기록 표가 담당).
-type SeasonAgg = { seasonName: string; gp: number; ppg: number; rpg: number; apg: number; minPg: number; tsPct: number | null };
-
-function aggregateSeasonsAsc(seasons: SeasonLine[]): SeasonAgg[] {
-  const bySeason = new Map<string, SeasonLine[]>();
-  for (const s of seasons) {
-    (bySeason.get(s.seasonName) ?? bySeason.set(s.seasonName, []).get(s.seasonName)!).push(s);
-  }
-  return Array.from(bySeason.entries())
-    .map(([seasonName, lines]) => {
-      const gp = lines.reduce((s, l) => s + l.gp, 0);
-      const wavg = (fn: (l: SeasonLine) => number) => lines.reduce((s, l) => s + fn(l) * l.gp, 0) / gp;
-      const ppg = wavg((l) => l.ppg);
-      const tsaPg = wavg((l) => l.fgaPg + l.tpaPg + 0.44 * l.ftaPg);
-      return {
-        seasonName,
-        gp,
-        ppg,
-        rpg: wavg((l) => l.rpg),
-        apg: wavg((l) => l.apg),
-        minPg: wavg((l) => l.minPg),
-        tsPct: tsaPg > 0 ? ppg / (2 * tsaPg) : null,
-      };
-    })
-    .sort((a, b) => (a.seasonName < b.seasonName ? -1 : 1));
-}
+// 시즌 축 라벨("2021-2022" -> "21-22")과 시즌 단위 집계(시즌 중 이적은 경기수 가중으로 한 시즌에
+// 합쳐짐)는 lib/seasonFocus.ts seasonShort / lib/playerPageData.ts aggregateCareer를 그대로 쓴다 -
+// 페이지마다 다른 정의가 생기지 않도록(중복 구현 금지).
 
 // 템플릿 renderPerfChart() 포팅 - 막대=득점(홈 컬러), 선=출전시간(골드), viewBox 640x160.
 function PerfChart({ games }: { games: GameLogRow[] }) {
@@ -367,11 +347,12 @@ export default async function PlayerPage({
   const info = await getPlayerInfo(pcode);
   if (!info) notFound();
 
-  // 시즌 선택과 무관한 조회(클러치/시너지/온오프/존 기대값 포함)는 전부 1차 병렬로 -
-  // 시즌 의존 조회(2차)만 seasons[0]을 기다림(워터폴 1단 축소).
-  const [{ seasons, careerGp }, recentGames, teamByTcode, careerShots, clutch, combos, onOffMap, zoneExpectedPts] =
+  // 1차: 시즌 선택과 무관한 조회(클러치/시너지/온오프/존 기대값 포함)를 전부 병렬로. 커리어 경기
+  // 행(getPlayerCareerGames)은 로스터 상태 판정·히어로 타일·커리어 아크·시즌별 기록표가 모두
+  // 공유하므로 한 번만 읽는다(기존 getPlayerCareerBySeason과 중복 조회하지 않기 위해 교체).
+  const [careerRows, recentGames, teamByTcode, careerShots, clutch, combos, onOffMap, zoneExpectedPts] =
     await Promise.all([
-      getPlayerCareerBySeason(pcode),
+      getPlayerCareerGames(pcode),
       getPlayerRecentGames(pcode),
       getAllTeams(),
       getCareerShots(pcode),
@@ -381,23 +362,51 @@ export default async function PlayerPage({
       getZoneExpectedPts(),
     ]);
 
+  // 2차: 확정 명단(season_roster) 대조 - 히어로 정체성(팀·등번호·포지션)의 유일한 출처다.
+  // recentGames[0]에서 신분을 추론하면 이적 선수가 옛 팀 배지·옛 등번호를 단 채로 렌더된다
+  // (해먼즈 291698 실측: 마지막 경기 tcode 10 울산 현대모비스 #2 'FD' vs 26-27 명단 tcode 16
+  // 원주 DB · back_num NULL · note '외국인 2옵션 | MOB→DB 이적'). 커리어 행은 그대로 넘겨 재조회 없음.
+  const status = await getPlayerRosterStatus(pcode, careerRows);
+  // "이번 시즌"의 정의는 lib/seasonFocus.ts 한 곳에서만 - 추정 패널(평균·퍼센타일·슛)은 statSeason을
+  // 받아 개막일 밤에 1경기 평균이 시즌 수치로 승격되는 일이 없게 한다(선수 임계 10GP).
+  const focus = resolvePlayerSeasons(pcode, status.seasonsPlayedDesc, status.state === "active");
+
+  const { lines: seasonLines, seasonsAsc } = aggregateCareer(careerRows);
+  const careerGp = careerRows.length;
+  const seasonNames = seasonsAsc.map((s) => s.seasonName);
+  // 시즌별 기록표에서 "가장 최근 시즌" 행을 강조 - 사실(출전 기록이 있는 최신 시즌)이라 첫 경기부터 바뀐다.
+  const latestSeason = seasonLines.length ? seasonLines[0].seasonName : null;
+
   const windowN = WINDOWS.includes(Number(w) as (typeof WINDOWS)[number]) ? Number(w) : 15;
   const windowGames = recentGames.slice(0, windowN);
   const windowAvg = computeWindowAverages(recentGames, windowN);
 
-  const latest = recentGames[0];
-  const headerTcode = latest?.tcode ?? seasons[0]?.tcode;
-  const headerTeam = headerTcode ? teamByTcode.get(headerTcode) : undefined;
-  const latestSeason = seasons.length ? seasons[0].seasonName : null;
-  const headerTeamName = headerTeam ? displayTeamName(headerTeam.tcode, headerTeam.name, latestSeason) : null;
+  const headerTeam = status.tcode ? (teamByTcode.get(status.tcode) ?? null) : null;
 
-  const shotSeason = season ?? seasons[0]?.seasonName;
-  // 2차: 선택 시즌 의존 조회(퍼센타일 RPC는 실측 29ms).
-  const [boxTotals, percentile, wpaRank] = await Promise.all([
+  // ?season= 쿼리로 직접 고른 시즌이 있으면 그 시즌, 없으면 statSeason(개막 전·표본 미달이면 마지막 시즌).
+  // 쿼리 값은 반드시 화이트리스트로 검증한다 - 그러지 않으면 ?season=아무말이 그대로 기준 칩에
+  // 찍혀서 페이지가 없는 시즌을 근거로 단언하는 것처럼 보인다(검증 지적).
+  const selectableSeasons = new Set<string>([...seasonNames, PRESEASON_SEASON]);
+  const shotSeason = season && selectableSeasons.has(season) ? season : focus.statSeason;
+  // 3차: 선택 시즌 의존 조회(퍼센타일 RPC는 실측 29ms) + 시즌별 WPA(히어로 WPA 타일·정규시즌 집계).
+  const [boxTotals, percentile, wpaRank, wpaBySeason] = await Promise.all([
     shotSeason ? getPlayerSeasonBoxTotals(pcode, shotSeason) : Promise.resolve(null),
     shotSeason ? getPercentileProfile(pcode, shotSeason) : Promise.resolve(null),
     shotSeason ? getSeasonWpaRank(pcode, shotSeason) : Promise.resolve(null),
+    getPlayerWpaBySeason(pcode, seasonNames),
   ]);
+
+  // 시즌 의존 패널의 기준 칩은 전부 여기서 만든다(shared_design_language (2) - 다섯 어휘만 존재).
+  const panelChip = (s: string | null): string | null => {
+    if (!s) return null;
+    if (s === focus.statSeason) return statSeasonChip(focus);
+    // ?season=2026-2027처럼 아직 진행 중인 시즌을 직접 고른 경우 - "최종"이라고 쓰면 거짓이 된다.
+    if (s === PRESEASON_SEASON) return basisChip("inprogress", { n: focus.focusGp, threshold: focus.thresholdLabel });
+    return basisChip("final", { season: s, last: s < prevSeasonName(PRESEASON_SEASON) });
+  };
+  const statChip = panelChip(shotSeason ?? null);
+  // 개막 후·임계 전에만 붙는 두 번째 칩('26-27 진행 중 · 3경기 (임계 10경기)'). 다른 시즌을 직접 고른 경우엔 생략.
+  const statProgressChip = shotSeason === focus.statSeason ? progressChip(focus) : null;
 
   // 슛 임팩트 리포트의 시즌 슛 = 커리어 슛에서 필터(별자리/DNA와 요청 1회 공유).
   const seasonShots = careerShots.filter((s) => s.season === shotSeason);
@@ -410,8 +419,12 @@ export default async function PlayerPage({
   const astPerGame = boxTotals && boxTotals.gp > 0 ? boxTotals.ast / boxTotals.gp : null;
   const tovPerGame = boxTotals && boxTotals.gp > 0 ? boxTotals.tov / boxTotals.gp : null;
 
-  const seasonsAsc = aggregateSeasonsAsc(seasons);
-  const heroSeason = seasonsAsc.length ? seasonsAsc[seasonsAsc.length - 1] : null;
+  // 히어로 타일의 기준 시즌 = statSeason. statSeason이 없는 신입(직전 출전 시즌 없음)은 26-27 표본이
+  // 있을 때만 그 시즌을 쓰고, 칩이 "진행 중 · N경기 (임계 10경기)"라고 표본을 밝힌다.
+  const heroSeasonName = focus.statSeason ?? (focus.focusGp > 0 ? focus.focusSeason : null);
+  const heroSeason = heroSeasonName ? (seasonsAsc.find((s) => s.seasonName === heroSeasonName) ?? null) : null;
+  const heroWpa = heroSeasonName ? (wpaBySeason.get(heroSeasonName) ?? null) : null;
+  const heroChip = panelChip(heroSeasonName);
   const dnaMix = computeShootingDna(careerShots);
   const constellationSvg = buildConstellationSvg(careerShots);
   const teamColor = headerTeam?.color ?? "#d9640a";
@@ -448,19 +461,33 @@ export default async function PlayerPage({
           </svg>
         )}
         <div className={styles.heroScrim} />
-        {latest?.backNum && <div className={styles.heroNum}>{latest.backNum}</div>}
+        {status.backNum && <div className={styles.heroNum}>{status.backNum}</div>}
         <div className={styles.heroContent}>
           <div className={styles.heroKicker}>COURTSIDE PLAYER PROFILE</div>
           <h1 className={styles.heroName}>{info.name}</h1>
           <div className={styles.heroMeta}>
-            <TeamBadge team={headerTeam ?? null} size={22} />
-            <span>{headerTeamName ?? "-"}</span>
+            <TeamBadge team={headerTeam} size={22} />
+            <span>{status.teamName ?? "-"}</span>
             <span className={styles.heroMetaDot}>·</span>
-            <span>{latest?.pos ?? "-"}</span>
+            {/* 포지션은 G/F/C 정규화 값만(game_player_stats.pos 원문 'FD'/'GD' 노출 금지 - playerStatus.normalizePos). */}
+            <span>{status.pos ?? "-"}</span>
+            {status.backNum && (
+              <>
+                <span className={styles.heroMetaDot}>·</span>
+                {/* 외국인 행은 season_roster.back_num이 NULL이라 같은 팀이면 마지막 경기 번호를 시즌
+                    라벨과 함께 쓴다(팀이 바뀌면 playerStatus가 null로 돌려줘 여기까지 오지 않음). */}
+                <span>
+                  {status.backNumAsLastSeason && status.backNumSeason ? `${shortSeason(status.backNumSeason)} ` : ""}#
+                  {status.backNum}
+                </span>
+              </>
+            )}
             <span className={styles.heroMetaDot}>·</span>
             <span>커리어 {careerGp}경기</span>
             <span className={styles.heroMetaDot}>·</span>
-            <span>슛 {careerShots.length.toLocaleString()}개의 별자리</span>
+            {/* 히어로 배경은 점 구름이 아니라 밀도 장(lib/shotDensityField.ts) - 밝기는 "시도 밀도"이지
+                성공률이 아니다. 표본 수와 함께 그 사실을 캡션에 남긴다. */}
+            <span>슛 {careerShots.length.toLocaleString()}개의 밀도 지도 · 밝을수록 시도가 많은 자리</span>
           </div>
           {heroSeason && (
             <div className={styles.heroStatRow}>
@@ -477,27 +504,49 @@ export default async function PlayerPage({
                   <div className={styles.heroStatLabel}>
                     {label} · {shortSeason(heroSeason.seasonName)}
                   </div>
+                  {/* 값 + 표본 + 기준 시즌(thesis (3)) - 타일 하나가 53경기인지 3경기인지 보이게. */}
+                  <div className={styles.heroStatSample}>정규+PO {heroSeason.gpReg + heroSeason.gpPo}경기</div>
                 </div>
               ))}
+              {heroWpa && (
+                <div className={styles.heroStat}>
+                  <div className={styles.heroStatVal}>{signed(heroWpa.totalWpa)}</div>
+                  <div className={styles.heroStatLabel}>WPA · {shortSeason(heroWpa.seasonName)}</div>
+                  {/* player_season_wpa.games는 정규시즌 GP(워니 25-26 50 vs 정규+PO 53 - 검증) → '정규' 라벨 필수. */}
+                  <div className={styles.heroStatSample}>
+                    정규 {heroWpa.games}경기 · 리그 {heroWpa.rank}위/{heroWpa.outOf}
+                  </div>
+                </div>
+              )}
             </div>
           )}
+          {heroSeason && heroChip && <div className={styles.heroBasis}>{heroChip}</div>}
         </div>
       </section>
 
       {/* ── 1. 리그 퍼센타일 프로필 ── */}
       <div className={styles.panel}>
-        <div className={styles.panelTitle}>리그 퍼센타일 프로필 {shotSeason ? `· ${shotSeason}` : ""}</div>
+        {/* 제목의 기준 시즌은 항상 칩으로(원문 시즌 문자열 금지) - 같은 헬퍼가 두 페이지의 문구를 만든다. */}
+        <div className={styles.panelTitle}>
+          리그 퍼센타일 프로필
+          {statChip && <span className={styles.panelChip}>{statChip}</span>}
+          {statProgressChip && <span className={styles.panelChip}>{statProgressChip}</span>}
+        </div>
         <PercentilePanel profile={percentile} seasonName={shotSeason ?? "-"} />
       </div>
 
       {/* ── 2. 슛 임팩트 리포트(기존 유지) ── */}
       <div className={styles.panel}>
-        <div className={styles.panelTitle}>슛 임팩트 리포트</div>
+        <div className={styles.panelTitle}>
+          슛 임팩트 리포트
+          {statChip && <span className={styles.panelChip}>{statChip}</span>}
+          {statProgressChip && <span className={styles.panelChip}>{statProgressChip}</span>}
+        </div>
         <form className={styles.heatRow}>
           <label>시즌</label>
-          <select name="season" defaultValue={shotSeason} className={styles.heatSelect} disabled={!seasons.length}>
-            {seasons.length ? (
-              Array.from(new Set(seasons.map((s) => s.seasonName))).map((sn) => (
+          <select name="season" defaultValue={shotSeason ?? undefined} className={styles.heatSelect} disabled={!seasonNames.length}>
+            {seasonNames.length ? (
+              [...seasonNames].reverse().map((sn) => (
                 <option key={sn} value={sn}>
                   {sn}
                 </option>
@@ -553,7 +602,11 @@ export default async function PlayerPage({
       </div>
 
       <div className={styles.panel}>
-        <div className={styles.panelTitle}>유발 파울 · 어시스트 · 턴오버</div>
+        <div className={styles.panelTitle}>
+          유발 파울 · 어시스트 · 턴오버
+          {statChip && <span className={styles.panelChip}>{statChip}</span>}
+          {statProgressChip && <span className={styles.panelChip}>{statProgressChip}</span>}
+        </div>
         {boxTotals && boxTotals.gp > 0 ? (
           <div className={styles.miniStatGrid}>
             <div className={styles.miniStatCard}>
@@ -563,7 +616,7 @@ export default async function PlayerPage({
                 FTr {drawnFoulProxy!.ftr != null ? drawnFoulProxy!.ftr.toFixed(2) : "-"}
               </div>
               <div className={styles.miniStatNote}>
-                이벤트 로그(파울자유투)에는 "파울을 당한" 선수가 아니라 "파울을 범한" 선수만 기록돼
+                이벤트 로그(파울자유투)에는 &quot;파울을 당한&quot; 선수가 아니라 &quot;파울을 범한&quot; 선수만 기록돼
                 있어, 정확한 유발 파울 횟수 대신 자유투 시도 수(FTA)를 근사치로 표시 · FTr = FTA/FGA
               </div>
             </div>
@@ -579,7 +632,7 @@ export default async function PlayerPage({
             </div>
           </div>
         ) : (
-          <div className="empty-note">이 시즌 기록 없음</div>
+          <div className="empty-note">{emptyState("none")}</div>
         )}
       </div>
 
@@ -670,12 +723,20 @@ export default async function PlayerPage({
             <div className={styles.miniStatSub}>{onOff ? `코트 위 NET/40분 · ${Math.round(onOff.minutes)}분 표본` : "표본 없음"}</div>
           </div>
           <div className={styles.miniStatCard}>
-            <div className={styles.miniStatLabel}>승리 기여 WPA {shotSeason ? `· ${shortSeason(shotSeason)}` : ""}</div>
+            {/* player_season_wpa는 정규시즌만 집계 - 옆의 정규+PO 라인과 섞이지 않도록 라벨에 '정규'를 박는다. */}
+            <div className={styles.miniStatLabel}>
+              승리 기여 WPA(정규)
+              {statChip && <span className={styles.panelChip}>{statChip}</span>}
+            </div>
             <div className={styles.miniStatMain} style={wpaRank ? { color: wpaRank.totalWpa >= 0 ? "var(--positive)" : "var(--negative)" } : undefined}>
               {wpaRank ? signed(wpaRank.totalWpa) : "-"}
             </div>
             <div className={styles.miniStatSub}>
-              {wpaRank ? `리그 ${wpaRank.rank}위 / ${wpaRank.outOf}명 · 경기당 ${signed(wpaRank.wpaPerGame, 2)}` : "이 시즌 WPA 집계 없음"}
+              {wpaRank
+                ? `리그 ${wpaRank.rank}위 / ${wpaRank.outOf}명 · 정규 ${wpaRank.games}경기 · 경기당 ${signed(wpaRank.wpaPerGame, 2)}`
+                : shotSeason === PRESEASON_SEASON
+                  ? emptyState("offline")
+                  : "이 시즌 WPA 집계 없음"}
             </div>
           </div>
         </div>
@@ -819,7 +880,7 @@ export default async function PlayerPage({
 
       <div className={styles.panel}>
         <div className={styles.panelTitle}>시즌별 기록</div>
-        {seasons.length ? (
+        {seasonLines.length ? (
           <div className="table-scroll">
             <table className="data-table">
               <thead>
@@ -840,28 +901,30 @@ export default async function PlayerPage({
                 </tr>
               </thead>
               <tbody>
-                {seasons.map((s) => {
-                  const team = teamByTcode.get(s.tcode);
+                {seasonLines.map((l) => {
+                  const team = teamByTcode.get(l.tcode);
+                  const b = l.all;
                   return (
-                    <tr key={`${s.seasonName}-${s.tcode}`} className={s.seasonName === latestSeason ? styles.curSeason : ""}>
-                      <td>{s.seasonName}</td>
+                    <tr key={`${l.seasonName}-${l.tcode}`} className={l.seasonName === latestSeason ? styles.curSeason : ""}>
+                      <td>{l.seasonName}</td>
                       <td>
                         <span className={styles.glOpp}>
                           <TeamBadge team={team ?? null} size={16} />
-                          {s.teamName}
+                          {/* 팀명은 그 시즌 표기 기준(전주 KCC → 부산 KCC) - displayTeamName. */}
+                          {displayTeamName(l.tcode, team?.name ?? l.tcode, l.seasonName)}
                         </span>
                       </td>
-                      <td>{s.gp}</td>
-                      <td>{s.minPg.toFixed(1)}</td>
-                      <td>{s.ppg.toFixed(1)}</td>
-                      <td>{s.rpg.toFixed(1)}</td>
-                      <td>{s.apg.toFixed(1)}</td>
-                      <td>{s.spg.toFixed(1)}</td>
-                      <td>{s.bpg.toFixed(1)}</td>
-                      <td>{s.tovPg.toFixed(1)}</td>
-                      <td>{pct(s.fgPct)}</td>
-                      <td>{pct(s.tpPct)}</td>
-                      <td>{pct(s.ftPct)}</td>
+                      <td>{b.gp}</td>
+                      <td>{b.minPg.toFixed(1)}</td>
+                      <td>{b.ppg.toFixed(1)}</td>
+                      <td>{b.rpg.toFixed(1)}</td>
+                      <td>{b.apg.toFixed(1)}</td>
+                      <td>{b.spg.toFixed(1)}</td>
+                      <td>{b.bpg.toFixed(1)}</td>
+                      <td>{b.tovPg.toFixed(1)}</td>
+                      <td>{pct(b.fgPct)}</td>
+                      <td>{pct(b.tpPct)}</td>
+                      <td>{pct(b.ftPct)}</td>
                     </tr>
                   );
                 })}

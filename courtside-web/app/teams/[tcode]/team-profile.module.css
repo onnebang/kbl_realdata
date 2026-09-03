@@ -190,12 +190,32 @@
   padding: 16px 18px;
 }
 .panelTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
   font-weight: 700;
   color: var(--ink-faint);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   margin-bottom: 10px;
+}
+/* 기준 시즌 칩 - 문구는 lib/seasonFocus.ts basisChip/statSeasonChip만이 만든다(다섯 어휘).
+   "이 숫자가 어느 시즌 것인가"를 제목 옆에서 즉시 읽히게 하는 게 목적이라 값 타일과 같은
+   모노 폰트를 쓰고 대문자 변환은 끈다(한글 칩). */
+.basisChip {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-soft);
+  background: var(--surface-soft);
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
 }
 .pctNote {
   font-size: 10.5px;
@@ -280,12 +300,44 @@
   white-space: nowrap;
 }
 
-/* ── 시즌 여정 차트 ────────────────────────────────────────────────────────────── */
-.journeySvg {
+/* ── 시즌 리본(치른 경기 + 남은 경기) ─────────────────────────────────────────────
+   raw SVG 문자열(lib/seasonRibbon.ts)을 dangerouslySetInnerHTML로 넣는 컨테이너.
+   칸마다 <a><title>이 들어 있어 브라우저 기본 툴팁이 뜬다(React 19가 JSX <title>을
+   <head>로 끌어올리는 함정을 피한 이유 - lib/seasonRibbon.ts 주석). */
+.ribbonSvg {
   width: 100%;
   height: auto;
   display: block;
+  overflow: visible;
 }
+.ribbonSvg a {
+  cursor: pointer;
+}
+/* 범례의 선 스와치(점선 = 모델 기대승, 골드 실선 = 실제 누적 승수) */
+.swLine {
+  width: 14px;
+  height: 0;
+  border-top: 1.5px dashed rgba(var(--line-rgb), 0.6);
+  display: inline-block;
+  align-self: center;
+}
+.swLineSolid {
+  width: 14px;
+  height: 1.8px;
+  background: var(--gold);
+  display: inline-block;
+  align-self: center;
+  border-radius: 1px;
+}
+/* 고스트(예정) 칸 스와치 - 홈은 채움, 원정은 외곽선. 색은 팀 액센트라 인라인으로 받는다. */
+.swGhost {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* ── 범례(리본·존 구성비 공용) ────────────────────────────────────────────────── */
 .journeyLegend {
   display: flex;
   flex-wrap: wrap;
@@ -463,6 +515,27 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+/* 예정 행: 시각·구장·모델 승률은 결과 행의 점수와 같은 무게로 읽히면 안 되므로 한 단 낮춘다. */
+.schedStart {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.schedPending {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+.schedTag {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  background: var(--surface-soft);
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  border-radius: 999px;
+  padding: 1px 6px;
+  white-space: nowrap;
 }
 
 @media (max-width: 620px) {

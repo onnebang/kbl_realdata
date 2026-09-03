@@ -165,6 +165,14 @@
   padding-top: 14px;
   border-top: 1px solid rgba(244, 245, 248, 0.14);
 }
+/* 타일 하나(값 + 라벨 + 표본 줄). page.tsx가 참조하는데 정의가 없어서 표본 줄이 값에
+   달라붙어 있었다 - 세로 스택으로 묶고 줄바꿈을 막는다(검증 지적). */
+.heroStat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+}
 .heroStatVal {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
@@ -178,6 +186,26 @@
   text-transform: uppercase;
   color: var(--hero-ink-faint);
   margin-top: 4px;
+}
+/* 표본 줄 - 값 · 기준 시즌 아래 세 번째 줄("정규+PO 53경기" / "정규 50경기 · 리그 2위/177").
+   히어로는 두 테마 모두 다크라 색을 직접 칠한다(--hero-* 토큰). */
+.heroStatSample {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  color: var(--hero-ink-soft);
+  margin-top: 3px;
+  letter-spacing: -0.01em;
+}
+/* 히어로 타일 전체의 기준 시즌 칩('25-26 최종' / '26-27 진행 중 · 3경기 (임계 10경기)'). */
+.heroBasis {
+  display: inline-block;
+  margin-top: 12px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(244, 245, 248, 0.2);
+  color: var(--hero-ink-soft);
 }
 
 /* 윈도우 토글 */
@@ -222,6 +250,25 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* 기준 시즌 칩 - lib/seasonFocus.ts basisChip()이 만든 다섯 어휘만 들어온다(패널 제목이 원문
+   시즌 문자열을 직접 쓰지 않도록). 대문자 변환은 한글에 무의미하므로 해제. */
+.panelChip {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  color: var(--ink-soft);
+  white-space: nowrap;
 }
 
 /* 퍼포먼스 차트 */

@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { displayTeamName } from "./teamNames";
+import { getPlayerCareerGames, type CareerGameRow } from "./playerProfile";
 
 // 개막 전 리포트(/preseason) 데이터 - 요청: "이적생들로 인해서 팀이 많이 변경이 되었을텐데 그
 // 부분에 대해서도 리포트가 필요... 시즌 시작전 리포트를 먼저 제공하고, 실제 시즌이 시작되면
@@ -31,8 +32,9 @@ export function shortSeason(season: string): string {
 
 // 실제 KBL gmkey는 "S47G01N174"처럼 S로 시작한다. 라이브 드라이런/시뮬레이터가 넣는
 // 합성 경기(P2LIVE-/DRYRUN-/ZZTEST-)는 같은 시즌에 예정 경기로 섞여 들어오므로 일정 집계에서
-// 제외(실측: 2026-09-02자 P2LIVE 경기가 "개막일"로 잡혔음).
-function isRealGmkey(gmkey: string): boolean {
+// 제외(실측: 2026-09-02자 P2LIVE 경기가 "개막일"로 잡혔음). 프로필의 일정·다음 경기 조회
+// (lib/matchups.ts getTeamSeasonFixtures/getTeamNextGame)도 같은 가드를 쓰도록 export.
+export function isRealGmkey(gmkey: string): boolean {
   return /^S\d/.test(gmkey);
 }
 
@@ -334,7 +336,8 @@ export type DirectoryPlayer = {
 };
 export type DirectoryTeam = { team: TeamInfo; players: DirectoryPlayer[] };
 
-function roleFromNote(note: string | null): string | null {
+/** season_roster.note의 머리("외국인 1옵션 | ...")에서 역할만. 국내 선수는 null. lib/playerStatus.ts도 같은 규칙을 쓴다. */
+export function roleFromNote(note: string | null): string | null {
   const head = (note ?? "").split("|")[0].trim();
   return head && (head.includes("외국인") || head.includes("아시아")) ? head : null;
 }
@@ -467,4 +470,274 @@ export async function getDemoGames(): Promise<DemoGame[]> {
     });
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// 4. 프로필 개편 1단계 - 선수 "이 상대와의 나", 팀 "출전시간 잔류율", 경기 전 모델 승률
+// ---------------------------------------------------------------------------
+
+export type VsOpponentMeeting = {
+  gmkey: string;
+  gameDate: string;
+  seasonName: string;
+  seasonCategory: string;
+  isHome: boolean;
+  teamScore: number;
+  oppScore: number;
+  won: boolean;
+  pts: number;
+  reb: number;
+  ast: number;
+};
+
+export type VsOpponentCareer = {
+  oppTcode: string;
+  gp: number; // 스코어가 있는(종료된) + 실제 출전(0분 DNP 제외) 경기만 - "vs 소노 21경기"처럼 항상 표본과 함께 표기
+  dnp: number; // 명단엔 있었지만 0분이었던 맞대결 수(평균에서 제외한 이유를 캡션에 쓸 수 있도록)
+  ppg: number;
+  rpg: number;
+  apg: number;
+  tsPct: number | null; // PTS / (2·(FGA+TPA+0.44·FTA)) - fga는 2점 시도만이라 tpa를 더함(lib/playerProfile.ts 관례)
+  teamW: number; // 선수 소속팀의 승패(선수 개인 승패가 아님 - 캡션 '팀 13-8')
+  teamL: number;
+  last3: VsOpponentMeeting[]; // 최근 맞대결 3경기, 최신순
+};
+
+/**
+ * 커리어 전 경기 중 한 상대(oppTcode)와의 통산 라인 + 최근 3경기. 상대 팀코드 기준이라 팀명이
+ * 바뀐 같은 프랜차이즈(전주→부산 KCC, tcode 60 동일)는 이어지고, 다른 팀코드(오리온스 30 →
+ * 캐롯 73 → 소노 66)는 잇지 않는다(사실 그대로). 페이지가 이미 getPlayerCareerGames 행을 갖고
+ * 있으면 careerRows로 넘겨 재조회를 피한다. 0분(DNP) 행은 평균을 깎기만 하므로 제외하고 dnp로
+ * 센다(실측: 국내 베테랑의 최근 맞대결 3경기가 전부 0P 0R 0A인 DNP 행으로 나왔음). 출전 맞대결이
+ * 없으면 null.
+ * 검증(2026-09-03): 워니(291248) vs 소노(66) = 21G 20.7P 11.6R 5.0A · TS .504 · 팀 13-8.
+ */
+export async function getPlayerVsOpponentCareer(pcode: string, oppTcode: string, careerRows?: CareerGameRow[]): Promise<VsOpponentCareer | null> {
+  const all = careerRows ?? (await getPlayerCareerGames(pcode));
+  const ended = all.filter((r) => r.oppTcode === oppTcode && r.teamScore != null && r.oppScore != null);
+  const rows = ended
+    .filter((r) => r.min > 0)
+    .sort((a, b) => (a.gameDate < b.gameDate ? 1 : a.gameDate > b.gameDate ? -1 : a.gmkey < b.gmkey ? 1 : -1));
+  if (!rows.length) return null;
+  const gp = rows.length;
+  const dnp = ended.length - gp;
+  const sum = (fn: (r: CareerGameRow) => number) => rows.reduce((s, r) => s + fn(r), 0);
+  const tsa = sum((r) => r.fga + r.tpa + 0.44 * r.fta);
+  const teamW = rows.filter((r) => (r.teamScore as number) > (r.oppScore as number)).length;
+  return {
+    oppTcode,
+    gp,
+    dnp,
+    ppg: sum((r) => r.pts) / gp,
+    rpg: sum((r) => r.reb) / gp,
+    apg: sum((r) => r.ast) / gp,
+    tsPct: tsa > 0 ? sum((r) => r.pts) / (2 * tsa) : null,
+    teamW,
+    teamL: gp - teamW,
+    last3: rows.slice(0, 3).map((r) => ({
+      gmkey: r.gmkey,
+      gameDate: r.gameDate,
+      seasonName: r.seasonName,
+      seasonCategory: r.seasonCategory,
+      isHome: r.isHome,
+      teamScore: r.teamScore as number,
+      oppScore: r.oppScore as number,
+      won: (r.teamScore as number) > (r.oppScore as number),
+      pts: r.pts,
+      reb: r.reb,
+      ast: r.ast,
+    })),
+  };
+}
+
+// 출전시간 잔류율 - 명칭 고정. "전력 유지율"·"continuity"라고 부르지 않는다(pregame_features.
+// roster_continuity는 모델 입력값이라 뜻이 다르고, "전력"은 출전시간이 말해 주지 않는 것을
+// 약속한다). 캡션 문구도 이 함수가 만든다.
+export function retainedMinutesCaption(prevSeason: string): string {
+  const s = shortSeason(prevSeason);
+  return `출전시간 잔류율 = 잔류 선수의 ${s} 정규 출전시간 / 팀 전체 ${s} 정규 출전시간 · 분모 = ${s} 정규 팀 총 출전시간 · 복귀·신입은 0`;
+}
+
+export type RetainedMinutesTeam = {
+  tcode: string;
+  retainedPct: number | null; // 0~1, 팀 총 출전시간이 0이면 null
+  retainedMinutes: number;
+  teamMinutes: number;
+  countStay: number;
+};
+
+export type RetainedMinutes = RetainedMinutesTeam & {
+  season: string; // 확정 명단 시즌(= 분자의 잔류 판정 기준)
+  prevSeason: string; // 출전시간·WPA를 집계한 시즌(정규시즌만)
+  minutesOut: number; // 이탈 선수들이 이 팀에서 뛴 prevSeason 정규 출전시간
+  minutesIn: number; // 영입 선수들이 "이전 팀"에서 뛴 prevSeason 정규 출전시간(복귀·신입은 0)
+  wpaOut: number; // 이탈 선수 prevSeason 정규 WPA 합(player_season_wpa, 이 팀 소속 행)
+  wpaIn: number; // 영입 선수 prevSeason 정규 WPA 합(이전 팀 소속 행) - 팀 맥락 보정 없음
+  wpaStay: number; // 잔류 선수 prevSeason 정규 WPA 합
+  countOut: number; // roster_changes out 행 수
+  countOutWithWpa: number; // 그중 prevSeason WPA가 있는 선수 수(캡션 '떠난 WPA −X (N명)'의 N)
+  countIn: number; // roster_changes in 행 수(이적 + 복귀)
+  countInWithWpa: number; // 그중 prevSeason WPA가 있는 선수 수 - 복귀 선수는 기록이 없어 "0이 아니라 제외"
+  countNew: number;
+  leagueRank: number | null; // 잔류율 내림차순 순위(확정 명단이 있는 팀 중)
+  leagueN: number;
+  league: RetainedMinutesTeam[]; // 리그 미니 순위 바용, 내림차순
+  caption: string;
+};
+
+/**
+ * 한 팀의 출전시간 잔류율 + 이탈/영입 WPA 헤드라인(팀 프로필 히어로 타일·오프시즌 패널).
+ * 계산: roster_changes(season) × game_player_stats(prevSeason 정규시즌, 분) × player_season_wpa(prevSeason).
+ * player_season_wpa.games는 정규시즌 GP다(검증: 워니 25-26 games 50 = 정규 50, 정규+PO 53).
+ * 리그 순위를 내려면 10팀 전부 필요해서 prevSeason 정규 전 선수-경기 행(약 6,400행)을 받는다.
+ * 리그 전체를 offset 페이지네이션으로 받으면 10초가 걸렸고(실측, count+offset 7페이지), 팀별로
+ * 쪼개면 팀당 650행 안팎이라 1페이지씩 10개를 병렬로 받는 편이 1~2초로 끝난다(PostgREST 집계
+ * 함수는 이 프로젝트에서 비활성 - "Use of aggregate functions is not allowed" 실측).
+ * 검증(2026-09-03, 분모 = 팀 총 출전시간): SK .957 · SAM .917 · DB .908 · KCC .903 · GAS .891 ·
+ * LG .883 · SONO .756 · MOB .689 · KGC .640 · KT .620; KT 떠난 WPA 55.7(6명) / 들어온 6.0(3명).
+ * 이 팀에 roster_changes 행이 없으면(과거 시즌·명단 미수신) null.
+ */
+type RegMinRow = { pcode: string; tcode: string; min_played: number | string | null };
+
+async function fetchTeamRegMinutes(tcode: string, seasonName: string): Promise<RegMinRow[]> {
+  const PAGE = 1000;
+  const rows: RegMinRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("game_player_stats")
+      .select("pcode, tcode, min_played, games!inner()")
+      .eq("tcode", tcode)
+      .eq("games.season_name", seasonName)
+      .eq("games.season_category", "정규시즌")
+      // offset 페이지네이션은 정렬이 없으면 페이지 경계에서 행이 겹치거나 빠질 수 있다(PostgreSQL은
+      // ORDER BY 없는 LIMIT/OFFSET 순서를 보장하지 않음). game_player_stats PK가 (gmkey, pcode)라
+      // 이 두 컬럼이면 전순서라, 시즌이 길어져 2페이지가 되어도 잔류율이 조용히 흔들리지 않는다.
+      .order("gmkey", { ascending: true })
+      .order("pcode", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error || !data || !data.length) break;
+    rows.push(...(data as unknown as RegMinRow[]));
+    if (data.length < PAGE) break;
+  }
+  return rows;
+}
+
+export async function getRetainedMinutes(tcode: string, season = PRESEASON_SEASON): Promise<RetainedMinutes | null> {
+  const prevSeason = prevSeasonName(season);
+  const [changesRes, wpaRes] = await Promise.all([
+    supabase.from("roster_changes").select("tcode, pcode, change, prev_tcode, prev_season_name").eq("season_name", season),
+    supabase.from("player_season_wpa").select("pcode, tcode, total_wpa").eq("season_name", prevSeason),
+  ]);
+  const changes = changesRes.data ?? [];
+  if (!changes.some((c) => c.tcode === tcode)) return null;
+
+  // 확정 명단이 있는 팀 + 영입 선수의 이전 팀(해체 팀 등 명단 밖일 수 있음) 전부의 prevSeason 정규 분.
+  const teamSet = new Set<string>();
+  for (const c of changes) {
+    teamSet.add(c.tcode as string);
+    if (c.prev_tcode) teamSet.add(c.prev_tcode as string);
+  }
+  const minRows = (await Promise.all([...teamSet].map((t) => fetchTeamRegMinutes(t, prevSeason)))).flat();
+
+  // (pcode|tcode) -> prevSeason 정규 분 / WPA. 시즌 중 이적한 선수는 팀별로 따로 잡힌다.
+  const minutes = new Map<string, number>();
+  const teamMinutes = new Map<string, number>();
+  for (const r of minRows) {
+    const m = Number(r.min_played ?? 0);
+    if (!Number.isFinite(m)) continue;
+    const key = `${r.pcode}|${r.tcode}`;
+    minutes.set(key, (minutes.get(key) ?? 0) + m);
+    teamMinutes.set(r.tcode, (teamMinutes.get(r.tcode) ?? 0) + m);
+  }
+  const wpa = new Map<string, number>();
+  for (const r of wpaRes.data ?? []) if (r.total_wpa != null) wpa.set(`${r.pcode}|${r.tcode}`, Number(r.total_wpa));
+
+  const league: RetainedMinutesTeam[] = [];
+  const perTeam = new Map<string, RetainedMinutesTeam>();
+  for (const c of changes) {
+    const t = c.tcode as string;
+    const row = perTeam.get(t) ?? { tcode: t, retainedPct: null, retainedMinutes: 0, teamMinutes: teamMinutes.get(t) ?? 0, countStay: 0 };
+    if (c.change === "stay" && c.pcode) {
+      row.countStay += 1;
+      row.retainedMinutes += minutes.get(`${c.pcode}|${t}`) ?? 0;
+    }
+    perTeam.set(t, row);
+  }
+  for (const row of perTeam.values()) {
+    row.retainedPct = row.teamMinutes > 0 ? row.retainedMinutes / row.teamMinutes : null;
+    league.push(row);
+  }
+  league.sort((a, b) => (b.retainedPct ?? -1) - (a.retainedPct ?? -1));
+  const mine = perTeam.get(tcode)!;
+  const rankIdx = league.findIndex((r) => r.tcode === tcode);
+
+  let minutesOut = 0,
+    minutesIn = 0,
+    wpaOut = 0,
+    wpaIn = 0,
+    wpaStay = 0,
+    countOut = 0,
+    countOutWithWpa = 0,
+    countIn = 0,
+    countInWithWpa = 0,
+    countNew = 0;
+  for (const c of changes) {
+    if (c.tcode !== tcode) continue;
+    const pcode = c.pcode as string | null;
+    if (c.change === "out") {
+      countOut += 1;
+      if (!pcode) continue;
+      minutesOut += minutes.get(`${pcode}|${tcode}`) ?? 0;
+      const w = wpa.get(`${pcode}|${tcode}`);
+      if (w != null) {
+        wpaOut += w;
+        countOutWithWpa += 1;
+      }
+    } else if (c.change === "in") {
+      countIn += 1;
+      if (!pcode) continue;
+      // 영입의 지난 시즌 기록은 "이전 팀" 소속 행(같은 팀 복귀면 이 팀 행). prev_season_name이
+      // prevSeason이 아닌 복귀 선수는 행 자체가 없어 자연히 제외된다.
+      const from = (c.prev_tcode as string | null) ?? tcode;
+      minutesIn += minutes.get(`${pcode}|${from}`) ?? 0;
+      const w = wpa.get(`${pcode}|${from}`);
+      if (w != null) {
+        wpaIn += w;
+        countInWithWpa += 1;
+      }
+    } else if (c.change === "stay") {
+      if (pcode) wpaStay += wpa.get(`${pcode}|${tcode}`) ?? 0;
+    } else if (c.change === "new") {
+      countNew += 1;
+    }
+  }
+
+  return {
+    ...mine,
+    season,
+    prevSeason,
+    minutesOut,
+    minutesIn,
+    wpaOut,
+    wpaIn,
+    wpaStay,
+    countOut,
+    countOutWithWpa,
+    countIn,
+    countInWithWpa,
+    countNew,
+    leagueRank: rankIdx >= 0 ? rankIdx + 1 : null,
+    leagueN: league.length,
+    league,
+    caption: retainedMinutesCaption(prevSeason),
+  };
+}
+
+/** 경기 전 모델 홈 승률(pregame_features.home_win_prob, 0~1). 없으면 null. 캡션은 페이지가
+ *  PREGAME_MODEL_CAPTION을 그대로 붙인다(로스터 변화 부분 반영 - 실측 continuity 0.891~1.0). */
+export const PREGAME_MODEL_CAPTION = "지난 시즌 지표 기반 프리시즌 모델 · 로스터 변화 부분 반영(연속성 입력 0.89~1.0) · 참고용";
+
+export async function getPregameProb(gmkey: string): Promise<number | null> {
+  const { data } = await supabase.from("pregame_features").select("home_win_prob").eq("gmkey", gmkey).maybeSingle();
+  return data?.home_win_prob == null ? null : Number(data.home_win_prob);
 }
