@@ -2,6 +2,8 @@ import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getSeasons, getTeamsForSeason, getGames, getPregameWinProbs, getLiveWinProbs, getGameMvps, getGameTags, getSeasonWinPcts } from "@/lib/homeGames";
 import { deriveGameStatus } from "@/lib/gameStatus";
+import HomeLiveRefresher from "@/components/HomeLiveRefresher";
+import { PreseasonBanner } from "@/components/PreseasonBanner";
 
 // 실측(라이브 검증 중 발견) - 기본 진입(팀 필터 없음, 최근 시즌)이 최대 200경기 x
 // 선수당 ~24행짜리 MVP 조회까지 겹쳐서 병렬화 전엔 20~30초 가까이 걸림(lib/homeGames.ts의
@@ -33,7 +35,10 @@ export default async function HomePage({
     getPregameWinProbs(gmkeys),
     getLiveWinProbs(liveGmkeys),
     getGameMvps(finalGames),
-    getGameTags(gmkeys),
+    // 태그(짜릿한 역전승 등)는 game_summary_tags에 종료 경기만 들어있다 - 예정/진행중
+    // gmkey까지 같이 넘기면 어차피 못 찾을 키로 IN 절만 불린다. 라이브 자동 갱신이
+    // 30초마다 이 쿼리를 다시 때리므로 넘기는 키 수를 줄여둔다.
+    getGameTags(finalGames.map((g) => g.gmkey)),
     getSeasonWinPcts(activeSeason),
   ]);
 
@@ -45,6 +50,9 @@ export default async function HomePage({
         승률 그래프와 박스스코어를 볼 수 있어요. 팀 이름을 누르면 그 팀의 시즌 일정으로
         이동합니다.
       </div>
+
+      {/* 개막 전(이 시즌 종료 경기 0, 예정 경기 있음)에만 - 첫 경기가 끝나면 자동으로 사라짐. */}
+      {finalGames.length === 0 && games.length > 0 && <PreseasonBanner season={activeSeason} />}
 
       <form className="filter-form">
         <select name="season" defaultValue={activeSeason}>
@@ -203,9 +211,14 @@ export default async function HomePage({
         })}
       </div>
 
+      {/* D. 진행중 경기가 하나라도 있을 때만 자동 갱신 타이머를 붙인다 - 없으면 이
+          컴포넌트 자체가 렌더되지 않아 타이머도, 네트워크 요청도 0이다. */}
+      {liveGmkeys.length > 0 && <HomeLiveRefresher />}
+
       <footer className="foot">
         {activeSeason} 시즌 · {games.length}경기 표시(최대 200경기) · Supabase 프로젝트
         &quot;who are u_kbl&quot;에서 실시간 조회
+        {liveGmkeys.length > 0 && ` · 라이브 ${liveGmkeys.length}경기 진행중(30초마다 자동 갱신)`}
       </footer>
     </div>
   );

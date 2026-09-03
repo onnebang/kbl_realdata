@@ -4,7 +4,21 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import Link from "next/link";
 import { TeamBadge } from "./TeamBadge";
 import { buildCourtDotsSvg, shotValue, COURT_X, COURT_Y, type ShotDotMeta } from "@/lib/zoneCompare";
-import { findShootingStreaks, computeStatBursts, computeCurrentDroughts, fmtRating, gameWideTopPerformer, type GameEvent, type PlayerBox, type StreakEvent } from "@/lib/postgameReport";
+import {
+  attachDerivedFields,
+  findShootingStreaks,
+  computeStatBursts,
+  computeCurrentDroughts,
+  fmtRating,
+  gameWideTopPerformer,
+  QUARTER_ORDER,
+  quarterLenSec,
+  type GameEvent,
+  type PlayerBox,
+  type StreakEvent,
+} from "@/lib/postgameReport";
+import { mergeEventRows, type LiveEventRow } from "@/lib/useLiveGame";
+import { useLiveGameContext } from "./LiveGameProvider";
 import {
   buildRecentFeed,
   buildShotReliability,
@@ -200,26 +214,91 @@ type ShotWithQuarter = ShotWithMeta;
 // 정밀 대조 - 50% 기준 점선 + 쿼터 경계 세로선 + 곡선 아래 영역 채우기(area fill)를
 // 추가(이전엔 빠져 있었음). 스크럽 위치를 따라가는 마커(세로 가이드선+점+% 라벨)는 이
 // 컴포넌트만의 인터랙티브 기능이라 그대로 유지.
-function WinProbLiveChart({ events, idx, homeColor }: { events: GameEvent[]; idx: number; homeColor: string }) {
+//
+// C. 진행중 경기의 정직한 축(Phase 2). 지금까지의 축은 "유효 이벤트 인덱스를 폭 전체에
+// 균등 배치"라서, 2쿼터까지만 진행된 경기도 오른쪽 끝까지 꽉 찬 곡선이 되어 완주한 경기처럼
+// 보였다. 진행중일 때만 x축을 "경기 경과 시간"으로 바꾸고 남은 시간은 빈 칸으로 둔다
+// (Q3/Q4 격자선까지 미리 그려서 '아직 두 쿼터가 남았다'가 한눈에 보이게) + 곡선의 맨 앞에
+// 진행중 마커를 찍는다. 종료 경기는 live=false로 예전 경로를 그대로 타서 픽셀 단위로 동일.
+// 라이브로 들어온 raw game_events 행을 서버(app/games/[gmkey]/page.tsx의 buildGameData)와
+// 똑같은 모양의 GameEvent로. 파생 3필드(elapsed/runHome/runAway)는 호출부가 채운 뒤
+// attachDerivedFields가 배열 전체에 대해 다시 계산한다.
+function toGameEventShape(
+  r: LiveEventRow,
+  actionLabels: Record<string, string>,
+  names: Record<string, string>,
+  lateNames: Record<string, string>
+): Omit<GameEvent, "elapsed" | "runHome" | "runAway"> {
+  return {
+    event_order: r.event_order,
+    quarter: r.quarter,
+    clock_min: r.clock_min,
+    clock_sec: r.clock_sec,
+    action_code: r.action_code,
+    action_label: r.action_code ? actionLabels[r.action_code] ?? r.action_code : null,
+    pcode: r.pcode,
+    player_name: r.pcode ? names[r.pcode] ?? lateNames[r.pcode] ?? null : null,
+    tcode: r.tcode,
+    home_score: r.home_score,
+    away_score: r.away_score,
+    home_win_prob: r.home_win_prob,
+    wpa_home: r.wpa_home,
+    objective_prob: r.objective_prob,
+  };
+}
+
+function plannedTotalSec(lastQuarter: string): number {
+  const i = QUARTER_ORDER.indexOf(lastQuarter);
+  // 최소 4쿼터, 연장에 들어갔으면 지금 진행 중인 연장 쿼터까지가 "예정된 경기 길이".
+  const upto = Math.max(4, i + 1);
+  let total = 0;
+  for (let k = 0; k < upto && k < QUARTER_ORDER.length; k++) total += quarterLenSec(QUARTER_ORDER[k]);
+  return total;
+}
+
+function WinProbLiveChart({ events, idx, homeColor, live }: { events: GameEvent[]; idx: number; homeColor: string; live: boolean }) {
   const valid = events.map((e, i) => ({ e, i })).filter((r) => r.e.home_win_prob != null);
   if (!valid.length) return <div className="empty-note">승률 데이터 없음</div>;
   const W = 640,
     H = 150;
   const n = valid.length;
-  const xOf = (vi: number) => (vi / Math.max(1, n - 1)) * W;
+
+  // 진행중 - 경과 시간(attachDerivedFields가 이미 채워둔 elapsed, PRE는 0)을 x로. 시계
+  // 데이터가 튀는 경우를 대비해 단조 증가로 눌러준다(뒤로 가는 곡선 방지).
+  const totalSec = live ? plannedTotalSec(events[events.length - 1].quarter) : 0;
+  const elapsedOf: number[] = [];
+  if (live) {
+    let run = 0;
+    for (const r of valid) {
+      run = Math.max(run, Math.min(totalSec, r.e.elapsed));
+      elapsedOf.push(run);
+    }
+  }
+  const xOf = live ? (vi: number) => (elapsedOf[vi] / Math.max(1, totalSec)) * W : (vi: number) => (vi / Math.max(1, n - 1)) * W;
   const yOf = (p: number) => (1 - p) * H;
   const points = valid.map((r, vi) => [xOf(vi), yOf(r.e.home_win_prob as number)] as const);
   const linePath = "M " + points.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L ");
   const areaPath = `${linePath} L ${points[points.length - 1][0].toFixed(1)} ${H} L 0 ${H} Z`;
 
+  // 격자선: 종료 경기는 예전대로 "그 쿼터 첫 이벤트 위치", 진행중은 아직 시작도 안 한
+  // 쿼터까지 포함한 고정 시간 경계.
   const quarterBounds: { x: number; q: string }[] = [];
-  let lastQ: string | null = null;
-  valid.forEach((r, vi) => {
-    if (r.e.quarter !== "PRE" && r.e.quarter !== lastQ) {
-      quarterBounds.push({ x: xOf(vi), q: r.e.quarter });
-      lastQ = r.e.quarter;
+  if (live) {
+    let acc = 0;
+    for (let k = 0; k < QUARTER_ORDER.length; k++) {
+      if (acc >= totalSec) break;
+      quarterBounds.push({ x: (acc / totalSec) * W, q: QUARTER_ORDER[k] });
+      acc += quarterLenSec(QUARTER_ORDER[k]);
     }
-  });
+  } else {
+    let lastQ: string | null = null;
+    valid.forEach((r, vi) => {
+      if (r.e.quarter !== "PRE" && r.e.quarter !== lastQ) {
+        quarterBounds.push({ x: xOf(vi), q: r.e.quarter });
+        lastQ = r.e.quarter;
+      }
+    });
+  }
 
   let markerVi = 0;
   for (let vi = 0; vi < valid.length; vi++) {
@@ -230,15 +309,39 @@ function WinProbLiveChart({ events, idx, homeColor }: { events: GameEvent[]; idx
   const mx = xOf(markerVi);
   const my = yOf(marker.e.home_win_prob as number);
   const midY = H / 2;
+  // 곡선의 맨 앞(= 지금까지 들어온 마지막 이벤트) - 스크럽 마커와 별개.
+  const leadX = xOf(valid.length - 1);
+  const leadY = yOf(valid[valid.length - 1].e.home_win_prob as number);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 150, display: "block" }}>
+      {live && leadX < W - 0.5 && (
+        // 아직 안 치른 시간 - 곡선이 없는 영역임을 명시적으로 칠해서 "여기까지가 전부"라는
+        // 오독을 막는다.
+        <rect x={leadX} y={0} width={W - leadX} height={H} fill="var(--ink-faint)" opacity={0.07} />
+      )}
       <line x1={0} y1={midY} x2={W} y2={midY} stroke="var(--ink-faint)" strokeWidth={1} strokeDasharray="3,4" />
       {quarterBounds.map((b) => (
         <line key={b.q} x1={b.x} y1={0} x2={b.x} y2={H} stroke="var(--ink-faint)" strokeWidth={1} opacity={0.35} />
       ))}
       <path d={areaPath} fill={homeColor} fillOpacity={0.12} />
       <path d={linePath} fill="none" stroke={homeColor} strokeWidth={2} />
+      {live && (
+        <>
+          <circle cx={leadX} cy={leadY} r={3} fill="var(--negative)" />
+          <text
+            x={Math.min(W - 2, leadX + 6)}
+            y={12}
+            textAnchor={leadX > W - 60 ? "end" : "start"}
+            fontSize={10}
+            fontWeight={800}
+            fill="var(--negative)"
+            fontFamily="IBM Plex Mono, monospace"
+          >
+            진행중
+          </text>
+        </>
+      )}
       <line x1={mx} y1={0} x2={mx} y2={H} stroke="var(--ink-faint)" strokeWidth={1} strokeDasharray="2,3" />
       <circle cx={mx} cy={my} r={4.5} fill={homeColor} stroke="var(--surface)" strokeWidth={1.5} />
       <text x={mx} y={Math.max(11, my - 10)} textAnchor="middle" fontSize={11} fontWeight={700} fill={homeColor} fontFamily="IBM Plex Mono, monospace">
@@ -249,7 +352,7 @@ function WinProbLiveChart({ events, idx, homeColor }: { events: GameEvent[]; idx
 }
 
 export default function GameReplay({
-  events,
+  events: serverEvents,
   players,
   homeTeam,
   awayTeam,
@@ -258,6 +361,9 @@ export default function GameReplay({
   awayNetRating,
   lineupRatings,
   playerOnOff,
+  live = false,
+  liveActionLabels,
+  liveNames,
 }: {
   events: GameEvent[];
   players: PlayerMeta[];
@@ -274,8 +380,65 @@ export default function GameReplay({
   // 요청: "코트 위 패널에 온/오프 넷레이팅" - lineupRatings와 같은 이유로 스크럽 위치와
   // 무관한 정적 값이라 page.tsx가 player_onoff를 서버에서 한 번만 조회해 넘김.
   playerOnOff?: Record<string, PlayerOnOff>;
+  // Phase 2 - 진행중(deriveGameStatus === "live")일 때만 true. false면 이 컴포넌트는
+  // 예전과 완전히 동일하게 동작한다(구독/폴링 없음, 라벨/차트도 그대로).
+  live?: boolean;
+  // 라이브로 새로 들어온 game_events 행을 서버가 만든 GameEvent와 같은 모양으로 만들려면
+  // action_code -> 라벨, pcode -> 이름 맵이 필요하다. 서버가 이미 조회해 둔 것을 그대로
+  // 내려받는다(클라이언트에서 다시 조회하지 않음). 경기 도중 처음 투입되는 선수 이름만
+  // useLiveGame이 따로 채운다(lateNames).
+  liveActionLabels?: Record<string, string>;
+  liveNames?: Record<string, string>;
 }) {
-  const [idx, setIdx] = useState(events.length - 1);
+  // ---- B-1. events = 서버 prop ∪ 라이브 수신 행 --------------------------------
+  // 로컬 state가 아니라 파생값(useMemo)으로 둔 것이 이 구현의 핵심 선택이다. state로 두면
+  // "prop이 새로 오면 seed"와 "라이브 행이 오면 append" 두 동기화 경로가 생기고, 그 사이에
+  // 도착한 행이 router.refresh() 한 번에 사라지는 종류의 버그가 실제로 난다. 파생값이면
+  // 서버 prop은 언제나 기준선이고(리마운트/refresh 시 자동으로 소스 오브 트루스), 라이브
+  // 행은 그 위에 event_order 기준으로 덮인다 - 순서 상관없이 결과가 같다.
+  // 병합은 realtime/폴링과 완전히 같은 mergeEventRows 하나를 쓴다.
+  const liveCtx = useLiveGameContext();
+  const liveRows = liveCtx.rows;
+  const events = useMemo(() => {
+    if (!live || liveRows.length === 0) return serverEvents;
+    const byOrder = new Map(serverEvents.map((e) => [e.event_order, e]));
+    const incoming: GameEvent[] = liveRows.map((r) => {
+      const cur = byOrder.get(r.event_order);
+      return {
+        ...toGameEventShape(r, liveActionLabels ?? {}, liveNames ?? {}, liveCtx.lateNames),
+        // 파생 3필드는 아래 attachDerivedFields가 어차피 전부 다시 계산한다. 다만 기존 행과
+        // "값이 같은지" 비교할 때 이 3개 때문에 매번 달라 보이면 무의미한 재계산이 나므로
+        // 기존 값을 그대로 실어 보낸다(mergeEventRows가 참조 동일성을 유지할 수 있게).
+        elapsed: cur?.elapsed ?? 0,
+        runHome: cur?.runHome ?? 0,
+        runAway: cur?.runAway ?? 0,
+      };
+    });
+    const merged = mergeEventRows(serverEvents, incoming);
+    return merged === serverEvents ? serverEvents : attachDerivedFields(merged);
+  }, [live, liveRows, serverEvents, liveActionLabels, liveNames, liveCtx.lateNames]);
+
+  // ---- B-2. 팔로우 라이브 / 이탈 ------------------------------------------------
+  // pinnedIdx === null 이 곧 "최신 이벤트에 붙어 있음(팔로우 중)". 사용자가 뒤로 스크럽하면
+  // 그 인덱스가 핀으로 박히고, 새 이벤트가 들어와도 절대 앞으로 끌려가지 않는다.
+  // idx를 state로 두고 새 이벤트마다 setIdx로 밀어 올리는 대신 이렇게 파생시킨 이유는,
+  // "따라가는 중"이라는 상태를 별도 불리언으로 또 관리하다가 둘이 어긋나는 걸 막기 위해서다.
+  const [pinnedIdx, setPinnedIdx] = useState<number | null>(null);
+  const lastIdx = events.length - 1;
+  const idx = pinnedIdx == null ? lastIdx : Math.min(pinnedIdx, lastIdx);
+  const following = pinnedIdx == null;
+  const setIdx = useCallback(
+    (next: number | ((cur: number) => number)) => {
+      setPinnedIdx((cur) => {
+        const curIdx = cur == null ? lastIdx : Math.min(cur, lastIdx);
+        const v = typeof next === "function" ? next(curIdx) : next;
+        const clamped = Math.max(0, Math.min(lastIdx, v));
+        // 맨 끝으로 이동 = 라이브에 다시 붙는다(⏭/슬라이더를 끝까지 미는 경우 포함).
+        return clamped >= lastIdx ? null : clamped;
+      });
+    },
+    [lastIdx]
+  );
   const [playing, setPlaying] = useState(false);
   const [speedMs, setSpeedMs] = useState(300);
   // 요청: "슛 차트와 슛 차트가 중복" - 독립 슛차트 패널(성공/실패, 2점/3점 필터)을 없애고
@@ -325,13 +488,94 @@ export default function GameReplay({
     // react-hooks/set-state-in-effect 린트 에러가 나서, 그 대신 idx를 실제로 옮기는 이
     // 지점(setTimeout 콜백/버튼 클릭 - 둘 다 effect 본문 밖)에서 처리.
     if (next >= events.length - 1) setPlaying(false);
-  }, [events, homeTeam, awayTeam, pushToast]);
+  }, [events, homeTeam, awayTeam, pushToast, setIdx]);
 
   useEffect(() => {
     if (!playing || idx >= events.length - 1) return;
     const t = setTimeout(() => advanceForward(), speedMs);
     return () => clearTimeout(t);
   }, [playing, idx, events.length, speedMs, advanceForward]);
+
+  // ---- B-3. 라이브 전진 시 알림(버스트 상한 포함) --------------------------------
+  // 요구사항: realtime으로 밀려온 전진도 재생 버튼과 "같은 느낌"이어야 하고, 50개짜리
+  // 따라잡기 폭탄이 알림 스팸이 되면 안 된다.
+  //  - 한 번에 10개 이하로 들어오면(= 실제 중계 속도) 각 단계마다 computePushNotifications를
+  //    돌려 재생 버튼과 완전히 동일한 알림을 만들고, 화면 스택 상한(3)에 맞춰 마지막 3개만 띄운다.
+  //  - 10개를 넘으면(탭을 오래 비워뒀다가 돌아온 경우 등) 개별 알림은 전부 버리고
+  //    "N개를 한 번에 반영했다 + 현재 스코어" 요약 하나만 띄운다. 지나간 순간을 실제로는
+  //    못 본 사용자에게 "승부처!"를 10개 쏘는 건 정직하지도, 유용하지도 않다.
+  //
+  // 코얼레싱이 핵심이다: Supabase Realtime은 한 번에 들어온 50개 행도 웹소켓 메시지 50개로
+  // 쪼개 보낸다. 메시지마다 알림을 계산하면 "한 번에 50개"가 아니라 "1개씩 50번"이 되어
+  // 위 상한이 무력화된다. 그래서 이벤트가 늘어날 때마다 타이머를 다시 걸고(디바운스),
+  // 그동안 쌓인 구간의 시작점(pendingFromRef)은 유지한다 - 조용해진 뒤 한 번만, 버스트
+  // 전체 구간을 대상으로 계산한다. 실제 중계 속도(플레이당 수십 초)에서는 400ms 지연이
+  // 체감되지 않고, 따라잡기 폭탄에서는 요약 하나로 접힌다.
+  const LIVE_TOAST_MAX_SPAN = 10;
+  const LIVE_TOAST_DEBOUNCE_MS = 400;
+  const TOAST_STACK_MAX = 3;
+  const seenLenRef = useRef(events.length);
+  const pendingFromRef = useRef<number | null>(null);
+  const followingRef = useRef(following);
+  useEffect(() => {
+    followingRef.current = following;
+  }, [following]);
+
+  // 디바운스 타이머는 effect의 cleanup이 아니라 ref가 소유한다. 이게 실제로 물린 버그다
+  // (2026-09-02 드라이런에서 관측): 타이머를 `return () => clearTimeout(t)`로 정리하면,
+  // "이벤트가 안 늘어난 리렌더"가 한 번만 끼어들어도 React가 먼저 이전 cleanup을 돌려
+  // 타이머를 죽이는데, 그 리렌더 경로는 조기 return이라 타이머를 다시 걸지 않는다 -
+  // 결과적으로 알림이 영영 안 뜬다. 그리고 그 리렌더는 드물기는커녕 버스트 때마다 온다:
+  // useLiveGame이 새로 등장한 pcode 이름을 채우려고 players를 조회한 뒤 lateNames를
+  // 갱신하면(라이브 교체 투입 = 버스트마다 발생) events 배열의 "길이는 그대로, 참조만
+  // 새로" 바뀌기 때문. 그래서 타이머는 언마운트 때만 정리한다.
+  const burstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 타이머 콜백이 걸릴 때의 렌더에 갇히지 않도록 최신 스냅샷을 따로 들고 간다.
+  const latestRef = useRef({ events, homeTeam, awayTeam });
+  useEffect(() => {
+    latestRef.current = { events, homeTeam, awayTeam };
+  }, [events, homeTeam, awayTeam]);
+  useEffect(() => () => { if (burstTimerRef.current) clearTimeout(burstTimerRef.current); }, []);
+
+  useEffect(() => {
+    const prevLen = seenLenRef.current;
+    if (events.length <= prevLen) {
+      seenLenRef.current = events.length;
+      return;
+    }
+    const from = prevLen - 1;
+    seenLenRef.current = events.length;
+    if (!live || !followingRef.current || from < 0) return;
+    if (pendingFromRef.current == null) pendingFromRef.current = from;
+    // effect 본문에서 동기적으로 상태를 바꾸지 않는다(이 파일이 이미 겪은
+    // react-hooks/set-state-in-effect 제약과 같은 이유) - 새 스코어가 먼저 그려지고
+    // 그다음에 알림이 뜨는 순서가 중계 감각에도 더 맞다.
+    if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
+    burstTimerRef.current = setTimeout(() => {
+      burstTimerRef.current = null;
+      const burstFrom = pendingFromRef.current;
+      pendingFromRef.current = null;
+      // 버스트 도중 사용자가 뒤로 스크럽했으면(이탈) 조용히 버린다 - 본 적도 없는 장면의
+      // "승부처!"를 띄우지 않는다.
+      if (burstFrom == null || !followingRef.current) return;
+      const cur = latestRef.current;
+      const to = cur.events.length - 1;
+      const span = to - burstFrom;
+      if (span <= 0) return;
+      if (span > LIVE_TOAST_MAX_SPAN) {
+        const row = cur.events[to];
+        pushToast({
+          icon: "⏩",
+          title: "라이브 따라잡기",
+          msg: `새 플레이 ${span}개를 한 번에 반영했습니다 · 현재 ${row.home_score}-${row.away_score}`,
+        });
+        return;
+      }
+      const specs: PushToastSpec[] = [];
+      for (let i = burstFrom; i < to; i++) specs.push(...computePushNotifications(cur.events, i, i + 1, cur.homeTeam, cur.awayTeam));
+      for (const spec of specs.slice(-TOAST_STACK_MAX)) pushToast(spec);
+    }, LIVE_TOAST_DEBOUNCE_MS);
+  }, [events, live, pushToast]);
 
   // 요청: "스크롤을 내리면 상단에 점수/팀/예상승률/현재 쿼터 시간등을 작게 틀 고정" - 처음엔
   // 순수 CSS position:sticky였는데, "자기 자신이 줄어들거나 사라지는 sticky 요소가 있으면
@@ -385,7 +629,7 @@ export default function GameReplay({
     }
     document.addEventListener("click", handleJumpClick);
     return () => document.removeEventListener("click", handleJumpClick);
-  }, [events.length]);
+  }, [events.length, setIdx]);
 
   const quarterOrder = useMemo(() => {
     const seen: string[] = [];
@@ -643,6 +887,10 @@ export default function GameReplay({
     [events, players, homeTeam.tcode, awayTeam.tcode]
   );
 
+  // C. ⭐ 배지 문구 - 진행중이면 "최고 활약"이 확정된 게 아니라 지금까지의 1등이다. 계산
+  // (아래 topPcode)은 손대지 않고 표현만 바꾼다.
+  const topBadgeTitle = live ? "현재 최고 활약" : "이 경기 최고 활약";
+
   // ⭐ 배지("이 경기 최고 활약")용 - 항상 경기 최종 박스스코어 기준(스크럽 위치와 무관,
   // lib/postgameReport.ts의 gameWideTopPerformer를 그대로 재사용 - 블로아웃 가드까지 포함).
   const finalBox = useMemo(() => computeBoxScore(events, events.length - 1, players), [events, players]);
@@ -706,7 +954,9 @@ export default function GameReplay({
       <th>FG</th>
       <th>3P</th>
       <th>FT</th>
-      <th>+/-</th>
+      {/* C. 진행중 경기에서는 이 +/-가 "최종"이 아니라 "지금까지"다 - 계산은 그대로 두고
+          라벨만 정직하게(종료 경기는 예전과 글자 하나까지 동일). */}
+      <th title={live ? "지금 이 시점까지의 득실 마진" : "경기 최종 득실 마진"}>{live ? "+/- (현재까지)" : "+/-"}</th>
       <th>온/오프</th>
     </tr>
   );
@@ -729,7 +979,7 @@ export default function GameReplay({
           </span>
         )}
         {isTop && (
-          <span className="replay-court-mvp" title="이 경기 최고 활약">
+          <span className="replay-court-mvp" title={topBadgeTitle}>
             ⭐
           </span>
         )}
@@ -926,7 +1176,7 @@ export default function GameReplay({
                     <div>
                       <div className="replay-psc-name">
                         {r.pcode === topPcode && (
-                          <span className="replay-psc-star" title="이 경기 최고 활약">
+                          <span className="replay-psc-star" title={topBadgeTitle}>
                             ⭐
                           </span>
                         )}
@@ -941,7 +1191,7 @@ export default function GameReplay({
                   <div>
                     <div className="replay-psc-name">
                       {scoreRow.pcode === topPcode && (
-                        <span className="replay-psc-star" title="이 경기 최고 활약">
+                        <span className="replay-psc-star" title={topBadgeTitle}>
                           ⭐
                         </span>
                       )}
@@ -956,7 +1206,7 @@ export default function GameReplay({
                     <div>
                       <div className="replay-psc-name">
                         {assistRow.pcode === topPcode && (
-                          <span className="replay-psc-star" title="이 경기 최고 활약">
+                          <span className="replay-psc-star" title={topBadgeTitle}>
                             ⭐
                           </span>
                         )}
@@ -1124,7 +1374,10 @@ export default function GameReplay({
           자체는 레이아웃에 영향 없음). */}
       <div className="replay-sticky-sentinel" ref={stickySentinelRef} />
 
-      <div className="replay-now-line">{row.pcode ? `${row.player_name} · ` : ""}{row.action_label ?? "-"}</div>
+      {/* pcode가 아니라 player_name으로 판단해야 한다(2026-09-02) - 라이브 경기에서는
+          pcode는 있는데 이름이 아직 안 붙는 경우가 있고, 그때 예전 코드는 문자 그대로
+          `null · 수비리바운드`를 그렸다. 이름이 없으면 액션만 보여준다. */}
+      <div className="replay-now-line">{row.player_name ? `${row.player_name} · ` : ""}{row.action_label ?? "-"}</div>
 
       {flowChips.length > 0 && (
         <div className="replay-flow-chips">
@@ -1175,6 +1428,38 @@ export default function GameReplay({
         <div className="replay-lineups">
           {lineupLine(homeTeam, homeOnCourt)}
           {lineupLine(awayTeam, awayOnCourt)}
+        </div>
+      )}
+
+      {/* B-2. 붙어있음/떨어짐이 눈에 확 띄어야 한다 - 라이브일 때만 나오는 줄.
+          팔로우 중이면 점멸하는 LIVE 점(홈 카드의 .live-dot 재사용)과 함께 "라이브 따라가는
+          중", 사용자가 뒤로 스크럽했으면 몇 개 뒤인지와 함께 돌아가는 칩. 칩을 누르기 전엔
+          절대 앞으로 끌고 가지 않는다. */}
+      {live && (
+        <div className={`replay-live-bar${following ? " following" : " detached"}`}>
+          {following ? (
+            <span className="replay-live-state">
+              <span className="live-dot" />
+              라이브 따라가는 중
+            </span>
+          ) : (
+            <>
+              <span className="replay-live-state">
+                ⏸ 지난 장면 보는 중 · 라이브보다 {lastIdx - idx}개 뒤
+              </span>
+              <button
+                type="button"
+                className="replay-live-chip"
+                onClick={() => {
+                  setPlaying(false);
+                  setPinnedIdx(null);
+                }}
+              >
+                <span className="live-dot" />
+                라이브로 돌아가기
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -1271,7 +1556,7 @@ export default function GameReplay({
         </div>
       )}
 
-      <WinProbLiveChart events={events} idx={idx} homeColor={homeTeam.color} />
+      <WinProbLiveChart events={events} idx={idx} homeColor={homeTeam.color} live={live} />
 
       <div className="replay-cols">
         <div>

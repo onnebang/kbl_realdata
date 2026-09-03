@@ -44,11 +44,19 @@ export function daysUntilKst(dateStr: string): number {
   return Math.round((b - a) / 86400000);
 }
 
-/** 홈 배너용 경량 조회 - 이 시즌 실제 첫 경기 날짜와 예정 경기 수(승률 조회 없음). */
+/** 홈 배너용 경량 조회 - 이 시즌 실제 첫 경기 날짜와 예정 경기 수(승률 조회 없음).
+ *
+ * 리그 전체에 이미 치른 경기가 하나라도 있으면 null(= 개막 전이 아님). 홈 화면의 렌더 조건은
+ * 팀 필터가 걸린 목록을 보기 때문에, "그 팀만 아직 안 뛰었을 뿐인 시즌 중반"을 개막 전으로
+ * 오인할 수 있다(실측: 창원 LG의 첫 경기는 2026-10-18이라 10/10에 팀 필터를 걸면 종료 경기가
+ * 0건 → "개막까지 개막 7일째"라는 모순된 배너가 떴음). 개막 여부는 필터와 무관한 리그 전체
+ * 기준이어야 하므로 그 판정을 이 함수 안으로 옮긴다.
+ */
 export async function getSeasonOpener(season: string): Promise<{ firstGameDate: string; nGames: number } | null> {
-  const { data } = await supabase.from("games").select("gmkey, game_date").eq("season_name", season).order("game_date");
+  const { data } = await supabase.from("games").select("gmkey, game_date, home_score").eq("season_name", season).order("game_date");
   const real = (data ?? []).filter((g) => isRealGmkey(g.gmkey as string));
   if (!real.length) return null;
+  if (real.some((g) => g.home_score != null)) return null; // 이미 개막함
   return { firstGameDate: real[0].game_date as string, nGames: real.length };
 }
 
@@ -89,6 +97,10 @@ export type SeasonOutlook = {
   firstGameDate: string | null;
   lastGameDate: string | null;
   nGames: number;
+  // 승률이 실제로 매겨진 경기 수. nGames와 다를 수 있고(모델이 아직 값을 못 낸 경기), 캡션은
+  // 반드시 이쪽을 써야 한다 - "예정 N경기 각각에 매긴 승률"이라고 nGames로 말하면 값이 없는
+  // 경기까지 매긴 것처럼 과장된다(실측 지적).
+  nPriced: number;
   teams: TeamOutlook[];
 };
 
@@ -168,6 +180,7 @@ export async function getSeasonOutlook(season = PRESEASON_SEASON): Promise<Seaso
     firstGameDate: sched.length ? (sched[0].game_date as string) : null,
     lastGameDate: sched.length ? (sched[sched.length - 1].game_date as string) : null,
     nGames: sched.length,
+    nPriced: sched.filter((g) => probs.has(g.gmkey as string)).length,
     teams: rows,
   };
 }
@@ -212,7 +225,12 @@ export type RosterChangeReport = {
   topIn: (RosterChange & { team: TeamInfo }) | null; // 지난 시즌 득점 기준 최대 영입
   topOut: (RosterChange & { team: TeamInfo }) | null; // 지난 시즌 득점 기준 최대 이탈
   counts: Record<ChangeKind, number>;
-  domesticPending: boolean; // 국내 선수 로스터가 아직 안 들어온 단계(외국인만 판정된 상태)
+  hasData: boolean; // 이 시즌 roster_changes 행이 하나라도 있는가(없으면 대조 자체를 안 한 것)
+  // 국내 선수 로스터가 아직 안 들어온 팀들의 약어. 로스터는 팀별로 들어오므로 리그 전체를
+  // 하나의 불리언으로 말하면, 한 팀만 입력돼도 나머지 아홉 팀의 "국내 미입력" 단서가 통째로
+  // 사라진다(실측 지적) - 그래서 팀 목록으로 들고 다닌다.
+  domesticPendingTeams: string[];
+  domesticPending: boolean; // = domesticPendingTeams.length > 0
 };
 
 function num(v: unknown): number | null {
@@ -269,6 +287,13 @@ export async function getRosterChangeReport(season = PRESEASON_SEASON): Promise<
   const counts: Record<ChangeKind, number> = { stay: 0, in: 0, out: 0, new: 0 };
   for (const r of rows) counts[r.change]++;
 
+  // 국내 선수가 한 명도 없는(= role 태그가 붙지 않은 잔류/영입/신입 행이 없는) 팀 = 그 팀의
+  // 국내 로스터는 아직 미입력. import_roster.py가 외국인 행에만 "외국인 1옵션/2옵션/
+  // 아시아쿼터"를 role로 남기므로 role == null 이 곧 국내 선수라는 신호다.
+  const domesticPendingTeams = teamList
+    .filter((t) => ![...t.in, ...t.new, ...t.stay].some((r) => r.role == null))
+    .map((t) => t.team.abbr);
+
   return {
     season,
     prevSeason,
@@ -277,7 +302,9 @@ export async function getRosterChangeReport(season = PRESEASON_SEASON): Promise<
     topIn: ins.length ? withTeam(ins[0]) : null,
     topOut: outs.length ? withTeam(outs[0]) : null,
     counts,
-    domesticPending: !rows.some((r) => r.change !== "out" && r.role == null),
+    hasData: rows.length > 0,
+    domesticPendingTeams,
+    domesticPending: domesticPendingTeams.length > 0,
   };
 }
 
@@ -312,7 +339,9 @@ export const DEMO_GAMES: { gmkey: string; why: string }[] = [
   { gmkey: "S47G01N174", why: "45점차 압도적 승리 - 승률이 일찍 굳는 경기는 어떻게 보이는지" },
   { gmkey: "S47G01N177", why: "2차 연장, 시즌 최다 합계 득점(211점)" },
   { gmkey: "S47G03N11", why: "플레이오프 역전승" },
-  { gmkey: "S47G01N189", why: "시즌 최대 점수차 역전승" },
+  // "최대 점수차"는 뒤집은 점수차가 아니라 최종 점수차 기준(역전승 태그가 붙은 19경기 중 12점이
+  // 최대). 그냥 "최대 점수차 역전승"이라고 쓰면 뒤집은 열세 폭으로 읽힐 수 있어 기준을 명시함.
+  { gmkey: "S47G01N189", why: "역전승 중 최종 점수차가 가장 컸던 경기(12점 차)" },
   { gmkey: "S47G01N175", why: "연장 2점차 접전" },
 ];
 

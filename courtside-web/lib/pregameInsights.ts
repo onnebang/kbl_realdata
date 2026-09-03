@@ -40,7 +40,15 @@ export type PregameFeatures = {
 
 // courtside_template.html의 pregameInsightItems()를 그대로 포팅 - "차이가 유의미할 때만
 // 문장 생성" 원칙(renderZoneDominance 패턴)까지 동일. 임계값도 원본과 동일하게 유지.
-export function pregameInsightItems(f: PregameFeatures, homeTname: string, awayTname: string): string[] {
+// priorSeasonLabel: 이 경기가 그 팀의 이번 시즌 첫 경기여서 아래 "최근 3경기 / 직전 10경기"가
+// 실제로는 지난 시즌 경기일 때, 호출자가 "25-26" 같은 라벨을 넘긴다. 넘어오면 해당 문장에
+// 시즌을 명시한다 - 개막전 프리뷰가 지난 시즌 폼을 이번 시즌 폼처럼 말하던 문제(실측 지적).
+export function pregameInsightItems(
+  f: PregameFeatures,
+  homeTname: string,
+  awayTname: string,
+  priorSeasonLabel?: string | null
+): string[] {
   const lines: string[] = [];
 
   if (f.home_reb_rt != null && f.away_reb_rt != null) {
@@ -84,7 +92,8 @@ export function pregameInsightItems(f: PregameFeatures, homeTname: string, awayT
     const d = last3 - last10;
     if (Math.abs(d) >= 5) {
       const dir = d > 0 ? "상승세" : "하락세";
-      lines.push(`<b>${name}</b> 최근 3경기 넷레이팅이 직전 10경기 평균 대비 뚜렷한 ${dir}(${fmtRating(last3)} vs ${fmtRating(last10)}).`);
+      const scope = priorSeasonLabel ? `지난 시즌(${priorSeasonLabel}) 마지막 3경기` : "최근 3경기";
+      lines.push(`<b>${name}</b> ${scope} 넷레이팅이 직전 10경기 평균 대비 뚜렷한 ${dir}(${fmtRating(last3)} vs ${fmtRating(last10)}).`);
     }
   }
 

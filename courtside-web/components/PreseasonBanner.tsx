@@ -3,8 +3,9 @@ import { getSeasonOpener, daysUntilKst, shortSeason } from "@/lib/preseason";
 import styles from "./PreseasonBanner.module.css";
 
 // 홈 상단 개막 배너 - 요청: "시즌 시작전 리포트를 먼저 제공하고... 이렇게 중계가 보일거다라는
-// 것을 알려주면". app/page.tsx가 "이 시즌에 종료 경기가 0, 예정 경기는 있음"일 때만 렌더하므로
-// 첫 경기가 끝나는 순간 자동으로 사라진다(별도 플래그/날짜 하드코딩 없음).
+// 것을 알려주면". 개막 여부 판정은 getSeasonOpener 안에 있다(리그 전체에 치른 경기가 하나라도
+// 있으면 null을 돌려주고 배너는 렌더되지 않음) - 홈 화면의 렌더 조건은 팀 필터가 걸린 목록을
+// 보기 때문에 그것만으로는 "그 팀만 아직 안 뛴 시즌 중반"과 개막 전을 구분하지 못한다.
 export async function PreseasonBanner({ season }: { season: string }) {
   const opener = await getSeasonOpener(season);
   if (!opener) return null;

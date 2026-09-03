@@ -13,7 +13,11 @@ export const CHANGE_CHIP: Record<RosterChange["change"], { label: string; cls: s
   out: { label: "이탈", cls: styles.chipOut },
 };
 
-/** "25-26 51G · 20.8P 8.9R 2.6A" - 성적이 없으면 null(신입). */
+/** "25-26 51G · 20.8P 8.9R 2.6A" - 성적이 없으면 null(신입).
+ *
+ * 이 수치는 정규시즌+플레이오프 합산 평균이다(tools/build_roster_changes.py가 season_name만으로
+ * 집계). 팀 전망표의 전적은 정규시즌 기준이라 분모가 다르므로, 이 값을 쓰는 화면은 캡션에
+ * 그 사실을 밝힌다(예: 카이린 갤러웨이는 정규 6경기 8.0점, 합산 9경기 5.3점). */
 export function statLine(r: RosterChange): string | null {
   if (r.gp == null || r.prevSeason == null) return null;
   return `${shortSeason(r.prevSeason)} ${r.gp}G · ${r.ppg?.toFixed(1)}P ${r.rpg?.toFixed(1)}R ${r.apg?.toFixed(1)}A`;

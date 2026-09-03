@@ -11,10 +11,13 @@ import { displayTeamName } from "@/lib/teamNames";
 import { collectAllOnCourtLineups, subComboKeys, type PlayerStartInfo } from "@/lib/gameLineups";
 import { getLineupRatings, getPlayerOnOffRatings, type LineupRating, type PlayerOnOff } from "@/lib/lineupNetRating";
 import { buildMatchupInsights, gradeMatchupInsights, type PreviewInsight, type PriorGameData } from "@/lib/matchupInsights";
+import { getDepartedByTeam } from "@/lib/preseason";
 import { TeamBadge } from "@/components/TeamBadge";
 import GameReplay from "@/components/GameReplay";
 import { InsightCard } from "@/components/InsightCard";
 import { deriveGameStatus } from "@/lib/gameStatus";
+import LiveGameProvider from "@/components/LiveGameProvider";
+import LiveScore from "@/components/LiveScore";
 
 type TeamRef = { tcode: string; name: string; abbr: string; color: string; logo_url: string | null } | null;
 
@@ -149,6 +152,18 @@ async function getEvents(gmkey: string) {
 
 // action_codes(30여 개, 가벼움) 통째로 가져와 code->label 맵 - courtside_template.html의
 // ACTION_LABELS 오브젝트와 같은 역할.
+// 진행중 경기 전용 선수 이름 폴백(2026-09-02). 라이브 수집기는 game_events만 채우고
+// game_player_stats(공식 박스스코어)는 경기가 끝난 뒤 정산 배치가 넣는다. 그래서 경기 중에는
+// buildGameData의 nameMap이 통째로 비어 player_name이 전부 null이 되고, 스코어보드의
+// "지금 이 순간" 줄이 문자 그대로 `null · 수비리바운드`를 렌더했다. 10월엔 모든 라이브 경기에서
+// 보이는 문제라, 이벤트에 등장한 pcode만 players에서 직접 읽어 이름을 채운다(경기당 한 번,
+// 20~30명 규모라 가볍다). 종료된 경기는 박스스코어가 있으니 이 조회 자체를 하지 않는다.
+async function getPlayerNames(pcodes: string[]): Promise<Map<string, string>> {
+  if (pcodes.length === 0) return new Map();
+  const { data } = await supabase.from("players").select("pcode, name").in("pcode", pcodes);
+  return new Map((data ?? []).map((r) => [r.pcode as string, r.name as string]));
+}
+
 async function getActionLabels(): Promise<Map<string, string>> {
   const { data } = await supabase.from("action_codes").select("code, label");
   return new Map((data ?? []).map((r) => [r.code as string, r.label as string]));
@@ -184,7 +199,9 @@ async function getShots(gmkey: string): Promise<(ShotRow & { quarter: string; pc
 function buildGameData(
   playerStats: PlayerStatRow[],
   events: EventRow[],
-  actionLabels: Map<string, string>
+  actionLabels: Map<string, string>,
+  // 진행중 경기용 이름 폴백(getPlayerNames 주석 참고). 박스스코어가 있으면 빈 맵.
+  fallbackNames: Map<string, string> = new Map()
 ): {
   box: PlayerBox[];
   derivedEvents: GameEvent[];
@@ -201,7 +218,7 @@ function buildGameData(
     action_code: e.action_code,
     action_label: e.action_code ? actionLabels.get(e.action_code) ?? e.action_code : null,
     pcode: e.pcode,
-    player_name: e.pcode ? nameMap.get(e.pcode) ?? null : null,
+    player_name: e.pcode ? nameMap.get(e.pcode) ?? fallbackNames.get(e.pcode) ?? null : null,
     tcode: e.tcode,
     home_score: e.home_score,
     away_score: e.away_score,
@@ -241,13 +258,14 @@ async function buildPriorGameData(
   gameDate: string | null,
   priorHomeTcode: string | null,
   priorAwayTcode: string | null,
-  actionLabels: Map<string, string>
+  actionLabels: Map<string, string>,
+  seasonName: string | null = null // 그 직전 경기가 열린 시즌(개막 전엔 지난 시즌 - 문구에 명시하기 위해)
 ): Promise<PriorGameData | null> {
   if (!gmkey || !gameDate || !priorHomeTcode || !priorAwayTcode) return null;
   const [pStats, pEvents] = await Promise.all([getPlayerStats(gmkey), getEvents(gmkey)]);
   if (!pStats.length || !pEvents.length) return null;
   const { box, derivedEvents, players, minutesByPcode, usageByPcode } = buildGameData(pStats, pEvents, actionLabels);
-  return { gmkey, gameDate, homeTcode: priorHomeTcode, awayTcode: priorAwayTcode, box, events: derivedEvents, players, minutesByPcode, usageByPcode };
+  return { gmkey, gameDate, seasonName: seasonName ?? undefined, homeTcode: priorHomeTcode, awayTcode: priorAwayTcode, box, events: derivedEvents, players, minutesByPcode, usageByPcode };
 }
 
 // 요청: "팀별 색상을 해놨듯이, 스탯표에도 색상으로 비교" - 이 아래 바 차트들은 전부
@@ -422,7 +440,12 @@ export default async function GamePage({
   // 불러와 lib/postgameReport.ts(A1-A8 그대로 이식)가 같은 계산을 함.
   // buildGameData - 이 경기 자체와 "직전 경기"(lib/matchupInsights.ts)에 완전히 동일한 규칙으로
   // GameEvent[]/PlayerBox[]를 조립(중복 로직 제거, 위 buildGameData 정의부 주석 참고).
-  const { box, derivedEvents, players: currentGamePlayers } = buildGameData(playerStats, events, actionLabels);
+  // 박스스코어가 아직 없는 진행중 경기에서만 players에서 이름을 보충한다(getPlayerNames 주석).
+  const liveNames =
+    playerStats.length === 0
+      ? await getPlayerNames([...new Set(events.map((e) => e.pcode).filter((p): p is string => !!p))])
+      : new Map<string, string>();
+  const { box, derivedEvents, players: currentGamePlayers } = buildGameData(playerStats, events, actionLabels, liveNames);
 
   let reportSections: { title: string; html: string }[] = [];
   if (status === "final" && game.home_score != null && game.away_score != null && derivedEvents.length > 0 && game.home_team && game.away_team) {
@@ -440,10 +463,8 @@ export default async function GamePage({
     });
   }
 
-  const pregameLines =
-    pregameFeatures && game.home_team && game.away_team
-      ? pregameInsightItems(pregameFeatures, game.home_team.name, game.away_team.name)
-      : [];
+  // pregameLines는 아래 최근 일정(homeSchedule)이 있어야 "이 폼 수치가 지난 시즌 것인지"를
+  // 알 수 있어서, 일정 조회가 끝난 뒤에 계산한다(선언 위치가 내려간 이유).
 
   // 매치업 패널(README "다음 단계" - 매치업/선수 프로필/득점 분포 중 첫 번째) - 전부
   // games/game_team_stats에서 라이브로 계산 가능해서(정적 페이지처럼 미리 구운 JSON이
@@ -508,6 +529,20 @@ export default async function GamePage({
     playerOnOff = Object.fromEntries(onOffMap);
   }
 
+  // 개막 전이면 pregame_features의 "최근 3경기 / 직전 10경기" 폼 수치도 실제로는 지난 시즌
+  // 경기다 - 그 시즌 라벨을 넘겨서 문장에 명시하게 한다(넘기지 않으면 기존 "최근 3경기" 그대로).
+  const priorSeasonLabel =
+    homeSchedule[0]?.seasonName && homeSchedule[0].seasonName !== game.season_name
+      ? (() => {
+          const [a, b] = homeSchedule[0].seasonName!.split("-");
+          return `${a.slice(2)}-${b.slice(2)}`;
+        })()
+      : null;
+  const pregameLines =
+    pregameFeatures && game.home_team && game.away_team
+      ? pregameInsightItems(pregameFeatures, game.home_team.name, game.away_team.name, priorSeasonLabel)
+      : [];
+
   // 프리뷰 스카우팅 인사이트(lib/matchupInsights.ts, 요청 항목 1~6) + 경기 후 예측 정확도
   // 채점(항목 7) - "직전 경기"는 homeSchedule[0]/awaySchedule[0](이미 위에서 getRecentSchedule로
   // 가져온 것, date desc 정렬이라 [0]이 가장 최근)을 그대로 재사용(새 쿼리 없음). 그 직전
@@ -519,22 +554,26 @@ export default async function GamePage({
   if (game.home_team && game.away_team) {
     const homeSched0 = homeSchedule[0] ?? null;
     const awaySched0 = awaySchedule[0] ?? null;
-    const [homePriorGame, awayPriorGame, leagueAvgOrebPct] = await Promise.all([
+    // 개막 전 게이트(roster_changes 'out') - 이 시즌에 확정 로스터가 없으면 빈 맵이라 게이트 없음.
+    const [homePriorGame, awayPriorGame, leagueAvgOrebPct, departedByTeam] = await Promise.all([
       buildPriorGameData(
         homeSched0?.gmkey ?? null,
         homeSched0?.gameDate ?? null,
         homeSched0 ? (homeSched0.isHome ? game.home_team.tcode : homeSched0.oppTcode) : null,
         homeSched0 ? (homeSched0.isHome ? homeSched0.oppTcode : game.home_team.tcode) : null,
-        actionLabels
+        actionLabels,
+        homeSched0?.seasonName ?? null
       ),
       buildPriorGameData(
         awaySched0?.gmkey ?? null,
         awaySched0?.gameDate ?? null,
         awaySched0 ? (awaySched0.isHome ? game.away_team.tcode : awaySched0.oppTcode) : null,
         awaySched0 ? (awaySched0.isHome ? awaySched0.oppTcode : game.away_team.tcode) : null,
-        actionLabels
+        actionLabels,
+        awaySched0?.seasonName ?? null
       ),
       getLeagueAvgOrebPct(game.season_name, game.game_date),
+      getDepartedByTeam(game.season_name),
     ]);
 
     previewInsights = await buildMatchupInsights({
@@ -553,6 +592,8 @@ export default async function GamePage({
       homeWinProb: derivedEvents[0]?.home_win_prob ?? pregameFeatures?.home_win_prob ?? null,
       homePriorGame,
       awayPriorGame,
+      homeDeparted: departedByTeam.get(game.home_team.tcode),
+      awayDeparted: departedByTeam.get(game.away_team.tcode),
     });
 
     // 경기 후 채점 - "종료" 상태에서만(예정/진행중 경기는 채점 대상 없음).
@@ -571,7 +612,13 @@ export default async function GamePage({
     }
   }
 
+  // Phase 2 - 라이브 전송 계층(웹소켓 구독 1 + 폴백 폴링 1)을 페이지당 딱 하나만 돌린다.
+  // live=false(예정/종료)면 훅이 구독도 타이머도 만들지 않는다(검증 5). 서버 컴포넌트가
+  // 클라이언트 프로바이더로 children을 감싸는 형태 - 본문은 그대로 서버에서 렌더된다.
+  const lastEventOrder = events.length > 0 ? events[events.length - 1].event_order : 0;
+
   return (
+    <LiveGameProvider gmkey={gmkey} live={status === "live"} initialLastOrder={lastEventOrder}>
     <div className="wrap">
       <Link href="/" className="back-link">
         ← 경기 목록
@@ -594,11 +641,11 @@ export default async function GamePage({
             />
             <span className="matchup-banner-name">{game.home_team?.name ?? game.gmkey}</span>
             {/* 예정 경기는 스코어 자리를 아예 비움(0-0이나 빈칸처럼 보이는 것 방지) - 가운데 VS만 */}
-            {status !== "scheduled" && <span className="matchup-banner-score">{game.home_score}</span>}
+            {status !== "scheduled" && <LiveScore side="home" initial={game.home_score} />}
           </div>
           <div className="matchup-banner-vs">VS</div>
           <div className="matchup-banner-side away" style={{ background: game.away_team?.color ?? "#888" }}>
-            {status !== "scheduled" && <span className="matchup-banner-score">{game.away_score}</span>}
+            {status !== "scheduled" && <LiveScore side="away" initial={game.away_score} />}
             <span className="matchup-banner-name">{game.away_team?.name ?? ""}</span>
             <TeamBadge
               team={game.away_team ? { name: game.away_team.name, abbr: game.away_team.abbr, color: "#ffffff33", logoUrl: game.away_team.logo_url } : null}
@@ -622,7 +669,11 @@ export default async function GamePage({
             없는 팀 - 이 블록 자체가 자연스럽게 비거나 줄어듦, 자리만 비워두는 플레이스홀더 없음). */}
         {previewInsights.length > 0 && (
           <div className="panel">
-            <div className="panel-title">📋 스카우팅 인사이트 (직전 경기 · 시즌 데이터 기반)</div>
+            {/* 개막 전엔 "직전 경기"가 지난 시즌 경기라, 고정 제목이 카드 내용과 정면으로
+                어긋난다(실측 지적) - 그래서 제목도 카드와 같은 기준을 따른다. */}
+            <div className="panel-title">
+              📋 스카우팅 인사이트 ({priorSeasonLabel ? `지난 시즌(${priorSeasonLabel}) 데이터 기반` : "직전 경기 · 시즌 데이터 기반"})
+            </div>
             {previewInsights.map((insight, i) => (
               <InsightCard
                 key={i}
@@ -633,6 +684,16 @@ export default async function GamePage({
                 awayTname={game.away_team?.name ?? ""}
               />
             ))}
+            {/* 이적 게이트의 실제 적용 범위를 밝힌다 - roster_changes의 이탈 행은 확정 로스터가
+                들어온 범위에서만 만들어지므로, 국내 로스터 미입력 단계에서는 국내 선수의 이적을
+                걸러내지 못한다. 걸러진 것처럼 보이게 두면 그 자체가 부정직하다. */}
+            {priorSeasonLabel && (
+              <div className="insight-caveat">
+                이 카드들은 지난 시즌 기록으로 만들어지며, 이번 시즌 로스터에서 빠진 선수는 제외했습니다. 다만 제외 판정은 확정 로스터가 들어온 범위
+                (현재 외국인·아시아쿼터)까지만 가능해서, 국내 선수의 이적은 아직 반영되지 않았을 수 있습니다.{" "}
+                <Link href="/preseason">개막 리포트에서 로스터 변화 보기 →</Link>
+              </div>
+            )}
           </div>
         )}
 
@@ -843,6 +904,9 @@ export default async function GamePage({
             awayNetRating={awaySeasonStats ? awaySeasonStats.ppg - awaySeasonStats.oppPpg : null}
             lineupRatings={lineupRatings}
             playerOnOff={playerOnOff}
+            live={status === "live"}
+            liveActionLabels={status === "live" ? Object.fromEntries(actionLabels) : undefined}
+            liveNames={status === "live" ? Object.fromEntries(liveNames) : undefined}
           />
         </div>
       )}
@@ -917,5 +981,6 @@ export default async function GamePage({
 
       <footer className="foot">Supabase에서 실시간 조회 · {gmkey}</footer>
     </div>
+    </LiveGameProvider>
   );
 }

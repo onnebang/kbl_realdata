@@ -245,6 +245,10 @@ function buildWeakDefenderInsight(
   let ourTarget: { pcode: string; name: string; usage: number } | null = null;
   for (const p of ourPriorGame.players) {
     if (p.tcode !== ourTcode || ourDeparted?.has(p.pcode)) continue;
+    // usage_rtg는 출전시간이 짧을수록 폭주한다(실측: 12초 뛴 가비지타임 선수가 264.1로 1위).
+    // "이 약점을 노릴 우리 선수"로 그런 선수를 지목하면 인사이트가 통째로 무의미해지므로,
+    // 상대 쪽 약점 판정과 같은 출전시간 하한(MIN_MINUTES_FOR_WEAK_DEFENDER)을 여기도 적용.
+    if ((ourPriorGame.minutesByPcode.get(p.pcode) ?? 0) < MIN_MINUTES_FOR_WEAK_DEFENDER) continue;
     const usage = ourPriorGame.usageByPcode.get(p.pcode) ?? 0;
     if (!ourTarget || usage > ourTarget.usage) {
       ourTarget = { pcode: p.pcode, name: ourPriorGame.box.find((b) => b.pcode === p.pcode)?.name ?? p.pcode, usage };
@@ -399,8 +403,16 @@ function buildComboSynergyInsight(
 function buildTrendInsight(team: "home" | "away", schedule: ScheduleGame[], seasonName?: string): PreviewInsight | null {
   if (!schedule.length) return null;
   // 개막 전엔 "최근 N경기"가 전부 지난 시즌 경기 - 이번 시즌 성적처럼 읽히지 않도록 문구에 명시.
-  const crossSeason = seasonName != null && schedule[0].seasonName != null && schedule[0].seasonName !== seasonName;
-  const scope = crossSeason ? `지난 시즌(${shortSeasonLabel(schedule[0].seasonName!)}) 마지막` : "최근";
+  // schedule[0](가장 최근 경기) 하나만 보면 안 된다: 개막 직후엔 이번 시즌 1~2경기 + 지난 시즌
+  // 3~4경기가 섞인 창이 되는데, 그때 schedule[0]은 이번 시즌이라 라벨이 "최근"으로 돌아가면서
+  // 지난 시즌 경기까지 이번 시즌 성적인 것처럼 읽힌다(실측 지적).
+  const priorSeasons = seasonName == null ? [] : [...new Set(schedule.map((g) => g.seasonName).filter((s): s is string => s != null && s !== seasonName))];
+  const allPrior = priorSeasons.length > 0 && schedule.every((g) => g.seasonName != null && g.seasonName !== seasonName);
+  const scope = allPrior
+    ? `지난 시즌(${shortSeasonLabel(priorSeasons[0])}) 마지막`
+    : priorSeasons.length > 0
+      ? `지난 시즌(${shortSeasonLabel(priorSeasons[0])}) 경기를 포함한 최근`
+      : "최근";
   const wins = schedule.filter((g) => g.teamScore > g.oppScore).length;
   const losses = schedule.length - wins;
   const avgMargin = schedule.reduce((s, g) => s + (g.teamScore - g.oppScore), 0) / schedule.length;

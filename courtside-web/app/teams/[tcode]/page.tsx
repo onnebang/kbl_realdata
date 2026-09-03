@@ -381,7 +381,8 @@ function RosterChangesPanel({ rc, abbrOf }: { rc: TeamRosterChanges; abbrOf: (tc
         <ChangeLine key={`${r.change}-${r.name}`} r={r} abbrOf={abbrOf} />
       ))}
       <div className={styles.pctNote}>
-        확정 로스터를 지난 시즌 출전 기록과 대조한 결과 · 성적은 그 선수의 마지막 KBL 시즌 기준 · 국내 선수 로스터가 들어오면 자동 반영 ·{" "}
+        확정 로스터를 지난 시즌 출전 기록과 대조한 결과 · 성적은 그 선수의 마지막 KBL 시즌 정규+플레이오프 합산 평균(위 시즌 여정·4팩터는 이 시즌 기준이라
+        분모가 다름) · 국내 선수 로스터가 들어오면 자동 반영 ·{" "}
         <Link href="/preseason">리그 전체 이동 지도와 시즌 전망 →</Link>
       </div>
     </div>

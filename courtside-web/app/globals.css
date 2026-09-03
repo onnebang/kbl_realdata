@@ -1796,6 +1796,58 @@ table.data-table td:nth-child(2) {
   color: var(--negative);
 }
 
+/* Phase 2 - 라이브 팔로우 상태 줄(진행중 경기에서만 렌더). 붙어있음/떨어짐이 한눈에
+   구분돼야 해서 배경색과 테두리까지 다르게 준다 - 텍스트만 바뀌면 못 알아챈다.
+   점멸 점은 홈 카드 LIVE 배지의 .live-dot을 그대로 재사용(같은 의미 = 같은 시각언어). */
+.replay-live-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+}
+.replay-live-bar.following {
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+}
+.replay-live-bar.detached {
+  /* 라이브에서 떨어져 있다 = 지금 보고 있는 게 최신이 아니다. 경고 톤(--gold)으로. */
+  background: var(--gold-soft);
+  border-color: var(--gold);
+  color: var(--ink);
+}
+.replay-live-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+.replay-live-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--negative);
+  background: var(--negative);
+  color: #fff;
+  font-family: "Pretendard", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.replay-live-chip:hover {
+  filter: brightness(1.08);
+}
+.replay-live-chip .live-dot {
+  background: #fff;
+}
+
 .replay-controls {
   display: flex;
   align-items: center;
@@ -2222,4 +2274,20 @@ footer.foot {
   font-size: 11px;
   font-family: "IBM Plex Mono", monospace;
   line-height: 1.7;
+}
+
+/* 스카우팅 인사이트 하단 단서 - 개막 전에 "이 카드는 지난 시즌 기록이고, 이적 제외 판정은
+   확정 로스터가 들어온 범위까지만"이라고 밝히는 자리. .empty-note는 가운데 정렬 + 큰 여백이라
+   패널 안 각주로는 맞지 않아 따로 둠. */
+.insight-caveat {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px dashed rgba(var(--line-rgb), 0.14);
+  color: var(--ink-faint);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.insight-caveat a {
+  color: var(--gold);
+  font-weight: 600;
 }

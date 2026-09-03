@@ -391,16 +391,21 @@
   text-align: center;
   margin-top: 2px;
 }
+/* 배경은 --positive/--negative/--gold에서 직접 섞어 만든다(--*-soft 토큰을 쓰지 않음).
+   이 칩들은 components/RosterChangeLine.tsx를 통해 팀 프로필(app/teams/[tcode])에서도
+   렌더되는데, 그 페이지의 래퍼(team-profile.module.css의 .pageRoot)는 --positive-soft/
+   --negative-soft를 정의하지 않아서 -soft를 참조하면 그쪽에서 배경이 통째로 사라진다
+   (실측 지적). --positive/--negative/--gold는 두 모듈 모두에 있으므로 이게 안전하다. */
 .chipIn {
-  background: var(--positive-soft);
+  background: color-mix(in srgb, var(--positive) 14%, transparent);
   color: var(--positive);
 }
 .chipOut {
-  background: var(--negative-soft);
+  background: color-mix(in srgb, var(--negative) 14%, transparent);
   color: var(--negative);
 }
 .chipNew {
-  background: var(--gold-soft);
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
   color: var(--gold);
 }
 .chipStay {

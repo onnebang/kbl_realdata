@@ -70,8 +70,11 @@ export type GameRarity = {
 
 export type ReportSection = { title: string; html: string };
 
-const QUARTER_ORDER = ["Q1", "Q2", "Q3", "Q4", "X1", "X2", "X3", "X4", "EQ1", "EQ2", "EQ3", "EQ4"];
-function quarterLenSec(q: string) {
+// export - Phase 2의 진행중 경기 승률 차트(components/GameReplay.tsx의 WinProbLiveChart)가
+// "경과 시간축 + 남은 시간은 빈 칸"으로 그리려면 쿼터 길이 규칙이 필요한데, 그 표를 저쪽에
+// 복사하면 두 벌이 서로 어긋날 수 있어서 여기 하나만 공개한다(값/동작 변화 없음).
+export const QUARTER_ORDER = ["Q1", "Q2", "Q3", "Q4", "X1", "X2", "X3", "X4", "EQ1", "EQ2", "EQ3", "EQ4"];
+export function quarterLenSec(q: string) {
   return q === "Q1" || q === "Q2" || q === "Q3" || q === "Q4" ? 600 : 300;
 }
 function cumulativeElapsed(q: string, m: number, s: number): number {

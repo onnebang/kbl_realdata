@@ -99,6 +99,24 @@ function RosterSection({ report }: { report: RosterChangeReport }) {
   const abbrByTcode = new Map(report.teams.map((t) => [t.team.tcode, t.team.abbr]));
   const abbrOf = (tcode: string | null) => (tcode ? (abbrByTcode.get(tcode) ?? tcode) : null);
   const prev = shortSeason(report.prevSeason);
+
+  // 대조 결과가 0행이면 "변화 없음"이 아니라 "아직 확정 로스터를 못 받음"이다. 헤드라인 타일을
+  // 그대로 그리면 "팀 간 이동 0건 · 영입 0 · 이탈 0"이 되어, 하지도 않은 대조를 수행한 것처럼
+  // 단언하게 된다(실측 지적) - 그래서 지도 전체를 그리지 않고 상태만 밝힌다.
+  if (!report.hasData) {
+    return (
+      <div className={styles.panel}>
+        <div className={styles.panelTitle}>
+          <span className={styles.sectionNum}>2</span>외국인 선수 이동 지도
+        </div>
+        <div className="empty-note">
+          {report.season} 확정 로스터가 아직 입력되지 않아 {prev} 시즌과의 대조를 수행하지 못했습니다 - 구단 발표가 확정되는 대로 이 자리에 이적·영입·이탈
+          지도가 채워집니다.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.panel}>
       <div className={styles.panelTitle}>
@@ -160,9 +178,10 @@ function RosterSection({ report }: { report: RosterChangeReport }) {
 
       <div className={styles.note}>
         {report.domesticPending
-          ? `국내 선수 확정 로스터는 아직 입력 전입니다 - 입력되면 같은 지도에 자동으로 반영되고, 그때까지 이탈 판정은 외국인 선수에 한정합니다. `
+          ? `국내 선수 확정 로스터가 아직 입력되지 않은 팀: ${report.domesticPendingTeams.join(", ")} - 이 팀들은 이탈 판정을 외국인 선수에 한정하며, 로스터가 들어오면 같은 지도에 자동 반영됩니다. `
           : ""}
-        {prev} 시즌 5경기 미만 출전 선수는 이탈 목록에서 제외. &quot;신입&quot;은 KBL 출전 기록이 없는 선수로, 첫 경기 출전 시 프로필이 자동 연결됩니다.
+        성적은 {prev} 정규시즌+플레이오프 합산 평균입니다(위 시즌 전망표의 전적은 정규시즌 기준이라 분모가 다릅니다). {prev} 시즌 5경기 미만 출전
+        선수는 이탈 목록에서 제외. &quot;신입&quot;은 KBL 출전 기록이 없는 선수로, 첫 경기 출전 시 프로필이 자동 연결됩니다.
       </div>
     </div>
   );
@@ -251,8 +270,9 @@ export default async function PreseasonPage() {
           <span className={styles.sectionNum}>1</span>코트사이드 시즌 전망 - 기대승수
         </div>
         <p className={styles.panelLede}>
-          경기 전 승률 모델이 {cur} 예정 경기 {outlook.nGames}개 각각에 매긴 승률을 팀별로 더한 값입니다. 오른쪽은 {prev} 정규시즌 성적과
-          승률 차이(%p).
+          경기 전 승률 모델이 {cur} 예정 경기 {outlook.nPriced}개에 매긴 승률을 팀별로 더한 값입니다
+          {outlook.nPriced < outlook.nGames ? ` (전체 ${outlook.nGames}경기 중 ${outlook.nGames - outlook.nPriced}경기는 아직 승률이 없어 제외)` : ""}. 오른쪽은{" "}
+          {prev} 정규시즌 성적과 승률 차이(%p).
         </p>
         <div className={styles.outlookGrid}>
           <div className={`${styles.outlookRow} ${styles.outlookHead}`}>

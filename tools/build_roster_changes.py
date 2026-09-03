@@ -14,9 +14,13 @@
   new   로스터에 있고 KBL 출전 기록이 전혀 없다(pcode 없음 - 첫 경기 때 자동 연결)
   out   지난 시즌 그 팀에서 MIN_GP_FOR_OUT 경기 이상 뛰었는데 그 팀의 이번 시즌 로스터에 없다.
         다른 팀 로스터에 있으면 next_tcode(이적), 없으면 리그 이탈.
-        ! 로스터가 외국인만 들어온 단계(팀당 FOREIGN_ONLY_ROSTER_MAX행 이하)에서는 국내 선수의
-          이탈을 판정할 수 없으므로 외국인 표기(이름에 공백 - 한국 선수 이름엔 공백이 없음)만
-          본다. 국내 로스터가 들어오면 같은 스크립트가 자동으로 전체 판정으로 바뀐다.
+        ! 다른 팀 로스터에서 이름이 확인되면(= 이적) 추측 없이 항상 out을 만든다.
+        ! 어느 로스터에도 없는 경우는 그 팀의 국내 로스터가 들어온 뒤에만 판정한다(팀별로
+          role이 없는 행 = 국내 선수가 하나라도 있는지로 확인). 아직이면 외국인(is_foreign_name)
+          만 판정하고 국내 선수는 건너뛴다 - 국내 로스터가 들어오면 자동으로 전체 판정이 된다.
+
+주의: prev_* 성적은 정규시즌+플레이오프 합산 평균이다(season_name만으로 집계). 웹의 시즌
+전망표는 정규시즌 전적을 쓰므로 분모가 다르고, 화면 캡션에서 그 사실을 밝힌다.
 
 사용:
     python build_roster_changes.py --season 2026-2027
@@ -33,7 +37,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_roster import load_database_url  # noqa: E402  (같은 .env.supabase 해석)
 
 MIN_GP_FOR_OUT = 5            # 이보다 적게 뛴 지난 시즌 선수(단기 대체 외국인 등)는 "이탈"로 세지 않음
-FOREIGN_ONLY_ROSTER_MAX = 9   # 팀 로스터 행이 이 이하면 외국인만 들어온 단계로 본다(외국인 최대 3명 + 여유)
+
+# 외국인 판별: 한글 표기에 공백이 있으면 외국인("레이션 해먼즈"), 없으면 국내("이정현").
+# 실측으로 확인한 근거 - 25-26 출전자 중 공백이 있는 국내 선수는 0명. 다만 귀화 선수는 공백
+# 없는 한글 이름을 쓰므로 휴리스틱이 뚫린다(라건아). 그 예외만 명시적으로 적어둔다.
+NATURALIZED_FOREIGN = {"라건아"}
+
+
+def is_foreign_name(name):
+    return (" " in (name or "")) or (name in NATURALIZED_FOREIGN)
 
 
 def prev_season_name(season):
@@ -72,10 +84,21 @@ def fetch_season_stats(cur, season):
     for pcode, tcode, name, gp, ppg, rpg, apg, mpg in cur.fetchall():
         rows.setdefault(pcode, []).append(
             {"tcode": tcode, "name": name, "gp": gp, "ppg": ppg, "rpg": rpg, "apg": apg, "mpg": mpg})
-    # 팀별 여러 행이면 가장 많이 뛴 팀을 대표로
+    # 팀별 여러 행이면 가장 많이 뛴 팀을 대표로. 출전 수가 같으면(시즌 중 이적 선수에게
+    # 실제로 일어난다) tcode로 2차 정렬 - 안 그러면 Postgres 반환 순서에 따라 stay/in
+    # 분류가 실행마다 달라진다(실측 지적).
     for pcode in rows:
-        rows[pcode].sort(key=lambda r: -r["gp"])
+        rows[pcode].sort(key=lambda r: (-r["gp"], r["tcode"]))
     return rows
+
+
+def fetch_names_to_pcodes(cur, names):
+    """이름 -> pcode 목록. 동명이인 판별용(import_roster.py는 동명이인을 pcode 미연결로 남긴다)."""
+    if not names:
+        return {}
+    cur.execute("select name, array_agg(pcode) from players where name = any(%s) group by name",
+                (list(names),))
+    return dict(cur.fetchall())
 
 
 def fetch_last_season_before(cur, season, pcodes):
@@ -104,6 +127,11 @@ def build(cur, season):
     if not roster:
         sys.exit("season_roster에 %s 로스터가 없다 - import_roster.py로 먼저 적재해줘." % season)
     stats = fetch_season_stats(cur, prev)
+    # import_roster.py는 동명이인을 "모호함"으로 두고 pcode를 비운다. 그 행을 그대로 "신입 ·
+    # KBL 출전 기록 없음"으로 발표하면, 같은 이름의 기존 선수가 있는데도 신인이라고 단언하게
+    # 된다(그리고 그 선수는 옛 팀에서 "이탈"로 또 한 번 발표된다). 이름이 players에 이미
+    # 있으면 신입으로 부르지 않고 확인 필요로 표시한다.
+    name_pcodes = fetch_names_to_pcodes(cur, {r[2] for r in fetch_roster(cur, season)})
 
     roster_by_team = {}
     team_of_pcode = {}
@@ -128,7 +156,14 @@ def build(cur, season):
         for pcode, name, note in members:
             role = role_from_note(note)
             if not pcode:
-                row(tcode, None, name, "new", role, note="KBL 출전 기록 없음 - 첫 경기 때 pcode 자동 연결")
+                existing = name_pcodes.get(name) or []
+                if existing:
+                    # 이름은 이미 있는데 연결이 안 된 상태 = 동명이인이거나 표기 차이.
+                    row(tcode, None, name, "new", role,
+                        note="동명이인 확인 필요 - players에 같은 이름 %d명(%s). 확인 전까지 KBL 첫 시즌으로 단정하지 않음"
+                             % (len(existing), ",".join(existing[:3])))
+                else:
+                    row(tcode, None, name, "new", role, note="KBL 출전 기록 없음 - 첫 경기 때 pcode 자동 연결")
                 continue
             st_rows = stats.get(pcode)
             if st_rows:
@@ -147,6 +182,15 @@ def build(cur, season):
                 # pcode는 있는데(과거 players 테이블 등재) 출전 기록이 없는 경우 - 사실상 신입
                 row(tcode, pcode, name, "new", role, note="pcode는 있으나 KBL 출전 기록 없음")
 
+    # 팀별로 "국내 선수 로스터가 들어왔는가" - import_roster.py가 외국인 행에만 role을 남기므로
+    # role이 없는 행이 하나라도 있으면 그 팀은 국내 로스터까지 받은 것으로 본다. 예전엔 팀
+    # 로스터 행수(<=9)로 판단했는데, 국내 로스터가 부분 입력된 팀(예: 10명)이 그 순간 "완비"로
+    # 넘어가면서 아직 안 들어온 선수들을 무더기로 "리그 이탈"이라고 발표하는 절벽이 있었다.
+    domestic_loaded = {
+        tcode: any(role_from_note(note) is None for _, _, note in members)
+        for tcode, members in roster_by_team.items()
+    }
+
     # 2) 지난 시즌 기준: out (로스터가 들어온 팀만 판정 가능)
     for pcode, st_rows in stats.items():
         for st in st_rows:
@@ -155,10 +199,12 @@ def build(cur, season):
                 continue
             if team_of_pcode.get(pcode) == tcode:
                 continue  # stay
-            foreign_only_stage = len(roster_by_team[tcode]) <= FOREIGN_ONLY_ROSTER_MAX
-            if foreign_only_stage and " " not in st["name"]:
-                continue  # 국내 선수는 아직 판정 불가(로스터 미수신)
+            foreign_only_stage = not domestic_loaded.get(tcode, False)
             next_tcode = team_of_pcode.get(pcode)
+            # 다른 팀 로스터에 이름이 있으면 이적이 확정적이라 추측이 필요 없다. 그 외에는
+            # 국내 로스터가 아직 안 들어온 팀의 국내 선수를 "이탈"로 발표할 수 없다.
+            if next_tcode is None and foreign_only_stage and not is_foreign_name(st["name"]):
+                continue
             row(tcode, pcode, st["name"], "out", None, next_tcode=next_tcode, prev_season=prev, st=st,
                 note=("다른 팀으로 이적" if next_tcode else
                       ("리그 이탈(로스터 미포함)" if not foreign_only_stage else "외국인 교체 - 이번 시즌 로스터 미포함")))

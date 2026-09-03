@@ -165,9 +165,45 @@ export async function getLiveWinProbs(gmkeys: string[]): Promise<Map<string, num
 const PAGE = 1000;
 export type GameMvp = { pcode: string; name: string; pts: number };
 export type GameMvps = { winnerTop: GameMvp | null; loserTop: GameMvp | null; sixthMan: GameMvp | null };
+// D(Phase 2 - 홈 자동 갱신) 비용 절감. 라이브 경기가 있으면 홈이 30초마다 서버에서 다시
+// 돌고, 그때마다 이 함수가 종료 경기 200개분 game_player_stats를 페이지네이션하며 통째로
+// 다시 읽는다(실측 홈 전체 응답의 대부분). 그런데 "이미 끝난 경기의 MVP"는 절대 안 바뀐다.
+// 그래서 결과를 프로세스 메모리에 캐시하되, 키를 "종료 경기 gmkey 목록 자체"로 잡는다 -
+// 새 경기가 하나라도 종료되면 키가 달라져 자동으로 다시 계산된다(오래된 MVP가 남지 않음).
+// TTL은 순수 안전장치(경기 종료 직후 박스스코어 정산 배치가 아직 안 돌아 MVP가 빈 채로
+// 캐시된 경우를 언젠가는 풀어주기 위한 것).
+// 서버리스에서는 워밍된 인스턴스 안에서만 유효한 캐시라, 안 맞아도 그냥 한 번 더 조회할
+// 뿐 정합성 문제는 생기지 않는다.
+const MVP_CACHE_TTL_MS = 5 * 60 * 1000;
+const mvpCache = new Map<string, { at: number; value: Map<string, GameMvps> }>();
+const tagCache = new Map<string, { at: number; value: Map<string, GameTag> }>();
+
+function cacheKey(gmkeys: string[]): string {
+  // 정렬해서 조인 - 호출부의 배열 순서(정렬/필터 변화)에 흔들리지 않게.
+  return gmkeys.slice().sort().join("|");
+}
+function readCache<T>(cache: Map<string, { at: number; value: T }>, key: string): T | null {
+  const hit = cache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > MVP_CACHE_TTL_MS) {
+    cache.delete(key);
+    return null;
+  }
+  return hit.value;
+}
+function writeCache<T>(cache: Map<string, { at: number; value: T }>, key: string, value: T): T {
+  // 시즌/팀 필터 조합만큼만 늘어나는 작은 캐시지만 상한은 둔다.
+  if (cache.size > 32) cache.clear();
+  cache.set(key, { at: Date.now(), value });
+  return value;
+}
+
 export async function getGameMvps(games: GameRow[]): Promise<Map<string, GameMvps>> {
   const gmkeys = games.map((g) => g.gmkey);
   if (!gmkeys.length) return new Map();
+  const ck = cacheKey(gmkeys);
+  const cached = readCache(mvpCache, ck);
+  if (cached) return cached;
 
   // 실측(이번 요청 검증 중 발견) - 청크를 순차 for-loop로 돌리면(200경기 ÷ 40 = 5개
   // 청크, 매번 await로 하나씩) Supabase 왕복 지연이 그대로 누적돼 홈 화면 전체가
@@ -234,7 +270,7 @@ export async function getGameMvps(games: GameRow[]): Promise<Map<string, GameMvp
       sixthMan: sixthMan ? toMvp(sixthMan) : null,
     });
   }
-  return result;
+  return writeCache(mvpCache, ck, result);
 }
 
 // 실제 시즌 승률(요청: "예상 승률과 실제 흘러간 승률, 표시") - 모델의 경기 전 예측
@@ -256,11 +292,15 @@ export async function getSeasonWinPcts(seasonName: string): Promise<Map<string, 
 export type GameTag = { key: string; label: string };
 export async function getGameTags(gmkeys: string[]): Promise<Map<string, GameTag>> {
   if (!gmkeys.length) return new Map();
+  // MVP와 같은 이유로 캐시(호출부가 종료 경기 gmkey만 넘긴다 - 태그는 끝난 경기에만 붙는다).
+  const ck = cacheKey(gmkeys);
+  const cached = readCache(tagCache, ck);
+  if (cached) return cached;
   const map = new Map<string, GameTag>();
   for (let i = 0; i < gmkeys.length; i += 200) {
     const chunk = gmkeys.slice(i, i + 200);
     const { data } = await supabase.from("game_summary_tags").select("gmkey, tag_key, tag_label").in("gmkey", chunk);
     for (const r of data ?? []) map.set(r.gmkey, { key: r.tag_key, label: r.tag_label });
   }
-  return map;
+  return writeCache(tagCache, ck, map);
 }

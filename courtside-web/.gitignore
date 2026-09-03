@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
+.env*
+
+# Browser pane 개발 서버 설정 - runtimeExecutable이 이 머신의 nvm 절대경로라 공유 불가
+.claude/
