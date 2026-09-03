@@ -25,6 +25,7 @@ import {
 } from "@/lib/teamDataScience";
 import styles from "./team-profile.module.css";
 import { ChangeLine } from "@/components/RosterChangeLine";
+import pre from "@/app/preseason/preseason.module.css";
 import { getTeamRosterChanges, type TeamRosterChanges } from "@/lib/preseason";
 
 // 팀 프로필 "데이터 사이언스 + 데이터로 아름다움" 대개편(요청) - 선수 프로필과 같은 디자인
@@ -370,16 +371,25 @@ function ZoneProfilePanel({ zp, seasonName }: { zp: TeamZoneProfile | null; seas
 //    있을 때만 렌더(과거 시즌·로스터 미수신 시즌은 null이라 아무것도 안 나옴). 한 줄 렌더는
 //    /preseason과 같은 컴포넌트(components/RosterChangeLine.tsx)를 써서 표기가 갈라지지 않게.
 function RosterChangesPanel({ rc, abbrOf }: { rc: TeamRosterChanges; abbrOf: (tcode: string | null) => string | null }) {
-  const rows = [...rc.in, ...rc.new, ...rc.stay, ...rc.out];
-  if (!rows.length) return null;
+  const changed = [...rc.in, ...rc.new, ...rc.out];
+  if (!changed.length && !rc.stay.length) return null;
   return (
     <div className={styles.panel}>
       <div className={styles.panelTitle}>
         이번 시즌 로스터 변화 · 영입 {rc.in.length} · 신입 {rc.new.length} · 잔류 {rc.stay.length} · 이탈 {rc.out.length}
       </div>
-      {rows.map((r) => (
+      {changed.map((r) => (
         <ChangeLine key={`${r.change}-${r.name}`} r={r} abbrOf={abbrOf} />
       ))}
+      {changed.length === 0 && <div className={styles.pctNote}>영입·이탈 없음</div>}
+      {rc.stay.length > 0 && (
+        <details className={pre.stayDetails}>
+          <summary className={pre.staySummary}>잔류 {rc.stay.length}명 보기</summary>
+          {rc.stay.map((r) => (
+            <ChangeLine key={`stay-${r.name}`} r={r} abbrOf={abbrOf} />
+          ))}
+        </details>
+      )}
       <div className={styles.pctNote}>
         확정 로스터를 지난 시즌 출전 기록과 대조한 결과 · 성적은 그 선수의 마지막 KBL 시즌 정규+플레이오프 합산 평균(위 시즌 여정·4팩터는 이 시즌 기준이라
         분모가 다름) · 국내 선수 로스터가 들어오면 자동 반영 ·{" "}

@@ -6,6 +6,8 @@ import Link from "next/link";
 const LINKS = [
   { href: "/", label: "경기 목록" },
   { href: "/preseason", label: "개막 리포트" },
+  { href: "/teams", label: "팀 자세히 보기" },
+  { href: "/players", label: "선수 자세히 보기" },
   { href: "/season-browser", label: "시즌 브라우저" },
   { href: "/leaderboards/win-contribution", label: "승리 기여도" },
   { href: "/leaderboards/scoring-explorer", label: "득점 분포" },

@@ -1,0 +1,249 @@
+/* 팀/선수 디렉터리(/teams, /players) 공용 스타일 - globals.css :root 토큰만 사용(라이트/다크는
+   토큰이 알아서 바뀜). 프로필 페이지의 시각 언어(Big Shoulders 숫자, IBM Plex Mono 라벨)와 맞춤. */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 16px;
+  margin-top: 6px;
+}
+.kicker {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--ink-faint);
+}
+.lede {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  max-width: 68ch;
+  margin: 6px 0 14px;
+}
+
+/* ── 팀 카드 ── */
+.teamGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.teamCard {
+  display: block;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-top: 4px solid var(--team, var(--gold));
+  border-radius: 14px;
+  padding: 14px 16px 12px;
+  color: var(--ink);
+  text-decoration: none;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.teamCard:hover {
+  transform: translateY(-1px);
+  border-color: rgba(var(--line-rgb), 0.28);
+  border-top-color: var(--team, var(--gold));
+}
+.teamName {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 16px;
+}
+.teamAbbr {
+  margin-left: auto;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  color: var(--team, var(--gold));
+  letter-spacing: 0.02em;
+}
+.teamStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(var(--line-rgb), 0.12);
+}
+.statVal {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.statLabel {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: 3px;
+}
+.teamLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+/* ── 선수 디렉터리 ── */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 10px 0 14px;
+}
+.search {
+  flex: 1 1 220px;
+  display: flex;
+  gap: 6px;
+}
+.search input {
+  flex: 1;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  background: var(--surface);
+  color: var(--ink);
+}
+.chip {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  background: var(--surface);
+  color: var(--ink-soft);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.chipActive {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+.teamSection {
+  margin-top: 16px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+  border-left: 4px solid var(--team, var(--gold));
+}
+.teamSectionHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.teamSectionCount {
+  margin-left: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+.playerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 4px 12px;
+}
+.playerRow {
+  display: grid;
+  grid-template-columns: 34px 30px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  color: var(--ink);
+  text-decoration: none;
+}
+a.playerRow:hover {
+  background: var(--surface-soft);
+}
+.playerRowMuted {
+  color: var(--ink-soft);
+}
+.photo {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top;
+  background: var(--surface-soft);
+}
+.photoFallback {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--surface-soft);
+  display: grid;
+  place-items: center;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+.num {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--ink-faint);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.nameCell {
+  min-width: 0;
+}
+.name {
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sub {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.tagForeign {
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+  color: var(--gold);
+}
+.tagIn {
+  background: color-mix(in srgb, var(--positive) 14%, transparent);
+  color: var(--positive);
+}
+.tagNew {
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+}
+.note {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  margin-top: 12px;
+  line-height: 1.5;
+}

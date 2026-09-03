@@ -54,6 +54,7 @@ def load_database_url():
 COLUMN_ALIASES = {
     "team": {"team", "tcode", "팀", "팀명", "소속", "소속팀"},
     "name": {"name", "player", "player_name", "이름", "선수", "선수명", "성명"},
+    "pcode": {"pcode", "player_code", "선수코드", "코드"},
     "back_num": {"back_num", "backnum", "number", "no", "등번호", "번호", "배번"},
     "pos": {"pos", "position", "포지션", "포지션명"},
     "note": {"note", "비고", "메모"},
@@ -206,6 +207,12 @@ def main():
 
     resolve_team = resolve_teams(cur)
     player_lookup = resolve_players(cur)
+    # pcode 열이 있으면(fetch_kbl_roster.py 출력) 이름 매칭을 건너뛰고 그대로 쓴다 - 동명이인
+    # (이정현 x2, 둘 다 현역)이 모호함 없이 연결된다. 단 players에 없는 pcode는 신뢰하지 않고
+    # 이름 매칭으로 내려보낸다(명부와 우리 DB의 코드 체계가 어긋난 경우를 조용히 넘기지 않기 위해).
+    cur.execute("select pcode from players")
+    known_pcodes = {r[0] for r in cur.fetchall()}
+    used_pcode_col = 0
 
     resolved, unknown_team, new_faces, ambiguous = [], [], [], []
     for r in rows:
@@ -213,8 +220,12 @@ def main():
         if not tcode:
             unknown_team.append(r)
             continue
+        given = (r.get("pcode") or "").strip() or None
         cands = player_lookup.get(norm_name(r["name"]), [])
-        if len(cands) == 1:
+        if given and given in known_pcodes:
+            pcode = given
+            used_pcode_col += 1
+        elif len(cands) == 1:
             pcode = cands[0]
         elif len(cands) > 1:
             pcode = None
@@ -228,7 +239,8 @@ def main():
     print("팀 매칭 실패: %d" % len(unknown_team))
     for r in unknown_team[:10]:
         print("   ? %s / %s" % (r["team"], r["name"]))
-    print("기존 선수로 연결: %d" % sum(1 for x in resolved if x[2]))
+    print("기존 선수로 연결: %d%s" % (sum(1 for x in resolved if x[2]),
+                                   " (그중 pcode 열로 직접 연결 %d)" % used_pcode_col if used_pcode_col else ""))
     print("새 얼굴(pcode 없음 - 첫 경기 때 자동 연결): %d" % len(new_faces))
     for r in new_faces[:15]:
         print("   + %s (%s)" % (r["name"], r["team"]))

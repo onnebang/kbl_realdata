@@ -77,7 +77,9 @@ function OutlookRow({ t, rank }: { t: TeamOutlook; rank: number }) {
 
 // ── 2. 로스터 이동 지도 - 한 줄 렌더(ChangeLine/statLine)는 팀 프로필과 공유(components/RosterChangeLine.tsx) ──
 function TeamCard({ t, abbrOf }: { t: TeamRosterChanges; abbrOf: (tcode: string | null) => string | null }) {
-  const rows = [...t.in, ...t.new, ...t.stay, ...t.out];
+  // 국내 로스터까지 들어오면 팀당 25행 안팎이 되는데, 그중 15~18행이 "잔류"라 카드가 잔류
+  // 목록에 묻힌다. 변화(영입·신입·이탈)만 펼쳐 두고 잔류는 접어 둔다(순수 <details>, JS 없음).
+  const changed = [...t.in, ...t.new, ...t.out];
   const summary = [t.in.length && `영입 ${t.in.length}`, t.new.length && `신입 ${t.new.length}`, t.stay.length && `잔류 ${t.stay.length}`, t.out.length && `이탈 ${t.out.length}`]
     .filter(Boolean)
     .join(" · ");
@@ -88,9 +90,18 @@ function TeamCard({ t, abbrOf }: { t: TeamRosterChanges; abbrOf: (tcode: string 
         {t.team.name}
         <span className={styles.teamCardSum}>{summary}</span>
       </Link>
-      {rows.map((r) => (
+      {changed.map((r) => (
         <ChangeLine key={`${r.change}-${r.name}`} r={r} abbrOf={abbrOf} />
       ))}
+      {changed.length === 0 && <div className={styles.changeStat}>영입·이탈 없음</div>}
+      {t.stay.length > 0 && (
+        <details className={styles.stayDetails}>
+          <summary className={styles.staySummary}>잔류 {t.stay.length}명 보기</summary>
+          {t.stay.map((r) => (
+            <ChangeLine key={`stay-${r.name}`} r={r} abbrOf={abbrOf} />
+          ))}
+        </details>
+      )}
     </div>
   );
 }
@@ -107,7 +118,7 @@ function RosterSection({ report }: { report: RosterChangeReport }) {
     return (
       <div className={styles.panel}>
         <div className={styles.panelTitle}>
-          <span className={styles.sectionNum}>2</span>외국인 선수 이동 지도
+          <span className={styles.sectionNum}>2</span>로스터 이동 지도
         </div>
         <div className="empty-note">
           {report.season} 확정 로스터가 아직 입력되지 않아 {prev} 시즌과의 대조를 수행하지 못했습니다 - 구단 발표가 확정되는 대로 이 자리에 이적·영입·이탈
@@ -120,11 +131,11 @@ function RosterSection({ report }: { report: RosterChangeReport }) {
   return (
     <div className={styles.panel}>
       <div className={styles.panelTitle}>
-        <span className={styles.sectionNum}>2</span>외국인 선수 이동 지도
+        <span className={styles.sectionNum}>2</span>로스터 이동 지도
       </div>
       <p className={styles.panelLede}>
-        확정 로스터를 {prev} 시즌 출전 기록과 대조한 결과입니다. 이적한 선수는 옛 팀엔 &quot;이탈&quot;, 새 팀엔 &quot;영입&quot;으로 두 번 나타나고, 성적은 그
-        선수가 마지막으로 뛴 시즌 기준입니다.
+        확정 로스터(국내는 KBL 등록 명부, 외국인·아시아쿼터는 구단 발표)를 {prev} 시즌 출전 기록과 대조한 결과입니다. 이적한 선수는 옛 팀엔 &quot;이탈&quot;,
+        새 팀엔 &quot;영입&quot;으로 두 번 나타나고, 성적은 그 선수가 마지막으로 뛴 시즌 기준입니다. 카드는 변화만 펼쳐 두고 잔류는 접어 두었습니다.
       </p>
 
       <div className={styles.headlineRow}>
@@ -225,7 +236,7 @@ export default async function PreseasonPage() {
   const ddayLabel = dday == null ? "" : dday > 0 ? `D-${dday}` : dday === 0 ? "D-DAY" : `D+${-dday}`;
   const prev = shortSeason(outlook.prevSeason);
   const cur = shortSeason(outlook.season);
-  const foreignCount = roster.counts.in + roster.counts.new + roster.counts.stay;
+  const rosterCount = roster.counts.in + roster.counts.new + roster.counts.stay;
 
   return (
     <div className={`wrap ${styles.pageRoot}`}>
@@ -253,8 +264,8 @@ export default async function PreseasonPage() {
               <div className={styles.heroStatLabel}>반영된 예정 경기</div>
             </div>
             <div>
-              <div className={styles.heroStatVal}>{foreignCount}</div>
-              <div className={styles.heroStatLabel}>확정 외국인·아시아쿼터</div>
+              <div className={styles.heroStatVal}>{rosterCount}</div>
+              <div className={styles.heroStatLabel}>확정 로스터 (국내+외국인)</div>
             </div>
             <div>
               <div className={styles.heroStatVal}>{roster.moves.length}</div>

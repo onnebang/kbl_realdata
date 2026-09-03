@@ -62,7 +62,7 @@ export async function getSeasonOpener(season: string): Promise<{ firstGameDate: 
 
 export type TeamInfo = { tcode: string; name: string; abbr: string; color: string; logoUrl: string | null };
 
-async function getTeams(season: string): Promise<Map<string, TeamInfo>> {
+export async function getTeams(season: string): Promise<Map<string, TeamInfo>> {
   const { data } = await supabase.from("teams").select("tcode, name, abbr, color, logo_url");
   return new Map(
     (data ?? []).map((t) => [
@@ -312,6 +312,87 @@ export async function getRosterChangeReport(season = PRESEASON_SEASON): Promise<
 export async function getTeamRosterChanges(season: string, tcode: string): Promise<TeamRosterChanges | null> {
   const report = await getRosterChangeReport(season);
   return report.teams.find((t) => t.team.tcode === tcode) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// 선수 디렉터리(/players) - 이 시즌 확정 로스터(season_roster) 전체를 팀별로. 사진은 players,
+// 지난 시즌 성적과 잔류/영입/신입 구분은 roster_changes에서. 국내 선수는 KBL 명부(tools/
+// fetch_kbl_roster.py)에서, 외국인은 확정 명단에서 왔다는 출처 차이가 note에 남아 있다.
+// ---------------------------------------------------------------------------
+export type DirectoryPlayer = {
+  pcode: string | null; // null = 아직 KBL 출전 기록이 없는 신입(첫 경기 때 자동 연결)
+  name: string;
+  backNum: string | null;
+  pos: string | null;
+  role: string | null; // 외국인 1옵션 / 2옵션 / 아시아쿼터 / null(국내)
+  registryStatus: string | null; // KBL 명부 상태가 현역(A)이 아닌 경우의 표기(군복무·육성 추정)
+  photoUrl: string | null;
+  change: ChangeKind | null;
+  prevSeason: string | null;
+  gp: number | null;
+  ppg: number | null;
+};
+export type DirectoryTeam = { team: TeamInfo; players: DirectoryPlayer[] };
+
+function roleFromNote(note: string | null): string | null {
+  const head = (note ?? "").split("|")[0].trim();
+  return head && (head.includes("외국인") || head.includes("아시아")) ? head : null;
+}
+
+export async function getSeasonDirectory(season = PRESEASON_SEASON): Promise<DirectoryTeam[]> {
+  const [teams, rosterRes, changesRes] = await Promise.all([
+    getTeams(season),
+    supabase.from("season_roster").select("tcode, pcode, player_name, back_num, pos, note").eq("season_name", season),
+    supabase
+      .from("roster_changes")
+      .select("tcode, pcode, player_name, change, prev_season_name, prev_gp, prev_ppg")
+      .eq("season_name", season)
+      .neq("change", "out"),
+  ]);
+  const roster = rosterRes.data ?? [];
+  const changeByKey = new Map<string, { change: ChangeKind; prevSeason: string | null; gp: number | null; ppg: number | null }>();
+  for (const c of changesRes.data ?? []) {
+    changeByKey.set(`${c.tcode}|${c.player_name}`, {
+      change: c.change as ChangeKind,
+      prevSeason: (c.prev_season_name as string | null) ?? null,
+      gp: num(c.prev_gp),
+      ppg: num(c.prev_ppg),
+    });
+  }
+
+  const pcodes = [...new Set(roster.map((r) => r.pcode as string | null).filter((p): p is string => !!p))];
+  const photo = new Map<string, string | null>();
+  for (let i = 0; i < pcodes.length; i += 200) {
+    const { data } = await supabase.from("players").select("pcode, photo_url").in("pcode", pcodes.slice(i, i + 200));
+    for (const p of data ?? []) photo.set(p.pcode as string, (p.photo_url as string | null) ?? null);
+  }
+
+  const byTeam = new Map<string, DirectoryTeam>();
+  for (const r of roster) {
+    const team = teams.get(r.tcode as string);
+    if (!team) continue;
+    const entry = byTeam.get(team.tcode) ?? { team, players: [] };
+    const note = (r.note as string | null) ?? null;
+    const ch = changeByKey.get(`${r.tcode}|${r.player_name}`);
+    entry.players.push({
+      pcode: (r.pcode as string | null) ?? null,
+      name: r.player_name as string,
+      backNum: (r.back_num as string | null) || null,
+      pos: (r.pos as string | null) || null,
+      role: roleFromNote(note),
+      registryStatus: note && note.includes("등록상태") ? "등록상태 별도(군복무·육성 추정)" : null,
+      photoUrl: r.pcode ? (photo.get(r.pcode as string) ?? null) : null,
+      change: ch?.change ?? null,
+      prevSeason: ch?.prevSeason ?? null,
+      gp: ch?.gp ?? null,
+      ppg: ch?.ppg ?? null,
+    });
+    byTeam.set(team.tcode, entry);
+  }
+  // 등번호 순(없으면 뒤로), 같은 번호면 이름순
+  const numKey = (b: string | null) => (b && /^\d+$/.test(b) ? parseInt(b, 10) : 999);
+  for (const t of byTeam.values()) t.players.sort((a, b) => numKey(a.backNum) - numKey(b.backNum) || a.name.localeCompare(b.name));
+  return [...byTeam.values()].sort((a, b) => a.team.abbr.localeCompare(b.team.abbr));
 }
 
 /** 프리뷰 인사이트 게이트용 - 팀별 "이미 떠난" 선수 pcode(직전 시즌 경기에서 뽑힌 선수를 걸러낼 때). */

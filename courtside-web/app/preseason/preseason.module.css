@@ -412,6 +412,30 @@
   background: var(--surface-soft);
   color: var(--ink-soft);
 }
+/* 잔류 목록 접기 - 팀 카드/팀 프로필 패널 공용 */
+.stayDetails {
+  margin-top: 6px;
+  border-top: 1px dashed rgba(var(--line-rgb), 0.1);
+}
+.staySummary {
+  cursor: pointer;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  padding: 7px 0 3px;
+  list-style: none;
+}
+.staySummary::-webkit-details-marker {
+  display: none;
+}
+.staySummary::before {
+  content: "▸ ";
+  color: var(--ink-faint);
+}
+.stayDetails[open] > .staySummary::before {
+  content: "▾ ";
+}
 .changeName {
   font-weight: 700;
   font-size: 13px;
