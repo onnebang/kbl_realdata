@@ -24,6 +24,10 @@ import {
   type ProjectionTeam,
   type SeasonProjection,
 } from "@/lib/seasonProjection";
+import { DepartureImpact } from "@/components/DepartureImpact";
+import { ImportRule } from "@/components/ImportRule";
+import { getDepartureReport } from "@/lib/departureImpact";
+import { getImportRuleReport } from "@/lib/importRule";
 import styles from "./preseason.module.css";
 
 // 개막 리포트 - 요청: "시즌 시작전 리포트를 먼저 제공하고, 실제 시즌이 시작되면 실제 경기가
@@ -139,7 +143,18 @@ function ProjectionRow({ t, lo, hi }: { t: ProjectionTeam; lo: number; hi: numbe
   );
 }
 
-function ProjectionSection({ proj, prev, cur }: { proj: SeasonProjection; prev: string; cur: string }) {
+function ProjectionSection({
+  proj,
+  prev,
+  cur,
+  knows,
+}: {
+  proj: SeasonProjection;
+  prev: string;
+  cur: string;
+  /** 이 모델이 아직 모르는 변화들 - 각주에서 아래 섹션을 가리킨다. */
+  knows: { departures: number | null; ruleChange: boolean };
+}) {
   const lo = Math.min(...proj.teams.map((t) => t.winsLo)) - 1;
   const hi = Math.max(...proj.teams.map((t) => t.winsHi)) + 1;
   const m = proj.matrix;
@@ -178,8 +193,14 @@ function ProjectionSection({ proj, prev, cur }: { proj: SeasonProjection; prev: 
       </div>
       <div className={styles.note}>
         1위·PO 확률과 승수 구간은 같은 {GAMES_FULL}경기 일정을 {proj.sims.toLocaleString()}번 돌린 결과입니다(6강 플레이오프 기준). 기대승수가
-        비슷해도 순위 분포는 다를 수 있고, 실제 시즌은 이 분포 안 어느 한 점입니다. 단 이 모델은 {prev} 전력(넷레이팅·라인업 시너지·홈코트)으로
-        계산되어 아래 로스터 변화가 아직 반영되지 않았습니다 — {cur} 개막 후 경기가 쌓이면 다시 계산됩니다.
+        비슷해도 순위 분포는 다를 수 있고, 실제 시즌은 이 분포 안 어느 한 점입니다.
+      </div>
+      <div className={styles.note}>
+        <b>이 표가 아직 모르는 것.</b> 승률은 {prev} 전력(넷레이팅·라인업 시너지·홈코트)으로만 계산됩니다. 그래서{" "}
+        {knows.departures != null && <>{cur}에 뛰지 않는 것이 확정된 {knows.departures}명도, </>}
+        {knows.ruleChange && <>2·3쿼터 외국인 2명 동시 출전을 허용하는 규정 변경도, </>}로스터 이동도 반영되어 있지 않습니다. 아래 섹션들이 그
+        차이를 각각 측정합니다 - 다만 그 어느 것도 승수로 환산되지 않으니, 이 표의 숫자를 손으로 더하거나 빼지 마십시오(왜 그럴 수 없는지는 각
+        섹션 각주에 적어 두었습니다). {cur} 개막 후 경기가 쌓이면 모델이 실제 결과로 다시 계산됩니다.
       </div>
     </div>
   );
@@ -203,7 +224,9 @@ function TeamCard({ t, abbrOf }: { t: TeamRosterChanges; abbrOf: (tcode: string 
     <div className={styles.teamCard} style={{ borderTopColor: t.team.color }}>
       <Link href={`/teams/${t.team.tcode}?season=${PRESEASON_SEASON}`} className={styles.teamCardHead}>
         <TeamBadge team={badgeOf(t.team)} size={22} />
-        {t.team.name}
+        {/* 맨 텍스트 노드로 두면 익명 flex 아이템이 되어 최소 폭까지 줄어든다("원/주/DB").
+            span으로 감싸 nowrap을 준다 - 좁아질 때 접혀야 하는 건 이름이 아니라 오른쪽 요약이다. */}
+        <span className={styles.teamCardName}>{t.team.name}</span>
         <span className={styles.teamCardSum}>{summary}</span>
       </Link>
       {changed.map((r) => (
@@ -222,7 +245,7 @@ function TeamCard({ t, abbrOf }: { t: TeamRosterChanges; abbrOf: (tcode: string 
   );
 }
 
-function RosterSection({ report }: { report: RosterChangeReport }) {
+function RosterSection({ report, num }: { report: RosterChangeReport; num: number }) {
   const abbrByTcode = new Map(report.teams.map((t) => [t.team.tcode, t.team.abbr]));
   const abbrOf = (tcode: string | null) => (tcode ? (abbrByTcode.get(tcode) ?? tcode) : null);
   const prev = shortSeason(report.prevSeason);
@@ -234,7 +257,7 @@ function RosterSection({ report }: { report: RosterChangeReport }) {
     return (
       <div className={styles.panel}>
         <div className={styles.panelTitle}>
-          <span className={styles.sectionNum}>2</span>로스터 이동 지도
+          <span className={styles.sectionNum}>{num}</span>로스터 이동 지도
         </div>
         <div className="empty-note">
           {report.season} 확정 로스터가 아직 입력되지 않아 {prev} 시즌과의 대조를 수행하지 못했습니다 - 구단 발표가 확정되는 대로 이 자리에 이적·영입·이탈
@@ -247,7 +270,7 @@ function RosterSection({ report }: { report: RosterChangeReport }) {
   return (
     <div className={styles.panel}>
       <div className={styles.panelTitle}>
-        <span className={styles.sectionNum}>2</span>로스터 이동 지도
+        <span className={styles.sectionNum}>{num}</span>로스터 이동 지도
       </div>
       <p className={styles.panelLede}>
         확정 로스터(국내는 KBL 등록 명부, 외국인·아시아쿼터는 구단 발표)를 {prev} 시즌 출전 기록과 대조한 결과입니다. 이적한 선수는 옛 팀엔 &quot;이탈&quot;,
@@ -354,12 +377,19 @@ function DemoCard({ g }: { g: DemoGame }) {
 }
 
 export default async function PreseasonPage() {
-  const [outlook, roster, demos, proj] = await Promise.all([
+  const [outlook, roster, demos, proj, departures, importRule] = await Promise.all([
     getSeasonOutlook(PRESEASON_SEASON),
     getRosterChangeReport(PRESEASON_SEASON),
     getDemoGames(),
     getSeasonProjection(PRESEASON_SEASON),
+    // 둘 다 없으면 해당 섹션만 빠지고 나머지 페이지는 그대로 - 확정 명단/슬롯 집계가 아직
+    // 없는 시즌에도 개막 리포트는 열려야 한다.
+    getDepartureReport(PRESEASON_SEASON),
+    getImportRuleReport(PRESEASON_SEASON),
   ]);
+  // 섹션 번호는 실제로 그려지는 것만 세어 매긴다(빠진 섹션 때문에 번호가 건너뛰면 안 된다).
+  let sectionNo = 1;
+  const nextNo = () => ++sectionNo;
   const dday = outlook.firstGameDate ? daysUntilKst(outlook.firstGameDate) : null;
   const ddayLabel = dday == null ? "" : dday > 0 ? `D-${dday}` : dday === 0 ? "D-DAY" : `D+${-dday}`;
   const prev = shortSeason(outlook.prevSeason);
@@ -405,7 +435,12 @@ export default async function PreseasonPage() {
 
       {/* 1. 시즌 전망 - 매치업 행렬이 완성되면 54경기 전망·예상 순위, 아니면 공개 일정 기준 표로 폴백 */}
       {proj ? (
-        <ProjectionSection proj={proj} prev={prev} cur={cur} />
+        <ProjectionSection
+          proj={proj}
+          prev={prev}
+          cur={cur}
+          knows={{ departures: departures ? departures.players.length : null, ruleChange: !!importRule }}
+        />
       ) : (
       <div className={styles.panel}>
         <div className={styles.panelTitle}>
@@ -436,13 +471,19 @@ export default async function PreseasonPage() {
       </div>
       )}
 
-      {/* 2. 로스터 이동 지도 */}
-      <RosterSection report={roster} />
+      {/* 2. 확정 결장 - 명부에는 남아 있지만 이번 시즌엔 못 뛰는 선수들 */}
+      {departures && <DepartureImpact report={departures} num={nextNo()} />}
 
-      {/* 3. 데모 경기 */}
+      {/* 3. 외국인 출전 규정 변경 */}
+      {importRule && <ImportRule report={importRule} num={nextNo()} />}
+
+      {/* 4. 로스터 이동 지도 */}
+      <RosterSection report={roster} num={nextNo()} />
+
+      {/* 5. 데모 경기 */}
       <div className={styles.panel}>
         <div className={styles.panelTitle}>
-          <span className={styles.sectionNum}>3</span>개막하면 이렇게 보입니다 - {prev} 실제 경기 10선
+          <span className={styles.sectionNum}>{nextNo()}</span>개막하면 이렇게 보입니다 - {prev} 실제 경기 10선
         </div>
         <p className={styles.panelLede}>
           경기 페이지는 세 막으로 구성됩니다. 아래 경기들은 지난 시즌에 실제로 열린 경기라 세 막이 전부 채워져 있어서, 개막 후 라이브 경기가

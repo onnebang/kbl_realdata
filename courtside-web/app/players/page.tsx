@@ -34,6 +34,9 @@ function PlayerRow({ p, prev }: { p: DirectoryPlayer; prev: string }) {
       <div>
         {p.role ? (
           <span className={`${styles.tag} ${styles.tagForeign}`}>{p.role.replace("외국인 ", "")}</span>
+        ) : p.departure ? (
+          // 명부에는 있지만 이 시즌엔 안 뛴다 - 다른 태그보다 이게 먼저 읽혀야 한다.
+          <span className={`${styles.tag} ${styles.tagOut}`}>{p.departure.label}</span>
         ) : p.change === "in" ? (
           <span className={`${styles.tag} ${styles.tagIn}`}>영입</span>
         ) : p.change === "back" ? (

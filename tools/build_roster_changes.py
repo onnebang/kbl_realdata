@@ -82,6 +82,26 @@ def fetch_roster(cur, season):
     return cur.fetchall()
 
 
+def fetch_departures(cur, season):
+    """이 시즌에 등록은 돼 있지만 뛰지 않는 선수(tools/load_departures.py가 채운 표).
+
+    pcode -> (tcode, player_name, reason, detail). 명부에는 없는 사실이라 사람이 확인해 넣는다."""
+    cur.execute("""
+        select pcode, tcode, player_name, reason, detail
+        from roster_departure where season_name = %s
+    """, (season,))
+    return {r[0]: {"tcode": r[1], "name": r[2], "reason": r[3], "detail": r[4]} for r in cur.fetchall()}
+
+
+REASON_LABEL = {
+    "military": "군 입대",
+    "overseas": "해외 진출",
+    "unsigned": "FA 미계약",
+    "retired": "은퇴",
+    "other": "이탈",
+}
+
+
 def fetch_season_stats(cur, season):
     """지난 시즌 (pcode, tcode)별 출전 성적. 시즌 중 이적한 선수는 팀별로 두 행이 나온다."""
     cur.execute("""
@@ -146,9 +166,14 @@ def build(cur, season):
     # 있으면 신입으로 부르지 않고 확인 필요로 표시한다.
     name_pcodes = fetch_names_to_pcodes(cur, {r[2] for r in fetch_roster(cur, season)})
 
+    # 이 시즌에 못 뛰는 선수는 로스터 판정에서 통째로 뺀다 - 명부에 남아 있다고 전력이 아니다.
+    departures = fetch_departures(cur, season)
+
     roster_by_team = {}
     team_of_pcode = {}
     for tcode, pcode, name, note in roster:
+        if pcode and pcode in departures:
+            continue
         roster_by_team.setdefault(tcode, []).append((pcode, name, note))
         if pcode:
             team_of_pcode[pcode] = tcode
@@ -159,10 +184,11 @@ def build(cur, season):
 
     out_rows = []
 
-    def row(tcode, pcode, name, change, role, prev_tcode=None, next_tcode=None, prev_season=None, st=None, note=None):
+    def row(tcode, pcode, name, change, role, prev_tcode=None, next_tcode=None, prev_season=None, st=None,
+            note=None, reason=None):
         st = st or {}
         out_rows.append((season, tcode, pcode, name, change, role, prev_tcode, next_tcode, prev_season,
-                         st.get("gp"), st.get("ppg"), st.get("rpg"), st.get("apg"), st.get("mpg"), note))
+                         st.get("gp"), st.get("ppg"), st.get("rpg"), st.get("apg"), st.get("mpg"), note, reason))
 
     # 1) 로스터 기준: stay / in / new
     for tcode, members in roster_by_team.items():
@@ -206,8 +232,29 @@ def build(cur, season):
         for tcode, members in roster_by_team.items()
     }
 
+    # 1-b) 확인된 이탈(군 입대·해외 진출·미계약) - 문턱 없이 무조건 내보낸다.
+    # 지난 시즌 출전이 적은 어린 선수도 있어서 아래 MIN_GP_FOR_OUT에 걸리면 "사라졌다"는 사실
+    # 자체가 화면에서 없어진다.
+    for pcode, d in sorted(departures.items()):
+        st_rows = stats.get(pcode)
+        st = None
+        prev_season_of = None
+        if st_rows:
+            st = st_rows[0]
+            prev_season_of = prev
+        else:
+            last = fetch_last_season_before(cur, prev, [pcode]).get(pcode)
+            if last:
+                st = last
+                prev_season_of = last["season"]
+        label = REASON_LABEL.get(d["reason"], "이탈")
+        row(d["tcode"], pcode, d["name"], "out", None, prev_season=prev_season_of, st=st,
+            note=(label + (" · " + d["detail"] if d["detail"] else "")), reason=d["reason"])
+
     # 2) 지난 시즌 기준: out (로스터가 들어온 팀만 판정 가능)
     for pcode, st_rows in stats.items():
+        if pcode in departures:
+            continue  # 위에서 이유를 달아 이미 내보냈다
         for st in st_rows:
             tcode = st["tcode"]
             if tcode not in roster_by_team or st["gp"] < MIN_GP_FOR_OUT:
@@ -247,7 +294,7 @@ def main():
     for tcode in sorted(by_team, key=lambda t: abbr.get(t, t)):
         print("  [%s]" % abbr.get(tcode, tcode))
         for r in sorted(by_team[tcode], key=lambda r: (order[r[4]], -(r[9] or 0))):
-            _, _, pcode, name, change, role, prev_t, next_t, prev_s, gp, ppg, rpg, apg, mpg, note = r
+            _, _, pcode, name, change, role, prev_t, next_t, prev_s, gp, ppg, rpg, apg, mpg, note, reason = r
             extra = ""
             if change in ("in", "back"):
                 extra = " <- %s" % abbr.get(prev_t, prev_t)
@@ -266,7 +313,7 @@ def main():
     execute_values(cur, """
         insert into roster_changes
           (season_name, tcode, pcode, player_name, change, role, prev_tcode, next_tcode, prev_season_name,
-           prev_gp, prev_ppg, prev_rpg, prev_apg, prev_mpg, note)
+           prev_gp, prev_ppg, prev_rpg, prev_apg, prev_mpg, note, reason)
         values %s
     """, rows)
     conn.commit()

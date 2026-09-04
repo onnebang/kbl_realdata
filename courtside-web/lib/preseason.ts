@@ -213,6 +213,8 @@ export type RosterChange = {
   apg: number | null;
   mpg: number | null;
   note: string | null;
+  /** 이탈 사유(roster_departure에서 확인된 경우에만). military/overseas/unsigned/retired/other. */
+  reason: string | null;
 };
 
 export type TeamRosterChanges = {
@@ -270,6 +272,7 @@ export async function getRosterChangeReport(season = PRESEASON_SEASON): Promise<
     apg: num(r.prev_apg),
     mpg: num(r.prev_mpg),
     note: (r.note as string | null) ?? null,
+    reason: (r.reason as string | null) ?? null,
   }));
 
   const byTeam = new Map<string, TeamRosterChanges>();
@@ -336,6 +339,8 @@ export type DirectoryPlayer = {
   pos: string | null;
   role: string | null; // 외국인 1옵션 / 2옵션 / 아시아쿼터 / null(국내)
   registryStatus: string | null; // KBL 명부 상태가 현역(A)이 아닌 경우의 표기(군복무·육성 추정)
+  /** 이 시즌에 뛰지 않는 것이 확인된 경우(roster_departure). 명부에는 남아 있어도 전력이 아니다. */
+  departure: { reason: string; label: string; detail: string | null } | null;
   photoUrl: string | null;
   change: ChangeKind | null;
   prevSeason: string | null;
@@ -344,6 +349,15 @@ export type DirectoryPlayer = {
 };
 export type DirectoryTeam = { team: TeamInfo; players: DirectoryPlayer[] };
 
+/** roster_departure.reason -> 화면 문구. components/RosterChangeLine.tsx의 REASON_TEXT와 같은 표. */
+export const DEPARTURE_LABEL: Record<string, string> = {
+  military: "군 입대",
+  overseas: "해외 진출",
+  unsigned: "FA 미계약",
+  retired: "은퇴",
+  other: "이탈",
+};
+
 /** season_roster.note의 머리("외국인 1옵션 | ...")에서 역할만. 국내 선수는 null. lib/playerStatus.ts도 같은 규칙을 쓴다. */
 export function roleFromNote(note: string | null): string | null {
   const head = (note ?? "").split("|")[0].trim();
@@ -351,7 +365,7 @@ export function roleFromNote(note: string | null): string | null {
 }
 
 export async function getSeasonDirectory(season = PRESEASON_SEASON): Promise<DirectoryTeam[]> {
-  const [teams, rosterRes, changesRes] = await Promise.all([
+  const [teams, rosterRes, changesRes, departureRes] = await Promise.all([
     getTeams(season),
     supabase.from("season_roster").select("tcode, pcode, player_name, back_num, pos, note").eq("season_name", season),
     supabase
@@ -359,7 +373,18 @@ export async function getSeasonDirectory(season = PRESEASON_SEASON): Promise<Dir
       .select("tcode, pcode, player_name, change, prev_season_name, prev_gp, prev_ppg")
       .eq("season_name", season)
       .neq("change", "out"),
+    // 명부에는 남아 있지만 이 시즌엔 못 뛰는 선수. 없으면 빈 목록이라 화면은 예전과 같다.
+    supabase.from("roster_departure").select("pcode, reason, detail").eq("season_name", season),
   ]);
+  const departureByPcode = new Map<string, { reason: string; label: string; detail: string | null }>();
+  for (const d of departureRes.data ?? []) {
+    const reason = d.reason as string;
+    departureByPcode.set(d.pcode as string, {
+      reason,
+      label: DEPARTURE_LABEL[reason] ?? "이탈",
+      detail: (d.detail as string | null) ?? null,
+    });
+  }
   const roster = rosterRes.data ?? [];
   const changeByKey = new Map<string, { change: ChangeKind; prevSeason: string | null; gp: number | null; ppg: number | null }>();
   for (const c of changesRes.data ?? []) {
@@ -391,7 +416,14 @@ export async function getSeasonDirectory(season = PRESEASON_SEASON): Promise<Dir
       backNum: (r.back_num as string | null) || null,
       pos: (r.pos as string | null) || null,
       role: roleFromNote(note),
-      registryStatus: note && note.includes("등록상태") ? "등록상태 별도(군복무·육성 추정)" : null,
+      // 이탈이 확인된 선수는 명부 상태를 "추정"으로 말하지 않는다 - 이제 사유를 안다.
+      registryStatus:
+        r.pcode && departureByPcode.has(r.pcode as string)
+          ? null
+          : note && note.includes("등록상태")
+            ? "등록상태 별도(군복무·육성 추정)"
+            : null,
+      departure: r.pcode ? (departureByPcode.get(r.pcode as string) ?? null) : null,
       photoUrl: r.pcode ? (photo.get(r.pcode as string) ?? null) : null,
       change: ch?.change ?? null,
       prevSeason: ch?.prevSeason ?? null,

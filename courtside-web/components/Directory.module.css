@@ -252,3 +252,8 @@ a.playerRow:hover {
   margin-top: 12px;
   line-height: 1.5;
 }
+/* 이 시즌에 안 뛰는 선수(군 입대·해외 진출·미계약) - 명부에는 있지만 전력이 아니다. */
+.tagOut {
+  background: color-mix(in srgb, var(--negative) 13%, transparent);
+  color: var(--negative);
+}

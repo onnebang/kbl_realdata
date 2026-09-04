@@ -6,6 +6,12 @@ import styles from "@/app/preseason/preseason.module.css";
 // /teams/[tcode]의 "이번 시즌 로스터 변화" 패널이 같은 컴포넌트를 쓴다(문구·판정 표기가
 // 두 곳에서 달라지지 않도록). 스타일은 preseason.module.css를 그대로 공유.
 
+/** 사유가 확인된 이탈은 칩 글자도 바꾼다("이탈"보다 "군 입대"가 먼저 읽혀야 한다). */
+export function changeChipLabel(r: RosterChange): string {
+  if (r.change === "out" && r.reason) return REASON_TEXT[r.reason] ?? "이탈";
+  return CHANGE_CHIP[r.change].label;
+}
+
 export const CHANGE_CHIP: Record<RosterChange["change"], { label: string; cls: string }> = {
   in: { label: "영입", cls: styles.chipIn },
   back: { label: "복귀", cls: styles.chipBack },
@@ -29,6 +35,15 @@ export function statLine(r: RosterChange): string | null {
   return `${shortSeason(r.prevSeason)} ${r.gp}G · ${r.ppg?.toFixed(1)}P ${r.rpg?.toFixed(1)}R ${r.apg?.toFixed(1)}A`;
 }
 
+/** 확인된 이탈 사유 -> 화면 문구. 여기 없는 값(=null)은 예전처럼 이적/리그 이탈로 적는다. */
+const REASON_TEXT: Record<string, string> = {
+  military: "군 입대",
+  overseas: "해외 진출",
+  unsigned: "FA 미계약",
+  retired: "은퇴",
+  other: "이탈",
+};
+
 export function ChangeLine({ r, abbrOf }: { r: RosterChange; abbrOf: (tcode: string | null) => string | null }) {
   const chip = CHANGE_CHIP[r.change];
   const stat = statLine(r);
@@ -43,13 +58,24 @@ export function ChangeLine({ r, abbrOf }: { r: RosterChange; abbrOf: (tcode: str
   } else if (r.change === "in" && r.prevTcode) {
     from = `← ${abbrOf(r.prevTcode)}`;
   } else if (r.change === "out") {
-    from = r.nextTcode ? `→ ${abbrOf(r.nextTcode)}` : "리그 이탈";
+    // 사유가 확인된 이탈은 "리그 이탈"로 뭉뚱그리지 않는다 - 군 입대는 전역일이 정해진 한시적
+    // 공백이고(2027-11 전역이면 다음 시즌 복귀), 해외 진출·미계약은 성격이 또 다르다.
+    // note에 이미 "군 입대 · 2026-05-18 입대 · 2027-11-17 전역 예정"이 들어 있어 그대로 쓴다.
+    if (r.reason) {
+      // note는 "군 입대 · 2026-05-18 입대 · 2027-11-17 전역 예정" 꼴이다. 앞의 사유는 이미 칩이
+      // 말하고 있으니 뒤의 상세만 남긴다(같은 말이 한 줄에 두 번 나오지 않게).
+      const label = REASON_TEXT[r.reason] ?? "이탈";
+      const detail = r.note && r.note.startsWith(label) ? r.note.slice(label.length).replace(/^\s*·\s*/, "") : r.note;
+      from = detail || label;
+    } else {
+      from = r.nextTcode ? `→ ${abbrOf(r.nextTcode)}` : "리그 이탈";
+    }
   } else if (r.change === "new") {
     from = "KBL 첫 시즌";
   }
   return (
     <div className={styles.changeRow}>
-      <span className={`${styles.chip} ${chip.cls}`}>{chip.label}</span>
+      <span className={`${styles.chip} ${chip.cls}`}>{changeChipLabel(r)}</span>
       <div>
         {r.pcode ? (
           <Link href={`/players/${r.pcode}`} className={styles.changeName}>

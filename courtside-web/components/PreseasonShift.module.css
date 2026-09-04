@@ -1,0 +1,324 @@
+/* 개막 리포트의 두 변화 섹션(확정 결장 · 외국인 규정) 공용 스타일.
+   패널/제목/각주는 app/preseason/preseason.module.css 쪽 클래스를 그대로 쓰고, 여기는
+   두 섹션에만 있는 표·칩·게이지만 담는다. */
+
+/* ── 공통: 큰 숫자 타일 ── */
+.figureRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.figure {
+  background: var(--surface-soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.figureLabel {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+}
+/* 숫자에만 Big Shoulders를 쓴다 - 이 폰트엔 한글 글리프가 없어서 한글이 섞이면 통째로
+   폴백된다(같은 실수를 세 번 했다). 단위 한글은 .figureUnit으로 따로 뺀다. */
+.figureVal {
+  font-family: "Big Shoulders Display", "IBM Plex Mono", monospace;
+  font-weight: 800;
+  font-size: 30px;
+  line-height: 1.05;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.figureUnit {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  margin-left: 3px;
+  color: var(--ink-soft);
+}
+.figureSub {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
+/* ── 확정 결장: 팀 표 ── */
+.lossGrid {
+  display: grid;
+  gap: 6px;
+}
+.lossRow {
+  display: grid;
+  /* 세 번째 칸은 "17.3%" 아래에 "타격 큼" 칩이 통째로 들어가는 자리라 넓다.
+     칩을 숫자 옆에 인라인으로 두면 62px에서 글자가 잘린다(실측). */
+  grid-template-columns: 150px 1fr 74px 54px 54px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.lossRow:hover {
+  background: var(--surface-soft);
+}
+.lossHead {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  padding-bottom: 0;
+}
+.lossHead:hover {
+  background: none;
+}
+.lossTeam {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  font-size: 13px;
+  min-width: 0;
+}
+.lossTeamName {
+  white-space: nowrap;
+}
+.lossTrack {
+  position: relative;
+  height: 20px;
+  border-radius: 5px;
+  background: rgba(var(--line-rgb), 0.1);
+  overflow: hidden;
+}
+.lossFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 5px;
+  opacity: 0.85;
+}
+.lossNames {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 10.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lossNum {
+  text-align: right;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.lossNumMuted {
+  color: var(--ink-faint);
+}
+.tier {
+  display: block;
+  width: fit-content;
+  margin-left: auto;
+  margin-top: 3px;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.tierBig {
+  background: rgba(214, 69, 69, 0.16);
+  color: #d64545;
+}
+.tierMid {
+  background: rgba(224, 154, 46, 0.16);
+  color: #b57614;
+}
+.tierNone {
+  background: rgba(var(--line-rgb), 0.12);
+  color: var(--ink-faint);
+}
+
+/* 자리(포지션) 구멍 - 총량 표 아래에 붙는 한 줄들 */
+.holeList {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.holeItem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  word-break: keep-all;
+}
+.holeTeam {
+  font-weight: 800;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.holeVal {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 외국인 규정: 팀 카드 ── */
+.slotGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+.slotCard {
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 12px;
+  border-top-width: 3px;
+  padding: 11px 13px 10px;
+}
+.slotHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-weight: 800;
+  font-size: 14px;
+  margin-bottom: 9px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.slotHeadName {
+  white-space: nowrap;
+}
+.slotIndex {
+  margin-left: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.seat {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  border-top: 1px solid rgba(var(--line-rgb), 0.08);
+  font-size: 12px;
+}
+.seat:first-of-type {
+  border-top: none;
+}
+.seatRole {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.seatName {
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seatFrom {
+  font-weight: 400;
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-left: 5px;
+}
+.seatStat {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.seatNone {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.slotFoot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.08);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.slotFootVal {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.slotFootMuted {
+  color: var(--ink-faint);
+}
+
+/* 규정 대비 - 전/후 두 줄 */
+.ruleBox {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.ruleCol {
+  background: var(--surface-soft);
+  border-radius: 12px;
+  padding: 11px 13px;
+}
+.ruleColHead {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  margin-bottom: 7px;
+}
+.quarterStrip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-bottom: 7px;
+}
+.qCell {
+  border-radius: 6px;
+  padding: 6px 4px;
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.35;
+  background: rgba(var(--line-rgb), 0.08);
+  color: var(--ink-faint);
+}
+.qCellOpen {
+  background: rgba(214, 168, 69, 0.2);
+  color: var(--ink);
+  font-weight: 700;
+}
+.qCellName {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+}
+.ruleText {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  word-break: keep-all;
+}

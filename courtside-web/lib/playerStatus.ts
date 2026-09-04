@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { displayTeamName } from "./teamNames";
-import { PRESEASON_SEASON, prevSeasonName, roleFromNote, type ChangeKind } from "./preseason";
+import { DEPARTURE_LABEL, PRESEASON_SEASON, prevSeasonName, roleFromNote, type ChangeKind } from "./preseason";
 import { getPlayerCareerGames, type CareerGameRow } from "./playerProfile";
 
 // 선수 프로필 상태 스트립의 3상태(프로필 개편 1단계, player_profile[0]).
@@ -44,6 +44,11 @@ export type LastPlayedGame = {
 
 export type PlayerRosterStatus = {
   pcode: string;
+  /**
+   * 이 시즌에 뛰지 않는 것이 확인된 경우(roster_departure). 명부에 등록은 남아 있어도
+   * 전력이 아니다 - 군 복무 중인 선수가 구단 명부에 그대로 있기 때문에 필요한 구분이다.
+   */
+  departure: { reason: string; label: string; detail: string | null } | null;
   /** 확정 명단을 대조한 시즌(= PRESEASON_SEASON). */
   season: string;
   state: PlayerRosterState;
@@ -116,12 +121,21 @@ function startYear(season: string): number {
 export async function getPlayerRosterStatus(pcode: string, careerRows?: CareerGameRow[]): Promise<PlayerRosterStatus> {
   const season = PRESEASON_SEASON;
   const prevSeason = prevSeasonName(season);
-  const [rosterRes, changesRes, teamsRes, career] = await Promise.all([
+  const [rosterRes, changesRes, teamsRes, career, departureRes] = await Promise.all([
     supabase.from("season_roster").select("tcode, back_num, pos, note, source").eq("season_name", season).eq("pcode", pcode).limit(1),
     supabase.from("roster_changes").select("tcode, change, role, prev_tcode, next_tcode, prev_season_name, note").eq("season_name", season).eq("pcode", pcode),
     supabase.from("teams").select("tcode, name"),
     careerRows ? Promise.resolve(careerRows) : getPlayerCareerGames(pcode),
+    supabase.from("roster_departure").select("reason, detail, tcode").eq("season_name", season).eq("pcode", pcode).maybeSingle(),
   ]);
+  const dep = departureRes.data
+    ? {
+        reason: departureRes.data.reason as string,
+        label: DEPARTURE_LABEL[departureRes.data.reason as string] ?? "이탈",
+        detail: (departureRes.data.detail as string | null) ?? null,
+        tcode: departureRes.data.tcode as string,
+      }
+    : null;
   const roster = ((rosterRes.data ?? []) as RosterRow[])[0] ?? null;
   const changes = (changesRes.data ?? []) as ChangeRow[];
   const rawName = new Map((teamsRes.data ?? []).map((t) => [t.tcode as string, t.name as string]));
@@ -170,6 +184,7 @@ export async function getPlayerRosterStatus(pcode: string, careerRows?: CareerGa
   const base = {
     pcode,
     season,
+    departure: dep ? { reason: dep.reason, label: dep.label, detail: dep.detail } : null,
     seasonsPlayed,
     seasonsPlayedDesc,
     lastPlayed,
@@ -178,6 +193,34 @@ export async function getPlayerRosterStatus(pcode: string, careerRows?: CareerGa
     rosterSource: roster?.source ?? null,
     registryFlag: !!roster?.note?.includes("등록상태"),
   };
+
+  // 이탈이 확인되면 명부 행이 있어도 'active'가 아니다. 상태는 'departed'이고, 팀은 직전 소속이다.
+  if (dep) {
+    const tcode = dep.tcode;
+    const prevSeasonOf = lastPlayed?.seasonName ?? prevSeason;
+    return {
+      ...base,
+      state: "departed",
+      tcode,
+      teamName: nameFor(tcode, prevSeasonOf),
+      backNum: roster?.back_num?.trim() || lastPlayed?.backNum || null,
+      backNumAsLastSeason: !roster?.back_num?.trim() && !!lastPlayed?.backNum,
+      backNumSeason: !roster?.back_num?.trim() && lastPlayed?.backNum ? lastPlayed.seasonName : null,
+      pos: normalizePos(roster?.pos ?? null) ?? normalizePos(lastPlayed?.pos ?? null),
+      role: roleFromNote(roster?.note ?? null),
+      change: null,
+      isTransfer: false,
+      isReturn: false,
+      gapSeasons: null,
+      prevTcode: null,
+      prevTeamName: null,
+      prevSeasonName: prevSeasonOf,
+      nextTcode: null,
+      nextTeamName: null,
+      note: dep.detail ? `${dep.label} · ${dep.detail}` : dep.label,
+      seasonsInLeague: seasonsPlayed,
+    };
+  }
 
   if (roster) {
     const tcode = roster.tcode;

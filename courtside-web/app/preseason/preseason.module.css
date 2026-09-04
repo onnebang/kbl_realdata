@@ -355,19 +355,25 @@
 .teamCardHead {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   font-weight: 800;
   font-size: 14px;
   margin-bottom: 8px;
   text-decoration: none;
   color: var(--ink);
 }
+/* 팀명은 절대 줄바꿈하지 않는다. 자리가 모자라면 위 flex-wrap이 요약을 다음 줄로 내린다. */
+.teamCardName {
+  white-space: nowrap;
+}
 .teamCardSum {
   margin-left: auto;
   font-family: "IBM Plex Mono", monospace;
   font-size: 10px;
   color: var(--ink-faint);
-  white-space: nowrap;
+  /* 요약은 줄어들 수 있어야 한다 - 이름 대신 이쪽이 접힌다. */
+  min-width: 0;
 }
 .changeRow {
   display: grid;
