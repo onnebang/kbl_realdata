@@ -67,6 +67,49 @@ export function subComboKeys(lineup: Set<string>): string[] {
   return keys;
 }
 
+// 요청: "선수들 출전 시간 표시" - game_player_stats.min_played는 경기 최종값이라
+// 스크럽 중에는 쓸 수 없다(3쿼터인데 40분이라고 적히면 거짓). 대신 currentOnCourt와 같은
+// 온코트 추적으로 "지금까지 코트 위에 있던 시간"을 직접 쌓는다. 이벤트의 elapsed(경기 시작
+// 이후 누적 초, lib/postgameReport.attachDerivedFields)를 구간 길이로 쓰고, 교체는 그 시점의
+// 시간을 반영한 뒤에 적용한다(들어온 선수는 이 이벤트부터, 나간 선수는 이 이벤트까지).
+//
+// 정확도 실측(2026-09-04, 25-26 최근 8경기): 재구성 합계 = DB 합계 = 400.0분, 선수별 최대
+// 오차 0.00분. KBL 이벤트 로그는 경기 종료 시 5명 전원을 102(OUT)로 빼주기까지 해서
+// 이 재구성은 근사가 아니라 정확한 값이다.
+export function computeSecondsUpTo(
+  events: GameEvent[],
+  uptoIdx: number,
+  players: PlayerStartInfo[],
+  homeTcode: string,
+  awayTcode: string
+): Map<string, number> {
+  const sec = new Map<string, number>();
+  for (const p of players) sec.set(p.pcode, 0);
+  const homeOn = startingFive(players, homeTcode);
+  const awayOn = startingFive(players, awayTcode);
+  let prev = 0;
+  const end = Math.min(uptoIdx, events.length - 1);
+  for (let i = 0; i <= end; i++) {
+    const row = events[i];
+    const t = row.quarter === "PRE" ? 0 : row.elapsed;
+    const dt = t - prev;
+    if (dt > 0) {
+      for (const p of homeOn) sec.set(p, (sec.get(p) ?? 0) + dt);
+      for (const p of awayOn) sec.set(p, (sec.get(p) ?? 0) + dt);
+      prev = t;
+    }
+    if (!row.pcode) continue;
+    if (row.action_code === "101") {
+      if (row.tcode === homeTcode) homeOn.add(row.pcode);
+      else if (row.tcode === awayTcode) awayOn.add(row.pcode);
+    } else if (row.action_code === "102") {
+      if (row.tcode === homeTcode) homeOn.delete(row.pcode);
+      else if (row.tcode === awayTcode) awayOn.delete(row.pcode);
+    }
+  }
+  return sec;
+}
+
 // 요청: "박스스코어에 +/- 컬럼 추가" - game_player_stats엔 plus_minus 컬럼 자체가 없어서
 // game_events를 끝까지 훑어 직접 계산(표준 정의: 이 선수가 코트 위에 있는 동안 난 모든
 // 득점에서 "자기 팀 득점 - 상대 팀 득점"을 누적). currentOnCourt(uptoIdx 하나만 재구성)와

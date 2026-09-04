@@ -1848,6 +1848,117 @@ table.data-table td:nth-child(2) {
   background: #fff;
 }
 
+/* ── 하단 고정 재생바 ────────────────────────────────────────────────────────────
+   요청: "리플레이 재생바를, 가장 하단에 고정시키도록,(상단에 점수와 예상승률, 팀명 시간등등을
+   고정한것처럼)". 구조는 .replay-sticky-bar와 대칭 - position:fixed + transform으로만
+   등장/퇴장시켜 문서 높이에 영향을 주지 않는다(sticky가 스크롤 위치를 되돌리는 버그 회피).
+   .wrap과 같은 900px로 가운데 정렬해서 본문과 폭이 어긋나지 않게. */
+.replay-transport {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  transform: translateY(110%);
+  transition: transform 0.16s ease-out;
+  pointer-events: none;
+}
+.replay-transport.show {
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.replay-transport-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  background: var(--surface);
+  border-top: 1px solid rgba(var(--line-rgb), 0.12);
+  box-shadow: 0 -3px 14px rgba(0, 0, 0, 0.1);
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px));
+  border-radius: 12px 12px 0 0;
+}
+.replay-transport .replay-slider {
+  margin-bottom: 6px;
+}
+.replay-transport-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.replay-transport .replay-controls,
+.replay-transport .replay-quarter-btns {
+  margin-bottom: 0;
+}
+/* 스코어보드가 화면 밖으로 나가면 상단 바가 시계를 들지만, 재생바에도 한 번 더 둔다 -
+   스크러버를 끄는 동안 눈이 아래에 있기 때문. */
+.replay-transport-clock {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  min-width: 74px;
+  text-align: right;
+}
+.replay-transport-spacer {
+  height: 104px;
+}
+@media (max-width: 640px) {
+  .replay-transport-inner {
+    padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+  .replay-transport .replay-quarter-btn {
+    padding: 5px 9px;
+  }
+  .replay-transport-clock {
+    display: none;
+  }
+  .replay-transport-spacer {
+    height: 128px;
+  }
+}
+
+/* ── 박스스코어 표 전환 탭(기본 / 슈팅 / 영향) ──────────────────────────────────── */
+.replay-boxtabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 2px 0 10px;
+}
+.replay-boxtab {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 7px;
+  color: var(--ink-soft);
+  border: 1px solid rgba(var(--line-rgb), 0.2);
+  background: rgba(var(--line-rgb), 0.04);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+.replay-boxtab:hover {
+  border-color: var(--home);
+  color: var(--home);
+}
+.replay-boxtab.active {
+  color: #fff;
+  background: var(--home);
+  border-color: var(--home);
+}
+.replay-boxtab-hint {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+.replay-box-note {
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--ink-faint);
+  margin-top: 10px;
+}
+
 .replay-controls {
   display: flex;
   align-items: center;

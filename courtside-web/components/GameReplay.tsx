@@ -32,7 +32,7 @@ import {
   type ShotWithMeta,
 } from "@/lib/possessionFeed";
 import { iGa } from "@/lib/josa";
-import { currentOnCourt, comboKey, computeFinalPlusMinus } from "@/lib/gameLineups";
+import { currentOnCourt, comboKey, computeFinalPlusMinus, computeSecondsUpTo } from "@/lib/gameLineups";
 import type { LineupRating, PlayerOnOff } from "@/lib/lineupNetRating";
 
 // "코트사이드" 시그니처 기능(인터랙티브 리플레이/스크럽) 포팅 - courtside_template.html의
@@ -42,7 +42,11 @@ import type { LineupRating, PlayerOnOff } from "@/lib/lineupNetRating";
 // postgameReport/pregameInsights 패널이 "경기 끝난 뒤 요약"은 커버하고 있음).
 const MAKE_CODES = new Set(["201", "205", "207"]);
 const MISS_CODES = new Set(["202", "206", "208"]);
-const FOUL_CODES = new Set(["216", "224"]);
+// 215(파울자유투)가 빠져 있으면 개인 파울이 실제보다 적게 세어진다 - PF 칸을 추가하면서
+// 실측(25-26 최근 40경기 845 선수-경기)으로 확인: 215+216+224면 845/845 전부 game_player_stats.fouls와
+// 일치, 216+224만이면 463/845만 일치했다. lib/possessionFeed.ts·lib/postgameReport.ts는 처음부터
+// 세 코드를 다 세고 있었고 이 파일만 어긋나 있었다.
+const FOUL_CODES = new Set(["215", "216", "224"]);
 
 function emptyBoxLine() {
   // oreb/dreb - Game Leaders 카드(REBOUNDS 항목의 "N DREB, M OREB" 서브라인)용으로 209/210을
@@ -98,6 +102,33 @@ function computeBoxScore(events: GameEvent[], uptoIdx: number, players: PlayerMe
     }
   }
   return box;
+}
+
+// ── 박스스코어 표 세 장(요청: "득점, 리바, 어시, 스틸, 블락, 턴오버 말고도, 성공률 부터해서
+// 복합적인 데이터까지(길어진다면, 표를 여러개 만들어서 항목을 넘기도록)") ────────────────
+// 세 장 전부 이벤트 로그만으로 스크럽 시점에서 다시 계산된다 - game_player_stats의 per/pie/
+// off_rtg 같은 "경기 최종" 지표는 섞지 않는다(3쿼터인데 최종 PER를 적으면 거짓).
+type BoxView = "basic" | "shooting" | "impact";
+const BOX_VIEWS: { key: BoxView; label: string; hint: string }[] = [
+  { key: "basic", label: "기본", hint: "출전 시간과 기본 스탯" },
+  { key: "shooting", label: "슈팅", hint: "구간별 성공/시도와 성공률, eFG%·TS%" },
+  { key: "impact", label: "영향", hint: "팀 득점 점유 · USG% · AST/TO" },
+];
+const BOX_HEADERS: Record<BoxView, string[]> = {
+  basic: ["MIN", "PTS", "REB", "OR", "AST", "STL", "BLK", "TO", "PF"],
+  shooting: ["MIN", "PTS", "FG", "FG%", "2P", "3P", "3P%", "FT", "FT%", "eFG%", "TS%"],
+  impact: ["MIN", "PTS", "팀득점%", "USG%", "AST/TO", "STL+BLK"],
+};
+/** 세 장 모두 마지막 두 칸은 +/-와 온/오프로 공통(뷰를 넘겨도 비교 기준을 잃지 않게). */
+const BOX_TAIL = 2;
+
+function mmss(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+/** 성공률 - 시도가 없으면 "-"(0%로 적으면 없는 시도를 실패로 단정하게 된다). */
+function rate(made: number, att: number): string {
+  return att > 0 ? `${Math.round((made / att) * 100)}%` : "-";
 }
 
 function clockStr(e: GameEvent) {
@@ -590,6 +621,10 @@ export default function GameReplay({
   // 폴백도 이중화(둘 중 하나만 붙어도 정상 동작).
   const stickySentinelRef = useRef<HTMLDivElement | null>(null);
   const [stickyVisible, setStickyVisible] = useState(false);
+  /** 박스스코어 표 세 장 중 지금 보고 있는 것. */
+  const [boxView, setBoxView] = useState<BoxView>("basic");
+  /** 하단 고정 재생바 노출 - 리플레이 패널이 화면에 걸쳐 있는 동안만. */
+  const [transportVisible, setTransportVisible] = useState(false);
   useEffect(() => {
     const el = stickySentinelRef.current;
     if (!el) return;
@@ -604,6 +639,28 @@ export default function GameReplay({
     return () => {
       observer?.disconnect();
       window.removeEventListener("scroll", updateFromRect);
+    };
+  }, []);
+
+  // 요청: "리플레이 재생바를, 가장 하단에 고정시키도록,(상단에 점수와 예상승률, 팀명 시간등등을
+  // 고정한것처럼)". 상단 바와 같은 구조(문서 흐름 밖의 position:fixed + show 클래스)로 만들되,
+  // 켜지는 조건은 반대다 - 상단 바는 "스코어보드를 지나쳤을 때", 하단 재생바는 "리플레이 패널이
+  // 화면에 걸쳐 있는 동안". 패널을 완전히 지나가면(경기 후 리포트를 읽는 중) 스스로 사라져서
+  // 그 아래 내용을 가리지 않는다. 아래 panelRef를 그대로 재사용한다(별도 sentinel 불필요).
+  useEffect(() => {
+    const update = () => {
+      const el = panelRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      // 위/아래로 조금 여유를 둬서, 패널 경계에 딱 걸릴 때 바가 깜빡이지 않게.
+      setTransportVisible(r.top < window.innerHeight - 80 && r.bottom > 160);
+    };
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    update();
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
     };
   }, []);
 
@@ -935,25 +992,42 @@ export default function GameReplay({
     for (const s of liveStreaks) m.set(s.pcode, s);
     return m;
   }, [liveStreaks]);
+
+  // 스크럽 시점까지의 출전 시간(초). 교체 이벤트로 재구성 - 실측상 경기 종료 시점 값이
+  // game_player_stats.min_played와 소수점까지 일치한다(lib/gameLineups.ts 주석 참고).
+  const liveSec = useMemo(
+    () => computeSecondsUpTo(events, idx, players, homeTeam.tcode, awayTeam.tcode),
+    [events, idx, players, homeTeam.tcode, awayTeam.tcode]
+  );
+  // 팀별 스크럽 시점 합계 - '팀 득점 점유'와 USG%의 분모.
+  const teamTotals = useMemo(() => {
+    const acc = new Map<string, { pts: number; fga: number; fta: number; to: number }>();
+    for (const p of players) {
+      const b = box.get(p.pcode);
+      if (!b) continue;
+      const cur = acc.get(p.tcode) ?? { pts: 0, fga: 0, fta: 0, to: 0 };
+      cur.pts += b.pts;
+      cur.fga += b.fga;
+      cur.fta += b.fta;
+      cur.to += b.to;
+      acc.set(p.tcode, cur);
+    }
+    return acc;
+  }, [box, players]);
+  const elapsedMin = (row.quarter === "PRE" ? 0 : row.elapsed) / 60;
   const isDnp = (p: PlayerMeta) => p.minPlayed == null || Number(p.minPlayed) === 0;
   const jerseyNum = (p: PlayerMeta) => (p.backNum ? <span className="replay-jersey-num">#{p.backNum}</span> : null);
   const plusMinusCell = (p: PlayerMeta) => {
     const pm = finalPlusMinus.get(p.pcode) ?? 0;
     return <td className={pm > 0 ? "replay-pm pos" : pm < 0 ? "replay-pm neg" : "replay-pm"}>{pm > 0 ? `+${pm}` : pm}</td>;
   };
-  const COURT_COLS = 12; // 선수 1 + PTS/REB/AST/STL/BLK/TO/FG/3P/FT/+- 10 + 온/오프 1
+  const COURT_COLS = 1 + BOX_HEADERS[boxView].length + BOX_TAIL; // 선수 + 뷰별 칸 + (+/-, 온/오프)
   const courtHeaderRow = (key: string) => (
     <tr key={key}>
       <th>선수</th>
-      <th>PTS</th>
-      <th>REB</th>
-      <th>AST</th>
-      <th>STL</th>
-      <th>BLK</th>
-      <th>TO</th>
-      <th>FG</th>
-      <th>3P</th>
-      <th>FT</th>
+      {BOX_HEADERS[boxView].map((h) => (
+        <th key={h}>{h}</th>
+      ))}
       {/* C. 진행중 경기에서는 이 +/-가 "최종"이 아니라 "지금까지"다 - 계산은 그대로 두고
           라벨만 정직하게(종료 경기는 예전과 글자 하나까지 동일). */}
       <th title={live ? "지금 이 시점까지의 득실 마진" : "경기 최종 득실 마진"}>{live ? "+/- (현재까지)" : "+/-"}</th>
@@ -996,24 +1070,51 @@ export default function GameReplay({
       );
     }
     const b = box.get(p.pcode) ?? emptyBoxLine();
+    const sec = liveSec.get(p.pcode) ?? 0;
+    const min = sec / 60;
+    // 2점은 전체 FG에서 3점을 뺀 값(computeBoxScore의 fga/fgm은 3점을 포함한다 -
+    // game_player_stats의 fga/fgm이 2점만 세는 것과 규칙이 다르니 주의).
+    const twoM = b.fgm - b.threePM;
+    const twoA = b.fga - b.threePA;
+    const tsAtt = b.fga + 0.44 * b.fta;
+    const tm = teamTotals.get(p.tcode);
+    const tmUse = tm ? tm.fga + 0.44 * tm.fta + tm.to : 0;
+    const use = b.fga + 0.44 * b.fta + b.to;
+    // USG% 표준식: 100 × (선수 포제션 사용 × 팀 출전분/5) ÷ (선수 출전분 × 팀 포제션 사용).
+    // 팀 출전분/5 = 경과 시간이라 스크럽 어느 지점에서도 그대로 성립한다.
+    const usg = min > 0 && tmUse > 0 && elapsedMin > 0 ? (100 * use * elapsedMin) / (min * tmUse) : null;
+    const share = tm && tm.pts > 0 ? (b.pts / tm.pts) * 100 : null;
+    const cells: (string | number)[] =
+      boxView === "basic"
+        ? [mmss(sec), b.pts, b.reb, b.oreb, b.ast, b.stl, b.blk, b.to, b.foul]
+        : boxView === "shooting"
+          ? [
+              mmss(sec),
+              b.pts,
+              `${b.fgm}/${b.fga}`,
+              rate(b.fgm, b.fga),
+              `${twoM}/${twoA}`,
+              `${b.threePM}/${b.threePA}`,
+              rate(b.threePM, b.threePA),
+              `${b.ftm}/${b.fta}`,
+              rate(b.ftm, b.fta),
+              b.fga > 0 ? `${Math.round(((b.fgm + 0.5 * b.threePM) / b.fga) * 100)}%` : "-",
+              tsAtt > 0 ? `${Math.round((b.pts / (2 * tsAtt)) * 100)}%` : "-",
+            ]
+          : [
+              mmss(sec),
+              b.pts,
+              share != null ? `${Math.round(share)}%` : "-",
+              usg != null ? `${usg.toFixed(1)}%` : "-",
+              b.to > 0 ? (b.ast / b.to).toFixed(1) : b.ast > 0 ? "∞" : "-",
+              b.stl + b.blk,
+            ];
     return (
       <tr className={`replay-court-row ${isOnCourt ? "on-court" : "bench"}${isTop ? " top" : ""}`} key={p.pcode}>
         <td>{nameCell}</td>
-        <td>{b.pts}</td>
-        <td>{b.reb}</td>
-        <td>{b.ast}</td>
-        <td>{b.stl}</td>
-        <td>{b.blk}</td>
-        <td>{b.to}</td>
-        <td>
-          {b.fgm}/{b.fga}
-        </td>
-        <td>
-          {b.threePM}/{b.threePA}
-        </td>
-        <td>
-          {b.ftm}/{b.fta}
-        </td>
+        {cells.map((c, i) => (
+          <td key={i}>{c}</td>
+        ))}
         {plusMinusCell(p)}
         <td className={`replay-court-onoff ${onoffCls}`}>{onoff ? fmtRating(onoff.netRatingPer40) : "-"}</td>
       </tr>
@@ -1035,7 +1136,10 @@ export default function GameReplay({
               {onCourtList.map((p) => onCourtRow(p, true))}
               {bench.length > 0 && (
                 <tr className="bench-divider-row">
-                  <td colSpan={COURT_COLS}>벤치</td>
+                  {/* KBL 이벤트 로그는 경기 종료 시 5명 전원을 102(OUT)로 뺀다 - 그래서 마지막
+                      순간에는 온코트가 0명이 되고 전원이 이 구분선 아래로 내려간다. 그때 "벤치"라고
+                      적으면 거짓이라 무슨 상태인지 그대로 말한다. */}
+                  <td colSpan={COURT_COLS}>{onCourtList.length === 0 ? "경기 종료 · 최종 기록" : "벤치"}</td>
                 </tr>
               )}
               {bench.map((p) => onCourtRow(p, false))}
@@ -1418,9 +1522,32 @@ export default function GameReplay({
           통산 얼마나 잘했는지"를 한 섹션처럼 읽히게 배치(요청). */}
       <div className="replay-court">
         <div className="panel-title">코트 위</div>
+        {/* 표를 넘기는 탭(요청: "길어진다면, 표를 여러개 만들어서 항목을 넘기도록"). 세 장 모두
+            지금 스크럽 시점까지의 이벤트만으로 계산한다 - 아래 캡션이 그 사실을 들고 있다. */}
+        <div className="replay-boxtabs" role="tablist">
+          {BOX_VIEWS.map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              role="tab"
+              aria-selected={boxView === v.key}
+              title={v.hint}
+              className={`replay-boxtab${boxView === v.key ? " active" : ""}`}
+              onClick={() => setBoxView(v.key)}
+            >
+              {v.label}
+            </button>
+          ))}
+          <span className="replay-boxtab-hint">{BOX_VIEWS.find((v) => v.key === boxView)?.hint}</span>
+        </div>
         <div className="replay-court-grid">
           {onCourtColumn(homeTeam, homePlayers, homeOnCourt)}
           {onCourtColumn(awayTeam, awayPlayers, awayOnCourt)}
+        </div>
+        <div className="replay-box-note">
+          MIN은 교체 기록으로 다시 센 &quot;지금까지 코트 위에 있던 시간&quot;입니다(경기 종료 시점에서 공식 기록과 일치). eFG% =
+          (FG성공 + 0.5×3점성공) ÷ FG시도, TS% = 득점 ÷ (2 × (FG시도 + 0.44×자유투시도)), USG% = 이 선수가 쓴 팀 포제션 비율. 세 표
+          전부 이 순간까지의 이벤트만으로 계산하며, 오른쪽 온/오프만 15시즌 통산값입니다.
         </div>
       </div>
 
@@ -1463,6 +1590,23 @@ export default function GameReplay({
         </div>
       )}
 
+      {/* 아래 재생 컨트롤은 문서 흐름이 아니라 화면 하단 고정 바 안에 있다(요청).
+          .replay-transport는 position:fixed라 이 자리에 공간을 차지하지 않는다. */}
+      <div className={`replay-transport${transportVisible ? " show" : ""}`}>
+      <div className="replay-transport-inner">
+      <input
+        type="range"
+        className="replay-slider"
+        min={0}
+        max={events.length - 1}
+        value={idx}
+        aria-label="재생 위치"
+        onChange={(e) => {
+          setPlaying(false);
+          setIdx(Number(e.target.value));
+        }}
+      />
+      <div className="replay-transport-row">
       <div className="replay-controls">
         <button type="button" className="replay-btn" onClick={() => setIdx(0)} aria-label="처음으로">
           ⏮
@@ -1507,18 +1651,6 @@ export default function GameReplay({
         </select>
       </div>
 
-      <input
-        type="range"
-        className="replay-slider"
-        min={0}
-        max={events.length - 1}
-        value={idx}
-        onChange={(e) => {
-          setPlaying(false);
-          setIdx(Number(e.target.value));
-        }}
-      />
-
       <div className="replay-quarter-btns">
         {quarterOrder.map((q) => (
           <button
@@ -1533,6 +1665,10 @@ export default function GameReplay({
             {q}
           </button>
         ))}
+      </div>
+      <div className="replay-transport-clock">{clockStr(row)}</div>
+      </div>
+      </div>
       </div>
 
       {objProb != null && actProb != null && (
@@ -1614,6 +1750,9 @@ export default function GameReplay({
           )}
         </div>
       )}
+
+      {/* 하단 고정 재생바가 패널 마지막 내용을 가리지 않도록 그 높이만큼 여백. */}
+      <div className="replay-transport-spacer" aria-hidden />
     </div>
   );
 }
