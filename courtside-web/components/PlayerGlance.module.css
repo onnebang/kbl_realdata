@@ -1,0 +1,507 @@
+/* 한눈 카드 - 선수 프로필 히어로 바로 아래에 놓이는 조밀한 격자.
+
+   색 토큰은 globals.css :root의 것을 그대로 쓴다(전역 파일도, 선수 페이지 CSS도 건드리지
+   않는다). 이 카드는 선수 페이지의 .pageRoot 안에 렌더되는데, .pageRoot가 같은 이름의
+   토큰을 같은 값으로 다시 선언하고 있어서 어느 쪽이 이겨도 결과가 같다.
+   --positive / --negative는 .pageRoot에 없고 :root에만 있으므로 전역 값이 그대로 내려온다.
+
+   서체 규칙(이 저장소가 세 번 밟은 함정):
+     한글  -> 지정하지 않음 = 문서 기본 Pretendard.
+     숫자  -> "Big Shoulders Display"(한글 글리프가 없다). 숫자와 한글이 붙는 자리는
+              .careerNum처럼 숫자만 span으로 떼어내 이 서체를 건다.
+     라틴  -> "IBM Plex Mono"(단위 PPG/RPG, 기준 칩). 칩만은 다른 패널의 .panelChip과
+              모양이 같아야 해서 같은 규칙을 그대로 복제했다.
+
+   애니메이션은 하나도 없다(hover는 즉시 전환) - prefers-reduced-motion 분기 자체가 필요 없다. */
+
+.card {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 14px;
+  padding: 16px 18px 18px;
+}
+
+/* ── 머리: 제목 + 기준 칩 하나 ─────────────────────────────────────────────────── */
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+/* 선수/팀 페이지 .panelChip과 같은 모양 - 카드가 페이지 안에서 이물감 없이 앉도록. */
+.chip {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* ── 퍼센타일 색 언어 ──────────────────────────────────────────────────────────────
+   선수 페이지 percentileColor / 팀 페이지 4팩터 패널과 같은 경계(70 이상 / 30 이하).
+   --tone     = 막대 색, --tone-ink = 숫자 색.
+   tone="none"은 두 경우를 함께 덮는다 - 퍼센타일이 없거나(리그 풀 없음), 방향이 없는
+   스타일 지표(USG%·림 비중·3점 비중)라 좋고나쁨 색을 쓰면 안 되는 칸. */
+.cell,
+.hlCell {
+  --tone: rgba(var(--line-rgb), 0.34);
+  --tone-ink: var(--ink-soft);
+}
+.cell[data-tone="high"],
+.hlCell[data-tone="high"] {
+  --tone: var(--positive);
+  --tone-ink: var(--positive);
+}
+.cell[data-tone="mid"],
+.hlCell[data-tone="mid"] {
+  --tone: var(--gold);
+  --tone-ink: var(--gold);
+}
+.cell[data-tone="low"],
+.hlCell[data-tone="low"] {
+  --tone: var(--negative);
+  --tone-ink: var(--negative);
+}
+
+/* ── 헤드라인: 리그 평균에서 가장 멀리 떨어진 2~3개 ────────────────────────────── */
+.headlines {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(196px, 100%), 1fr));
+  gap: 10px;
+  margin: 12px 0 0;
+}
+.hlCell {
+  min-width: 0;
+  padding: 11px 13px 12px;
+  border-radius: 11px;
+  background: var(--surface-soft);
+  border-left: 3px solid var(--tone);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hlLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.hlValue {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 0.94;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.hlRank {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tone-ink);
+  line-height: 1.35;
+}
+.headlineEmpty {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px dashed rgba(var(--line-rgb), 0.18);
+  border-radius: 11px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-faint);
+}
+
+/* ── 커리어 한 줄 ────────────────────────────────────────────────────────────────── */
+.careerLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 14px;
+  margin: 12px 0 0;
+  padding: 11px 0 0;
+  border-top: 1px solid rgba(var(--line-rgb), 0.08);
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+/* 짧은 숫자 조각은 한 덩어리로 붙여 둔다. max-width/overflow는 안전장치 - flex 아이템은
+   min-width:auto라서 nowrap 텍스트가 컨테이너보다 길면 페이지를 옆으로 밀어버린다. */
+.careerSeg {
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 긴 조각(경기 날짜 + 상대 팀, 소속 팀 목록)은 줄바꿈을 허용한다 - 320px 폭에서도
+   가로 스크롤이 생기지 않게. 한글은 어절 단위로만 끊는다. */
+.careerWrapOk {
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+/* 사이트 캡션 관례대로 조각 사이에 가운뎃점 - 줄바꿈되면 점이 줄 앞머리에 남지 않도록
+   조각 안쪽(::before)에 둔다. */
+.careerSeg + .careerSeg::before {
+  content: "·";
+  margin-right: 7px;
+  color: var(--ink-faint);
+}
+/* 숫자만 콘덴스드로 - 바로 뒤의 "경기"/"시즌"/"점"은 Pretendard로 남는다. */
+.careerNum {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  margin-right: 1px;
+}
+.careerLink {
+  color: var(--home);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.careerLink .careerNum {
+  color: var(--home);
+}
+.careerLink:hover,
+.careerLink:focus-visible {
+  border-bottom-color: var(--home);
+}
+.careerFaint {
+  color: var(--ink-faint);
+}
+
+/* ── 격자 ─────────────────────────────────────────────────────────────────────────
+   minmax(min(112px, 100%), 1fr) - min()이 있어서 컨테이너가 112px보다 좁아도 칸이
+   컨테이너를 밀지 않는다(가로 스크롤 금지). 900px 본문에서는 한 줄에 7칸이라
+   '득점' 블록 7칸이 정확히 한 줄에 앉는다. */
+.group {
+  margin-top: 14px;
+}
+.groupHead {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 6px;
+}
+.groupTitle {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+/* '수비 블록이 얇은 것은 데이터의 한계다' - lib/playerGlance.ts notes의 문장을 그대로 건다. */
+.groupNote {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+.cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(112px, 100%), 1fr));
+  gap: 8px;
+}
+
+.cell {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--surface-soft);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 8px 9px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+/* 라벨 두 줄분을 항상 비워 둔다 - 칸마다 값의 세로 위치가 어긋나지 않도록.
+   한글은 keep-all로 어절 단위로만 끊고, 긴 라틴 토큰은 anywhere로 강제 줄바꿈. */
+.cLabel {
+  font-size: 10.5px;
+  line-height: 1.22;
+  min-height: 2.44em;
+  color: var(--ink-soft);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.cVal {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  min-width: 0;
+}
+.cNum {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.cUnit {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+}
+
+/* 퍼센타일 바(0-100). 가운데 눈금 = 리그 중앙(50). */
+.meter {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(var(--line-rgb), 0.1);
+  overflow: hidden;
+}
+.meterFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--tone);
+  opacity: 0.92;
+}
+.meterMid {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(var(--line-rgb), 0.3);
+}
+/* 75포제션당 칸 - 퍼센타일이 아니라 '리그 평균 눈금'이다. 초록/빨강/골드를 쓰지 않고
+   --away 계열 반투명으로 그려서 한눈에 다른 종류의 막대로 읽히게 한다. 가운데 눈금이
+   리그 평균이고, 오른쪽 끝이 리그 평균의 2배다(발밑에 배수를 숫자로도 적는다). */
+.meterLeague .meterFill {
+  background: var(--away);
+  opacity: 0.5;
+}
+.meterLeague .meterMid {
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(var(--line-rgb), 0.55);
+}
+/* 리그 맥락 자체가 없는 지표(PER·PIE·WPA·온오프·AST/TOV·슛 구성비) - 빈 막대를 그리면
+   '리그 어디쯤'이라고 거짓말이 되므로 점선 기준선만 남긴다. */
+.meterNone {
+  height: 6px;
+  display: flex;
+  align-items: center;
+}
+.meterNone::before {
+  content: "";
+  display: block;
+  width: 100%;
+  border-top: 1px dashed rgba(var(--line-rgb), 0.2);
+}
+
+.cFoot {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+.cFootText {
+  min-width: 0;
+  font-size: 9.5px;
+  line-height: 1.35;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cPct {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--tone-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 표본이 없거나 표시 하한 미달인 칸 - 지우지 않고 회색 + 점선으로 남긴다.
+   격자 모양이 선수마다 같아야 하기 때문이다(조은후와 워니가 같은 22칸). */
+.cell[data-dim="1"] {
+  background: transparent;
+  border-color: rgba(var(--line-rgb), 0.16);
+  border-style: dashed;
+}
+.cell[data-dim="1"] .cNum,
+.cell[data-dim="1"] .cLabel {
+  color: var(--ink-faint);
+}
+/* 값이 아예 없는 칸은 발밑 줄이 곧 '왜 없는지'다 - 말줄임으로 자르지 말고 그대로 펼친다
+   (여기 들어오는 문구는 '기준 시즌 없음' '라인업 로그 없음'처럼 전부 20자 안쪽이다). */
+.cell[data-empty="1"] .cFootText {
+  white-space: normal;
+  overflow: visible;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+/* ── 슛 구성(참고 카드식 세 통: 림 / 미드 / 3점) ────────────────────────────────── */
+.diet {
+  margin-top: 16px;
+}
+.dietHead {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 6px;
+}
+.dietSample {
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+.dietBar {
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: rgba(var(--line-rgb), 0.08);
+}
+.dietSeg {
+  display: block;
+  height: 100%;
+}
+.dietLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 14px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.dietItem {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.dietSwatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  display: inline-block;
+  transform: translateY(1px);
+}
+.dietPct {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.diet[data-dim="1"] {
+  opacity: 0.6;
+}
+
+/* ── 기준과 한계 ─────────────────────────────────────────────────────────────────── */
+.caption {
+  margin-top: 12px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--ink-faint);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.more {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.08);
+}
+.moreSummary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  list-style: none;
+}
+.moreSummary::-webkit-details-marker {
+  display: none;
+}
+.moreSummary::before {
+  content: "+ ";
+  color: var(--ink-faint);
+}
+.more[open] .moreSummary::before {
+  content: "− ";
+}
+.moreLine {
+  margin-top: 9px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--ink-faint);
+}
+.moreList {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  font-size: 10.5px;
+  line-height: 1.65;
+  color: var(--ink-faint);
+}
+.defs {
+  margin: 12px 0 0;
+  display: grid;
+  gap: 7px;
+}
+.defRow {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 10px;
+}
+.defTerm {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  word-break: keep-all;
+}
+.defDesc {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.defBasis {
+  display: block;
+  margin-top: 2px;
+  opacity: 0.78;
+}
+
+/* ── 좁은 화면 ────────────────────────────────────────────────────────────────────
+   칸 최소폭을 120px로 낮춰 실제 휴대폰 폭(320~430px, 본문 폭 256~366px)에서 정확히
+   2열이 되게 한다. min(120px, 100%)라서 어떤 폭에서도 컨테이너를 밀지 않는다. */
+@media (max-width: 620px) {
+  .card {
+    padding: 14px 14px 16px;
+  }
+  .cells {
+    grid-template-columns: repeat(auto-fill, minmax(min(120px, 100%), 1fr));
+  }
+  .hlValue {
+    font-size: 30px;
+  }
+  .defRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .careerLine {
+    gap: 3px 12px;
+  }
+}

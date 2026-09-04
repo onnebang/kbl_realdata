@@ -49,8 +49,12 @@ import {
 import { aggregateCareer, getPlayerWpaBySeason } from "@/lib/playerPageData";
 import { getCareerGrain, type CareerNight } from "@/lib/careerGrain";
 import { buildCareerStripSvg, CELL_MAX_W, GAP_RESERVE } from "@/lib/careerStrip";
+import { getPlayerForm } from "@/lib/playerForm";
+import { getPlayerGlance } from "@/lib/playerGlance";
 import { displayTeamName } from "@/lib/teamNames";
 import { TeamBadge } from "@/components/TeamBadge";
+import { PlayerGlanceCard } from "@/components/PlayerGlance";
+import { PlayerFormPanel, resolveFormUnit } from "@/components/PlayerForm";
 import styles from "./player-profile.module.css";
 
 // "데이터 사이언스 + 데이터로 아름다움" 대개편(요청) - sportsjobs.online 레퍼런스의
@@ -234,12 +238,19 @@ export default async function PlayerPage({
   searchParams,
 }: {
   params: Promise<{ pcode: string }>;
-  searchParams: Promise<{ w?: string; season?: string }>;
+  searchParams: Promise<{ w?: string; season?: string; rate?: string }>;
 }) {
   const { pcode } = await params;
-  const { w, season } = await searchParams;
+  const { w, season, rate } = await searchParams;
   const info = await getPlayerInfo(pcode);
   if (!info) notFound();
+
+  // 창(L5/L10/L15/L30)과 폼 단위(75포제션당/40분당)는 쿼리만 보면 정해진다 - 조회보다 먼저
+  // 확정해 둬야 2차 파도에서 getPlayerForm(recentN)을 나란히 띄울 수 있다(직렬 대기 방지).
+  // 두 값 모두 화이트리스트를 통과한 것만 쓴다(?w=아무말 / ?rate=아무말이 그대로 화면에
+  // 찍히거나 링크로 되돌아가지 않도록 - ?season=과 같은 규칙).
+  const windowN = WINDOWS.includes(Number(w) as (typeof WINDOWS)[number]) ? Number(w) : 15;
+  const formUnit = resolveFormUnit(rate);
 
   // 1차: 시즌 선택과 무관한 조회(클러치/시너지/온오프/존 기대값 포함)를 전부 병렬로. 커리어 경기
   // 행(getPlayerCareerGames)은 로스터 상태 판정·히어로 타일·커리어 아크·시즌별 기록표가 모두
@@ -262,9 +273,13 @@ export default async function PlayerPage({
   // 원주 DB · back_num NULL · note '외국인 2옵션 | MOB→DB 이적'). 커리어 행은 그대로 넘겨 재조회 없음.
   // 커리어 결 띠도 같은 careerRows를 재사용한다(출전 절반은 추가 왕복 0). 남는 비용은 팀 경기
   // 1~2페이지 + season_roster 1건 + 공백 시즌 확인 몇 건뿐이라 로스터 상태 조회와 나란히 돈다.
-  const [status, grain] = await Promise.all([
+  // 다중 시즌 폼(75포제션당)도 같은 파도에 넣는다 - careerRows를 주입하므로 커리어 경기 재조회는
+  // 0이고, 남는 비용은 팀-경기 한 갈래(4시즌 약 2,280행/3페이지, 15시즌 김선형도 병렬 9페이지)뿐이라
+  // 로스터 상태·커리어 결과 나란히 돌면 벽시계 시간이 늘지 않는다. 한눈 카드가 이 form을 재사용한다.
+  const [status, grain, form] = await Promise.all([
     getPlayerRosterStatus(pcode, careerRows),
     getCareerGrain(pcode, careerRows),
+    getPlayerForm(pcode, { careerRows, recentN: windowN }),
   ]);
   // "이번 시즌"의 정의는 lib/seasonFocus.ts 한 곳에서만 - 추정 패널(평균·퍼센타일·슛)은 statSeason을
   // 받아 개막일 밤에 1경기 평균이 시즌 수치로 승격되는 일이 없게 한다(선수 임계 10GP).
@@ -276,7 +291,6 @@ export default async function PlayerPage({
   // 시즌별 기록표에서 "가장 최근 시즌" 행을 강조 - 사실(출전 기록이 있는 최신 시즌)이라 첫 경기부터 바뀐다.
   const latestSeason = seasonLines.length ? seasonLines[0].seasonName : null;
 
-  const windowN = WINDOWS.includes(Number(w) as (typeof WINDOWS)[number]) ? Number(w) : 15;
   const windowGames = recentGames.slice(0, windowN);
   const windowAvg = computeWindowAverages(recentGames, windowN);
 
@@ -286,13 +300,43 @@ export default async function PlayerPage({
   // 쿼리 값은 반드시 화이트리스트로 검증한다 - 그러지 않으면 ?season=아무말이 그대로 기준 칩에
   // 찍혀서 페이지가 없는 시즌을 근거로 단언하는 것처럼 보인다(검증 지적).
   const selectableSeasons = new Set<string>([...seasonNames, PRESEASON_SEASON]);
-  const shotSeason = season && selectableSeasons.has(season) ? season : focus.statSeason;
-  // 3차: 선택 시즌 의존 조회(퍼센타일 RPC는 실측 29ms) + 시즌별 WPA(히어로 WPA 타일·정규시즌 집계).
-  const [boxTotals, percentile, wpaRank, wpaBySeason] = await Promise.all([
+  const seasonQuery = season && selectableSeasons.has(season) ? season : undefined;
+  const shotSeason = seasonQuery ?? focus.statSeason;
+  // 세 쿼리(?w= 창 · ?season= 시즌 · ?rate= 폼 단위)는 서로를 지우지 않아야 한다 - 예전 창 토글은
+  // href="?w=15"라 시즌을 고른 뒤 L30을 누르는 순간 시즌 선택이 조용히 초기화됐다. 검증을 통과한
+  // 값만 다시 싣는다(?season=아무말이 링크를 타고 되돌아오지 않도록).
+  const windowHref = (wn: number) => {
+    const q = new URLSearchParams({ w: String(wn) });
+    if (seasonQuery) q.set("season", seasonQuery);
+    if (rate) q.set("rate", formUnit);
+    return `?${q.toString()}`;
+  };
+  // 3차: 선택 시즌 의존 조회(퍼센타일 RPC는 실측 29ms) + 시즌별 WPA(히어로 WPA 타일·정규시즌 집계)
+  // + 한눈 카드. 퍼센타일 RPC는 한 번만 쏘고 §1과 한눈 카드가 같은 결과를 나눠 쓴다 - 단, 카드가
+  // 집계하는 시즌은 언제나 focus.statSeason이므로 ?season=으로 다른 시즌을 고른 순간 이 퍼센타일은
+  // 카드와 다른 표본이 된다. 그때는 넘기지 않고(undefined) 카드가 자기 시즌 것을 따로 받게 둔다 -
+  // 값과 퍼센타일의 기준이 어긋난 칸을 만들지 않기 위해서다.
+  const percentileP = shotSeason ? getPercentileProfile(pcode, shotSeason) : Promise.resolve(null);
+  const glancePercentileP: Promise<PercentileProfile | null | undefined> =
+    shotSeason === focus.statSeason ? percentileP : Promise.resolve(undefined);
+  const [boxTotals, percentile, wpaRank, wpaBySeason, glance] = await Promise.all([
     shotSeason ? getPlayerSeasonBoxTotals(pcode, shotSeason) : Promise.resolve(null),
-    shotSeason ? getPercentileProfile(pcode, shotSeason) : Promise.resolve(null),
+    percentileP,
     shotSeason ? getSeasonWpaRank(pcode, shotSeason) : Promise.resolve(null),
     getPlayerWpaBySeason(pcode, seasonNames),
+    // 한눈 카드: 페이지가 이미 가진 것(커리어 경기·폼·커리어 슛·클러치·커리어 결)을 전부 주입해
+    // 재조회를 없앤다. 남는 조회는 온/오프 + 시즌 WPA + 분 가중 고급지표 세 갈래뿐이고, 그것도
+    // 이 파도의 나머지와 동시에 돈다(직렬 waterfall 추가 없음).
+    glancePercentileP.then((p) =>
+      getPlayerGlance(pcode, focus.statSeason, {
+        careerRows,
+        form,
+        careerShots,
+        percentile: p,
+        clutch,
+        grain,
+      })
+    ),
   ]);
 
   // 시즌 의존 패널의 기준 칩은 전부 여기서 만든다(shared_design_language (2) - 다섯 어휘만 존재).
@@ -301,11 +345,24 @@ export default async function PlayerPage({
     if (s === focus.statSeason) return statSeasonChip(focus);
     // ?season=2026-2027처럼 아직 진행 중인 시즌을 직접 고른 경우 - "최종"이라고 쓰면 거짓이 된다.
     if (s === PRESEASON_SEASON) return basisChip("inprogress", { n: focus.focusGp, threshold: focus.thresholdLabel });
-    return basisChip("final", { season: s, last: s < prevSeasonName(PRESEASON_SEASON) });
+    // "마지막 KBL 시즌"은 그 선수가 그 뒤로 뛰지 않았을 때만 참이다. 예전 조건(s가 현재 시즌보다
+    // 옛 시즌인가)은 선수와 무관해서, 워니에게 ?season=2024-2025를 걸면 25-26을 50경기 뛴 선수의
+    // 24-25가 '마지막 KBL 시즌'으로 찍혔다(실측). 실제 기준은 "그 선수의 최신 출전 시즌인가".
+    const isPlayersLast = s === latestSeason && s < prevSeasonName(PRESEASON_SEASON);
+    return basisChip("final", { season: s, last: isPlayersLast });
   };
   const statChip = panelChip(shotSeason ?? null);
   // 개막 후·임계 전에만 붙는 두 번째 칩('26-27 진행 중 · 3경기 (임계 10경기)'). 다른 시즌을 직접 고른 경우엔 생략.
   const statProgressChip = shotSeason === focus.statSeason ? progressChip(focus) : null;
+  // ?season=으로 기준 시즌이 아닌 시즌을 고른 경우 = 화면 맨 위 한눈 카드(언제나 focus.statSeason)와
+  // 그 아래 모든 패널(선택 시즌)이 서로 다른 시즌을 답하는 상태. 실측: /players/291248?season=2024-2025
+  // 는 카드 칩 '25-26 최종' 바로 아래에서 패널 칩이 전부 '24-25 최종'으로 찍힌다. 칩 두 개가 각자
+  // 자기 시즌을 밝히긴 하지만 세로로 붙어 있어 차이가 오히려 눈에 안 띄고, 스크롤하지 않은 독자가
+  // 카드 숫자를 "내가 고른 24-25"로 읽을 여지가 남는다. 그래서 두 기준이 갈리는 자리(카드와 §1 사이)에
+  // 그 사실을 문장으로 한 줄 세운다. seasonQuery에서 유도해야 값이 string으로 좁혀진다
+  // (shotSeason은 seasonQuery가 없으면 focus.statSeason과 같으므로 어긋남 자체가 성립하지 않는다).
+  const glanceSeasonMismatch: string | null =
+    seasonQuery && seasonQuery !== focus.statSeason ? seasonQuery : null;
 
   // 슛 임팩트 리포트의 시즌 슛 = 커리어 슛에서 필터(별자리/DNA와 요청 1회 공유).
   const seasonShots = careerShots.filter((s) => s.season === shotSeason);
@@ -462,6 +519,30 @@ export default async function PlayerPage({
         )}
       </section>
 
+      {/* ── 0. 한눈 카드 - 히어로 바로 아래, 기존 패널 전부보다 위 ──────────────────────
+          요청 그대로("첫 화면에 한눈에 볼 수 있는 개인별 시각화, 밑에는 이제 우리가 만든
+          자세한 내용"): "이 선수가 어떤 선수인가"를 한 화면에서 답하는 22칸 고정 격자가 먼저
+          오고, 아래의 기존 패널들은 순서 그대로 남아 '자세한 내용'을 맡는다.
+          기준 칩은 카드가 focus로 직접 만든다(이 페이지 panelChip과 같은 규칙) - ?season=으로
+          다른 시즌을 골라도 카드는 언제나 focus.statSeason 하나만 집계하므로 statChip(선택 시즌
+          기준)을 넘기면 칩과 값의 기준이 어긋난다. 그래서 넘기지 않는다.
+          chip prop으로 "선택 시즌과 다름"을 덧붙이는 길도 있었지만, chip을 넘기는 순간 카드가
+          두 번째 칩(개막 후·임계 전 '26-27 진행 중 · N경기')을 스스로 지운다. 그 정보를 잃지 않으려고
+          카드 칩은 건드리지 않고, 대신 기준이 갈리는 자리에 아래 한 줄을 세운다.
+          카드가 자기 .card 래퍼를 들고 오므로 styles.panel로 한 겹 더 감싸지 않는다. */}
+      <PlayerGlanceCard glance={glance} focus={focus} teams={teamByTcode} />
+
+      {/* 카드(기준 시즌)와 아래 패널(선택 시즌)의 기준이 갈렸을 때만 뜨는 이음새 문장.
+          카드를 선택 시즌으로 재집계하지 않는 이유까지 같이 밝힌다 - 퍼센타일은 그 시즌 리그 풀에서만
+          계산되므로 시즌을 바꿔 끼우면 값과 순위의 기준이 서로 어긋난 칸이 생긴다. */}
+      {glanceSeasonMismatch && (
+        <p className={styles.glanceSeasonNote}>
+          <span className={styles.glanceSeasonNoteChip}>{statSeasonChip(focus)}</span>
+          위 한눈 카드의 기준 시즌입니다. 선택한 {shortSeason(glanceSeasonMismatch)} 시즌은 아래 패널부터 적용됩니다 - 카드의 리그
+          퍼센타일이 기준 시즌 풀에서만 계산되는 값이라, 카드는 선택 시즌으로 다시 집계하지 않습니다.
+        </p>
+      )}
+
       {/* ── 1. 리그 퍼센타일 프로필 ── */}
       <div className={styles.panel}>
         {/* 제목의 기준 시즌은 항상 칩으로(원문 시즌 문자열 금지) - 같은 헬퍼가 두 페이지의 문구를 만든다. */}
@@ -481,6 +562,10 @@ export default async function PlayerPage({
           {statProgressChip && <span className={styles.panelChip}>{statProgressChip}</span>}
         </div>
         <form className={styles.heatRow}>
+          {/* GET 폼은 제출 시 쿼리를 통째로 갈아끼운다 - 창(?w=)과 폼 단위(?rate=)를 숨은 필드로
+              같이 실어야 시즌을 바꿔도 두 토글 상태가 살아남는다. 값은 검증을 통과한 것만. */}
+          {w && <input type="hidden" name="w" value={String(windowN)} />}
+          {rate && <input type="hidden" name="rate" value={formUnit} />}
           <label>시즌</label>
           <select name="season" defaultValue={shotSeason ?? undefined} className={styles.heatSelect} disabled={!seasonNames.length}>
             {seasonNames.length ? (
@@ -685,12 +770,15 @@ export default async function PlayerPage({
 
       {/* ── 6. 커리어 아크(시즌별 PPG 곡선)는 히어로 발치의 커리어 결 띠로 대체됨 ── */}
 
+      {/* 창 토글 하나가 세 가지를 함께 몬다: 커리어 띠 확대판의 크롭 · 그 아래 경기당 평균 ·
+          다중 시즌 폼 패널의 '최근 N경기' 행(75포제션당). 창의 단위는 '밤'이 아니라 '출전'이라
+          세 곳이 정확히 같은 N경기를 가리킨다. */}
       {recentGames.length > 0 && (
         <div className={styles.windowRow}>
           {WINDOWS.map((wn) => (
             <Link
               key={wn}
-              href={`?w=${wn}`}
+              href={windowHref(wn)}
               className={`${styles.wtoggle} ${windowN === wn ? styles.wtoggleActive : ""}`}
             >
               L{wn}
@@ -699,7 +787,12 @@ export default async function PlayerPage({
         </div>
       )}
 
-      {/* ── 최근 구간: 히어로 발치 띠를 그대로 확대(다른 차트가 아니라 같은 문법의 줌) ── */}
+      {/* ── 최근 구간: 히어로 발치 띠를 그대로 확대(다른 차트가 아니라 같은 문법의 줌)
+             + 같은 창의 경기당 평균 ─────────────────────────────────────────────────
+          옛 '최근 N경기 평균' 패널을 여기로 접었다. 창 토글 하나가 모는 두 그림(띠 확대 ·
+          경기당 평균)이 패널 둘로 갈려 있을 이유가 없고, 같은 창의 '비율' 읽기는 바로 아래
+          다중 시즌 폼 패널의 '최근 N경기' 행이 이어받는다(75포제션당). FG%/3P%/FT%는 폼 패널이
+          TS%·eFG%로 대체하지 않고 여기 그대로 남는다 - 원자료를 지우지 않기 위해서. */}
       <div className={styles.panel}>
         {/* 제목의 숫자는 "요청한 창"이 아니라 "실제로 그린 출전 수"다 - 커리어가 창보다 짧은
             선수(1경기 커리어)에게 '최근 15경기'라고 쓰면 없는 표본을 주장하게 된다. */}
@@ -721,36 +814,52 @@ export default async function PlayerPage({
         ) : (
           <div className="empty-note">경기 기록 없음</div>
         )}
+        {windowAvg ? (
+          <>
+            {/* 값 + 표본(thesis (3)): 요청한 창이 아니라 실제로 평균 낸 경기 수를 쓴다. */}
+            <div className={styles.windowAvgHead}>최근 {windowAvg.gp}경기 경기당 평균</div>
+            <div className={styles.statGrid}>
+              {(
+                [
+                  ["MIN", windowAvg.min.toFixed(1)],
+                  ["PTS", windowAvg.pts.toFixed(1)],
+                  ["REB", windowAvg.reb.toFixed(1)],
+                  ["AST", windowAvg.ast.toFixed(1)],
+                  ["STL", windowAvg.stl.toFixed(1)],
+                  ["BLK", windowAvg.blk.toFixed(1)],
+                  ["TOV", windowAvg.tov.toFixed(1)],
+                  ["FG%", windowAvg.fgPct != null ? `${windowAvg.fgPct.toFixed(1)}%` : "-"],
+                  ["3P%", windowAvg.tpPct != null ? `${windowAvg.tpPct.toFixed(1)}%` : "-"],
+                  ["FT%", windowAvg.ftPct != null ? `${windowAvg.ftPct.toFixed(1)}%` : "-"],
+                ] as const
+              ).map(([label, val]) => (
+                <div className={styles.statTile} key={label}>
+                  <div className={styles.sv}>{val}</div>
+                  <div className={styles.sl}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
 
-      <div className={styles.panel}>
-        <div className={styles.panelTitle}>{windowAvg ? `최근 ${windowAvg.gp}경기 평균` : "선택 구간 평균"}</div>
-        {windowAvg ? (
-          <div className={styles.statGrid}>
-            {(
-              [
-                ["MIN", windowAvg.min.toFixed(1)],
-                ["PTS", windowAvg.pts.toFixed(1)],
-                ["REB", windowAvg.reb.toFixed(1)],
-                ["AST", windowAvg.ast.toFixed(1)],
-                ["STL", windowAvg.stl.toFixed(1)],
-                ["BLK", windowAvg.blk.toFixed(1)],
-                ["TOV", windowAvg.tov.toFixed(1)],
-                ["FG%", windowAvg.fgPct != null ? `${windowAvg.fgPct.toFixed(1)}%` : "-"],
-                ["3P%", windowAvg.tpPct != null ? `${windowAvg.tpPct.toFixed(1)}%` : "-"],
-                ["FT%", windowAvg.ftPct != null ? `${windowAvg.ftPct.toFixed(1)}%` : "-"],
-              ] as const
-            ).map(([label, val]) => (
-              <div className={styles.statTile} key={label}>
-                <div className={styles.sv}>{val}</div>
-                <div className={styles.sl}>{label}</div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-note">경기 기록 없음</div>
-        )}
-      </div>
+      {/* ── 다중 시즌 폼(75포제션당 / 40분당) ─────────────────────────────────────────
+          요청("선수들 폼을, 최근 5경기가 아닌, 많은 시즌을 비교, 그리고 그 이전 시즌을 비교하는
+          느낌으로"). 위 패널이 '최근 창'을 경기당으로 읽는다면, 이 패널은 커리어 전 시즌을 비율로
+          세워 직전 시즌 대비 변화를 명시한다 - 워니의 어시스트가 4.5→6.0으로 오르는 동안 리바운드가
+          15.3→13.6으로 내려간 것처럼, 경기당 뷰의 어느 패널도 보여주지 못하는 사실이 여기서만 보인다.
+          레퍼런스가 말한 'Per 75'는 75경기가 아니라 75포제션이다 - 라벨·캡션은 전부 컴포넌트가
+          '75포제션당'으로 인쇄하고, 추정 포제션이라는 사실도 캡션이 직접 들고 있다.
+          기준 칩(chip)은 넘기지 않는다 - 이 표는 한 시즌이 아니라 모든 시즌이라 단일 시즌 기준 칩을
+          달면 거짓이 된다. 패널이 스스로 단위·시즌 수 칩을 만든다.
+          ?season=은 검증을 통과한 값만 넘겨 단위 토글이 잘못된 시즌을 링크로 되살리지 않게 한다. */}
+      <PlayerFormPanel
+        form={form}
+        unit={formUnit}
+        query={{ w: w ? String(windowN) : undefined, season: seasonQuery, rate: rate ? formUnit : undefined }}
+        teamAbbrs={teamAbbrs}
+        id="form"
+      />
 
       <div className={styles.panel}>
         <div className={styles.panelTitle}>게임 로그</div>
