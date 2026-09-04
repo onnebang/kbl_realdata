@@ -1,4 +1,5 @@
 import { supabaseServer as supabase } from "./supabaseServer";
+import { fetchAllPagesBounded } from "./scoringExplorer";
 import type { GameRarity } from "./postgameReport";
 
 // PostgREST는 abs(home_score-away_score) 같은 계산식 필터를 지원하지 않아서(컬럼 값
@@ -12,19 +13,17 @@ export async function getGameRarity(homeScore: number, awayScore: number): Promi
   // 조용히 잘림 - games가 4207행이라 range 없이 그냥 fetch하면 1000행만 받고도 에러 없이
   // 성공한 것처럼 보여서(실측 중 발견 - "1000경기 중 14%"로 나와야 할 게 다른 값으로 나옴)
   // 페이지네이션으로 전부 받아야 함.
-  const PAGE = 1000;
-  const rows: { home_score: number; away_score: number }[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
+  // 지역 루프였을 때는 `if (error || !data.length) break` 라 페이지 하나가 실패하면 분모가
+  // 조용히 줄었다 - 백분위가 틀린 채로 화면에 나간다. fetchAllPagesBounded는 재시도 후에도
+  // 실패하면 예외를 던진다.
+  const rows = await fetchAllPagesBounded<{ home_score: number; away_score: number }>((from, to) =>
+    supabase
       .from("games")
-      .select("home_score, away_score")
+      .select("home_score, away_score", { count: "exact" })
       .not("home_score", "is", null)
       .not("away_score", "is", null)
-      .range(from, from + PAGE - 1);
-    if (error || !data || !data.length) break;
-    rows.push(...(data as { home_score: number; away_score: number }[]));
-    if (data.length < PAGE) break;
-  }
+      .range(from, to)
+  );
   if (!rows.length) return null;
   const margin = Math.abs(homeScore - awayScore);
   const total = rows.length;

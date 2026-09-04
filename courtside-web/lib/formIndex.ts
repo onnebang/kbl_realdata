@@ -1,4 +1,5 @@
 import { supabaseServer as supabase } from "./supabaseServer";
+import { fetchAllPagesBounded } from "./scoringExplorer";
 import { displayTeamName } from "./teamNames";
 
 // "폼 지수" 리더보드(claude.ai/code/artifact 폼지수 리더보드) 포팅 - tools/build_form_index.py의
@@ -36,19 +37,11 @@ export function classifyShot(x: number, y: number, d: string): { zone: string; v
   return { zone: "three", value };
 }
 
-const PAGE = 1000;
-async function fetchAllPages<T>(
-  buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>
-): Promise<T[]> {
-  const rows: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await buildQuery(from, from + PAGE - 1);
-    if (error || !data || !data.length) break;
-    rows.push(...data);
-    if (data.length < PAGE) break;
-  }
-  return rows;
-}
+// 페이지네이션은 lib/scoringExplorer.ts의 fetchAllPagesBounded를 쓴다.
+// 여기 있던 지역 구현은 `if (error || !data.length) break` 라 **페이지 하나가 실패하면 예외
+// 없이 부분 데이터로 계산이 끝났다.** 같은 버그를 이 저장소가 두 번 겪었고(rarity.ts 주석,
+// scoringExplorer.ts 주석의 "37,621건이 13,000건으로 조용히 잘림"), 그때 만든 함수가
+// 재시도 후에도 실패하면 예외를 던진다 - 틀린 숫자를 정상처럼 그리지 않기 위해서다.
 
 export type FormIndexRow = {
   pcode: string;
@@ -89,7 +82,7 @@ export async function getFormIndexLeaderboard(
   // 1단계: 이 시즌 (선수, 경기, 날짜) 목록 - game_player_stats는 선수당 경기당 한 행이라
   // shot_log보다 훨씬 적음(한 시즌 최대 270경기 x ~24명 ≈ 6000행). 이걸로 선수별 "이 시즌
   // 마지막 N경기"의 gmkey 집합을 먼저 정함.
-  const gameRows = await fetchAllPages<GameStatRow>((from, to) =>
+  const gameRows = await fetchAllPagesBounded<GameStatRow>((from, to) =>
     supabase
       .from("game_player_stats")
       .select("pcode, gmkey, games!inner(game_date, season_name)")
@@ -119,7 +112,7 @@ export async function getFormIndexLeaderboard(
   if (!recentGmkeysByPlayer.size) return [];
 
   // 2단계: 이 시즌 슛 전체를 훑으면서, 위에서 정한 "마지막 N경기" 집합에 속하는 슛만 집계.
-  const shotRows = await fetchAllPages<ShotRow>((from, to) =>
+  const shotRows = await fetchAllPagesBounded<ShotRow>((from, to) =>
     supabase
       .from("shot_log")
       .select("pcode, gmkey, x, y, d, made, games!inner(season_name)")
@@ -150,7 +143,7 @@ export async function getFormIndexLeaderboard(
   // game_player_stats에서 mode(tcode)로 대표 팀을 뽑는 게 다른 리더보드(player_season_wpa)와
   // 일관적).
   const tcodeByPcode = new Map<string, string>();
-  const statRowsForTeam = await fetchAllPages<{ pcode: string; tcode: string; games: { season_name: string } | null }>((from, to) =>
+  const statRowsForTeam = await fetchAllPagesBounded<{ pcode: string; tcode: string; games: { season_name: string } | null }>((from, to) =>
     supabase
       .from("game_player_stats")
       .select("pcode, tcode, games!inner(season_name)")

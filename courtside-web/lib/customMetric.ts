@@ -1,4 +1,5 @@
 import { METRIC_COMPONENTS, type ComponentKey, type MetricPlayerRow } from "./customMetricShape";
+import { fetchAllPagesBounded } from "./scoringExplorer";
 import { supabaseServer as supabase } from "./supabaseServer";
 import { displayTeamName } from "./teamNames";
 
@@ -10,19 +11,11 @@ import { displayTeamName } from "./teamNames";
 // 전혀 없어서 이번 라운드는 "전통 박스스코어" 버전만(저쪽도 두 버전으로 나눠서 만들었음).
 // 실시간 슬라이더가 핵심 가치라 이 사이트에서 GameReplay.tsx에 이어 두 번째 "use client"
 // 예외 - 매 슬라이더 조작마다 서버 왕복하면 원본의 "real time" 가치가 사라짐.
-const PAGE = 1000;
-async function fetchAllPages<T>(
-  buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>
-): Promise<T[]> {
-  const rows: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await buildQuery(from, from + PAGE - 1);
-    if (error || !data || !data.length) break;
-    rows.push(...data);
-    if (data.length < PAGE) break;
-  }
-  return rows;
-}
+// 페이지네이션은 lib/scoringExplorer.ts의 fetchAllPagesBounded를 쓴다.
+// 여기 있던 지역 구현은 `if (error || !data.length) break` 라 **페이지 하나가 실패하면 예외
+// 없이 부분 데이터로 계산이 끝났다.** 같은 버그를 이 저장소가 두 번 겪었고(rarity.ts 주석,
+// scoringExplorer.ts 주석의 "37,621건이 13,000건으로 조용히 잘림"), 그때 만든 함수가
+// 재시도 후에도 실패하면 예외를 던진다 - 틀린 숫자를 정상처럼 그리지 않기 위해서다.
 
 const MIN_GP = 10;
 
@@ -66,7 +59,7 @@ function stddev(xs: number[], m: number) {
 }
 
 export async function getSeasonPlayerMetrics(seasonName: string): Promise<MetricPlayerRow[]> {
-  const rows = await fetchAllPages<StatRow>((from, to) =>
+  const rows = await fetchAllPagesBounded<StatRow>((from, to) =>
     supabase
       .from("game_player_stats")
       .select(
