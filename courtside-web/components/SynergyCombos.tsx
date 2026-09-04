@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { iGa } from "@/lib/josa";
 import {
   COMBO_MIN_MINUTES_BY_SIZE,
   COMBO_SE_CHECK,
@@ -39,6 +40,10 @@ const fmtMin = (m: number) => Math.round(m).toLocaleString();
 // 임계값을 캡션 문장 안에 손으로 적어 두면 lib에서 값을 고쳤을 때 화면만 옛말을 하게 된다.
 // 표본 기준을 말하는 문장은 전부 이 한 줄에서 만든다.
 const MIN_MINUTES_SENTENCE = COMBO_SIZES.map((s) => `${s}인 ${COMBO_MIN_MINUTES_BY_SIZE[s]}분`).join(" · ");
+// 그 임계값에서 실제로 찍히는 오차 폭. 임계값을 올리면 이 문장도 같이 움직인다.
+const SE_AT_THRESHOLD_SENTENCE = COMBO_SIZES.map(
+  (s) => `±${Math.round(NET40_SE_CONST / Math.sqrt(COMBO_MIN_MINUTES_BY_SIZE[s]))}`
+).join(" · ");
 
 /**
  * 원형 선수 타일. /lineups의 Avatar와 같은 문법(같은 지름·같은 링·같은 중립 디스크)이다.
@@ -90,9 +95,10 @@ function Row({ r, maxAbs }: { r: ComboRow; maxAbs: number }) {
           </span>
         ))}
       </span>
+      {/* 숫자만 모노 서체로 굵게(한글 단위는 기본 서체) - 줄바꿈을 넣으면 JSX가 공백을 하나
+          집어넣어 "1,234 스틴트"가 되므로 한 줄로 붙여 쓴다. */}
       <span className={styles.sample}>
-        <b className={styles.sampleNum}>{fmtMin(r.minutes)}</b>분 · <b className={styles.sampleNum}>{r.stints.toLocaleString()}</b>
-        스틴트
+        <b className={styles.sampleNum}>{fmtMin(r.minutes)}</b>분 · <b className={styles.sampleNum}>{r.stints.toLocaleString()}</b>스틴트
       </span>
       <span className={styles.netCell}>
         {/* |net/40| < ± 이면 부호조차 의미가 없다 - 색을 빼서 그 사실이 숫자보다 먼저 보이게. */}
@@ -168,7 +174,11 @@ export function SynergyCombos({ data, playerName }: { data: PlayerCombos; player
       {rows.length > 0 ? (
         data.blocks.map((b) => <SizeBlock key={b.size} b={b} maxAbs={maxAbs} />)
       ) : (
-        <div className={styles.blockEmpty}>{who}가 최소 표본({MIN_MINUTES_SENTENCE})을 넘긴 조합이 어느 크기에도 없습니다.</div>
+        <div className={styles.blockEmpty}>
+          {/* 받침에 따라 이/가가 갈린다("김선형이" vs "자밀 워니가") - lib/josa.ts를 쓴다. */}
+          {who}
+          {iGa(who)} 최소 표본({MIN_MINUTES_SENTENCE})을 넘긴 조합이 어느 크기에도 없습니다.
+        </div>
       )}
 
       <div className={styles.caption}>
@@ -192,20 +202,20 @@ export function SynergyCombos({ data, playerName }: { data: PlayerCombos; player
             때문에 인원이 늘수록 조합 하나에 쌓이는 시간이 급격히 줍니다(분 중앙값 86 → 22 → 10 → 7). 하한 하나를 네
             크기에 그대로 쓰면 5인 표가 비거나 2인 표가 노이즈로 덮입니다. 그래서 &quot;그 크기에서 {COMBO_TOP_N}개 이상
             남는 선수 비율&quot;이 86~89%로 같아지는 지점을 크기마다 따로 골랐습니다({MIN_MINUTES_SENTENCE}). 대가는 오차
-            폭입니다 - 같은 순서로 {COMBO_SIZES.map((s) => `±${Math.round(NET40_SE_CONST / Math.sqrt(COMBO_MIN_MINUTES_BY_SIZE[s]))}`).join(" · ")}
-            입니다.
+            폭입니다 - 같은 순서로 {SE_AT_THRESHOLD_SENTENCE}입니다.
           </li>
           <li>
-            <b>줄 세우는 값은 인쇄된 값이 아닙니다.</b> 통과한 것 중 net/40 순으로 뽑으면 상위권이 통째로 노이즈가 됩니다
-            (실측: 4인 원시 1위가 33분짜리 +46.7 ±17). 그래서 순위는 표본 두께로 눌러 준 값 <b>net/40 × 분/(분+
-            {COMBO_SHRINK_K.toLocaleString()})</b>으로 정하고, 그 값을 오른쪽 막대 길이로 같이 보여줍니다(막대 축척은 네
-            크기가 공유). {COMBO_SHRINK_K.toLocaleString()}은 이 테이블에서 관측 분산 − 노이즈 분산으로 추정한
+            <b>줄 세우는 값은 인쇄된 값이 아닙니다.</b> 통과한 것 중 net/40 순으로 뽑으면 상위권이 통째로
+            노이즈가 됩니다(실측: 자밀 워니 4인 조합의 원시 1위는 33분짜리 +46.7 ±17이고, 아래 순서의 1위는 635분짜리
+            +14.2 ±4입니다). 그래서 순위는 표본 두께로 눌러 준 값{" "}
+            <b>net/40 × 분/(분+{COMBO_SHRINK_K.toLocaleString()})</b>으로 정하고, 그 값을 오른쪽 막대 길이로 같이
+            보여줍니다(막대 축척은 네 크기가 공유). {COMBO_SHRINK_K.toLocaleString()}은 이 테이블에서 관측 분산 − 노이즈 분산으로 추정한
             참분산에서 나온 값입니다(2인 K≈1,030 · 3인 ≈1,295 · 4인 ≈2,630 · 5인은 참분산이 검출되지 않음).
           </li>
           <li>
             <b>5인은 특히 조심하세요.</b> 분 160 이상인 5인 조합 104개에서 관측 분산이 노이즈 분산보다도 작았습니다. 즉
-            이 데이터로는 5인 조합끼리 &quot;진짜로 다르다&quot;는 신호를 잡아내지 못합니다. 5인 줄은 우열이 아니라
-            <b> 실제로 같이 오래 뛴 다섯</b>의 기록으로 읽어 주세요.
+            이 데이터로는 5인 조합끼리 &quot;진짜로 다르다&quot;는 신호를 잡아내지 못합니다. 5인 줄은 우열이 아니라{" "}
+            <b>실제로 같이 오래 뛴 다섯</b>의 기록으로 읽어 주세요.
           </li>
         </ul>
       </div>

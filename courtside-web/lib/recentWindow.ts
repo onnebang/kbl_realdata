@@ -230,6 +230,22 @@ function sampleSd(values: number[]): number | null {
 }
 
 /**
+ * 카운팅 지표의 경기간 표준편차 하한.
+ *
+ * 관측 sd만 쓰면 값이 작은 지표에서 밴드가 비현실적으로 좁아진다 - 블록이 15경기 내내 0/1만
+ * 오갔다면 sd는 0.3인데, 그 0.3을 그대로 믿고 "커리어 대비 -0.4는 유의미한 감소"라고 색을 칠하게
+ * 된다. 개수형 사건의 분산은 최소한 평균만큼은 된다는 것이 포아송의 기본 성질이므로, √평균을
+ * 하한으로 깐다. 실측 대조(2026-09-04): 워니 L15 PTS는 sd 8.62 > √21.5 = 4.64라 값이 바뀌지 않고
+ * (밴드 ±2.2 유지), 조은후 L15 REB는 sd 0.35 < √0.13 = 0.37이라 밴드가 아주 조금 넓어진다.
+ * 시간(MIN)은 개수가 아니므로 적용하지 않는다.
+ */
+function countingSd(values: number[], mean: number): number | null {
+  const sd = sampleSd(values);
+  if (sd == null) return null;
+  return Math.max(sd, Math.sqrt(Math.max(0, mean)));
+}
+
+/**
  * 축 위쪽 끝을 사람이 읽는 숫자로 올림. 그림의 오른쪽 끝에 인쇄되는 값이므로 반올림이 아니라
  * 올림이어야 한다(내리면 점이 축 밖으로 나간다).
  */
@@ -323,7 +339,8 @@ export function buildRecentWindow(careerRows: CareerGameRow[], opts: BuildRecent
             return sd == null || !per36Vals.length ? null : sd / Math.sqrt(per36Vals.length);
           })()
         : (() => {
-            const sd = sampleSd(vals);
+            // MIN은 개수가 아니라 시간이라 포아송 하한을 씌우지 않는다(countingSd 주석 참고).
+            const sd = key === "min" ? sampleSd(vals) : countingSd(vals, perGame);
             return sd == null ? null : sd / Math.sqrt(n);
           })();
 
@@ -387,8 +404,13 @@ export function buildRecentWindow(careerRows: CareerGameRow[], opts: BuildRecent
     const value = a > 0 ? (m / a) * 100 : null;
     const career = ca > 0 ? (cm / ca) * 100 : null;
     const delta = value != null && career != null ? value - career : null;
-    // 이항 표준오차 √(p(1-p)/n) - lib/playerPageData.ts computeZoneTable가 같은 자를 쓴다.
-    const noise = value != null && a > 0 ? Math.sqrt(((value / 100) * (1 - value / 100)) / a) * 100 : null;
+    // 이항 표준오차 √(p(1-p)/n) - lib/playerPageData.ts computeZoneTable와 같은 자다. 다만 p를
+    // 관측값 그대로 쓰면 안 된다: 3점 0/1이면 p=0이라 표준오차가 정확히 0이 되고, 시도 한 번으로
+    // "커리어 대비 -24.2%p"를 유의미한 하락이라고 색칠하게 된다(실측 - 조은후 291499 L15에서
+    // 실제로 그렇게 찍혔다). 그래서 p는 라플라스 보정한 (m+1)/(a+2)로 재고, 분모는 실제 시도 수를
+    // 그대로 둔다 - 0/1의 밴드는 ±47%p가 되어 어떤 차이도 주장하지 못하게 된다.
+    const pTilde = a > 0 ? (m + 1) / (a + 2) : null;
+    const noise = pTilde != null && a > 0 ? Math.sqrt((pTilde * (1 - pTilde)) / a) * 100 : null;
 
     const dots: RecentDot[] = win
       .slice()
@@ -422,7 +444,9 @@ export function buildRecentWindow(careerRows: CareerGameRow[], opts: BuildRecent
       per36: null,
       careerPer36: null,
       noise,
-      meaningful: noise != null && delta != null && Math.abs(delta) >= noise,
+      // 시도 하한을 넘지 못한 행은 밴드와 무관하게 '변화'라고 부르지 않는다 - 값 자체를 회색으로
+      // 눌러 놓고 Δ만 원색으로 칠하면 같은 표본을 두 목소리로 말하게 된다.
+      meaningful: a >= PCT_MIN_ATTEMPTS && noise != null && delta != null && Math.abs(delta) >= noise,
       dots,
       lo: dots.length ? Math.min(...dots.map((d) => d.value)) : null,
       hi: dots.length ? Math.max(...dots.map((d) => d.value)) : null,
@@ -509,13 +533,15 @@ export function buildRecentWindow(careerRows: CareerGameRow[], opts: BuildRecent
 //
 // 색은 전부 var(--토큰)이라 인라인 SVG에도 테마가 그대로 상속된다.
 
-const STRIP_W = 300;
-const STRIP_H = 42;
-const STRIP_PAD = { l: 8, r: 8, t: 6, b: 13 };
-/** 같은 값에 몰린 점을 위로 쌓을 때의 간격과 최대 층수. 넘치면 "×N"으로 센다. */
+// 폭 430은 데스크톱(.wrap 900px)에서 스트립 칸이 실제로 받는 폭(실측 437px)에 맞춘 값이라 그림이
+// 확대되지 않고 원래 크기로 그려진다. 높이 48은 "점 다섯 층 + 축 + 축 숫자"가 잘리지 않는 최소값.
+const STRIP_W = 430;
+const STRIP_H = 52;
+const STRIP_PAD = { l: 8, r: 8, t: 12, b: 13 };
+/** 같은 값에 몰린 점을 위로 쌓을 때의 간격과 최대 층수. 넘치면 "+N"으로 센다. */
 const DOT_R = 2.7;
 const STACK_STEP = 5.4;
-const STACK_MAX = 4;
+const STACK_MAX = 5;
 
 export type RecentStrip = { svg: string; viewBox: string; loLabel: string; hiLabel: string };
 
@@ -563,7 +589,7 @@ export function buildDotStripSvg(
   if (opts.careerMean != null && Number.isFinite(opts.careerMean)) {
     const x = n1(xOf(opts.careerMean));
     parts.push(
-      `<line x1="${x}" y1="${PT - 2}" x2="${x}" y2="${axisY + 3}" stroke="var(--ink-soft)" stroke-width="1.1" stroke-dasharray="2.5 2.5"/>`
+      `<line x1="${x}" y1="${PT - 4}" x2="${x}" y2="${axisY + 3}" stroke="var(--ink-soft)" stroke-width="1.1" stroke-dasharray="2.5 2.5"/>`
     );
   }
 
@@ -594,8 +620,10 @@ export function buildDotStripSvg(
     parts.push(`<g><title>${esc(d.title)}</title>${shape}<circle cx="${cx}" cy="${n1(cy)}" r="7" fill="transparent"/></g>`);
   }
   for (const o of over.values()) {
+    // 쌓을 자리를 넘긴 경기는 숫자로 센다 - 그리지 않고 조용히 버리면 "리바운드 0이 열 경기"가
+    // 점 다섯 개로 보인다(조은후 291499의 L15가 정확히 그 모양이다).
     parts.push(
-      `<text x="${n1(o.x)}" y="${n1(axisY - 3.4 - STACK_MAX * STACK_STEP + 1)}" font-size="7.5" text-anchor="middle" ` +
+      `<text x="${n1(o.x)}" y="${n1(axisY - 3.4 - (STACK_MAX - 1) * STACK_STEP - 2.8)}" font-size="7.5" text-anchor="middle" ` +
         `fill="var(--ink-soft)" font-family="IBM Plex Mono, monospace">+${o.count}</text>`
     );
   }

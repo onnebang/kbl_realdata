@@ -307,10 +307,12 @@
   grid-area: str;
   min-width: 0;
 }
+/* 원래 크기(430×52)를 넘겨 확대하지 않는다 - 점 반지름 2.7이 커지면 겹침이 과장된다.
+   좁은 화면에서는 100%로 줄어들며 비율 그대로 축소된다(preserveAspectRatio meet). */
 .strip {
   display: block;
   width: 100%;
-  max-width: 340px;
+  max-width: 430px;
   height: auto;
   overflow: visible;
 }

@@ -266,41 +266,60 @@ export async function getWowy(pcode: string, scope: WowyScope = WOWY_CAREER): Pr
 
   const codes = [pcode, ...withAcc.keys()];
 
-  // 시즌 범위일 때 game_player_stats를 한 번 훑어 두 가지를 같이 얻는다:
-  // (1) 주인공의 그 시즌 소속 팀, (2) 조합원 전원의 등번호(원형 타일 폴백).
-  // 조합원이 15~20명이라 청크당 1,000행을 넘길 수 있어 페이지네이션이 필요하다.
+  // 시즌 범위에서만: (1) 주인공의 그 시즌 소속 팀, (2) 조합원의 등번호(원형 타일 폴백).
+  //
+  // 두 조회의 비용이 아주 다르다. 소속 팀은 주인공 한 명이라 전 청크를 훑어도 가볍고,
+  // 시즌 중 이적 선수는 경기 수가 갈리는 지점이 뒤쪽 청크에 있을 수 있어 전부 봐야 한다.
+  // 반대로 등번호는 조합원 15~20명 x 전 경기라 페이지네이션까지 걸려 /lineups가 4.0초에서
+  // 5.4초로 늘었다(실측). 등번호는 시즌 내내 거의 안 바뀌므로 첫 청크만 봐도 로테이션
+  // 선수는 전원 잡힌다 - 그래서 첫 청크 한 번만 읽는다.
   let tcode: string | null = null;
   const backNums = new Map<string, string>();
   if (!isCareer) {
-    const minByTeam = new Map<string, number>();
-    const numSeen = new Map<string, Map<string, number>>();
-    for (const part of chunk(games.map((g) => g.gmkey), GMKEY_CHUNK)) {
-      const rows = await fetchAllPagesBounded<{ pcode: string; tcode: string; min_played: number | null; back_num: string | null }>(
-        (from, to) =>
-          supabase
+    const gmkeys = games.map((g) => g.gmkey);
+    const parts = chunk(gmkeys, GMKEY_CHUNK);
+    const [teamRows, numRows] = await Promise.all([
+      (async () => {
+        const out: { tcode: string; min_played: number | null }[] = [];
+        for (const part of parts) {
+          const { data } = await supabase
             .from("game_player_stats")
-            .select("pcode, tcode, min_played, back_num", { count: "exact" })
-            .in("pcode", codes)
-            .in("gmkey", part)
-            .range(from, to)
-      );
-      for (const r of rows) {
-        if (r.pcode === pcode) {
-          minByTeam.set(r.tcode, (minByTeam.get(r.tcode) ?? 0) + num(r.min_played) + 0.001);
+            .select("tcode, min_played")
+            .eq("pcode", pcode)
+            .in("gmkey", part);
+          out.push(...((data ?? []) as { tcode: string; min_played: number | null }[]));
         }
-        const bn = (r.back_num ?? "").trim();
-        if (!bn) continue;
-        const m = numSeen.get(r.pcode) ?? new Map<string, number>();
-        m.set(bn, (m.get(bn) ?? 0) + 1);
-        numSeen.set(r.pcode, m);
-      }
-    }
+        return out;
+      })(),
+      parts.length
+        ? fetchAllPagesBounded<{ pcode: string; back_num: string | null }>((from, to) =>
+            supabase
+              .from("game_player_stats")
+              .select("pcode, back_num", { count: "exact" })
+              .in("pcode", codes)
+              .in("gmkey", parts[0])
+              .range(from, to)
+          )
+        : Promise.resolve([]),
+    ]);
+
+    const minByTeam = new Map<string, number>();
+    for (const r of teamRows) minByTeam.set(r.tcode, (minByTeam.get(r.tcode) ?? 0) + num(r.min_played) + 0.001);
     let best = -1;
     for (const [tc, m] of minByTeam)
       if (m > best) {
         tcode = tc;
         best = m;
       }
+
+    const numSeen = new Map<string, Map<string, number>>();
+    for (const r of numRows) {
+      const bn = (r.back_num ?? "").trim();
+      if (!bn) continue;
+      const m = numSeen.get(r.pcode) ?? new Map<string, number>();
+      m.set(bn, (m.get(bn) ?? 0) + 1);
+      numSeen.set(r.pcode, m);
+    }
     // 최빈 등번호. 동률이면 문자열 순으로 갈라 실행마다 값이 흔들리지 않게.
     for (const [pc, m] of numSeen) {
       const pick = [...m.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0];

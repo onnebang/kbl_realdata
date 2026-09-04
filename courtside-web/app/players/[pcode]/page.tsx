@@ -6,7 +6,6 @@ import {
   getPlayerCareerGames,
   getPlayerRecentGames,
   getAllTeams,
-  computeWindowAverages,
   WINDOWS,
 } from "@/lib/playerProfile";
 import {
@@ -23,17 +22,16 @@ import {
   buildConstellationSvg,
   getPercentileProfile,
   getClutchProfile,
-  getTopPairCombos,
   getSeasonWpaRank,
   computeShootingDna,
   DNA_ZONES,
   DNA_ZONE_LABELS,
   PERCENTILE_MIN_GP,
   PERCENTILE_MIN_MINUTES,
-  COMBO_MIN_MINUTES,
   type SeasonZoneMix,
   type PercentileProfile,
 } from "@/lib/playerDataScience";
+import { getPlayerCombos } from "@/lib/lineupCombos";
 import { getPlayerOnOffRatings } from "@/lib/lineupNetRating";
 import { getPlayerRosterStatus } from "@/lib/playerStatus";
 import {
@@ -55,6 +53,9 @@ import { displayTeamName } from "@/lib/teamNames";
 import { TeamBadge } from "@/components/TeamBadge";
 import { PlayerGlanceCard } from "@/components/PlayerGlance";
 import { PlayerFormPanel, resolveFormUnit } from "@/components/PlayerForm";
+import { RecentWindow } from "@/components/RecentWindow";
+import { RECENT_RATE_PARAM, resolveRecentRate } from "@/lib/recentWindow";
+import { SynergyCombos } from "@/components/SynergyCombos";
 import { WinImpactPanel } from "@/components/WinImpact";
 import { getWinImpact } from "@/lib/winImpact";
 import styles from "./player-profile.module.css";
@@ -284,10 +285,10 @@ export default async function PlayerPage({
   searchParams,
 }: {
   params: Promise<{ pcode: string }>;
-  searchParams: Promise<{ w?: string; season?: string; rate?: string }>;
+  searchParams: Promise<{ w?: string; season?: string; rate?: string; rw?: string }>;
 }) {
   const { pcode } = await params;
-  const { w, season, rate } = await searchParams;
+  const { w, season, rate, rw } = await searchParams;
   const info = await getPlayerInfo(pcode);
   if (!info) notFound();
 
@@ -297,6 +298,9 @@ export default async function PlayerPage({
   // 찍히거나 링크로 되돌아가지 않도록 - ?season=과 같은 규칙).
   const windowN = WINDOWS.includes(Number(w) as (typeof WINDOWS)[number]) ? Number(w) : 15;
   const formUnit = resolveFormUnit(rate);
+  // 최근 창의 단위(경기당/36분당). ?rate=는 아래 폼 패널이 이미 per75/per40으로 점유하고 있어
+  // 이 패널은 ?rw=를 쓴다 - 같은 파라미터를 나눠 쓰면 한쪽 토글이 다른 쪽 선택을 조용히 지운다.
+  const recentRate = resolveRecentRate(rw);
 
   // 1차: 시즌 선택과 무관한 조회(클러치/시너지/온오프/존 기대값 포함)를 전부 병렬로. 커리어 경기
   // 행(getPlayerCareerGames)은 로스터 상태 판정·히어로 타일·커리어 아크·시즌별 기록표가 모두
@@ -308,7 +312,9 @@ export default async function PlayerPage({
       getAllTeams(),
       getCareerShots(pcode),
       getClutchProfile(pcode),
-      getTopPairCombos(pcode),
+      // 2인만 보던 시너지 카드를 2·3·4·5인 조합표로 교체(요청: "3인/4인/5인 조합도").
+      // 크기별 임계값·정렬 근거는 lib/lineupCombos.ts 주석에 실측과 함께 있다.
+      getPlayerCombos(pcode),
       getPlayerOnOffRatings([pcode]),
       getZoneExpectedPts(),
       // 미리 구운 1행(tools/build_player_win_impact.py) - 실시간 집계는 콜드 1.1~2.1초라 못 얹는다.
@@ -340,7 +346,6 @@ export default async function PlayerPage({
   const latestSeason = seasonLines.length ? seasonLines[0].seasonName : null;
 
   const windowGames = recentGames.slice(0, windowN);
-  const windowAvg = computeWindowAverages(recentGames, windowN);
 
   const headerTeam = status.tcode ? (teamByTcode.get(status.tcode) ?? null) : null;
 
@@ -357,6 +362,8 @@ export default async function PlayerPage({
     const q = new URLSearchParams({ w: String(wn) });
     if (seasonQuery) q.set("season", seasonQuery);
     if (rate) q.set("rate", formUnit);
+    // 창을 바꿔도 36분당 선택이 풀리지 않게(세 토글이 서로를 지우지 않는다).
+    if (rw) q.set(RECENT_RATE_PARAM, recentRate);
     return `?${q.toString()}`;
   };
   // 3차: 선택 시즌 의존 조회(퍼센타일 RPC는 실측 29ms) + 시즌별 WPA(히어로 WPA 타일·정규시즌 집계)
@@ -778,25 +785,6 @@ export default async function PlayerPage({
       <div className={styles.panel}>
         <div className={styles.panelTitle}>시너지 & 임팩트</div>
         <div className={styles.miniStatGrid}>
-          {combos.length > 0 ? (
-            combos.map((c, i) => (
-              <Link href={`/players/${c.partnerPcode}`} className={`${styles.miniStatCard} ${styles.comboCard}`} key={c.partnerPcode}>
-                <div className={styles.miniStatLabel}>베스트 2인 조합 #{i + 1}</div>
-                <div className={styles.miniStatMain}>{c.partnerName}</div>
-                <div className={styles.miniStatSub}>
-                  <span style={{ color: c.netRatingPer40 >= 0 ? "var(--positive)" : "var(--negative)" }}>
-                    NET {signed(c.netRatingPer40)}
-                  </span>{" "}
-                  /40분 · 함께 {Math.round(c.minutes)}분
-                </div>
-              </Link>
-            ))
-          ) : (
-            <div className={styles.miniStatCard}>
-              <div className={styles.miniStatLabel}>베스트 2인 조합</div>
-              <div className={styles.miniStatSub}>함께 {COMBO_MIN_MINUTES}분 이상 뛴 조합 없음</div>
-            </div>
-          )}
           <div className={styles.miniStatCard}>
             {/* player_onoff엔 오프코트 컬럼이 없어 진짜 온-오프 차이는 계산 불가 - 온코트
                 넷레이팅만 있는 그대로 표기(검증 지적 반영, 제목이 과장하지 않게). */}
@@ -824,9 +812,9 @@ export default async function PlayerPage({
             </div>
           </div>
         </div>
-        <div className={styles.pctNote}>
-          2인 조합은 커리어 통산 넷레이팅(/40분) 상위, 함께 뛴 시간 {COMBO_MIN_MINUTES}분 이상만 · 온/오프는 15시즌 통산
-        </div>
+        <div className={styles.pctNote}>온/오프는 15시즌 통산 · 아래 조합표도 같은 15시즌 통산 범위입니다</div>
+        {/* 조합표는 표본·임계값·±·정렬 근거를 자기 캡션으로 달고 나온다 - components/SynergyCombos.tsx */}
+        <SynergyCombos data={combos} playerName={info.name} />
       </div>
 
       {/* ── 6. 커리어 아크(시즌별 PPG 곡선)는 히어로 발치의 커리어 결 띠로 대체됨 ── */}
@@ -875,34 +863,26 @@ export default async function PlayerPage({
         ) : (
           <div className="empty-note">경기 기록 없음</div>
         )}
-        {windowAvg ? (
-          <>
-            {/* 값 + 표본(thesis (3)): 요청한 창이 아니라 실제로 평균 낸 경기 수를 쓴다. */}
-            <div className={styles.windowAvgHead}>최근 {windowAvg.gp}경기 경기당 평균</div>
-            <div className={styles.statGrid}>
-              {(
-                [
-                  ["MIN", windowAvg.min.toFixed(1)],
-                  ["PTS", windowAvg.pts.toFixed(1)],
-                  ["REB", windowAvg.reb.toFixed(1)],
-                  ["AST", windowAvg.ast.toFixed(1)],
-                  ["STL", windowAvg.stl.toFixed(1)],
-                  ["BLK", windowAvg.blk.toFixed(1)],
-                  ["TOV", windowAvg.tov.toFixed(1)],
-                  ["FG%", windowAvg.fgPct != null ? `${windowAvg.fgPct.toFixed(1)}%` : "-"],
-                  ["3P%", windowAvg.tpPct != null ? `${windowAvg.tpPct.toFixed(1)}%` : "-"],
-                  ["FT%", windowAvg.ftPct != null ? `${windowAvg.ftPct.toFixed(1)}%` : "-"],
-                ] as const
-              ).map(([label, val]) => (
-                <div className={styles.statTile} key={label}>
-                  <div className={styles.sv}>{val}</div>
-                  <div className={styles.sl}>{label}</div>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : null}
       </div>
+
+      {/* ── 최근 N경기 기록(components/RecentWindow.tsx) ────────────────────────────
+          옛 타일 10개를 대체한다(요청: "최근 5,10,15,30경기가 보기가 좀 어려운데, 가시성 좋게,
+          디자인 좋게 변경"). 타일이 감춘 세 가지를 이 패널이 드러낸다:
+          (1) 분포 - 워니 L15는 평균 21.5점이지만 실제 6~38점이다(실측 2026-09-04). 행마다
+              경기별 점 스트립이 붙고 평균은 그 위의 눈금 하나로 내려간다.
+          (2) 창의 정체 - 실제 경기 수·날짜 범위·시즌·정규/PO 구성·결장 수를 헤더가 인쇄한다
+              (현 시점 코호트의 57.7%가 정규+PO 혼재, 30.6%가 결장 포함).
+          (3) 출전 시간 - 창 차이의 73%가 출전 시간 변화다(corr(ΔMIN,ΔPTS)=0.856). MIN이 첫 행이고
+              ?rw=per36 링크가 그 둘을 가른다.
+          창 토글(L5/L10/L15/L30)은 위에서 페이지가 이미 그리므로 이 컴포넌트는 다시 그리지 않는다. */}
+      <RecentWindow
+        careerRows={careerRows}
+        windowN={windowN}
+        rate={recentRate}
+        query={{ w: w ? String(windowN) : undefined, season: seasonQuery, rate: rate ? formUnit : undefined }}
+        teamAbbrs={teamAbbrs}
+        id="recent"
+      />
 
       {/* ── 다중 시즌 폼(75포제션당 / 40분당) ─────────────────────────────────────────
           요청("선수들 폼을, 최근 5경기가 아닌, 많은 시즌을 비교, 그리고 그 이전 시즌을 비교하는
@@ -917,7 +897,12 @@ export default async function PlayerPage({
       <PlayerFormPanel
         form={form}
         unit={formUnit}
-        query={{ w: w ? String(windowN) : undefined, season: seasonQuery, rate: rate ? formUnit : undefined }}
+        query={{
+          w: w ? String(windowN) : undefined,
+          season: seasonQuery,
+          rate: rate ? formUnit : undefined,
+          [RECENT_RATE_PARAM]: rw ? recentRate : undefined,
+        }}
         teamAbbrs={teamAbbrs}
         id="form"
       />

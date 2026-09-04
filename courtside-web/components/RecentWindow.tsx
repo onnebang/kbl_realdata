@@ -88,6 +88,11 @@ function hrefWith(
   return `?${sp.toString()}`;
 }
 
+/** 분 표기. 한 자리 수 분은 반올림해 버리면 "1.2분"이 "1분"이 된다 - 그 차이가 곧 표본이다. */
+function fmtMinutes(v: number): string {
+  return v < 10 ? v.toFixed(1) : v.toFixed(0);
+}
+
 function toneClass(tone: "good" | "bad" | "flat" | "role"): string {
   if (tone === "good") return styles.dGood;
   if (tone === "bad") return styles.dBad;
@@ -102,7 +107,7 @@ function altLine(row: RecentRow, rate: RecentRate, windowMinutes: number): { tex
   }
   // MIN은 36분당의 분모라 전환 대상이 아니다. 대신 창 합계 분을 적어 둔다 - 36분당이 가능한
   // 창인지(20분 이상), 결장이 얼마나 섞였는지를 이 한 줄로 가늠하게.
-  if (!row.def.per36) return { text: `합계 ${windowMinutes.toFixed(0)}분`, mono: false };
+  if (!row.def.per36) return { text: `합계 ${fmtMinutes(windowMinutes)}분`, mono: false };
   if (rate === "per36") {
     return row.perGame != null ? { text: `경기당 ${row.perGame.toFixed(row.def.digits)}`, mono: false } : null;
   }
@@ -171,7 +176,7 @@ export function RecentWindow({
           </span>
         )}
         <span className={styles.fact}>
-          출전 <b>{facts.minutes.toFixed(0)}</b>분
+          출전 <b>{fmtMinutes(facts.minutes)}</b>분
         </span>
       </div>
 
