@@ -1,5 +1,7 @@
 import { PRESEASON_SEASON, getTeams, isRealGmkey, prevSeasonName, type TeamInfo } from "./preseason";
 import { supabase } from "./supabase";
+import { MARGIN_TO_LOGIT, getStrengthAdjustment, type StrengthAdjustment, type TeamAdjustment } from "./strengthAdjustment";
+import { memoAsync } from "./memo";
 
 // 정규시즌 전체(54경기) 전망 - 요청: "기대승수가 26경기 기준이다보니 파워를 가늠하기 어려워,
 // 9경기씩 6라운드 총 54경기인데, 전반기 3라운드까지와, 6라운드 54경기 전체 기대승수와 AI 예상
@@ -152,6 +154,118 @@ export function buildMatchupMatrix(games: ScheduledGame[], probs: Map<string, nu
   return { prob, tcodes, fromModel, filled, hcaLogit, hcaProb: sigmoid(hcaLogit) };
 }
 
+/** 상대별 홈 3 · 원정 3 항등식으로 나오는 54경기 기대승수. 일정 편성과 무관하다. */
+function fullExpected(prob: Map<string, number>, tcodes: string[]): Map<string, number> {
+  const p = (h: string, a: string) => prob.get(pairKey(h, a)) as number;
+  const out = new Map<string, number>();
+  for (const t of tcodes) {
+    let e = 0;
+    for (const o of tcodes) {
+      if (t === o) continue;
+      e += ROUNDS_HALF * p(t, o); // 홈 3경기
+      e += ROUNDS_HALF * (1 - p(o, t)); // 원정 3경기
+    }
+    out.set(t, e);
+  }
+  return out;
+}
+
+type SimResult = {
+  /** [팀 인덱스][순위] 확률. */
+  rankDist: number[][];
+  winsMean: number[];
+  winsLo: number[];
+  winsHi: number[];
+};
+
+/**
+ * 완전 균형 54경기 일정을 SIMS번 돌린다. 시드를 고정하는 이유: 서버 컴포넌트가 렌더될 때마다
+ * 순위 확률이 흔들리면 안 된다. 기본/조정 두 행렬에 같은 시드를 쓰므로 두 결과의 차이는
+ * 오로지 승률 차이에서만 온다(난수 차이가 섞이지 않는다).
+ */
+function simulate(prob: Map<string, number>, tcodes: string[]): SimResult {
+  const n = tcodes.length;
+  const idx = new Map(tcodes.map((t, i) => [t, i]));
+  // 순서쌍마다 3경기. 미리 평탄화해 두면 내부 루프에서 Map 조회가 사라진다.
+  const gameHome: number[] = [];
+  const gameAway: number[] = [];
+  const gameP: number[] = [];
+  for (const h of tcodes) {
+    for (const a of tcodes) {
+      if (h === a) continue;
+      for (let k = 0; k < ROUNDS_HALF; k++) {
+        gameHome.push(idx.get(h) as number);
+        gameAway.push(idx.get(a) as number);
+        gameP.push(prob.get(pairKey(h, a)) as number);
+      }
+    }
+  }
+  const rand = mulberry32(0x5cb1a5ed);
+  const rankCount = Array.from({ length: n }, () => new Array<number>(n).fill(0));
+  const winsSum = new Array<number>(n).fill(0);
+  const winsHist = Array.from({ length: n }, () => new Array<number>(GAMES_FULL + 1).fill(0));
+  const wins = new Float64Array(n);
+  const order = new Array<number>(n);
+  for (let s = 0; s < SIMS; s++) {
+    wins.fill(0);
+    for (let g = 0; g < gameP.length; g++) {
+      if (rand() < gameP[g]) wins[gameHome[g]] += 1;
+      else wins[gameAway[g]] += 1;
+    }
+    // 동률은 무작위로 가른다(KBL 실제 규정은 상대 전적 우선이지만, 시뮬레이션에서 그걸
+    // 재현하려면 맞대결 결과를 따로 들고 있어야 한다 - 여기서는 편향 없는 무작위가 맞다).
+    for (let i = 0; i < n; i++) {
+      order[i] = i;
+      wins[i] += rand() * 1e-6;
+    }
+    order.sort((x, y) => wins[y] - wins[x]);
+    for (let r = 0; r < n; r++) {
+      const team = order[r];
+      rankCount[team][r] += 1;
+      const w = Math.round(wins[team] - 5e-7);
+      winsSum[team] += w;
+      winsHist[team][Math.max(0, Math.min(GAMES_FULL, w))] += 1;
+    }
+  }
+  const quantile = (hist: number[], q: number): number => {
+    const target = SIMS * q;
+    let acc = 0;
+    for (let w = 0; w < hist.length; w++) {
+      acc += hist[w];
+      if (acc >= target) return w;
+    }
+    return hist.length - 1;
+  };
+  return {
+    rankDist: rankCount.map((c) => c.map((v) => v / SIMS)),
+    winsMean: winsSum.map((v) => v / SIMS),
+    winsLo: winsHist.map((h) => quantile(h, 0.1)),
+    winsHi: winsHist.map((h) => quantile(h, 0.9)),
+  };
+}
+
+/**
+ * 전력 델타를 매치업 행렬에 밀어 넣은 사본. 원본은 건드리지 않는다.
+ * 델타의 리그 평균은 (Δ홈 - Δ원정)에서 저절로 상쇄되므로 중심화하지 않는다.
+ */
+function adjustMatrix(base: Map<string, number>, tcodes: string[], adj: StrengthAdjustment): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const h of tcodes) {
+    for (const a of tcodes) {
+      if (h === a) continue;
+      const k = pairKey(h, a);
+      const p0 = base.get(k);
+      if (p0 == null) continue;
+      const dh = adj.teams.get(h)?.dMarginTotal ?? 0;
+      const da = adj.teams.get(a)?.dMarginTotal ?? 0;
+      const z = logit(p0) + (dh - da) * MARGIN_TO_LOGIT;
+      // 극단으로 밀리지 않게 잘라 둔다(시뮬레이션이 0/1 확률에서 퇴화하는 것을 막는다).
+      out.set(k, Math.min(0.99, Math.max(0.01, sigmoid(z))));
+    }
+  }
+  return out;
+}
+
 /** 시드 고정 PRNG(mulberry32) - 렌더마다 같은 순위 확률이 나오게. */
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -193,6 +307,24 @@ export type ProjectionTeam = TeamInfo & {
   prevW: number;
   prevL: number;
   prevPct: number | null;
+  /**
+   * 이탈·규정 변경·신입 스카우팅을 반영한 시나리오. 재료가 없으면 null.
+   * **측정이 아니라 시나리오다** - lib/strengthAdjustment.ts 머리말을 읽을 것.
+   */
+  adj: {
+    fullExp: number;
+    winsLo: number;
+    winsHi: number;
+    titleOdds: number;
+    playoffOdds: number;
+    rankDist: number[];
+    modalRank: number;
+    expRank: number;
+    /** 팀별 전력 델타 원자료(이탈/슬롯/기타/규정 분해 포함). */
+    team: TeamAdjustment;
+    /** 리그 평균을 뺀 상대 델타 - 순위는 차이로만 정해지므로 이 값이 읽을 값이다. */
+    relMargin: number;
+  } | null;
 };
 
 export type SeasonProjection = {
@@ -206,6 +338,8 @@ export type SeasonProjection = {
   halfFilledN: number;
   /** 모든 팀이 54경기를 다 갖고 있는가 - 화면 문구가 이걸로 갈린다. */
   scheduleComplete: boolean;
+  /** 조정 전망 재료(없으면 null - 화면은 기본 전망만 그린다). */
+  adjustment: StrengthAdjustment | null;
   firstGameDate: string | null;
   lastGameDate: string | null;
   sims: number;
@@ -216,9 +350,24 @@ export type SeasonProjection = {
  * 매치업 행렬이 불완전하면(팀 수가 10이 아니거나 순서쌍이 모자라면) null - 화면은 기존
  * 공개 일정 기준 표만 보여주면 된다.
  */
-export async function getSeasonProjection(season = PRESEASON_SEASON): Promise<SeasonProjection | null> {
+/**
+ * 전망 한 판의 비용은 대부분 시뮬레이션이다(54경기 × SIMS × 2 시나리오). 그 결과는 같은 시즌
+ * 안에서 배치가 돌기 전까지 바뀌지 않으므로 요청마다 다시 돌릴 이유가 없다.
+ * 실측(2026-09-05, dev): 메모 없이 요청당 35~42초, SIMS를 2,000으로 낮추면 8초(= DB 왕복만).
+ * TTL 10분이면 배치 갱신이 늦어도 다음 10분 안에 반영되고, 개막 후 라이브 경기 화면은
+ * 이 함수를 쓰지 않으므로 30초 갱신 요구와 충돌하지 않는다.
+ */
+export const PROJECTION_TTL_MS = 10 * 60 * 1000;
+
+export const getSeasonProjection = memoAsync(computeSeasonProjection, {
+  name: "seasonProjection",
+  ttlMs: PROJECTION_TTL_MS,
+  key: (season) => season ?? PRESEASON_SEASON,
+});
+
+async function computeSeasonProjection(season = PRESEASON_SEASON): Promise<SeasonProjection | null> {
   const prevSeason = prevSeasonName(season);
-  const [teamMap, sched, prevRes] = await Promise.all([
+  const [teamMap, sched, prevRes, adjustment] = await Promise.all([
     getTeams(season),
     fetchScheduleWithProbs(season),
     supabase
@@ -227,6 +376,7 @@ export async function getSeasonProjection(season = PRESEASON_SEASON): Promise<Se
       .eq("season_name", prevSeason)
       .eq("is_ended", true)
       .eq("season_category", "정규시즌"),
+    getStrengthAdjustment(season),
   ]);
   const { games, probs } = sched;
   const priced = games.filter((g) => probs.has(g.gmkey));
@@ -289,62 +439,20 @@ export async function getSeasonProjection(season = PRESEASON_SEASON): Promise<Se
     }
   }
 
-  // ── 전체 54경기: 상대별 홈 3 · 원정 3(일정 편성과 무관한 항등식) ────────────────────
-  const fullExp = new Map<string, number>();
-  for (const t of tcodes) {
-    let e = 0;
-    for (const o of tcodes) {
-      if (t === o) continue;
-      e += ROUNDS_HALF * p(t, o); // 홈 3경기
-      e += ROUNDS_HALF * (1 - p(o, t)); // 원정 3경기
-    }
-    fullExp.set(t, e);
-  }
-
-  // ── 시뮬레이션: 같은 54경기 일정을 SIMS번 ────────────────────────────────────────
+  // ── 전체 54경기 기대승수 + 시뮬레이션 ───────────────────────────────────────────
+  // 조정 재료가 있으면 같은 일정을 두 번 돌린다(기본 / 조정). 시드가 같아서 두 결과의 차이는
+  // 오로지 매치업 승률 차이에서만 온다.
   const n = tcodes.length;
   const idx = new Map(tcodes.map((t, i) => [t, i]));
-  // 순서쌍마다 3경기. 미리 평탄화해 두면 내부 루프에서 Map 조회가 사라진다.
-  const gameHome: number[] = [];
-  const gameAway: number[] = [];
-  const gameP: number[] = [];
-  for (const h of tcodes) {
-    for (const a of tcodes) {
-      if (h === a) continue;
-      for (let k = 0; k < ROUNDS_HALF; k++) {
-        gameHome.push(idx.get(h) as number);
-        gameAway.push(idx.get(a) as number);
-        gameP.push(p(h, a));
-      }
-    }
-  }
-  const rand = mulberry32(0x5cb1a5ed);
-  const rankCount = Array.from({ length: n }, () => new Array<number>(n).fill(0));
-  const winsSum = new Array<number>(n).fill(0);
-  const winsHist = Array.from({ length: n }, () => new Array<number>(GAMES_FULL + 1).fill(0));
-  const wins = new Float64Array(n);
-  const order = new Array<number>(n);
-  for (let s = 0; s < SIMS; s++) {
-    wins.fill(0);
-    for (let g = 0; g < gameP.length; g++) {
-      if (rand() < gameP[g]) wins[gameHome[g]] += 1;
-      else wins[gameAway[g]] += 1;
-    }
-    // 동률은 무작위로 가른다(KBL 실제 규정은 상대 전적 우선이지만, 시뮬레이션에서 그걸
-    // 재현하려면 맞대결 결과를 따로 들고 있어야 한다 - 여기서는 편향 없는 무작위가 맞다).
-    for (let i = 0; i < n; i++) {
-      order[i] = i;
-      wins[i] += rand() * 1e-6;
-    }
-    order.sort((x, y) => wins[y] - wins[x]);
-    for (let r = 0; r < n; r++) {
-      const team = order[r];
-      rankCount[team][r] += 1;
-      const w = Math.round(wins[team] - 5e-7);
-      winsSum[team] += w;
-      winsHist[team][Math.max(0, Math.min(GAMES_FULL, w))] += 1;
-    }
-  }
+  const fullExp = fullExpected(matrix.prob, tcodes);
+  const sim = simulate(matrix.prob, tcodes);
+
+  const adjProb = adjustment ? adjustMatrix(matrix.prob, tcodes, adjustment) : null;
+  const adjExp = adjProb ? fullExpected(adjProb, tcodes) : null;
+  const adjSim = adjProb ? simulate(adjProb, tcodes) : null;
+  const adjRankOrder = adjExp
+    ? [...tcodes].sort((a, b) => (adjExp.get(b) as number) - (adjExp.get(a) as number))
+    : null;
 
   const rec = new Map<string, { w: number; l: number }>();
   for (const g of prevRes.data ?? []) {
@@ -364,24 +472,34 @@ export async function getSeasonProjection(season = PRESEASON_SEASON): Promise<Se
     rec.set(g.away_tcode as string, a);
   }
 
-  const quantile = (hist: number[], q: number): number => {
-    const target = SIMS * q;
-    let acc = 0;
-    for (let w = 0; w < hist.length; w++) {
-      acc += hist[w];
-      if (acc >= target) return w;
-    }
-    return hist.length - 1;
-  };
-
   const rows: ProjectionTeam[] = tcodes.map((t) => {
     const i = idx.get(t) as number;
     const info = teamMap.get(t);
-    const dist = rankCount[i].map((c) => c / SIMS);
+    const dist = sim.rankDist[i];
     let modal = 0;
     for (let r = 1; r < n; r++) if (dist[r] > dist[modal]) modal = r;
     const r = rec.get(t);
+    const a = adjustment?.teams.get(t) ?? null;
+    let adj: ProjectionTeam["adj"] = null;
+    if (a && adjSim && adjExp && adjRankOrder) {
+      const ad = adjSim.rankDist[i];
+      let am = 0;
+      for (let k = 1; k < n; k++) if (ad[k] > ad[am]) am = k;
+      adj = {
+        fullExp: adjExp.get(t) as number,
+        winsLo: adjSim.winsLo[i],
+        winsHi: adjSim.winsHi[i],
+        titleOdds: ad[0],
+        playoffOdds: ad.slice(0, PLAYOFF_SPOTS).reduce((s2, v) => s2 + v, 0),
+        rankDist: ad,
+        modalRank: am + 1,
+        expRank: adjRankOrder.indexOf(t) + 1,
+        team: a,
+        relMargin: a.dMarginTotal - (adjustment as StrengthAdjustment).leagueMean,
+      };
+    }
     return {
+      adj,
       tcode: t,
       name: info?.name ?? t,
       abbr: info?.abbr ?? t,
@@ -393,9 +511,9 @@ export async function getSeasonProjection(season = PRESEASON_SEASON): Promise<Se
       halfExp: halfExp.get(t) as number,
       fullExp: fullExp.get(t) as number,
       fullPct: (fullExp.get(t) as number) / GAMES_FULL,
-      simMean: winsSum[i] / SIMS,
-      winsLo: quantile(winsHist[i], 0.1),
-      winsHi: quantile(winsHist[i], 0.9),
+      simMean: sim.winsMean[i],
+      winsLo: sim.winsLo[i],
+      winsHi: sim.winsHi[i],
       titleOdds: dist[0],
       playoffOdds: dist.slice(0, PLAYOFF_SPOTS).reduce((s, v) => s + v, 0),
       modalRank: modal + 1,
@@ -420,6 +538,7 @@ export async function getSeasonProjection(season = PRESEASON_SEASON): Promise<Se
     scheduledN: priced.length,
     halfFilledN: halfFilledTotal / 2, // 두 팀 양쪽에서 세었으니 절반이 실제 경기 수
     scheduleComplete: rows.every((t) => t.schedN === GAMES_FULL) && matrix.filled === 0,
+    adjustment,
     firstGameDate: games.length ? games[0].gameDate : null,
     lastGameDate: games.length ? games[games.length - 1].gameDate : null,
     sims: SIMS,

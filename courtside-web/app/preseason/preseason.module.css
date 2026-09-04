@@ -603,7 +603,8 @@
    요점이 "숫자"가 아니라 "폭"이라서). */
 .projRow {
   display: grid;
-  grid-template-columns: 26px minmax(74px, 1fr) 54px 54px minmax(120px, 1.4fr) 116px 42px 42px 58px;
+  /* 순위 / 팀 / 전반기 / 기본 / 조정 / 승수 구간 / 순위 분포 / 1위 / PO / 지난 시즌 */
+  grid-template-columns: 26px minmax(72px, 1fr) 44px 48px 64px minmax(108px, 1.3fr) 104px 42px 42px 54px;
   align-items: center;
   gap: 8px;
   padding: 5px 8px;
@@ -629,6 +630,123 @@
 .projHalf {
   color: var(--ink-soft);
   font-size: 15px;
+}
+/* 기본(조정 전) 기대승수 - 조정 열이 주인공이라 한 단계 물러나 있다 */
+.projBase {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  text-align: right;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+/* 조정 기대승수 + 그 아래 변화량 */
+.projDelta {
+  display: block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  margin-top: 2px;
+  letter-spacing: -0.02em;
+}
+/* 조정 순위가 기본과 다를 때만 붙는 꼬리표 */
+.projBaseRank {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+/* 조정 시나리오 경고 - 표 위에서 한 번에 읽혀야 한다 */
+.adjWarn {
+  border: 1px solid rgba(214, 154, 46, 0.45);
+  background: rgba(214, 154, 46, 0.09);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  word-break: keep-all;
+}
+.adjWarn b {
+  color: var(--ink);
+}
+
+/* 조정 내역 표 */
+.adjGrid {
+  display: grid;
+  gap: 4px;
+}
+.adjRow {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) 52px 52px 52px 52px 58px minmax(120px, 1.1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 7px;
+}
+.adjRow:hover {
+  background: var(--surface-soft);
+}
+.adjHead {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+.adjHead:hover {
+  background: none;
+}
+.adjTeam {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 12.5px;
+  white-space: nowrap;
+  min-width: 0;
+}
+.adjNum {
+  text-align: right;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.adjTotal {
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 12px;
+}
+.adjTrack {
+  position: relative;
+  height: 14px;
+  border-radius: 4px;
+  background: rgba(var(--line-rgb), 0.07);
+  overflow: hidden;
+}
+.adjZero {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(var(--line-rgb), 0.3);
+}
+.adjBar {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 2px;
+}
+.adjBarUp {
+  background: #3f9c62;
+}
+.adjBarDown {
+  background: #d64545;
 }
 
 /* 승수 80% 구간 - 트랙 전체가 리그의 승수 범위, 막대가 그 팀의 80% 구간, 흰 점이 기대승수 */
@@ -693,20 +811,22 @@
 
 @media (max-width: 900px) {
   .projRow {
-    grid-template-columns: 24px minmax(66px, 1fr) 46px 46px minmax(90px, 1fr) 92px 40px 40px;
+    grid-template-columns: 24px minmax(64px, 1fr) 42px 44px 58px minmax(84px, 1fr) 84px 40px 40px;
   }
+  /* 지난 시즌 전적부터 접는다 */
   .projRow > :last-child {
     display: none;
   }
 }
 @media (max-width: 640px) {
   .projRow {
-    grid-template-columns: 22px minmax(62px, 1fr) 44px minmax(70px, 1fr) 78px 38px;
+    grid-template-columns: 22px minmax(60px, 1fr) 58px minmax(66px, 1fr) 72px 38px;
   }
-  /* 전반기 칸(3번째)과 PO 칸(8번째)만 남기고 접는 게 아니라, 좁은 화면에서는
-     전반기·1위 확률을 접고 전체 승수 / 구간 / 순위 분포 / PO만 남긴다. */
+  /* 좁은 화면에서는 전반기(3)·기본(4)·1위(8)를 접고, 조정 승수 / 구간 / 순위 분포 / PO만 남긴다.
+     기본 승수는 넓은 화면에서만 - 이 표의 요점은 "조정 후 어디쯤인가"라서. */
   .projRow > :nth-child(3),
-  .projRow > :nth-child(7) {
+  .projRow > :nth-child(4),
+  .projRow > :nth-child(8) {
     display: none;
   }
 }

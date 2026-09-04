@@ -94,10 +94,12 @@ function OutlookRow({ t, rank }: { t: TeamOutlook; rank: number }) {
 // 나올 확률. 행 안에서 최댓값을 1로 잡아 모양이 보이게 하고(팀마다 분포의 날카로움이 다르다),
 // 숫자는 옆 칸(1위 / PO)이 따로 말한다.
 function RankStrip({ t }: { t: ProjectionTeam }) {
-  const max = Math.max(...t.rankDist);
+  // 조정이 있으면 조정 분포를 그린다 - 같은 행의 승수 구간·확률과 기준이 어긋나면 안 된다.
+  const dist = t.adj ? t.adj.rankDist : t.rankDist;
+  const max = Math.max(...dist);
   return (
-    <div className={styles.rankStrip} title={`순위 분포 · 최빈 ${t.modalRank}위`}>
-      {t.rankDist.map((p, i) => (
+    <div className={styles.rankStrip} title={`순위 분포 · 최빈 ${t.adj ? t.adj.modalRank : t.modalRank}위${t.adj ? " (조정 기준)" : ""}`}>
+      {dist.map((p, i) => (
         <span
           key={i}
           className={`${styles.rankCell} ${i === PLAYOFF_SPOTS - 1 ? styles.rankCutoff : ""}`}
@@ -109,11 +111,15 @@ function RankStrip({ t }: { t: ProjectionTeam }) {
 }
 
 function ProjectionRow({ t, lo, hi }: { t: ProjectionTeam; lo: number; hi: number }) {
+  // 조정 재료가 있으면 막대·분포·확률은 전부 조정 기준으로 그린다(요청: "AI 예상순위를 변경해줘").
+  // 기대승수만 기본/조정 둘 다 보여준다(요청: "2가지 버전").
+  const a = t.adj;
   const span = Math.max(1, hi - lo);
-  const left = ((t.winsLo - lo) / span) * 100;
-  const width = ((t.winsHi - t.winsLo) / span) * 100;
-  const dot = ((t.fullExp - lo) / span) * 100;
+  const left = (((a ? a.winsLo : t.winsLo) - lo) / span) * 100;
+  const width = (((a ? a.winsHi : t.winsHi) - (a ? a.winsLo : t.winsLo)) / span) * 100;
+  const dot = (((a ? a.fullExp : t.fullExp) - lo) / span) * 100;
   const half = ((GAMES_FULL / 2 - lo) / span) * 100;
+  const delta = a ? a.fullExp - t.fullExp : 0;
   return (
     // --tc: 팀 색을 원색 그대로 쓰면 남색 계열(부산 KCC)이 다크 배경에서 사라진다.
     // CSS 쪽에서 잉크와 섞어 두 테마 모두 최소 대비를 갖게 한다.
@@ -122,14 +128,32 @@ function ProjectionRow({ t, lo, hi }: { t: ProjectionTeam; lo: number; hi: numbe
       className={styles.projRow}
       style={{ "--tc": t.color } as CSSProperties}
     >
-      <div className={styles.outlookRank}>{t.expRank}</div>
+      <div className={styles.outlookRank}>{a ? a.expRank : t.expRank}</div>
       <div className={styles.outlookTeam}>
         <TeamBadge team={badgeOf(t)} size={22} />
         <span>{t.name}</span>
+        {/* 기본과 조정의 순위가 다를 때만 - 같으면 잡음이다. */}
+        {a && a.expRank !== t.expRank && <span className={styles.projBaseRank}>기본 {t.expRank}위</span>}
       </div>
       <div className={styles.projHalf}>{t.halfExp.toFixed(1)}</div>
-      <div className={styles.projFull}>{t.fullExp.toFixed(1)}</div>
-      <div className={styles.projTrack} title={`80% 구간 ${t.winsLo}~${t.winsHi}승 · 기대 ${t.fullExp.toFixed(1)}승`}>
+      <div className={styles.projBase}>{t.fullExp.toFixed(1)}</div>
+      {a ? (
+        <div className={styles.projFull}>
+          {a.fullExp.toFixed(1)}
+          <span
+            className={`${styles.projDelta} ${delta > 0.05 ? styles.deltaUp : delta < -0.05 ? styles.deltaDown : styles.deltaFlat}`}
+          >
+            {delta > 0.05 ? "▲" : delta < -0.05 ? "▼" : "="}
+            {Math.abs(delta).toFixed(1)}
+          </span>
+        </div>
+      ) : (
+        <div className={styles.projFull}>-</div>
+      )}
+      <div
+        className={styles.projTrack}
+        title={`80% 구간 ${a ? a.winsLo : t.winsLo}~${a ? a.winsHi : t.winsHi}승 · 기대 ${(a ? a.fullExp : t.fullExp).toFixed(1)}승${a ? " (조정 기준)" : ""}`}
+      >
         {half >= 0 && half <= 100 && <span className={styles.projEven} style={{ left: `${half}%` }} />}
         <span className={styles.projBand} style={{ left: `${left}%`, width: `${width}%` }} />
         <span className={styles.projDot} style={{ left: `${dot}%` }} />
@@ -137,12 +161,90 @@ function ProjectionRow({ t, lo, hi }: { t: ProjectionTeam; lo: number; hi: numbe
       <RankStrip t={t} />
       {/* 반올림해서 "0%"로 적으면 "1위 불가능"으로 읽힌다. 10만 번 돌려도 못 본 값은
           0이 아니라 "0.01% 미만"이다(lib/seasonProjection.ts formatOdds). */}
-      <div className={styles.projOdds}>{formatOdds(t.titleOdds)}</div>
-      <div className={styles.projOdds}>{formatOdds(t.playoffOdds)}</div>
+      <div className={styles.projOdds}>{formatOdds(a ? a.titleOdds : t.titleOdds)}</div>
+      <div className={styles.projOdds}>{formatOdds(a ? a.playoffOdds : t.playoffOdds)}</div>
       <div className={styles.outlookPrev}>
         {t.prevW}-{t.prevL}
       </div>
     </Link>
+  );
+}
+
+/** 조정 델타의 부호와 크기를 한 줄로. 리그 평균을 뺀 상대값이라 합이 0에 가깝다. */
+function AdjBreakdown({ proj, cur, prev }: { proj: SeasonProjection; cur: string; prev: string }) {
+  const adj = proj.adjustment;
+  if (!adj) return null;
+  const rows = [...proj.teams].filter((t) => t.adj).sort((x, y) => (y.adj as NonNullable<typeof y.adj>).relMargin - (x.adj as NonNullable<typeof x.adj>).relMargin);
+  const max = Math.max(...rows.map((t) => Math.abs((t.adj as NonNullable<typeof t.adj>).relMargin)), 0.1);
+  const priors = rows
+    .flatMap((t) => (t.adj as NonNullable<typeof t.adj>).team.slots.filter((sl) => sl.tier).map((sl) => `${t.abbr} ${sl.name}(${sl.tier})`))
+    .join(" · ");
+  // 0.005 미만은 그냥 0으로 - "+0.00"은 부호가 있는 것처럼 읽힌다.
+  const sign = (v: number) => (Math.abs(v) < 0.005 ? "0.00" : `${v > 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}`);
+  return (
+    <>
+      <div className={styles.panelTitle} style={{ marginTop: 16 }}>
+        조정의 내역 - 경기당 득실차 (점)
+      </div>
+      <p className={styles.panelLede}>
+        앞의 네 칸은 그 팀이 얼마나 달라졌는지(절대값), 마지막 <b>상대</b> 칸은 거기서 리그 평균({adj.leagueMean.toFixed(2)}점)을 뺀 값입니다.
+        순위는 팀 사이의 차이로만 정해지므로 표를 움직이는 건 <b>상대</b> 쪽입니다 — 예를 들어 규정 변경은 10팀 모두를 +0.5~+1.1점 올리기
+        때문에, 그 자체로는 순위를 거의 바꾸지 않고 팀 간 격차만 남습니다.
+      </p>
+      <div className={styles.adjGrid}>
+        <div className={`${styles.adjRow} ${styles.adjHead}`}>
+          <div>팀</div>
+          <div style={{ textAlign: "right" }}>이탈</div>
+          <div style={{ textAlign: "right" }}>슬롯</div>
+          <div style={{ textAlign: "right" }}>기타</div>
+          <div style={{ textAlign: "right" }}>규정</div>
+          <div style={{ textAlign: "right" }}>상대</div>
+          <div>← 약해짐 · 강해짐 →</div>
+        </div>
+        {rows.map((t) => {
+          const a = t.adj as NonNullable<typeof t.adj>;
+          const w = (Math.abs(a.relMargin) / max) * 50;
+          return (
+            <div key={t.tcode} className={styles.adjRow}>
+              <div className={styles.adjTeam}>
+                <TeamBadge team={badgeOf(t)} size={16} />
+                <span>{t.name}</span>
+              </div>
+              <div className={styles.adjNum}>{sign(a.team.dMarginDepart)}</div>
+              <div className={styles.adjNum}>{sign(a.team.dMarginSlot)}</div>
+              <div className={styles.adjNum}>{sign(a.team.dMarginOther)}</div>
+              <div className={styles.adjNum}>{sign(a.team.dMarginRule)}</div>
+              <div className={`${styles.adjNum} ${styles.adjTotal}`}>{sign(a.relMargin)}</div>
+              <div className={styles.adjTrack}>
+                <span className={styles.adjZero} />
+                <span
+                  className={`${styles.adjBar} ${a.relMargin >= 0 ? styles.adjBarUp : styles.adjBarDown}`}
+                  style={a.relMargin >= 0 ? { left: "50%", width: `${w}%` } : { right: "50%", width: `${w}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className={styles.note}>
+        <b>이탈</b>은 {cur}에 뛰지 않는 것이 확정된 선수의 자리를 그 팀의 뎁스(잔류 선수 중 출전분 9~14위)로 메웠을 때의 변화입니다.{" "}
+        <b>슬롯</b>은 외국인·아시아쿼터 세 자리의 주인이 바뀐 몫, <b>기타</b>는 국내 영입·미계약 등 나머지 로스터 이동, <b>규정</b>은 2·3쿼터
+        외국인 2명 허용으로 외국인 2옵션이 경기당 10분을 더 뛴다고 가정했을 때의 몫입니다. 순차 분해라 순서에 따라 배분이 조금 달라집니다.
+      </div>
+      {priors && (
+        <div className={styles.note}>
+          <b>KBL 기록이 없어 사전확률로 채운 자리 {adj.priorSlots}개</b> (전체 {adj.totalSlots}개 중): {priors}. 등급은 KBL 첫 시즌 비국내 선수
+          195명(300분+)의 PER 분포 분위수에 배치한 값입니다 — 특급 30.7(상위 10%) · 상급 28.1(상위 25%) · 중급 24.1(중앙값) · 역할 20.8(하위
+          25%) · 아시아쿼터 16.2(중앙값). <b>이 등급은 측정이 아니라 스카우팅 판단입니다.</b>
+        </div>
+      )}
+      <div className={styles.note}>
+        나머지 자리는 실측입니다: {prev} 기록이 있으면 그 값을, 공백 후 복귀면 마지막 KBL 시즌 값을 쓰되, 둘 다 &quot;다음 시즌 PER&quot;
+        회귀를 통과시킵니다(비국내 연속 4.65+0.789p · n=131, 공백 복귀 12.29+0.491p · n=38, 국내 연속 3.76+0.690p · n=824). 공백이 있으면
+        평균으로 회귀하는 힘이 훨씬 세다는 것이 15시즌 실측이라, 케베 알루마·게이지 프림·패리스 배스·라숀 토마스는 마지막 기록보다 2~4점 낮게
+        잡힙니다.
+      </div>
+    </>
   );
 }
 
@@ -158,9 +260,15 @@ function ProjectionSection({
   /** 이 모델이 아직 모르는 변화들 - 각주에서 아래 섹션을 가리킨다. */
   knows: { departures: number | null; ruleChange: boolean };
 }) {
-  const lo = Math.min(...proj.teams.map((t) => t.winsLo)) - 1;
-  const hi = Math.max(...proj.teams.map((t) => t.winsHi)) + 1;
+  // 축은 두 시나리오를 모두 담아야 한다(조정 막대가 기본 범위를 벗어날 수 있다).
+  const lo = Math.min(...proj.teams.map((t) => Math.min(t.winsLo, t.adj?.winsLo ?? t.winsLo))) - 1;
+  const hi = Math.max(...proj.teams.map((t) => Math.max(t.winsHi, t.adj?.winsHi ?? t.winsHi))) + 1;
   const m = proj.matrix;
+  const hasAdj = !!proj.adjustment;
+  // 조정이 있으면 조정 기준 순위로 정렬한다 - 요청("AI 예상순위를 변경해줘").
+  const ordered = hasAdj
+    ? [...proj.teams].sort((a, b) => (a.adj?.expRank ?? a.expRank) - (b.adj?.expRank ?? b.expRank))
+    : proj.teams;
   return (
     <div className={styles.panel}>
       <div className={styles.panelTitle}>
@@ -181,19 +289,29 @@ function ProjectionSection({
           </>
         )}
       </p>
+      {hasAdj && (
+        <div className={styles.adjWarn}>
+          <b>&quot;조정&quot; 열은 측정이 아니라 시나리오입니다 — 정확도가 낮습니다.</b> 확정 결장 13명, 2·3쿼터 외국인 2명 허용, 그리고 KBL
+          기록이 없는 신입 선수 {proj.adjustment?.priorSlots}명의 스카우팅 등급을 넣어 로스터를 다시 조립한 값입니다. 이 프로젝트가 KBL
+          15시즌으로 확인한 바로는 <b>이탈 정보만으로 다음 시즌 득실차 변화를 설명한 설명력이 0.1% 미만</b>이었고, 그래서 아래 &quot;조정&quot;
+          숫자는 순서를 말하는 용도이지 맞힐 값이 아닙니다. 재미로 보시고, 진짜 예측은 개막 후 경기가 쌓이면 모델이 실제 결과로 다시
+          계산합니다.
+        </div>
+      )}
       <div className={styles.outlookGrid}>
         <div className={`${styles.projRow} ${styles.outlookHead}`}>
           <div />
           <div>팀</div>
           <div style={{ textAlign: "right" }}>전반기 {GAMES_HALF}G</div>
-          <div style={{ textAlign: "right" }}>전체 {GAMES_FULL}G</div>
-          <div>승수 80% 구간 (가운데 눈금 27승)</div>
+          <div style={{ textAlign: "right" }}>기본 {GAMES_FULL}G</div>
+          <div style={{ textAlign: "right" }}>{hasAdj ? "조정" : `전체 ${GAMES_FULL}G`}</div>
+          <div>승수 80% 구간 (가운데 눈금 27승){hasAdj ? " · 조정 기준" : ""}</div>
           <div>순위 분포 1→{proj.teams.length}위</div>
           <div style={{ textAlign: "right" }}>1위</div>
           <div style={{ textAlign: "right" }}>PO</div>
           <div className={styles.outlookPrev}>{prev} 정규</div>
         </div>
-        {proj.teams.map((t) => (
+        {ordered.map((t) => (
           <ProjectionRow key={t.tcode} t={t} lo={lo} hi={hi} />
         ))}
       </div>
@@ -230,12 +348,13 @@ function ProjectionSection({
         비슷해도 순위 분포는 다를 수 있고, 실제 시즌은 이 분포 안 어느 한 점입니다. 확률이 낮은 팀은 &quot;0%&quot;로 적지 않고{" "}
         <b>&lt;0.01%</b>로 적습니다 — {proj.sims.toLocaleString()}번 중 한 번도 안 나왔다는 뜻이지 불가능하다는 뜻이 아니기 때문입니다.
       </div>
+      <AdjBreakdown proj={proj} cur={cur} prev={prev} />
       <div className={styles.note}>
-        <b>이 표가 아직 모르는 것.</b> 승률은 {prev} 전력(넷레이팅·라인업 시너지·홈코트)으로만 계산됩니다. 그래서{" "}
+        <b>&quot;기본&quot; 열이 아는 것과 모르는 것.</b> 기본 승률은 {prev} 전력(넷레이팅·라인업 시너지·홈코트)만으로 계산됩니다. 그래서{" "}
         {knows.departures != null && <>{cur}에 뛰지 않는 것이 확정된 {knows.departures}명도, </>}
-        {knows.ruleChange && <>2·3쿼터 외국인 2명 동시 출전을 허용하는 규정 변경도, </>}로스터 이동도 반영되어 있지 않습니다. 아래 섹션들이 그
-        차이를 각각 측정합니다 - 다만 그 어느 것도 승수로 환산되지 않으니, 이 표의 숫자를 손으로 더하거나 빼지 마십시오(왜 그럴 수 없는지는 각
-        섹션 각주에 적어 두었습니다). {cur} 개막 후 경기가 쌓이면 모델이 실제 결과로 다시 계산됩니다.
+        {knows.ruleChange && <>2·3쿼터 외국인 2명 동시 출전을 허용하는 규정 변경도, </>}로스터 이동도 기본 열에는 들어 있지 않습니다. 그
+        차이를 넣어 본 것이 &quot;조정&quot; 열이고, 아래 섹션들이 각 재료를 하나씩 측정해 보여 줍니다. {cur} 개막 후 경기가 쌓이면 모델이
+        실제 결과로 다시 계산됩니다.
       </div>
     </div>
   );
