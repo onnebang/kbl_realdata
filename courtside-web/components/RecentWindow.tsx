@@ -4,7 +4,7 @@ import {
   PER36_BASE,
   PER36_MIN_MINUTES,
   RECENT_RATE_PARAM,
-  buildDotStripSvg,
+  buildRecentGaugeSvg,
   buildRecentWindow,
   formatRecentDelta,
   formatRecentRange,
@@ -27,7 +27,14 @@ import styles from "./RecentWindow.module.css";
 //       다섯 경기가 전부 플레이오프다. 창 구성은 '보는 날짜'의 함수라 다음 시즌 데이터가
 //       들어오면 조용히 바뀐다 - 그래서 헤더가 매번 실제 구성을 다시 인쇄한다.
 //   (3) 출전 시간 - 창 차이의 73%가 출전 시간 변화로 설명된다(corr(ΔMIN, ΔPTS)=0.856).
-//       MIN이 첫 행이고, 36분당 전환이 링크 하나로 붙는다.
+//       MIN이 첫 칸이고, 36분당 전환이 링크 하나로 붙는다.
+//
+// 표현 형식(2차 개편): 가로 점 스트립 -> 원형 게이지 격자.
+// 요청 - "항목이 작게 표시되다보니, 지금 이게 무엇을 표현하는지 보이지가 않아". 스트립이
+// 실패한 지점은 정확히 크기였다. 한 행에 430×52 그림이 열 개 쌓이니 점 하나가 2.7px이고 그
+// 안에서 축·눈금·점이 겹쳐 "무엇을 말하는 그림인지"가 먼저 안 읽혔다. 게이지는 같은 정보를
+// 지표당 100×100으로 펴서 담는다 - 값은 채워진 호, 커리어 평균은 링 위 눈금, 경기별 분포는
+// 링 바깥으로 쌓이는 점. 분포를 버리지 않은 이유는 위 (1) 그대로다.
 //
 // 렌더링 규칙(프로젝트 하드 룰):
 //   - 서버 컴포넌트. "use client" 없음, state·이벤트 핸들러 없음. 단위 전환은 쿼리스트링 링크.
@@ -181,8 +188,9 @@ export function RecentWindow({
       </div>
 
       <p className={styles.lede}>
-        점 하나가 <b>그 창의 경기 하나</b>다. 평균 한 줄로는 사라지는 폭을 그대로 둔 채, 창 평균(삼각형)과 커리어
-        평균(점선)을 그 위에 눈금으로 얹었다.
+        채워진 호가 <b>이 창의 값</b>, 링을 가로지르는 눈금이 <b>커리어 평균</b>, 링 바깥의 점 하나가{" "}
+        <b>그 창의 경기 하나</b>다. 같은 값에 몰린 경기는 바깥으로 쌓여서 둘레의 두께가 그대로 빈도가 된다 - 평균 한
+        줄로는 사라지는 폭을 그림이 그대로 들고 있게.
       </p>
 
       {/* ── 단위 토글(경기당 / 36분당) ────────────────────────────────────────────── */}
@@ -222,23 +230,32 @@ export function RecentWindow({
           결장(0분)
         </span>
         <span className={styles.legItem}>
-          <i className={styles.legTri} aria-hidden />창 평균
+          <i className={styles.legArc} aria-hidden />창 값
         </span>
         <span className={styles.legItem}>
-          <i className={styles.legLine} aria-hidden />
+          <i className={styles.legTick} aria-hidden />
           커리어 평균
         </span>
       </div>
 
-      {/* ── 지표 행 ──────────────────────────────────────────────────────────────── */}
-      <div className={styles.rows}>
+      {/* 36분당 축에 점을 얹지 않는 이유는 칸마다가 아니라 여기서 한 번만 말한다 - 같은 문장이
+          여섯 칸에 반복되면 그 자체가 소음이다. */}
+      {activeRate === "per36" && rows.some((r) => r.def.per36) && (
+        <p className={styles.omitNote}>
+          {PER36_BASE}분당 축에는 경기별 점을 얹지 않는다 - 3분 뛴 밤을 {PER36_BASE}분으로 늘린 점(4점 → 48점)은 실제로
+          일어난 적이 없는 밤이고, 그런 점이 축을 지배하면 그림이 거짓말을 한다. 분포를 보려면 경기당으로 돌아가면 된다.
+        </p>
+      )}
+
+      {/* ── 지표 게이지 ──────────────────────────────────────────────────────────── */}
+      <div className={styles.grid}>
         {rows.map((row) => {
-          const strip = buildDotStripSvg(row, { windowMean: row.perGame, careerMean: row.careerPerGame });
+          const gauge = buildRecentGaugeSvg(row, activeRate);
           const alt = altLine(row, activeRate, facts.minutes);
           const range = formatRecentRange(row);
           const tone = recentDeltaTone(row);
-          // 커리어 대비 Δ가 무엇과 비교한 값인지는 행마다 title로 붙인다 - 화면에 열을 하나 더
-          // 만드는 대신(열 여섯 개는 이 폭에서 읽히지 않는다).
+          // 커리어 대비 Δ가 무엇과 비교한 값인지는 카드마다 title로 붙인다 - 화면에 줄을 하나 더
+          // 만드는 대신(칸 하나가 120px이라 넉 줄이 한계다).
           const deltaTitle =
             row.career == null
               ? "커리어 표본이 없어 비교하지 않는다"
@@ -247,19 +264,34 @@ export function RecentWindow({
                   ? ` · 창 내부 표준오차 ±${row.noise.toFixed(row.def.digits)}${row.def.kind === "pct" ? "p" : ""}` +
                     (row.meaningful ? "" : " - 이 차이는 노이즈와 구분되지 않는다")
                   : " · 표본이 하나뿐이라 오차 폭을 잴 수 없다");
+          const axisTop =
+            gauge == null ? "-" : row.def.kind === "pct" ? "100%" : gauge.domainMax % 1 === 0 ? String(gauge.domainMax) : gauge.domainMax.toFixed(1);
           return (
-            <div key={row.def.key} className={`${styles.row} ${row.def.key === "fg" ? styles.rowSplit : ""}`}>
-              <div className={styles.lab}>
-                <span className={styles.short}>{row.def.short}</span>
-                <span className={styles.name}>{row.def.label}</span>
+            <div key={row.def.key} className={styles.cell}>
+              <div className={styles.gauge}>
+                {gauge ? (
+                  <svg
+                    className={styles.ring}
+                    viewBox={gauge.viewBox}
+                    preserveAspectRatio="xMidYMid meet"
+                    role="img"
+                    aria-label={`${row.def.label} ${formatRecentValue(row, row.value)} · 0부터 ${axisTop}까지의 축 · 커리어 평균 ${formatRecentValue(row, row.career)} · 경기별 실제 ${range ?? "표본 없음"}`}
+                    dangerouslySetInnerHTML={{ __html: gauge.svg }}
+                  />
+                ) : (
+                  <div className={styles.ringEmpty} aria-hidden />
+                )}
+                {/* 가운데 숫자는 HTML이다 - SVG 안에 두면 폰트 토큰을 못 쓰고, 한글 라벨이
+                    Big Shoulders(한글 글리프 없음)에 닿을 위험이 생긴다. */}
+                <div className={styles.center}>
+                  <span className={`${styles.vMain} ${row.thin ? styles.vDim : ""}`}>{formatRecentValue(row, row.value)}</span>
+                  <span className={styles.short}>{row.def.short}</span>
+                </div>
               </div>
 
-              <div className={styles.val}>
-                <span className={`${styles.vMain} ${row.thin ? styles.vDim : ""}`}>{formatRecentValue(row, row.value)}</span>
-                {alt && <span className={`${styles.vAlt} ${alt.mono ? styles.vAltNum : ""}`}>{alt.text}</span>}
-              </div>
+              <div className={styles.cellName}>{row.def.label}</div>
 
-              <div className={styles.del} title={deltaTitle}>
+              <div className={styles.cellDelta} title={deltaTitle}>
                 <span className={`${styles.dVal} ${toneClass(tone)}`}>{formatRecentDelta(row, row.delta)}</span>
                 {row.noise != null && (
                   <span className={styles.dNoise}>
@@ -269,26 +301,14 @@ export function RecentWindow({
                 )}
               </div>
 
-              <div className={styles.str}>
-                {strip ? (
-                  <svg
-                    className={styles.strip}
-                    viewBox={strip.viewBox}
-                    preserveAspectRatio="xMidYMid meet"
-                    role="img"
-                    aria-label={`${row.def.label} 경기별 분포 ${strip.loLabel}부터 ${strip.hiLabel}까지의 축 · 실제 ${range ?? "표본 없음"} · 창 평균 ${formatRecentValue(row, row.perGame)} · 커리어 평균 ${formatRecentValue(row, row.careerPerGame)}`}
-                    dangerouslySetInnerHTML={{ __html: strip.svg }}
-                  />
-                ) : (
-                  <span className={styles.strEmpty}>이 창에 시도가 없어 그릴 점이 없다</span>
-                )}
-                {row.note && <div className={styles.rowNote}>{row.note}</div>}
+              <div className={styles.cellSub}>
+                {/* 축의 끝을 적지 않으면 호의 길이는 아무 뜻이 없다. */}
+                <span className={styles.subAxis}>0~{axisTop}</span>
+                {range && <span className={styles.subRange}>실제 {range}</span>}
+                {alt && <span className={alt.mono ? styles.subNum : undefined}>{alt.text}</span>}
               </div>
 
-              <div className={styles.rng}>
-                <span className={styles.rngVal}>{range ?? "-"}</span>
-                <span className={styles.rngLab}>{row.def.kind === "pct" ? "경기별 범위" : "실제 범위"}</span>
-              </div>
+              {row.note && <div className={styles.cellNote}>{row.note}</div>}
             </div>
           );
         })}

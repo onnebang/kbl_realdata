@@ -533,17 +533,29 @@ export function buildRecentWindow(careerRows: CareerGameRow[], opts: BuildRecent
 //
 // 색은 전부 var(--토큰)이라 인라인 SVG에도 테마가 그대로 상속된다.
 
-// 폭 430은 데스크톱(.wrap 900px)에서 스트립 칸이 실제로 받는 폭(실측 437px)에 맞춘 값이라 그림이
-// 확대되지 않고 원래 크기로 그려진다. 높이 48은 "점 다섯 층 + 축 + 축 숫자"가 잘리지 않는 최소값.
-const STRIP_W = 430;
-const STRIP_H = 52;
-const STRIP_PAD = { l: 8, r: 8, t: 12, b: 13 };
-/** 같은 값에 몰린 점을 위로 쌓을 때의 간격과 최대 층수. 넘치면 "+N"으로 센다. */
-const DOT_R = 2.7;
-const STACK_STEP = 5.4;
-const STACK_MAX = 5;
+// ── 게이지 기하 ──────────────────────────────────────────────────────────────────
+// 아래가 트인 270도 링. 시작 각 135도(왼쪽 아래)에서 시계방향으로 270도 돌아 45도(오른쪽 아래)
+// 에서 끝난다 - 트인 자리가 아래라 값이 0일 때와 100%일 때가 서로 붙어 보이지 않는다.
+const G_VB = 100;
+const G_CX = 50;
+const G_CY = 52;
+const G_R = 30;
+const G_START = 135;
+const G_SWEEP = 270;
+/** 링 바깥으로 점을 쌓는다 - 같은 값에 몰린 경기 수가 그대로 둘레의 두께가 된다. */
+const G_DOT_R = 2.3;
+const G_DOT_R0 = G_R + 5.2;
+const G_STACK_STEP = 3.4;
+const G_STACK_MAX = 4;
 
-export type RecentStrip = { svg: string; viewBox: string; loLabel: string; hiLabel: string };
+export type RecentGauge = {
+  svg: string;
+  viewBox: string;
+  /** 축 위쪽 끝(라벨용). */
+  domainMax: number;
+  /** 36분당 축이라 경기별 점을 얹지 않았다. */
+  dotsOmitted: boolean;
+};
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -555,97 +567,116 @@ function n1(v: number): string {
   return Object.is(r, -0) ? "0" : String(r);
 }
 
+/** 링 위의 한 점(0..1) -> 좌표. */
+function gaugePt(frac: number, r: number): [number, number] {
+  const a = ((G_START + G_SWEEP * Math.max(0, Math.min(1, frac))) * Math.PI) / 180;
+  return [G_CX + r * Math.cos(a), G_CY + r * Math.sin(a)];
+}
+
+/** 링 호 경로(t0 -> t1, 시계방향). */
+function gaugeArc(t0: number, t1: number, r: number): string {
+  const [x0, y0] = gaugePt(t0, r);
+  const [x1, y1] = gaugePt(t1, r);
+  const large = G_SWEEP * (t1 - t0) > 180 ? 1 : 0;
+  return `M ${n1(x0)} ${n1(y0)} A ${r} ${r} 0 ${large} 1 ${n1(x1)} ${n1(y1)}`;
+}
+
 /**
- * 한 지표의 경기별 값을 값 축 위에 점으로 뿌린다.
+ * 한 지표의 게이지.
  *
- * 눈금 두 개를 서로 다른 모양으로 둔 것이 이 그림의 전부다:
- *   창 평균  = 축 아래 삼각형(--home)   커리어 평균 = 세로 점선(--ink-soft)
- * 같은 모양이면 둘 중 무엇이 '지금'인지 매번 범례를 봐야 한다.
+ * 세 가지를 한 그림에 담는다:
+ *   채워진 호   = 창 값(지금 단위)            링 위 눈금 = 커리어 평균
+ *   링 밖의 점 = 그 창의 경기 하나씩(같은 값이면 바깥으로 쌓인다)
  *
- * 점은 언제나 '그 경기의 실제 값'이다. 단위를 36분당으로 바꿔도 점은 경기당 원값 그대로 둔다 -
- * 3분 뛴 경기를 36분으로 늘린 점(4점 -> 48점)은 실제로 일어난 적 없는 밤이고, 그런 점이 축을
- * 지배하면 그림이 거짓말을 한다.
+ * 36분당 축에는 점을 얹지 않는다. 3분 뛴 경기를 36분으로 늘린 점(4점 -> 48점)은 실제로
+ * 일어난 적 없는 밤이라, 그런 점이 축을 지배하면 그림이 거짓말을 한다. 그래서 그 모드에서는
+ * 값과 커리어 눈금만 남기고 화면이 그 사실을 한 줄로 적는다(dotsOmitted).
  */
-export function buildDotStripSvg(
-  row: RecentRow,
-  opts: { windowMean: number | null; careerMean: number | null }
-): RecentStrip | null {
-  if (!row.dots.length) return null;
+export function buildRecentGaugeSvg(row: RecentRow, rate: RecentRate): RecentGauge | null {
+  const usePer36 = rate === "per36" && row.def.per36 && row.per36 != null;
+  const value = row.value;
+  const career = row.career;
+  if (value == null || !Number.isFinite(value)) return null;
 
-  const { l: PL, r: PR, t: PT, b: PB } = STRIP_PAD;
-  const plotW = STRIP_W - PL - PR;
-  const axisY = STRIP_H - PB;
-  const max = row.domainMax || 1;
-  const xOf = (v: number) => PL + Math.max(0, Math.min(1, v / max)) * plotW;
+  // 축 위쪽 끝. 경기당은 이미 계산된 domainMax(점·창 평균·커리어 평균을 전부 담는 값)를 쓰고,
+  // 36분당은 점이 없으므로 두 값만 담되 끝에 딱 붙지 않게 살짝 여유를 준다.
+  const domainMax = row.def.kind === "pct"
+    ? 100
+    : usePer36
+      ? Math.max(1, niceCeil(Math.max(value, career ?? 0) * 1.15))
+      : row.domainMax || 1;
 
+  const frac = (v: number) => Math.max(0, Math.min(1, v / domainMax));
   const parts: string[] = [];
 
-  // 축(0 -> domainMax). 카운팅 지표에 0 아닌 바닥은 없다.
+  // 트랙(빈 링).
   parts.push(
-    `<line x1="${PL}" y1="${axisY}" x2="${STRIP_W - PR}" y2="${axisY}" stroke="var(--ink-faint)" stroke-width="1"/>`
+    `<path d="${gaugeArc(0, 1, G_R)}" fill="none" stroke="var(--surface-soft)" stroke-width="7" stroke-linecap="round"/>`
   );
 
-  // 커리어 평균 - 세로 점선.
-  if (opts.careerMean != null && Number.isFinite(opts.careerMean)) {
-    const x = n1(xOf(opts.careerMean));
-    parts.push(
-      `<line x1="${x}" y1="${PT - 4}" x2="${x}" y2="${axisY + 3}" stroke="var(--ink-soft)" stroke-width="1.1" stroke-dasharray="2.5 2.5"/>`
-    );
+  // 값 호. 0에 가까우면 호가 사라지므로 최소 길이를 준다 - 값이 0인 것과 그림이 없는 것은 다르다.
+  const vf = frac(value);
+  parts.push(
+    `<path d="${gaugeArc(0, Math.max(vf, 0.012), G_R)}" fill="none" stroke="var(--home)" stroke-width="7" stroke-linecap="round"/>`
+  );
+
+  // 커리어 평균 - 링을 가로지르는 눈금. 값 호와 같은 모양이면 둘 중 무엇이 '지금'인지
+  // 매번 범례를 봐야 하므로 굳이 다른 형태로 둔다.
+  if (career != null && Number.isFinite(career)) {
+    const cf = frac(career);
+    const [ax, ay] = gaugePt(cf, G_R - 6.4);
+    const [bx, by] = gaugePt(cf, G_R + 6.4);
+    // 밑선(표면색)을 먼저 굵게 깔고 그 위에 잉크선을 얹는다 - 이 눈금은 링 위에도, 링 바깥에
+    // 쌓인 점들 사이에도 놓이므로 테두리가 없으면 배경에 따라 사라진다(실측: 점이 몰린 각도).
+    const seg = `x1="${n1(ax)}" y1="${n1(ay)}" x2="${n1(bx)}" y2="${n1(by)}"`;
+    parts.push(`<line ${seg} stroke="var(--surface)" stroke-width="4.4" stroke-linecap="round"/>`);
+    parts.push(`<line ${seg} stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/>`);
   }
 
-  // 점. 같은 x 버킷에 몰리면 위로 쌓는다(리바운드 0이 열 경기인 선수가 점 하나로 보이지 않게).
-  const bucketW = DOT_R * 2 + 0.6;
-  const stacks = new Map<number, number>();
-  const over = new Map<number, { x: number; count: number }>();
-  for (const d of row.dots) {
-    const x = xOf(d.value);
-    const b = Math.round(x / bucketW);
-    const k = stacks.get(b) ?? 0;
-    stacks.set(b, k + 1);
-    if (k >= STACK_MAX) {
-      const o = over.get(b) ?? { x, count: 0 };
-      o.count += 1;
-      over.set(b, o);
-      continue;
+  // 경기별 점 - 링 바깥. 같은 값에 몰리면 바깥으로 쌓아 둘레의 두께가 곧 빈도가 되게.
+  let dotsOmitted = false;
+  if (usePer36) {
+    dotsOmitted = true;
+  } else {
+    const arcLen = 2 * Math.PI * G_R * (G_SWEEP / 360);
+    const bucketFrac = (G_DOT_R * 2 + 0.9) / arcLen;
+    const stacks = new Map<number, number>();
+    const over = new Map<number, { frac: number; count: number }>();
+    for (const d of row.dots) {
+      const f = frac(d.value);
+      const b = Math.round(f / bucketFrac);
+      const k = stacks.get(b) ?? 0;
+      stacks.set(b, k + 1);
+      if (k >= G_STACK_MAX) {
+        const o = over.get(b) ?? { frac: f, count: 0 };
+        o.count += 1;
+        over.set(b, o);
+        continue;
+      }
+      const [cx, cy] = gaugePt(f, G_DOT_R0 + k * G_STACK_STEP);
+      const x = n1(cx);
+      const y = n1(cy);
+      const shape = d.dnp
+        ? // 결장은 속 빈 점 - 0이라는 값이 '못했다'가 아니라 '뛰지 않았다'임을 모양으로 구분한다.
+          `<circle cx="${x}" cy="${y}" r="${G_DOT_R}" fill="var(--surface)" stroke="var(--ink-soft)" stroke-width="1"/>`
+        : d.isPlayoff
+          ? // 플레이오프는 금색 테두리 - 창의 정규/PO 혼재가 헤더 문장뿐 아니라 그림에도 남게.
+            `<circle cx="${x}" cy="${y}" r="${G_DOT_R}" fill="var(--home)" stroke="var(--gold)" stroke-width="1.1"/>`
+          : `<circle cx="${x}" cy="${y}" r="${G_DOT_R}" fill="var(--home)"/>`;
+      parts.push(`<g><title>${esc(d.title)}</title>${shape}<circle cx="${x}" cy="${y}" r="6" fill="transparent"/></g>`);
     }
-    const cy = axisY - 3.4 - k * STACK_STEP;
-    const cx = n1(x);
-    const shape = d.dnp
-      ? // 결장은 속 빈 점 - 0이라는 값이 '못했다'가 아니라 '뛰지 않았다'임을 모양으로 구분한다.
-        `<circle cx="${cx}" cy="${n1(cy)}" r="${DOT_R}" fill="var(--surface)" stroke="var(--ink-soft)" stroke-width="1"/>`
-      : d.isPlayoff
-        ? // 플레이오프는 금색 테두리 - 창의 정규/PO 혼재가 헤더 문장뿐 아니라 그림에도 남게.
-          `<circle cx="${cx}" cy="${n1(cy)}" r="${DOT_R}" fill="var(--home)" stroke="var(--gold)" stroke-width="1.1"/>`
-        : `<circle cx="${cx}" cy="${n1(cy)}" r="${DOT_R}" fill="var(--home)"/>`;
-    parts.push(`<g><title>${esc(d.title)}</title>${shape}<circle cx="${cx}" cy="${n1(cy)}" r="7" fill="transparent"/></g>`);
-  }
-  for (const o of over.values()) {
-    // 쌓을 자리를 넘긴 경기는 숫자로 센다 - 그리지 않고 조용히 버리면 "리바운드 0이 열 경기"가
-    // 점 다섯 개로 보인다(조은후 291499의 L15가 정확히 그 모양이다).
-    parts.push(
-      `<text x="${n1(o.x)}" y="${n1(axisY - 3.4 - (STACK_MAX - 1) * STACK_STEP - 2.8)}" font-size="7.5" text-anchor="middle" ` +
-        `fill="var(--ink-soft)" font-family="IBM Plex Mono, monospace">+${o.count}</text>`
-    );
+    for (const o of over.values()) {
+      // 쌓을 자리를 넘긴 경기는 숫자로 센다 - 그리지 않고 조용히 버리면 "리바운드 0이 열 경기"가
+      // 점 넷으로 보인다(조은후 291499의 L15가 정확히 그 모양이다).
+      const [tx, ty] = gaugePt(o.frac, G_DOT_R0 + G_STACK_MAX * G_STACK_STEP + 1.2);
+      parts.push(
+        `<text x="${n1(tx)}" y="${n1(ty)}" font-size="6.6" text-anchor="middle" dominant-baseline="middle" ` +
+          `fill="var(--ink-soft)" font-family="IBM Plex Mono, monospace">+${o.count}</text>`
+      );
+    }
   }
 
-  // 창 평균 - 축 아래 삼각형.
-  if (opts.windowMean != null && Number.isFinite(opts.windowMean)) {
-    const x = xOf(opts.windowMean);
-    parts.push(
-      `<path d="M ${n1(x)} ${n1(axisY + 0.5)} L ${n1(x - 3.6)} ${n1(axisY + 5.4)} L ${n1(x + 3.6)} ${n1(axisY + 5.4)} Z" fill="var(--home)"/>`
-    );
-  }
-
-  // 축 양 끝 숫자 - 그림 오른쪽 끝이 무엇인지 말하지 않으면 점의 위치는 아무 뜻이 없다.
-  const pct = row.def.kind === "pct";
-  const loLabel = pct ? "0%" : "0";
-  const hiLabel = pct ? "100%" : max % 1 === 0 ? String(max) : max.toFixed(1);
-  const axisText = (x: number, anchor: string, t: string) =>
-    `<text x="${n1(x)}" y="${STRIP_H - 3}" font-size="7.5" text-anchor="${anchor}" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${esc(t)}</text>`;
-  parts.push(axisText(PL, "start", loLabel));
-  parts.push(axisText(STRIP_W - PR, "end", hiLabel));
-
-  return { svg: parts.join(""), viewBox: `0 0 ${STRIP_W} ${STRIP_H}`, loLabel, hiLabel };
+  return { svg: parts.join(""), viewBox: `0 0 ${G_VB} ${G_VB}`, domainMax, dotsOmitted };
 }
 
 // ---------------------------------------------------------------------------
@@ -658,10 +689,15 @@ export function formatRecentValue(row: RecentRow, v: number | null): string {
 }
 
 /** Δ 표시("+2.3" / "-0.4" / "0.0"). 퍼센트 행은 %포인트라 'p'를 붙인다. */
+/** 표시 자리에서 0으로 떨어지는가. 숫자와 색이 같은 기준을 쓰게 하려고 둘 다 이걸 통과한다. */
+function snapsToZero(row: RecentRow, v: number): boolean {
+  return Math.abs(v) < 0.5 / 10 ** row.def.digits;
+}
+
 export function formatRecentDelta(row: RecentRow, v: number | null): string {
   if (v == null || !Number.isFinite(v)) return "-";
   const d = row.def.digits;
-  const snapped = Math.abs(v) < 0.5 / 10 ** d ? 0 : v;
+  const snapped = snapsToZero(row, v) ? 0 : v;
   const body = `${snapped > 0 ? "+" : ""}${snapped.toFixed(d)}`;
   return row.def.kind === "pct" ? `${body}p` : body;
 }
@@ -674,6 +710,10 @@ export function formatRecentDelta(row: RecentRow, v: number | null): string {
  */
 export function recentDeltaTone(row: RecentRow): "good" | "bad" | "flat" | "role" {
   if (row.delta == null || !row.meaningful) return "flat";
+  // 화면에 "0.0"으로 찍히는 값에 좋고나쁨 색을 칠하지 않는다. 창 안 값이 전부 같으면 표준오차가
+  // 0이 되어 -0.03 같은 잔여 차이도 meaningful을 통과하는데(실측: 조은후 L15 블록), 그러면
+  // 숫자는 "0.0"인데 색은 하락이 된다 - 둘이 다른 말을 하면 색 쪽이 거짓말이다.
+  if (snapsToZero(row, row.delta)) return "flat";
   if (row.def.direction === "role") return "role";
   const better = row.def.direction === "up" ? row.delta > 0 : row.delta < 0;
   return better ? "good" : "bad";
