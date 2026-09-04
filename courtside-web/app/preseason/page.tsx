@@ -206,11 +206,11 @@ function AdjBreakdown({ proj, cur, prev }: { proj: SeasonProjection; cur: string
     .join(" · ");
   // 0.005 미만은 그냥 0으로 - "+0.00"은 부호가 있는 것처럼 읽힌다.
   // 뎁스 범위는 살아 있는 값에서 읽는다(하드코딩하면 팀 로스터가 바뀔 때 조용히 낡는다).
-  const depths = [...adj.teams.values()].map((t) => t.depthPer).filter((v) => v > 0);
+  const depths = adj.teams.map((t) => t.depthPer).filter((v) => v > 0);
   const depthLo = depths.length ? Math.min(...depths).toFixed(1) : "-";
   const depthHi = depths.length ? Math.max(...depths).toFixed(1) : "-";
   const depthAvg = depths.length ? (depths.reduce((a2, b2) => a2 + b2, 0) / depths.length).toFixed(1) : "-";
-  const thinTeams = [...adj.teams.values()]
+  const thinTeams = [...adj.teams]
     .sort((a2, b2) => a2.depthPer - b2.depthPer)
     .slice(0, 2)
     .map((t) => {

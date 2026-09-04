@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cachedFn } from "./cachePolicy";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import { getTeams, shortSeason } from "./preseason";
 import { ONOFF_MIN } from "./seasonFocus";
@@ -227,7 +228,17 @@ function diffSeOf(w: WowySplit, o: WowySplit): number {
  * @param scope 시즌명("2025-2026") 또는 WOWY_CAREER("career")
  * 스틴트가 하나도 없으면 null(라인업 로그가 없는 옛 경기·미출전 선수).
  */
-export async function getWowy(pcode: string, scope: WowyScope = WOWY_CAREER): Promise<Wowy | null> {
+/**
+ * (선수, 범위)마다 결정적이고 경기가 끝날 때만 바뀐다. 상호작용은 캐시 키가 바뀌는 것이라
+ * 즉시 반응하면서도 6,000행 조회는 TTL당 한 번만 돈다.
+ */
+export const getWowy = cachedFn(computeWowy, {
+  name: "wowy",
+  ttl: TTL.batchDaily,
+  tags: (_pcode, scope) => [TAG.batch, TAG.season(String(scope ?? WOWY_CAREER))],
+});
+
+async function computeWowy(pcode: string, scope: WowyScope = WOWY_CAREER): Promise<Wowy | null> {
   const isCareer = scope === WOWY_CAREER;
 
   // 시즌 범위 - 정규시즌+플레이오프 모두(category: null). 라인업 표본을 버리지 않는다.
@@ -540,7 +551,14 @@ export type WowyPicker = {
  * 정규시즌+플레이오프. 실측: 2025-2026 → 111명.
  * 팀은 그 시즌 가장 오래 뛴 팀(시즌 중 이적 선수는 한 번만 나온다).
  */
-export async function getWowyPlayers(seasonName: string): Promise<WowyPicker | null> {
+/** 조합 화면의 선수 선택 목록 - 시즌 로스터라 배치가 돌 때만 바뀐다. */
+export const getWowyPlayers = cachedFn(computeWowyPlayers, {
+  name: "wowyPlayers",
+  ttl: TTL.batchDaily,
+  tags: (seasonName) => [TAG.batch, TAG.season(seasonName)],
+});
+
+async function computeWowyPlayers(seasonName: string): Promise<WowyPicker | null> {
   const [{ rows }, teams] = await Promise.all([
     fetchSeasonPlayerGameRows(seasonName, { category: null }),
     getTeams(seasonName),

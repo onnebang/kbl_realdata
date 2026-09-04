@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cachedFn } from "./cachePolicy";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import { getSeasonGames, num } from "./teamSeasonStats";
 import {
@@ -171,7 +172,14 @@ async function fetchSizeRows(pcode: string, size: ComboSize): Promise<ComboDbRow
  * 이름·사진은 실제로 화면에 오르는 최대 12행의 조합원만 모아 한 번 더 조회한다 - 김선형처럼
  * 1,200개가 통과하는 선수도 이름 조회는 30명 안팎이다.
  */
-export async function getPlayerCombos(pcode: string): Promise<PlayerCombos> {
+/** 커리어 조합 - lineup_combo(142,756행)에서 뽑는다. 수동 build 때만 바뀐다. */
+export const getPlayerCombos = cachedFn(computePlayerCombos, {
+  name: "playerCombos",
+  ttl: TTL.manualBuild,
+  tags: (pcode) => [TAG.build, `player:${pcode}`],
+});
+
+async function computePlayerCombos(pcode: string): Promise<PlayerCombos> {
   let bySize: ComboDbRow[][];
   try {
     bySize = await Promise.all(COMBO_SIZES.map((size) => fetchSizeRows(pcode, size)));
@@ -259,7 +267,13 @@ export async function getPlayerCombos(pcode: string): Promise<PlayerCombos> {
  * "따로" 양쪽이 이 문턱을 넘어야 하지만 여기는 "함께"만 있으면 되므로 실제 통과율은 WOWY보다
  * 오히려 넉넉하다.
  */
-export async function getPlayerSeasonCombos(pcode: string, season: string): Promise<PlayerCombos | null> {
+export const getPlayerSeasonCombos = cachedFn(computeGetPlayerSeasonCombos, {
+  name: "playerSeasonCombos",
+  ttl: TTL.batchDaily,
+  tags: (pcode, season) => [TAG.batch, TAG.season(season), `player:${pcode}`],
+});
+
+async function computeGetPlayerSeasonCombos(pcode: string, season: string): Promise<PlayerCombos | null> {
   const games = await getSeasonGames(season, { category: null });
   if (!games.length) return null; // 개막 전 등 - 그 시즌에 끝난 경기가 없음
 

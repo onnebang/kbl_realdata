@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cached } from "./cachePolicy";
 import { displayTeamName } from "./teamNames";
 import { DEPARTURE_LABEL, PRESEASON_SEASON, prevSeasonName, roleFromNote, type ChangeKind } from "./preseason";
 import { getPlayerCareerGames, type CareerGameRow } from "./playerProfile";
@@ -118,7 +119,15 @@ function startYear(season: string): number {
  * 선수 한 명의 로스터 상태. 쿼리 4개(season_roster 1행, roster_changes ≤2행, teams, 커리어 경기 페이지네이션)를
  * 병렬로. 페이지가 이미 getPlayerCareerGames 행을 갖고 있으면 careerRows로 넘겨 재조회를 피한다.
  */
-export async function getPlayerRosterStatus(pcode: string, careerRows?: CareerGameRow[]): Promise<PlayerRosterStatus> {
+/** 키는 pcode만. season_roster는 배치가 돌 때만 바뀐다. */
+export function getPlayerRosterStatus(pcode: string, careerRows?: CareerGameRow[]): Promise<PlayerRosterStatus> {
+  return cached(() => computePlayerRosterStatus(pcode, careerRows), ["playerRosterStatus", pcode], TTL.batchDaily, [
+    TAG.batch,
+    `player:${pcode}`,
+  ]);
+}
+
+async function computePlayerRosterStatus(pcode: string, careerRows?: CareerGameRow[]): Promise<PlayerRosterStatus> {
   const season = PRESEASON_SEASON;
   const prevSeason = prevSeasonName(season);
   const [rosterRes, changesRes, teamsRes, career, departureRes] = await Promise.all([

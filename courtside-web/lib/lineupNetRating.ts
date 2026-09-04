@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cachedMap } from "./cachePolicy";
 
 // tools/build_synergy_matchup.py가 15시즌 전체 라인업 스틴트를 미리 집계해둔
 // lineup_combo/player_onoff 테이블 조회. 조회 범위는 lib/gameLineups.ts의 subComboKeys로
@@ -29,7 +30,18 @@ export async function getLineupRatings(comboKeys: string[]): Promise<Map<string,
 // 스크럽 위치와 무관한 정적 값이라 page.tsx가 한 번만 조회해 prop으로 내려줌.
 export type PlayerOnOff = { seconds: number; minutes: number; stints: number; ptsFor: number; ptsAgainst: number; netRatingPer40: number };
 
-export async function getPlayerOnOffRatings(pcodes: string[]): Promise<Map<string, PlayerOnOff>> {
+/** player_onoff는 수동 build 산출물. 키는 정렬한 pcode 목록. */
+export function getPlayerOnOffRatings(pcodes: string[]): Promise<Map<string, PlayerOnOff>> {
+  if (!pcodes.length) return Promise.resolve(new Map());
+  return cachedMap(
+    () => computePlayerOnOffRatings(pcodes),
+    ["playerOnOff", [...pcodes].sort().join(",")],
+    TTL.manualBuild,
+    [TAG.build]
+  );
+}
+
+async function computePlayerOnOffRatings(pcodes: string[]): Promise<Map<string, PlayerOnOff>> {
   if (!pcodes.length) return new Map();
   const map = new Map<string, PlayerOnOff>();
   for (let i = 0; i < pcodes.length; i += 200) {

@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cachedFn } from "./cachePolicy";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import { getTeams, shortSeason, type TeamInfo } from "./preseason";
 
@@ -319,7 +320,14 @@ const VALUE_OF: Record<TeamStatKey, (a: Agg) => number | null> = {
  * 표본: games.season_category = '정규시즌' & is_ended, game_team_stats 원본 행.
  * 경기가 하나도 없는 시즌(개막 전 2026-2027 등)은 null - 호출부가 정직하게 폴백할 것.
  */
-export async function getTeamSeasonStats(seasonName: string): Promise<TeamSeasonStats | null> {
+/** 시즌 팀 기록 - 경기가 끝날 때만 바뀐다. /teams와 팀 상세가 같이 쓴다. */
+export const getTeamSeasonStats = cachedFn(computeTeamSeasonStats, {
+  name: "teamSeasonStats",
+  ttl: TTL.batchDaily,
+  tags: (seasonName) => [TAG.batch, TAG.season(seasonName)],
+});
+
+async function computeTeamSeasonStats(seasonName: string): Promise<TeamSeasonStats | null> {
   const games = await getSeasonGames(seasonName, { category: SEASON_CATEGORY_REGULAR });
   if (!games.length) return null;
 
@@ -533,7 +541,13 @@ type PlayerStatRawRow = {
  * 출전 경기(gp)는 min_played > 0인 경기만 센다 - 엔트리에만 든 0분 행(2025-2026 정규시즌 612행,
  * 전부 득점·시도·리바운드 0)을 경기로 세면 경기당 수치의 분모가 부풀려진다.
  */
-export async function getTeamLeaders(tcode: string, seasonName: string): Promise<TeamLeaders | null> {
+export const getTeamLeaders = cachedFn(computeTeamLeaders, {
+  name: "teamLeaders",
+  ttl: TTL.batchDaily,
+  tags: (_tcode, seasonName) => [TAG.batch, TAG.season(seasonName)],
+});
+
+async function computeTeamLeaders(tcode: string, seasonName: string): Promise<TeamLeaders | null> {
   const games = await getSeasonGames(seasonName, { category: SEASON_CATEGORY_REGULAR });
   const teamGames = games.filter((g) => g.homeTcode === tcode || g.awayTcode === tcode);
   if (!teamGames.length) return null;

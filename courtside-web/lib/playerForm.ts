@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cached } from "./cachePolicy";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import { getPlayerCareerGames, type CareerGameRow } from "./playerProfile";
 import { PLAYOFF_CATEGORY, seasonStartYear } from "./playerPageData";
@@ -187,7 +188,11 @@ export type PlayerForm = {
   recentN: number;
   seasonsPlayed: number;
   /** 시즌별 리그 기준선(리그 평균 선수 1명 몫) - seasons에 이미 붙어 있지만 별도 조회용. */
-  leagueBySeason: Map<string, FormRates>;
+  /**
+   * 시즌 -> 리그 평균. Map이 아니라 객체인 이유: 이 값은 unstable_cache 경계를 넘는데
+   * Map은 직렬화되지 않는다(lib/cachePolicy.ts). 조회는 leagueBySeason[season]으로 같다.
+   */
+  leagueBySeason: Record<string, FormRates>;
   possFormula: string;
   estimateNote: string;
   qualifyNote: string;
@@ -427,7 +432,22 @@ export type PlayerFormOptions = {
  * 출전 기록이 하나도 없으면 seasons가 빈 배열인 PlayerForm을 돌려준다(null이 아님 - 화면이
  * 캡션과 빈 상태를 그대로 그릴 수 있게).
  */
-export async function getPlayerForm(pcode: string, opts?: PlayerFormOptions): Promise<PlayerForm> {
+/**
+ * 캐시 키는 (pcode, recentN). careerRows는 pcode에서 파생된 값이라 키에 넣을 필요가 없고,
+ * recentN(?w=)은 결과를 바꾸므로 반드시 들어가야 한다.
+ * 캐시 히트에서는 주입한 careerRows가 쓰이지 않는다 - 같은 pcode면 같은 값이라 문제없다.
+ */
+export function getPlayerForm(pcode: string, opts?: PlayerFormOptions): Promise<PlayerForm> {
+  const recentN = opts?.recentN ?? FORM_DEFAULT_RECENT_N;
+  return cached(
+    () => computePlayerForm(pcode, opts),
+    ["playerForm", pcode, String(recentN)],
+    TTL.batchDaily,
+    [TAG.batch, `player:${pcode}`]
+  );
+}
+
+async function computePlayerForm(pcode: string, opts?: PlayerFormOptions): Promise<PlayerForm> {
   const recentN = opts?.recentN ?? FORM_DEFAULT_RECENT_N;
   const all = (opts?.careerRows ?? (await getPlayerCareerGames(pcode))).filter((r) => r.isEnded);
   // 날짜 오름차순(같은 날이면 gmkey) - 시즌 순서와 "최근 N"이 같은 정렬을 쓰게.
@@ -451,13 +471,13 @@ export async function getPlayerForm(pcode: string, opts?: PlayerFormOptions): Pr
   // 카테고리별로 따로 만든다 - 플레이오프 행 옆에 정규시즌 리그 평균을 놓으면 표본이 어긋난다
   // (PO는 리그 페이스·효율이 정규시즌과 다르다).
   const leagueByKey = new Map<string, FormRates>();
-  const leagueBySeason = new Map<string, FormRates>();
+  const leagueBySeason: Record<string, FormRates> = {};
   for (const [season, byCat] of leagueRows) {
     for (const [category, list] of byCat) {
       const r = leagueRates(list);
       if (!r) continue;
       leagueByKey.set(`${season}|${category}`, r);
-      if (category === SEASON_CATEGORY_REGULAR) leagueBySeason.set(season, r);
+      if (category === SEASON_CATEGORY_REGULAR) leagueBySeason[season] = r;
     }
   }
 
@@ -595,7 +615,7 @@ export async function getPlayerForm(pcode: string, opts?: PlayerFormOptions): Pr
     // 최근 구간의 리그 기준선은 그 구간 마지막 시즌의 정규시즌 값이다 - 구간이 두 시즌이나
     // 정규/PO에 걸치면 근사이고, 그 사실은 바로 위 note에 이미 적혀 있다.
     const lastSeason = recentList[recentList.length - 1]?.seasonName;
-    recent.league = lastSeason ? leagueBySeason.get(lastSeason) ?? null : null;
+    recent.league = lastSeason ? leagueBySeason[lastSeason] ?? null : null;
   }
 
   const possFormula = `추정 온코트 포제션 = Σ(그 경기 팀 포제션 × 출전 분 ÷ ${REGULATION_MINUTES})`;

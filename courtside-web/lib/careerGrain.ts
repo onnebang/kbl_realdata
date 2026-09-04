@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cached } from "./cachePolicy";
 import { getPlayerCareerGames, type CareerGameRow } from "./playerProfile";
 import { buildSeasonAxis, seasonStartYear, PLAYOFF_CATEGORY } from "./playerPageData";
 
@@ -237,7 +238,15 @@ async function seasonsWithPlay(candidates: string[]): Promise<Set<string>> {
  *   이 배열에서 만들고 재조회하지 않는다(선수 페이지는 이미 careerRows를 갖고 있다).
  *   생략하면 내부에서 getPlayerCareerGames를 호출한다.
  */
-export async function getCareerGrain(pcode: string, careerRows?: CareerGameRow[]): Promise<CareerGrain> {
+/** 키는 pcode만 - careerRows는 pcode에서 파생된 값이다. */
+export function getCareerGrain(pcode: string, careerRows?: CareerGameRow[]): Promise<CareerGrain> {
+  return cached(() => computeCareerGrain(pcode, careerRows), ["careerGrain", pcode], TTL.batchDaily, [
+    TAG.batch,
+    `player:${pcode}`,
+  ]);
+}
+
+async function computeCareerGrain(pcode: string, careerRows?: CareerGameRow[]): Promise<CareerGrain> {
   const all = careerRows ?? (await getPlayerCareerGames(pcode));
   // 종료 경기만(예정·진행 중 경기는 아직 사실이 아니다). 실측상 미종료 경기의 기록 행은 0건이지만
   // 방어적으로 거른다.

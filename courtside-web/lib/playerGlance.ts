@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cached } from "./cachePolicy";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import { getPlayerCareerGames, type CareerGameRow } from "./playerProfile";
 import {
@@ -582,7 +583,28 @@ export type PlayerGlanceOptions = {
  * 퍼센타일이 0인 축이 있으면 동점 인원용 풀 RPC 1(fetchPercentileTies). 둘 다 해당 선수에게만
  * 일어난다(워니는 0회, 조은후는 동점 인원 조회 1회).
  */
-export async function getPlayerGlance(pcode: string, statSeason: string | null, opts?: PlayerGlanceOptions): Promise<PlayerGlance> {
+/**
+ * 키는 (pcode, statSeason). 주입되는 form에서 이 함수가 쓰는 건 form.seasons뿐이라
+ * 최근 창(?w=)과 무관하다 - 그래서 창을 키에 넣지 않는다.
+ */
+export function getPlayerGlance(
+  pcode: string,
+  statSeason: string | null,
+  opts?: PlayerGlanceOptions
+): Promise<PlayerGlance> {
+  return cached(
+    () => computePlayerGlance(pcode, statSeason, opts),
+    ["playerGlance", pcode, statSeason ?? "none"],
+    TTL.batchDaily,
+    [TAG.batch, `player:${pcode}`]
+  );
+}
+
+async function computePlayerGlance(
+  pcode: string,
+  statSeason: string | null,
+  opts?: PlayerGlanceOptions
+): Promise<PlayerGlance> {
   const careerRows = (opts?.careerRows ?? (await getPlayerCareerGames(pcode))).filter((r) => r.isEnded);
 
   // 기준 시즌 소속 팀 - 그 시즌 가장 오래 뛴 팀(시즌 중 이적 대비. 실측: 조은후 23-24는 정관장 -> 소노).

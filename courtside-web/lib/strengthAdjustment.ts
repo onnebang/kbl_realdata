@@ -68,7 +68,11 @@ export type TeamAdjustment = {
 
 export type StrengthAdjustment = {
   season: string;
-  teams: Map<string, TeamAdjustment>;
+  /**
+   * 팀 10개. Map이 아니라 배열인 이유: 이 값은 unstable_cache 경계를 넘는데 Map은 직렬화되지
+   * 않아 캐시 히트 때 빈 객체가 된다(lib/cachePolicy.ts 머리말). 10개짜리 find는 공짜다.
+   */
+  teams: TeamAdjustment[];
   /** 리그 평균 델타. 순위는 차이로만 정해지므로 화면은 이 값을 뺀 상대 델타를 보여준다. */
   leagueMean: number;
   /** 스카우팅 사전확률로 채운 자리 수 - 정확도 경고 문구의 근거. */
@@ -111,13 +115,13 @@ export async function getStrengthAdjustment(season: string): Promise<StrengthAdj
   }
   for (const list of slotsByTeam.values()) list.sort((a, b) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot));
 
-  const teams = new Map<string, TeamAdjustment>();
+  const teams: TeamAdjustment[] = [];
   let sum = 0;
   for (const r of teamRows) {
     const tc = r.tcode as string;
     const total = n(r.total_minutes);
     sum += n(r.d_margin_total);
-    teams.set(tc, {
+    teams.push({
       tcode: tc,
       perPrev: n(r.per_prev),
       perNext: n(r.per_next),
@@ -132,12 +136,13 @@ export async function getStrengthAdjustment(season: string): Promise<StrengthAdj
       slots: slotsByTeam.get(tc) ?? [],
     });
   }
+  teams.sort((a, b) => b.dMarginTotal - a.dMarginTotal);
 
   const priorSlots = slotRows.filter((r) => r.tier).length;
   return {
     season,
     teams,
-    leagueMean: teams.size ? sum / teams.size : 0,
+    leagueMean: teams.length ? sum / teams.length : 0,
     priorSlots,
     totalSlots: slotRows.length,
   };

@@ -1,7 +1,7 @@
 import { PRESEASON_SEASON, getTeams, isRealGmkey, prevSeasonName, type TeamInfo } from "./preseason";
 import { supabase } from "./supabase";
 import { MARGIN_TO_LOGIT, getStrengthAdjustment, type StrengthAdjustment, type TeamAdjustment } from "./strengthAdjustment";
-import { memoAsync } from "./memo";
+import { TAG, TTL, cachedFn } from "./cachePolicy";
 
 // 정규시즌 전체(54경기) 전망 - 요청: "기대승수가 26경기 기준이다보니 파워를 가늠하기 어려워,
 // 9경기씩 6라운드 총 54경기인데, 전반기 3라운드까지와, 6라운드 54경기 전체 기대승수와 AI 예상
@@ -94,9 +94,12 @@ export async function fetchScheduleWithProbs(season: string): Promise<{
   return { games, probs };
 }
 
+/**
+ * 화면이 읽는 매치업 행렬 요약. **승률 Map은 여기 없다** - 이 타입은 unstable_cache 경계를
+ * 넘는데 Map은 직렬화되지 않는다(lib/cachePolicy.ts). 승률은 이 모듈 안에서만 쓰이므로
+ * 아래 buildMatchupMatrix가 Map을 따로 돌려준다.
+ */
 export type MatchupMatrix = {
-  /** "홈>원정" -> 홈 승률. 90개 순서쌍 전부(모델 값 + 뒤집어 채운 값). */
-  prob: Map<string, number>;
   tcodes: string[];
   /** 모델이 직접 매긴 순서쌍 수. */
   fromModel: number;
@@ -109,7 +112,11 @@ export type MatchupMatrix = {
 };
 
 /** 예정 경기의 승률을 순서쌍 단위로 접어 90칸 매치업 행렬을 만든다. */
-export function buildMatchupMatrix(games: ScheduledGame[], probs: Map<string, number>, tcodes: string[]): MatchupMatrix {
+export function buildMatchupMatrix(
+  games: ScheduledGame[],
+  probs: Map<string, number>,
+  tcodes: string[]
+): MatchupMatrix & { prob: Map<string, number> } {
   // 같은 순서쌍이 여러 번 나오면 평균(실측상 차이가 0.002 이하라 어느 쪽이든 같지만,
   // "아무거나 하나" 대신 평균이면 실행마다 값이 흔들리지 않는다).
   const sum = new Map<string, { s: number; n: number }>();
@@ -250,14 +257,15 @@ function simulate(prob: Map<string, number>, tcodes: string[]): SimResult {
  */
 function adjustMatrix(base: Map<string, number>, tcodes: string[], adj: StrengthAdjustment): Map<string, number> {
   const out = new Map<string, number>();
+  const deltaOf = new Map(adj.teams.map((t) => [t.tcode, t.dMarginTotal]));
   for (const h of tcodes) {
     for (const a of tcodes) {
       if (h === a) continue;
       const k = pairKey(h, a);
       const p0 = base.get(k);
       if (p0 == null) continue;
-      const dh = adj.teams.get(h)?.dMarginTotal ?? 0;
-      const da = adj.teams.get(a)?.dMarginTotal ?? 0;
+      const dh = deltaOf.get(h) ?? 0;
+      const da = deltaOf.get(a) ?? 0;
       const z = logit(p0) + (dh - da) * MARGIN_TO_LOGIT;
       // 극단으로 밀리지 않게 잘라 둔다(시뮬레이션이 0/1 확률에서 퇴화하는 것을 막는다).
       out.set(k, Math.min(0.99, Math.max(0.01, sigmoid(z))));
@@ -351,18 +359,20 @@ export type SeasonProjection = {
  * 공개 일정 기준 표만 보여주면 된다.
  */
 /**
- * 전망 한 판의 비용은 대부분 시뮬레이션이다(54경기 × SIMS × 2 시나리오). 그 결과는 같은 시즌
- * 안에서 배치가 돌기 전까지 바뀌지 않으므로 요청마다 다시 돌릴 이유가 없다.
- * 실측(2026-09-05, dev): 메모 없이 요청당 35~42초, SIMS를 2,000으로 낮추면 8초(= DB 왕복만).
- * TTL 10분이면 배치 갱신이 늦어도 다음 10분 안에 반영되고, 개막 후 라이브 경기 화면은
- * 이 함수를 쓰지 않으므로 30초 갱신 요구와 충돌하지 않는다.
+ * 전망 한 판의 비용은 대부분 시뮬레이션이다(54경기 × SIMS × 2 시나리오).
+ * 실측(2026-09-05, dev): 캐시 없이 요청당 35~42초. SIMS를 2,000으로 낮추면 8초(= DB 왕복만)라
+ * 시뮬레이션이 원인임을 확인했다.
+ *
+ * 그 결과는 배치가 돌기 전까지 바뀌지 않는다 - 입력이 pregame_features(daily_batch 06:00)와
+ * strength_adjustment(수동 build)뿐이다. 그래서 배포 전체가 공유하는 Data Cache에 넣는다.
+ * 프로세스 로컬 메모였을 때는 인스턴스마다 한 번씩 다시 돌았는데, 이제는 TTL당 한 번이다.
+ *
+ * 라이브 경기 화면은 이 함수를 쓰지 않으므로 30초 갱신 요구와 충돌하지 않는다.
  */
-export const PROJECTION_TTL_MS = 10 * 60 * 1000;
-
-export const getSeasonProjection = memoAsync(computeSeasonProjection, {
+export const getSeasonProjection = cachedFn(computeSeasonProjection, {
   name: "seasonProjection",
-  ttlMs: PROJECTION_TTL_MS,
-  key: (season) => season ?? PRESEASON_SEASON,
+  ttl: TTL.manualBuild,
+  tags: (season) => [TAG.season(season ?? PRESEASON_SEASON), TAG.batch, TAG.build],
 });
 
 async function computeSeasonProjection(season = PRESEASON_SEASON): Promise<SeasonProjection | null> {
@@ -479,7 +489,7 @@ async function computeSeasonProjection(season = PRESEASON_SEASON): Promise<Seaso
     let modal = 0;
     for (let r = 1; r < n; r++) if (dist[r] > dist[modal]) modal = r;
     const r = rec.get(t);
-    const a = adjustment?.teams.get(t) ?? null;
+    const a = adjustment?.teams.find((x) => x.tcode === t) ?? null;
     let adj: ProjectionTeam["adj"] = null;
     if (a && adjSim && adjExp && adjRankOrder) {
       const ad = adjSim.rankDist[i];
@@ -530,11 +540,15 @@ async function computeSeasonProjection(season = PRESEASON_SEASON): Promise<Seaso
   let halfFilledTotal = 0;
   for (const t of tcodes) halfFilledTotal += filledN.get(t) as number;
 
+  // matrix.prob(Map)은 반환하지 않는다 - 캐시 직렬화를 통과하지 못한다. 화면이 읽는 건
+  // tcodes / fromModel / filled / hcaLogit / hcaProb뿐이다(실측).
+  const { prob: _unusedProb, ...matrixSummary } = matrix;
+  void _unusedProb;
   return {
     season,
     prevSeason,
     teams: rows,
-    matrix,
+    matrix: matrixSummary,
     scheduledN: priced.length,
     halfFilledN: halfFilledTotal / 2, // 두 팀 양쪽에서 세었으니 절반이 실제 경기 수
     scheduleComplete: rows.every((t) => t.schedN === GAMES_FULL) && matrix.filled === 0,

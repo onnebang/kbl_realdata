@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cached, cachedFn } from "./cachePolicy";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import { getTeams, shortSeason } from "./preseason";
 import { PERCENTILE_FINAL } from "./seasonFocus";
@@ -328,7 +329,25 @@ const EXTRACT: Record<LeaderCategoryKey, Extractor> = {
  * @param opts.categories 필요한 카테고리만 계산(생략 시 전부)
  * 경기가 없는 시즌(개막 전)은 null.
  */
+/**
+ * 시즌 리더보드는 game_player_stats 6,800행을 7~8왕복으로 읽어 접는다. 경기가 끝날 때만
+ * 바뀌므로 캐시한다. 키에 카테고리 목록이 들어가야 한다 - 같은 시즌이라도 요청한 카테고리가
+ * 다르면 다른 결과다(정렬해서 넣어야 순서가 달라도 같은 키가 된다).
+ */
 export async function getSeasonLeaderboards(
+  seasonName: string,
+  opts?: { topN?: number; categories?: LeaderCategoryKey[] }
+): Promise<SeasonLeaderboards | null> {
+  const catKey = opts?.categories?.length ? [...opts.categories].sort().join(",") : "all";
+  return cached(
+    () => computeSeasonLeaderboards(seasonName, opts),
+    ["seasonLeaderboards", seasonName, String(opts?.topN ?? "d"), catKey],
+    TTL.batchDaily,
+    [TAG.batch, TAG.season(seasonName)]
+  );
+}
+
+async function computeSeasonLeaderboards(
   seasonName: string,
   opts?: { topN?: number; categories?: LeaderCategoryKey[] }
 ): Promise<SeasonLeaderboards | null> {
@@ -455,22 +474,28 @@ export async function getSeasonLeaderboards(
 
 /**
  * 리더보드를 만들 수 있는 시즌(정규시즌 종료 경기가 하나라도 있는 시즌), 최신순.
- * seasons 표(16행)를 먼저 읽고 시즌마다 head count 한 번씩 - 행을 하나도 안 받아온다.
  * 개막 전 2026-2027은 여기서 자동으로 빠진다.
+ *
+ * 예전에는 seasons 16행을 읽고 시즌마다 head count를 한 번씩 던졌다 - 행은 하나도 안 받지만
+ * **왕복이 17번**이었고, /lineups와 /leaderboards/season이 매 요청 이걸 불렀다(실측).
+ * 지금은 뷰 하나로 1왕복이다:
+ *   create or replace view seasons_with_regular_games as
+ *     select distinct season_name from games
+ *      where season_category = '정규시즌' and is_ended;
+ * 미리 구운 컬럼이 아니라 뷰인 이유 - 개막 첫 경기가 끝난 날 배치(매일 06:00)를 기다리지
+ * 않고 바로 켜져야 하기 때문이다.
  */
-export async function getLeaderboardSeasons(): Promise<string[]> {
-  const { data } = await supabase.from("seasons").select("season_name").order("season_name", { ascending: false });
-  const seasons = (data ?? []).map((s) => s.season_name as string);
-  const checks = await Promise.all(
-    seasons.map(async (s) => {
-      const { count } = await supabase
-        .from("games")
-        .select("gmkey", { count: "exact", head: true })
-        .eq("season_name", s)
-        .eq("season_category", SEASON_CATEGORY_REGULAR)
-        .eq("is_ended", true);
-      return { s, n: count ?? 0 };
-    })
-  );
-  return checks.filter((c) => c.n > 0).map((c) => c.s);
+export const getLeaderboardSeasons = cachedFn(computeLeaderboardSeasons, {
+  name: "leaderboardSeasons",
+  ttl: TTL.batchDaily,
+  tags: () => [TAG.batch],
+});
+
+async function computeLeaderboardSeasons(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("seasons_with_regular_games")
+    .select("season_name")
+    .order("season_name", { ascending: false });
+  if (error) throw new Error(`getLeaderboardSeasons: ${error.message}`);
+  return (data ?? []).map((s) => s.season_name as string);
 }

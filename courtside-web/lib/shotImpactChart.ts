@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cachedFn, cachedMap } from "./cachePolicy";
 import { classifyShot } from "./formIndex";
 import { COURT_X, COURT_Y, HOOP_RIGHT, mirrorShotX, drawCourtMarkings, drawHoop } from "./zoneCompare";
 
@@ -13,7 +14,12 @@ export type ShotImpactRow = { x: number; y: number; d: string; made: boolean };
 // zone -> 슛 1회당 기대득점.
 export type ZoneExpected = Map<string, number>;
 
-export async function getZoneExpectedPts(): Promise<ZoneExpected> {
+/** xpts_zone_table 5행 - 일회성 적재라 사실상 상수. Map이라 cachedMap으로 감싼다. */
+export function getZoneExpectedPts(): Promise<ZoneExpected> {
+  return cachedMap(computeZoneExpectedPts, ["zoneExpectedPts"], TTL.reference, [TAG.build]);
+}
+
+async function computeZoneExpectedPts(): Promise<ZoneExpected> {
   const { data } = await supabase.from("xpts_zone_table").select("zone, expected_pts_per_shot");
   return new Map((data ?? []).map((z) => [z.zone as string, Number(z.expected_pts_per_shot)]));
 }
@@ -56,7 +62,13 @@ export type PlayerSeasonBoxTotals = {
 // 시즌별 기록 표의 FG%는 2점만의 성공률). shot_log 표본과 대조해서 확인(같은 선수·시즌 shot_log
 // 행 수 ≈ fga+tpa, fga 단독과는 안 맞음). TSA/MOREY%/FTr 공식이 말하는 "FGA"는 2점+3점 합산이
 // 표준이라 여기서 더해서 반환 - 안 더하면 TSA가 실제 슛 표본의 3분의 2 수준으로 축소되는 오류가 남.
-export async function getPlayerSeasonBoxTotals(pcode: string, seasonName: string): Promise<PlayerSeasonBoxTotals> {
+export const getPlayerSeasonBoxTotals = cachedFn(computeGetPlayerSeasonBoxTotals, {
+  name: "playerSeasonBoxTotals",
+  ttl: TTL.batchDaily,
+  tags: (pcode, seasonName) => [TAG.batch, TAG.season(seasonName), `player:${pcode}`],
+});
+
+async function computeGetPlayerSeasonBoxTotals(pcode: string, seasonName: string): Promise<PlayerSeasonBoxTotals> {
   type Row = {
     pts: number | null;
     fga: number | null;

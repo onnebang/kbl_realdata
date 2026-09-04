@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cachedFn, cachedMap } from "./cachePolicy";
 import { displayTeamName } from "./teamNames";
 
 // 선수 프로필(README "다음 단계" 세 번째, 새 /players/[pcode] 라우트) - 커리어 스탯을
@@ -15,7 +16,12 @@ export type PlayerInfo = { pcode: string; name: string; ename: string | null; ph
 // 페이지네이션 불필요.
 export type TeamMeta = { tcode: string; name: string; abbr: string; color: string; logoUrl: string | null };
 
-export async function getAllTeams(): Promise<Map<string, TeamMeta>> {
+/** 팀 13행 - 사실상 상수. 거의 모든 페이지가 부른다. */
+export function getAllTeams(): Promise<Map<string, TeamMeta>> {
+  return cachedMap(computeAllTeams, ["allTeams"], TTL.reference, [TAG.batch]);
+}
+
+async function computeAllTeams(): Promise<Map<string, TeamMeta>> {
   const { data } = await supabase.from("teams").select("tcode, name, abbr, color, logo_url");
   const map = new Map<string, TeamMeta>();
   for (const t of data ?? []) {
@@ -76,7 +82,13 @@ export type GameLogRow = {
   win: boolean;
 };
 
-export async function getPlayerInfo(pcode: string): Promise<PlayerInfo | null> {
+export const getPlayerInfo = cachedFn(computePlayerInfo, {
+  name: "playerInfo",
+  ttl: TTL.batchDaily,
+  tags: (pcode) => [TAG.batch, `player:${pcode}`],
+});
+
+async function computePlayerInfo(pcode: string): Promise<PlayerInfo | null> {
   const { data } = await supabase.from("players").select("pcode, name, ename, photo_url").eq("pcode", pcode).maybeSingle();
   if (!data) return null;
   return { pcode: data.pcode, name: data.name, ename: data.ename, photoUrl: data.photo_url };
@@ -224,7 +236,19 @@ export function computeWindowAverages(games: GameLogRow[], windowN: number) {
   };
 }
 
-export async function getPlayerRecentGames(pcode: string, limit = MAX_GAME_LOG): Promise<GameLogRow[]> {
+// limit이 기본값을 가지면 cachedFn의 인자 타입 추론이 그 인자를 잃는다(호출부가 2개를 넘기면
+// 컴파일 에러). 그래서 캐시 래퍼는 두 인자를 다 필수로 받고, 기본값은 여기서 채운다.
+const cachedRecentGames = cachedFn(computePlayerRecentGames, {
+  name: "playerRecentGames",
+  ttl: TTL.batchDaily,
+  tags: (pcode) => [TAG.batch, `player:${pcode}`],
+});
+
+export function getPlayerRecentGames(pcode: string, limit = MAX_GAME_LOG): Promise<GameLogRow[]> {
+  return cachedRecentGames(pcode, limit);
+}
+
+async function computePlayerRecentGames(pcode: string, limit: number): Promise<GameLogRow[]> {
   const { data } = await supabase
     .from("games")
     .select(
@@ -314,7 +338,17 @@ export type CareerGameRow = {
   fta: number;
 };
 
-export async function getPlayerCareerGames(pcode: string): Promise<CareerGameRow[]> {
+/**
+ * 커리어 전 경기 행 - 15시즌 선수면 1,000행 넘게 나오고 선수 상세의 여러 패널이 공유한다.
+ * 경기가 끝날 때만 바뀐다.
+ */
+export const getPlayerCareerGames = cachedFn(computePlayerCareerGames, {
+  name: "playerCareerGames",
+  ttl: TTL.batchDaily,
+  tags: (pcode) => [TAG.batch, `player:${pcode}`],
+});
+
+async function computePlayerCareerGames(pcode: string): Promise<CareerGameRow[]> {
   type Stat = {
     tcode: string;
     back_num: string | null;

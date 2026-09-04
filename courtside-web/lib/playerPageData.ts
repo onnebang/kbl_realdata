@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cachedMap } from "./cachePolicy";
 import { displayTeamName } from "./teamNames";
 import { PRESEASON_SEASON, isRealGmkey, getPregameProb } from "./preseason";
 import { getTeamNextGame, type TeamFixture } from "./matchups";
@@ -120,7 +121,20 @@ export type SeasonWpaLine = {
   outOf: number;
 };
 
-export async function getPlayerWpaBySeason(pcode: string, seasons: string[]): Promise<Map<string, SeasonWpaLine>> {
+/**
+ * 시즌 목록이 배열이라 cachedFn에 바로 못 넣는다. 정렬해 문자열로 만들면 같은 집합이면 같은
+ * 키가 되고(순서가 달라도), Map은 cachedMap이 엔트리 배열로 저장했다 되살린다.
+ */
+export function getPlayerWpaBySeason(pcode: string, seasons: string[]): Promise<Map<string, SeasonWpaLine>> {
+  return cachedMap(
+    () => computePlayerWpaBySeason(pcode, seasons),
+    ["playerWpaBySeason", pcode, [...seasons].sort().join(",")],
+    TTL.batchDaily,
+    [TAG.batch, `player:${pcode}`]
+  );
+}
+
+async function computePlayerWpaBySeason(pcode: string, seasons: string[]): Promise<Map<string, SeasonWpaLine>> {
   const out = new Map<string, SeasonWpaLine>();
   if (!seasons.length) return out;
   type Row = { pcode: string; season_name: string; tcode: string; games: number; plays: number; total_wpa: number; pos_wpa: number; neg_wpa: number; wpa_per_game: number };

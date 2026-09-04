@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cachedFn } from "./cachePolicy";
 import { classifyShot } from "./formIndex";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import { buildDensityFieldSvg } from "./shotDensityField";
@@ -13,7 +14,14 @@ import { buildDensityFieldSvg } from "./shotDensityField";
 // 페이지네이션을 재사용해 한 번만 받고, 시즌별 필터는 전부 JS에서(요청 1회로 3개 섹션 공급).
 export type CareerShot = { x: number; y: number; d: string; made: boolean; season: string };
 
-export async function getCareerShots(pcode: string): Promise<CareerShot[]> {
+/** 커리어 슛 로그 - 선수 상세에서 가장 행이 많은 조회 중 하나. */
+export const getCareerShots = cachedFn(computeCareerShots, {
+  name: "careerShots",
+  ttl: TTL.batchDaily,
+  tags: (pcode) => [TAG.batch, `player:${pcode}`],
+});
+
+async function computeCareerShots(pcode: string): Promise<CareerShot[]> {
   type Row = { x: number; y: number; d: string; made: boolean; games: { season_name: string } | { season_name: string }[] };
   const rows = await fetchAllPagesBounded<Row>(
     (from, to) =>
@@ -96,7 +104,13 @@ function rankPercentile(values: number[], mine: number, invert: boolean): number
   return Math.round((below / others) * 100);
 }
 
-export async function getPercentileProfile(pcode: string, seasonName: string): Promise<PercentileProfile | null> {
+export const getPercentileProfile = cachedFn(computeGetPercentileProfile, {
+  name: "percentileProfile",
+  ttl: TTL.batchDaily,
+  tags: (pcode, seasonName) => [TAG.batch, TAG.season(seasonName), `player:${pcode}`],
+});
+
+async function computeGetPercentileProfile(pcode: string, seasonName: string): Promise<PercentileProfile | null> {
   const { data, error } = await supabase.rpc("player_season_percentile_pool", { p_season: seasonName });
   if (error || !data) return null;
   const rows = (data as PoolRow[]).map((r) => ({
@@ -174,7 +188,13 @@ export type ClutchMoment = {
 
 export type ClutchProfile = { totals: ClutchTotals; moments: ClutchMoment[] };
 
-export async function getClutchProfile(pcode: string): Promise<ClutchProfile | null> {
+export const getClutchProfile = cachedFn(computeClutchProfile, {
+  name: "clutchProfile",
+  ttl: TTL.batchDaily,
+  tags: (pcode) => [TAG.batch, `player:${pcode}`],
+});
+
+async function computeClutchProfile(pcode: string): Promise<ClutchProfile | null> {
   const { data, error } = await supabase.rpc("player_clutch_profile", { p_pcode: pcode });
   if (error || !data) return null;
   type RawMoment = {
@@ -267,7 +287,13 @@ export async function getTopPairCombos(pcode: string): Promise<PairCombo[]> {
 // (winContributionLeaderboard.ts와 같은 테이블·정렬 기준 - total_wpa 내림차순).
 export type SeasonWpaRank = { totalWpa: number; wpaPerGame: number; games: number; rank: number; outOf: number };
 
-export async function getSeasonWpaRank(pcode: string, seasonName: string): Promise<SeasonWpaRank | null> {
+export const getSeasonWpaRank = cachedFn(computeGetSeasonWpaRank, {
+  name: "seasonWpaRank",
+  ttl: TTL.batchDaily,
+  tags: (pcode, seasonName) => [TAG.batch, TAG.season(seasonName), `player:${pcode}`],
+});
+
+async function computeGetSeasonWpaRank(pcode: string, seasonName: string): Promise<SeasonWpaRank | null> {
   const { data, error } = await supabase
     .from("player_season_wpa")
     .select("pcode, total_wpa, wpa_per_game, games")

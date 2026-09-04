@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { TAG, TTL, cachedFn } from "./cachePolicy";
 
 // 결정적 순간 득점(커리어) - 요청: "클러치 프로필에서, 승률에 + 되는 행동이 재미있는데,
 // 클러치가 아니더라도, 승률 올랐던 내용들에 대해서 표시".
@@ -137,7 +138,14 @@ function toMoments(rows: RawMoment[] | null): WinImpactMoment[] {
   }));
 }
 
-export async function getWinImpact(pcode: string): Promise<WinImpact | null> {
+/** player_win_impact 1행 - 수동 build 산출물. */
+export const getWinImpact = cachedFn(computeWinImpact, {
+  name: "winImpact",
+  ttl: TTL.manualBuild,
+  tags: (pcode) => [TAG.build, `player:${pcode}`],
+});
+
+async function computeWinImpact(pcode: string): Promise<WinImpact | null> {
   const { data, error } = await supabase
     .from("player_win_impact")
     .select(
