@@ -287,6 +287,89 @@ function plannedTotalSec(lastQuarter: string): number {
   return total;
 }
 
+
+// 스크러버 트랙 배경 - 승률 곡선 + 쿼터 경계(요청: "좀더 점수와, 중계흐름이 잘 보이도록").
+//
+// x축을 반드시 "이벤트 인덱스"로 잡아야 한다. 위 WinProbLiveChart는 진행 중 경기에서 경과
+// 시간을 x로 쓰는데(아직 안 치른 시간을 비워 두려고), 그 축을 여기 가져오면 곡선과 슬라이더
+// 손잡이가 어긋난다 - 슬라이더의 값은 인덱스이기 때문이다. 두 그림의 목적이 다르므로 축도 다르다.
+//
+// 곡선 아래(=홈 승률)와 위(=원정)를 팀 색으로 갈라 칠한다. 44px 높이에서도 "지금 어느 쪽으로
+// 기울었나"가 숫자 없이 읽힌다. 팀 색을 원색 그대로 쓰면 남색 계열이 다크 표면에 묻히므로
+// CSS에서 잉크와 섞는다(.replay-scrub-home/.replay-scrub-away).
+const SCRUB_W = 1000;
+const SCRUB_H = 100;
+const SCRUB_MAX_POINTS = 320; // 이벤트 800개짜리 경기도 path 문자열이 짧게 유지된다
+
+function ScrubTrack({
+  events,
+  idx,
+  quarterOrder,
+  firstIdxByQuarter,
+}: {
+  events: GameEvent[];
+  idx: number;
+  quarterOrder: string[];
+  firstIdxByQuarter: Map<string, number>;
+}) {
+  const n = events.length;
+  // 곡선은 idx와 무관하므로 events가 바뀔 때만 다시 만든다(스크럽 한 틱마다 800점 path를
+  // 새로 잇지 않기 위해서 - 움직이는 건 아래 마커뿐이다).
+  // 면(채움)과 선(경계)을 따로 만든다. 44px 트랙에서 채움만으로는 - 특히 팀 색이 어두우면 -
+  // 곡선의 모양이 안 읽혔다(실측: 부산 KCC 남색). 밝은 경계선 하나가 채움보다 훨씬 크게 읽힌다.
+  const { areaPath, linePath } = useMemo(() => {
+    if (n < 2) return { areaPath: null, linePath: null };
+    const step = Math.max(1, Math.floor(n / SCRUB_MAX_POINTS));
+    const pts: string[] = [];
+    let last: number | null = null;
+    for (let i = 0; i < n; i += step) {
+      const p = events[i].home_win_prob;
+      if (p != null) last = p;
+      if (last == null) continue;
+      const x = (i / (n - 1)) * SCRUB_W;
+      pts.push(`${x.toFixed(1)} ${((1 - last) * SCRUB_H).toFixed(1)}`);
+    }
+    if (last == null || pts.length < 2) return { areaPath: null, linePath: null };
+    // 마지막 점은 항상 오른쪽 끝까지(step 때문에 끝이 잘리면 트랙에 빈 칸이 생긴다).
+    pts.push(`${SCRUB_W} ${((1 - last) * SCRUB_H).toFixed(1)}`);
+    const line = `M ${pts.join(" L ")}`;
+    return { areaPath: `${line} L ${SCRUB_W} ${SCRUB_H} L 0 ${SCRUB_H} Z`, linePath: line };
+  }, [events, n]);
+
+  const markerX = n > 1 ? (idx / (n - 1)) * SCRUB_W : 0;
+
+  return (
+    <svg className="replay-scrub-svg" viewBox={`0 0 ${SCRUB_W} ${SCRUB_H}`} preserveAspectRatio="none" aria-hidden="true">
+      {/* 위쪽 = 원정 몫. 곡선이 아래를 덮으면 남는 부분이 그대로 원정 승률이 된다. */}
+      <rect x={0} y={0} width={SCRUB_W} height={SCRUB_H} className="replay-scrub-away" />
+      {areaPath && <path d={areaPath} className="replay-scrub-home" />}
+      {linePath && <path d={linePath} className="replay-scrub-line" vectorEffect="non-scaling-stroke" />}
+      <line
+        x1={0}
+        y1={SCRUB_H / 2}
+        x2={SCRUB_W}
+        y2={SCRUB_H / 2}
+        className="replay-scrub-mid"
+        vectorEffect="non-scaling-stroke"
+      />
+      {quarterOrder.map((q) => {
+        const first = firstIdxByQuarter.get(q);
+        if (first == null || first <= 0 || n < 2) return null;
+        const x = (first / (n - 1)) * SCRUB_W;
+        return <line key={q} x1={x} y1={0} x2={x} y2={SCRUB_H} className="replay-scrub-qline" vectorEffect="non-scaling-stroke" />;
+      })}
+      <line
+        x1={markerX}
+        y1={0}
+        x2={markerX}
+        y2={SCRUB_H}
+        className="replay-scrub-marker"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
 function WinProbLiveChart({ events, idx, homeColor, live }: { events: GameEvent[]; idx: number; homeColor: string; live: boolean }) {
   const valid = events.map((e, i) => ({ e, i })).filter((r) => r.e.home_win_prob != null);
   if (!valid.length) return <div className="empty-note">승률 데이터 없음</div>;
@@ -1021,6 +1104,16 @@ export default function GameReplay({
     const pm = finalPlusMinus.get(p.pcode) ?? 0;
     return <td className={pm > 0 ? "replay-pm pos" : pm < 0 ? "replay-pm neg" : "replay-pm"}>{pm > 0 ? `+${pm}` : pm}</td>;
   };
+  // 상단 고정 바의 한 줄짜리 "지금 흐름". 점수차는 항상, 런은 6-0 이상일 때만
+  // (아래 flow-chip의 RUN_THRESHOLD와 같은 기준 - 같은 화면에서 두 기준이 달라지면 안 된다).
+  const stickyFlow = (() => {
+    const diff = row.home_score - row.away_score;
+    const lead = diff === 0 ? "동점" : `${diff > 0 ? homeTeam.abbr : awayTeam.abbr} +${Math.abs(diff)}`;
+    if (row.runHome >= PUSH_RUN_THRESHOLD) return `${lead} · ${homeTeam.abbr} ${row.runHome}-0 런`;
+    if (row.runAway >= PUSH_RUN_THRESHOLD) return `${lead} · ${awayTeam.abbr} ${row.runAway}-0 런`;
+    return lead;
+  })();
+
   const COURT_COLS = 1 + BOX_HEADERS[boxView].length + BOX_TAIL; // 선수 + 뷰별 칸 + (+/-, 온/오프)
   const courtHeaderRow = (key: string) => (
     <tr key={key}>
@@ -1366,26 +1459,45 @@ export default function GameReplay({
           등장/퇴장시킴(문서 레이아웃에 영향 없음 - 위 useEffect의 IntersectionObserver/scroll
           폴백이 stickySentinelRef를 지켜보다가 켬/끔). 아래 .replay-scoreboard는 이제 완전히
           평범한 카드 - 이 컴포넌트 안 어디서도 sticky를 쓰지 않음. */}
-      <div className={`replay-sticky-bar${stickyVisible ? " show" : ""}`}>
+      <div
+        className={`replay-sticky-bar${stickyVisible ? " show" : ""}`}
+        style={{ "--h": homeTeam.color, "--a": awayTeam.color } as CSSProperties}
+      >
+        <div className="replay-sticky-main">
+          <div className="replay-sticky-side">
+            <TeamBadge team={homeTeam} size={26} />
+            <span className="replay-sticky-team">{homeTeam.abbr}</span>
+          </div>
+          <div className="replay-sticky-nums">
+            <span className="replay-sticky-score">{row.home_score}</span>
+            <span className="replay-sticky-clock">
+              {live && <span className="live-dot" />}
+              {clockStr(row)}
+            </span>
+            <span className="replay-sticky-score">{row.away_score}</span>
+          </div>
+          <div className="replay-sticky-side">
+            <span className="replay-sticky-team">{awayTeam.abbr}</span>
+            <TeamBadge team={awayTeam} size={26} />
+          </div>
+        </div>
+        {/* 승률을 숫자 두 개가 아니라 좌우로 갈리는 막대 하나로. 읽지 않고 보기만 해도
+            어느 쪽으로 기울었는지가 들어온다(요청: "좀더 ... 잘 보이도록"). */}
         {row.home_win_prob != null && (
-          <span className="replay-sticky-prob" style={{ color: homeTeam.color }}>
-            {Math.round(row.home_win_prob * 100)}%
-          </span>
+          <div className="replay-sticky-probbar" title={`${homeTeam.abbr} ${Math.round(row.home_win_prob * 100)}%`}>
+            <span className="replay-sticky-probfill home" style={{ width: `${row.home_win_prob * 100}%` }} />
+            <span className="replay-sticky-probfill away" style={{ width: `${(1 - row.home_win_prob) * 100}%` }} />
+          </div>
         )}
-        <span className="replay-sticky-team" style={{ color: homeTeam.color }}>
-          {homeTeam.abbr}
-        </span>
-        <span className="replay-sticky-score">{row.home_score}</span>
-        <span className="replay-sticky-clock">{clockStr(row)}</span>
-        <span className="replay-sticky-score">{row.away_score}</span>
-        <span className="replay-sticky-team" style={{ color: awayTeam.color }}>
-          {awayTeam.abbr}
-        </span>
-        {row.home_win_prob != null && (
-          <span className="replay-sticky-prob" style={{ color: awayTeam.color }}>
-            {Math.round((1 - row.home_win_prob) * 100)}%
+        <div className="replay-sticky-flowrow">
+          <span className="replay-sticky-prob">
+            {row.home_win_prob != null ? `${Math.round(row.home_win_prob * 100)}%` : ""}
           </span>
-        )}
+          <span className="replay-sticky-flow">{stickyFlow}</span>
+          <span className="replay-sticky-prob">
+            {row.home_win_prob != null ? `${Math.round((1 - row.home_win_prob) * 100)}%` : ""}
+          </span>
+        </div>
       </div>
 
       <div className="replay-scoreboard">
@@ -1592,20 +1704,39 @@ export default function GameReplay({
 
       {/* 아래 재생 컨트롤은 문서 흐름이 아니라 화면 하단 고정 바 안에 있다(요청).
           .replay-transport는 position:fixed라 이 자리에 공간을 차지하지 않는다. */}
-      <div className={`replay-transport${transportVisible ? " show" : ""}`}>
+      <div
+        className={`replay-transport${transportVisible ? " show" : ""}`}
+        style={{ "--h": homeTeam.color, "--a": awayTeam.color } as CSSProperties}
+      >
       <div className="replay-transport-inner">
-      <input
-        type="range"
-        className="replay-slider"
-        min={0}
-        max={events.length - 1}
-        value={idx}
-        aria-label="재생 위치"
-        onChange={(e) => {
-          setPlaying(false);
-          setIdx(Number(e.target.value));
-        }}
-      />
+      {/* 스크러버 트랙 자체가 승률 곡선이다. 손잡이를 끄는 일이 곧 경기의 이야기를 되감는
+          일이 되고, 트랙에 찍힌 쿼터 경계선이 "지금 어디인가"를 계속 말해 준다. */}
+      <div className="replay-scrub">
+        <ScrubTrack events={events} idx={idx} quarterOrder={quarterOrder} firstIdxByQuarter={firstIdxByQuarter} />
+        <div className="replay-scrub-qlabels" aria-hidden="true">
+          {quarterOrder.map((q) => {
+            const first = firstIdxByQuarter.get(q);
+            if (first == null || events.length < 2) return null;
+            return (
+              <span key={q} className="replay-scrub-qlabel" style={{ left: `${(first / (events.length - 1)) * 100}%` }}>
+                {q}
+              </span>
+            );
+          })}
+        </div>
+        <input
+          type="range"
+          className="replay-slider"
+          min={0}
+          max={events.length - 1}
+          value={idx}
+          aria-label="재생 위치"
+          onChange={(e) => {
+            setPlaying(false);
+            setIdx(Number(e.target.value));
+          }}
+        />
+      </div>
       <div className="replay-transport-row">
       <div className="replay-controls">
         <button type="button" className="replay-btn" onClick={() => setIdx(0)} aria-label="처음으로">
@@ -1666,7 +1797,12 @@ export default function GameReplay({
           </button>
         ))}
       </div>
-      <div className="replay-transport-clock">{clockStr(row)}</div>
+      <div className="replay-transport-clock">
+        <span className="replay-transport-time">{clockStr(row)}</span>
+        <span className="replay-transport-pos">
+          {(idx + 1).toLocaleString()} / {events.length.toLocaleString()}
+        </span>
+      </div>
       </div>
       </div>
       </div>

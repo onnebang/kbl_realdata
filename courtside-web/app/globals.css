@@ -1239,26 +1239,88 @@ table.data-table td:nth-child(2) {
    transform(translateY)+"show" 클래스로만 등장/퇴장시켜서 문서 레이아웃/스크롤 높이에 전혀
    영향을 안 줌(스크롤 위치가 흔들릴 메커니즘 자체가 없어짐) - GameReplay.tsx의
    IntersectionObserver(+scroll 폴백)가 .replay-sticky-sentinel을 보고 show를 토글. */
+/* 요청: "상단의 점수고정이 잘 안보이는데, 사이즈를 더 키워주고 ... 좀더 점수와, 중계흐름이
+   잘 보이도록". 한 줄에 7개 span을 늘어놓던 것을 세 층으로 다시 쌓았다:
+     1층 점수  - 15px -> 34px(Big Shoulders Display, 숫자만이라 한글 글리프 문제 없음)
+     2층 승률  - 숫자 두 개 대신 좌우로 갈리는 막대 하나. 읽지 않고 보기만 해도 기울기가 보인다.
+     3층 흐름  - 점수차와 진행 중인 런("SK 8-0 런"). 바 어디에도 없던 '지금 흐름'이 여기 들어간다.
+   높이는 40px 남짓에서 90px 안팎이 되지만, 여전히 position:fixed + transform이라 문서
+   레이아웃과 스크롤 높이에는 영향이 없다(sticky가 스크롤을 되돌리던 버그를 피하는 구조 유지). */
 .replay-sticky-bar {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 40;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 10px;
+  display: grid;
+  gap: 5px;
   max-width: 900px;
   margin: 0 auto;
   background: var(--surface);
-  border-bottom: 1px solid rgba(var(--line-rgb), 0.1);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  padding: 11px 18px;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.12);
+  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.16);
+  padding: 9px 18px 10px;
   font-family: "IBM Plex Mono", monospace;
   font-weight: 700;
   transform: translateY(-100%);
   transition: transform 0.15s ease-out;
+}
+.replay-sticky-main {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.replay-sticky-side {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.replay-sticky-side:last-child {
+  justify-content: flex-end;
+}
+.replay-sticky-nums {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.replay-sticky-probbar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+.replay-sticky-probfill {
+  display: block;
+  transition: width 0.2s ease-out;
+}
+/* 팀 색을 원색 그대로 쓰면 남색 계열(부산 KCC #0C2340)이 다크 표면에 묻힌다 - 잉크와 섞어
+   두 테마 모두에서 최소 대비를 확보한다(개막 리포트 순위 띠와 같은 규칙). */
+.replay-sticky-probfill.home {
+  background: var(--h, var(--home));
+  background: color-mix(in srgb, var(--h, var(--home)) 76%, var(--ink) 24%);
+}
+.replay-sticky-probfill.away {
+  background: var(--a, var(--away));
+  background: color-mix(in srgb, var(--a, var(--away)) 76%, var(--ink) 24%);
+}
+.replay-sticky-flowrow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.replay-sticky-flowrow > :last-child {
+  text-align: right;
+}
+.replay-sticky-flow {
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  white-space: nowrap;
 }
 .replay-sticky-bar.show {
   transform: translateY(0);
@@ -1274,28 +1336,50 @@ table.data-table td:nth-child(2) {
 /* 팀 색상은 실제 브랜드 hex(team.color) 그대로 쓰는데, 일부 팀(예: 부산 KCC 남색)은
    다크모드 표면색과 명도가 거의 같아서 텍스트가 사실상 안 보임(실측 대비율 ~1.1:1) - 팀
    색을 흰색에 가까운 고정 칩 배경 위에 얹어서 어떤 팀 색이든, 어떤 테마든 항상 읽히게. */
-.replay-sticky-team,
-.replay-sticky-prob {
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 5px;
-  padding: 1px 6px;
-}
+/* 팀 약어는 팀 색으로 쓰되, 어떤 팀 색이든 어떤 테마든 읽히도록 잉크와 섞는다
+   (예전엔 흰 칩 배경을 깔았는데, 로고 배지가 옆에 서면서 칩이 시각적으로 겹쳤다). */
 .replay-sticky-team {
   font-size: 15px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.replay-sticky-side:first-child .replay-sticky-team {
+  color: var(--h, var(--home));
+  color: color-mix(in srgb, var(--h, var(--home)) 72%, var(--ink) 28%);
+}
+.replay-sticky-side:last-child .replay-sticky-team {
+  color: var(--a, var(--away));
+  color: color-mix(in srgb, var(--a, var(--away)) 72%, var(--ink) 28%);
 }
 .replay-sticky-score {
-  font-size: 15px;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 34px;
+  line-height: 0.92;
   font-variant-numeric: tabular-nums;
+  color: var(--ink);
 }
 .replay-sticky-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--ink-soft);
   font-size: 13px;
-  margin: 0 2px;
+  white-space: nowrap;
 }
 .replay-sticky-prob {
-  font-size: 13px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+}
+.replay-sticky-flowrow > .replay-sticky-prob:first-child {
+  color: var(--h, var(--home));
+  color: color-mix(in srgb, var(--h, var(--home)) 72%, var(--ink) 28%);
+}
+.replay-sticky-flowrow > .replay-sticky-prob:last-child {
+  color: var(--a, var(--away));
+  color: color-mix(in srgb, var(--a, var(--away)) 72%, var(--ink) 28%);
 }
 
 /* 요청: "슛 차트와 슛 차트가 중복" - 독립 패널에 있던 필터 폼을 여기로 흡수. */
@@ -1872,12 +1956,120 @@ table.data-table td:nth-child(2) {
   margin: 0 auto;
   background: var(--surface);
   border-top: 1px solid rgba(var(--line-rgb), 0.12);
-  box-shadow: 0 -3px 14px rgba(0, 0, 0, 0.1);
-  padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px));
-  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.18);
+  padding: 10px 16px calc(11px + env(safe-area-inset-bottom, 0px));
+  border-radius: 14px 14px 0 0;
 }
+
+/* ── 스크러버 = 승률 트랙 ──────────────────────────────────────────────────────
+   요청: "하단의 재생바가 잘 안보이는데 ... 좀더 점수와, 중계흐름이 잘 보이도록".
+   기본 range 입력은 4px 선이라 눈에 안 띄고 잡기도 어려웠다. 트랙을 44px로 키우고
+   그 안을 승률 곡선으로 채운다 - 커진 동시에 "지금 경기가 어디로 가고 있나"를 들고 있게 된다.
+   곡선 아래가 홈, 위가 원정. 세로선은 쿼터 경계, 굵은 선이 지금 위치다. */
+.replay-scrub {
+  position: relative;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 9px;
+  background: var(--surface-soft);
+}
+.replay-scrub-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.replay-scrub-home {
+  fill: var(--h, var(--home));
+  fill: color-mix(in srgb, var(--h, var(--home)) 62%, var(--ink) 38%);
+  opacity: 0.62;
+}
+.replay-scrub-away {
+  fill: var(--a, var(--away));
+  fill: color-mix(in srgb, var(--a, var(--away)) 62%, var(--ink) 38%);
+  opacity: 0.3;
+}
+/* 채움보다 이 선이 훨씬 크게 읽힌다 - 곡선의 '모양'을 들고 있는 건 경계선이다. */
+.replay-scrub-line {
+  fill: none;
+  stroke: var(--h, var(--home));
+  stroke: color-mix(in srgb, var(--h, var(--home)) 40%, var(--ink) 60%);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.replay-scrub-mid {
+  stroke: rgba(var(--line-rgb), 0.35);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+.replay-scrub-qline {
+  stroke: rgba(var(--line-rgb), 0.3);
+  stroke-width: 1;
+}
+.replay-scrub-marker {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+.replay-scrub-qlabels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.replay-scrub-qlabel {
+  position: absolute;
+  top: 3px;
+  transform: translateX(4px);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+  /* 팀 색 채움 위에 얹히므로 글자색만으론 대비를 보장할 수 없다 - 표면색 칩을 깔아
+     어떤 팀 색·어떤 테마에서도 같은 대비가 나오게 한다. */
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border-radius: 3px;
+  padding: 1px 3px;
+}
+/* 입력 자체는 투명하게 깔고 손잡이만 보인다 - 트랙 그림이 그대로 비쳐 보이게. */
 .replay-transport .replay-slider {
-  margin-bottom: 6px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+.replay-transport .replay-slider::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 100%;
+}
+.replay-transport .replay-slider::-moz-range-track {
+  background: transparent;
+  height: 100%;
+}
+.replay-transport .replay-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3px solid var(--ink);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  margin-top: 12px;
+}
+.replay-transport .replay-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3px solid var(--ink);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
 }
 .replay-transport-row {
   display: flex;
@@ -1893,29 +2085,52 @@ table.data-table td:nth-child(2) {
 /* 스코어보드가 화면 밖으로 나가면 상단 바가 시계를 들지만, 재생바에도 한 번 더 둔다 -
    스크러버를 끄는 동안 눈이 아래에 있기 때문. */
 .replay-transport-clock {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
-  min-width: 74px;
+  min-width: 86px;
   text-align: right;
 }
+.replay-transport-time {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.replay-transport-pos {
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+/* 하단 바가 커진 만큼 여백도 같이 - 패널 마지막 내용이 바 뒤로 숨지 않게. */
 .replay-transport-spacer {
-  height: 104px;
+  height: 156px;
 }
 @media (max-width: 640px) {
   .replay-transport-inner {
-    padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
   }
   .replay-transport .replay-quarter-btn {
-    padding: 5px 9px;
+    padding: 7px 11px;
   }
   .replay-transport-clock {
     display: none;
   }
   .replay-transport-spacer {
-    height: 128px;
+    height: 168px;
+  }
+  /* 좁은 화면에서는 점수가 가장 먼저 커야 한다 - 로고와 약어를 줄이고 숫자를 지킨다. */
+  .replay-sticky-bar {
+    padding: 8px 12px 9px;
+  }
+  .replay-sticky-score {
+    font-size: 30px;
+  }
+  .replay-sticky-team {
+    font-size: 13px;
+  }
+  .replay-sticky-flow {
+    font-size: 11px;
   }
 }
 
@@ -1968,12 +2183,13 @@ table.data-table td:nth-child(2) {
 }
 .replay-btn {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 13px;
-  padding: 6px 10px;
-  border-radius: 7px;
-  border: 1px solid rgba(var(--line-rgb), 0.16);
+  font-size: 15px;
+  padding: 8px 13px;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--line-rgb), 0.2);
   background: var(--surface);
   color: var(--ink);
+  cursor: pointer;
 }
 .replay-btn:hover {
   border-color: var(--home);
@@ -1981,8 +2197,10 @@ table.data-table td:nth-child(2) {
 }
 .replay-btn-play {
   font-family: "Pretendard", sans-serif;
-  font-weight: 700;
-  padding: 6px 16px;
+  font-weight: 800;
+  font-size: 15px;
+  padding: 8px 24px;
+  min-width: 92px;
   background: var(--home);
   border-color: var(--home);
   color: #fff;
@@ -2012,9 +2230,9 @@ table.data-table td:nth-child(2) {
    (쿼터 시작으로 스크럽 이동) 크기·대비·호버 상태를 강화. */
 .replay-quarter-btn {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
-  padding: 6px 14px;
+  padding: 8px 16px;
   border-radius: 7px;
   color: var(--ink-soft);
   border: 1px solid rgba(var(--line-rgb), 0.22);
