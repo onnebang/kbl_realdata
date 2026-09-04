@@ -36,6 +36,8 @@ function PlayerRow({ p, prev }: { p: DirectoryPlayer; prev: string }) {
           <span className={`${styles.tag} ${styles.tagForeign}`}>{p.role.replace("외국인 ", "")}</span>
         ) : p.change === "in" ? (
           <span className={`${styles.tag} ${styles.tagIn}`}>영입</span>
+        ) : p.change === "back" ? (
+          <span className={`${styles.tag} ${styles.tagBack}`}>복귀</span>
         ) : p.change === "new" || !p.pcode ? (
           <span className={`${styles.tag} ${styles.tagNew}`}>신입</span>
         ) : null}

@@ -469,12 +469,13 @@ function ZoneProfilePanel({ zp, seasonName }: { zp: TeamZoneProfile | null; seas
 //    있을 때만 렌더(과거 시즌·로스터 미수신 시즌은 null이라 아무것도 안 나옴). 한 줄 렌더는
 //    /preseason과 같은 컴포넌트(components/RosterChangeLine.tsx)를 써서 표기가 갈라지지 않게.
 function RosterChangesPanel({ rc, abbrOf }: { rc: TeamRosterChanges; abbrOf: (tcode: string | null) => string | null }) {
-  const changed = [...rc.in, ...rc.new, ...rc.out];
+  const changed = [...rc.in, ...rc.back, ...rc.new, ...rc.out];
   if (!changed.length && !rc.stay.length) return null;
   return (
     <div className={styles.panel}>
       <div className={styles.panelTitle}>
-        이번 시즌 로스터 변화 · 영입 {rc.in.length} · 신입 {rc.new.length} · 잔류 {rc.stay.length} · 이탈 {rc.out.length}
+        이번 시즌 로스터 변화 · 영입 {rc.in.length} · 복귀 {rc.back.length} · 신입 {rc.new.length} · 잔류 {rc.stay.length} · 이탈{" "}
+        {rc.out.length}
       </div>
       {changed.map((r) => (
         <ChangeLine key={`${r.change}-${r.name}`} r={r} abbrOf={abbrOf} />

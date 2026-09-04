@@ -366,7 +366,7 @@ export async function getRosterWall(
       pos: r.pos ?? last?.pos ?? null,
       role: c?.role ?? roleFromRosterNote(r.note),
       change: c?.change ?? (r.pcode ? null : "new"),
-      isReturn: c?.change === "in" && !!c.note?.includes("복귀"),
+      isReturn: c?.change === "back",
       prevTcode: c?.prevTcode ?? null,
       prevSeason: c?.prevSeason ?? null,
       gp: c?.gp ?? null,

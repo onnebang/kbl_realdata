@@ -237,6 +237,11 @@ a.playerRow:hover {
   background: color-mix(in srgb, var(--positive) 14%, transparent);
   color: var(--positive);
 }
+/* 복귀 - 공백 후 돌아온 선수(preseason.module.css .chipBack과 같은 색 규칙) */
+.tagBack {
+  background: color-mix(in srgb, var(--away) 15%, transparent);
+  color: var(--away);
+}
 .tagNew {
   background: var(--surface-soft);
   color: var(--ink-soft);

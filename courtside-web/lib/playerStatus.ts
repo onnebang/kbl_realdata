@@ -60,7 +60,7 @@ export type PlayerRosterStatus = {
   pos: PlayerPos | null;
   /** 외국인 1옵션 / 2옵션 / 아시아쿼터 / null(국내). active에만. */
   role: string | null;
-  /** roster_changes 판정(active에만): stay / in(이적+복귀) / new. 대조표에 없으면 null. */
+  /** roster_changes 판정(active에만): stay / in(이적) / back(공백 후 복귀) / new. 대조표에 없으면 null. */
   change: Exclude<ChangeKind, "out"> | null;
   /** change 'in'이고 이전 팀이 다른 팀(해먼즈 MOB→DB). */
   isTransfer: boolean;
@@ -183,7 +183,7 @@ export async function getPlayerRosterStatus(pcode: string, careerRows?: CareerGa
     const tcode = roster.tcode;
     const change = (onChange?.change as Exclude<ChangeKind, "out"> | undefined) ?? null;
     const prevSeasonOf = onChange?.prev_season_name ?? (change === "stay" ? prevSeason : null);
-    const prevTcode = change === "in" ? (onChange?.prev_tcode ?? null) : change === "stay" ? tcode : null;
+    const prevTcode = change === "in" || change === "back" ? (onChange?.prev_tcode ?? null) : change === "stay" ? tcode : null;
     const sameTeamLast = lastPlayed?.tcode === tcode;
     const backFromRoster = (roster.back_num ?? "").trim() || null;
     const gap = prevSeasonOf ? Math.max(0, startYear(season) - startYear(prevSeasonOf) - 1) : null;
@@ -198,8 +198,8 @@ export async function getPlayerRosterStatus(pcode: string, careerRows?: CareerGa
       pos: normalizePos(roster.pos) ?? normalizePos(lastPlayed?.pos ?? null),
       role: onChange?.role ?? roleFromNote(roster.note),
       change,
-      isTransfer: change === "in" && !!prevTcode && prevTcode !== tcode,
-      isReturn: change === "in" && !!prevSeasonOf && prevSeasonOf !== prevSeason,
+      isTransfer: (change === "in" || change === "back") && !!prevTcode && prevTcode !== tcode,
+      isReturn: change === "back",
       gapSeasons: gap,
       prevTcode,
       prevTeamName: nameFor(prevTcode, prevSeasonOf),

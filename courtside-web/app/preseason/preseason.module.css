@@ -404,6 +404,11 @@
   background: color-mix(in srgb, var(--negative) 14%, transparent);
   color: var(--negative);
 }
+/* 복귀 - 영입(초록)과도 신입(골드)과도 구분되게 파랑 계열(--away). 군 전역·장기 부상 복귀. */
+.chipBack {
+  background: color-mix(in srgb, var(--away) 15%, transparent);
+  color: var(--away);
+}
 .chipNew {
   background: color-mix(in srgb, var(--gold) 16%, transparent);
   color: var(--gold);
@@ -583,5 +588,119 @@
   .heroDday {
     font-size: 96px;
     top: 6px;
+  }
+}
+
+/* ── 정규시즌 54경기 전망 행 ────────────────────────────────────────────────────
+   .outlookRow보다 칸이 많다: 순위 / 팀 / 전반기 / 전체 / 승수 구간 / 순위 분포 / 1위 / PO /
+   지난 시즌. 좁은 화면에서는 뒤쪽부터 접는다(구간 바와 순위 분포는 끝까지 남긴다 - 이 표의
+   요점이 "숫자"가 아니라 "폭"이라서). */
+.projRow {
+  display: grid;
+  grid-template-columns: 26px minmax(74px, 1fr) 54px 54px minmax(120px, 1.4fr) 116px 42px 42px 58px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.projRow:hover {
+  background: var(--surface-soft);
+}
+.projRow.outlookHead:hover {
+  background: none;
+}
+.projHalf,
+.projFull {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 17px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.projHalf {
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+/* 승수 80% 구간 - 트랙 전체가 리그의 승수 범위, 막대가 그 팀의 80% 구간, 흰 점이 기대승수 */
+.projTrack {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+.projBand {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tc, var(--ink-soft)) 74%, var(--ink) 26%);
+  opacity: 0.8;
+  min-width: 4px;
+}
+.projDot {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid color-mix(in srgb, var(--tc, var(--ink-soft)) 74%, var(--ink) 26%);
+  transform: translateY(-50%);
+}
+.projEven {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: rgba(var(--line-rgb), 0.34);
+}
+
+/* 순위 분포 - 팀 수만큼의 칸. 진하기 = 그 순위가 나올 확률(행 안 최댓값이 1). */
+.rankStrip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 1px;
+  height: 13px;
+}
+.rankCell {
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--tc, var(--ink-soft)) 74%, var(--ink) 26%);
+}
+/* 6강 플레이오프 커트라인 - 6번째 칸 오른쪽에 선(진출권 안/밖 경계) */
+.rankCutoff {
+  margin-right: 3px;
+  box-shadow: 3px 0 0 rgba(var(--line-rgb), 0.55);
+}
+.projOdds {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .projRow {
+    grid-template-columns: 24px minmax(66px, 1fr) 46px 46px minmax(90px, 1fr) 92px 40px 40px;
+  }
+  .projRow > :last-child {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  .projRow {
+    grid-template-columns: 22px minmax(62px, 1fr) 44px minmax(70px, 1fr) 78px 38px;
+  }
+  /* 전반기 칸(3번째)과 PO 칸(8번째)만 남기고 접는 게 아니라, 좁은 화면에서는
+     전반기·1위 확률을 접고 전체 승수 / 구간 / 순위 분포 / PO만 남긴다. */
+  .projRow > :nth-child(3),
+  .projRow > :nth-child(7) {
+    display: none;
   }
 }

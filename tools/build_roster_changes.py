@@ -9,8 +9,13 @@
 
 판정 규칙(전부 문서화 - 웹 캡션에 그대로 인용):
   stay  로스터에 있고 지난 시즌에도 같은 팀에서 뛰었다
-  in    로스터에 있고 지난 시즌엔 다른 팀에서 뛰었다(prev_tcode) - 또는 지난 시즌엔 KBL에 없었지만
-        그 전에 뛴 적이 있다(복귀, prev_season_name이 지난 시즌이 아님)
+  in    로스터에 있고 지난 시즌엔 다른 팀에서 뛰었다(prev_tcode) = 이적
+  back  로스터에 있고 지난 시즌엔 KBL 기록이 아예 없는데 그 전엔 있다 = 공백 후 복귀.
+        KBL은 상무(군) 복무 기간의 경기가 KBL 기록에 남지 않아 그 2시즌이 통째로 비고, 장기
+        부상도 같은 모양으로 빈다. 둘 다 "영입"이 아니라 "복귀"다(요청). 다만 어느 쪽인지는
+        DB 어디에도 없으므로 사유는 적지 않고 공백 시즌 수만 note에 남긴다.
+        외국인 선수의 재영입(패리스 배스 23-24 → 26-27)도 같은 모양이라 같은 판정을 쓰되,
+        note에 '재영입'이라고 적어 국내 선수의 복귀와 구분한다.
   new   로스터에 있고 KBL 출전 기록이 전혀 없다(pcode 없음 - 첫 경기 때 자동 연결)
   out   지난 시즌 그 팀에서 MIN_GP_FOR_OUT 경기 이상 뛰었는데 그 팀의 이번 시즌 로스터에 없다.
         다른 팀 로스터에 있으면 next_tcode(이적), 없으면 리그 이탈.
@@ -52,6 +57,14 @@ def prev_season_name(season):
     """'2026-2027' -> '2025-2026'."""
     a, b = season.split("-")
     return "%d-%d" % (int(a) - 1, int(b) - 1)
+
+
+def season_gap(last_season, prev):
+    """마지막으로 뛴 시즌과 직전 시즌 사이에 통째로 빠진 시즌 수(1 이상).
+
+    '2024-2025'가 마지막이고 직전이 '2025-2026'이면 25-26 한 시즌을 통으로 쉰 것 = 1.
+    상무 복무는 보통 두 시즌에 걸친다."""
+    return int(prev.split("-")[0]) - int(last_season.split("-")[0])
 
 
 def role_from_note(note):
@@ -176,8 +189,10 @@ def build(cur, season):
                 continue
             last = last_before.get(pcode)
             if last:
-                row(tcode, pcode, name, "in", role, prev_tcode=last["tcode"], prev_season=last["season"], st=last,
-                    note="%s 시즌 이후 KBL 복귀" % last["season"])
+                gap = season_gap(last["season"], prev)
+                kind = "재영입" if is_foreign_name(name) else "복귀"
+                row(tcode, pcode, name, "back", role, prev_tcode=last["tcode"], prev_season=last["season"], st=last,
+                    note="%s 시즌 이후 %d시즌 공백 · KBL %s" % (last["season"], gap, kind))
             else:
                 # pcode는 있는데(과거 players 테이블 등재) 출전 기록이 없는 경우 - 사실상 신입
                 row(tcode, pcode, name, "new", role, note="pcode는 있으나 KBL 출전 기록 없음")
@@ -228,20 +243,20 @@ def main():
     for r in rows:
         by_team.setdefault(r[1], []).append(r)
     print("%s 로스터 변화 (지난 시즌 %s 기준) - %d행" % (args.season, prev, len(rows)))
-    order = {"in": 0, "new": 1, "stay": 2, "out": 3}
+    order = {"in": 0, "back": 1, "new": 2, "stay": 3, "out": 4}
     for tcode in sorted(by_team, key=lambda t: abbr.get(t, t)):
         print("  [%s]" % abbr.get(tcode, tcode))
         for r in sorted(by_team[tcode], key=lambda r: (order[r[4]], -(r[9] or 0))):
             _, _, pcode, name, change, role, prev_t, next_t, prev_s, gp, ppg, rpg, apg, mpg, note = r
             extra = ""
-            if change == "in":
+            if change in ("in", "back"):
                 extra = " <- %s" % abbr.get(prev_t, prev_t)
             elif change == "out" and next_t:
                 extra = " -> %s" % abbr.get(next_t, next_t)
             line = "    %-4s %-14s %s" % (change, name, (role or "").ljust(8))
             if gp:
                 line += " %s %2d경기 %4.1f점 %4.1fR %4.1fA" % (prev_s, gp, ppg, rpg, apg)
-            print(line + extra + ("  (%s)" % note if note and change in ("in", "new") else ""))
+            print(line + extra + ("  (%s)" % note if note and change in ("in", "back", "new") else ""))
 
     if args.dry_run:
         print("\n--dry-run: DB에 쓰지 않았다.")

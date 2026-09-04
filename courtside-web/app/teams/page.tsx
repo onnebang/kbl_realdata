@@ -29,7 +29,7 @@ export default async function TeamsPage() {
       <div className={styles.teamGrid}>
         {outlook.teams.map((t) => {
           const ch = changesByTcode.get(t.tcode);
-          const rosterN = ch ? ch.in.length + ch.new.length + ch.stay.length : 0;
+          const rosterN = ch ? ch.in.length + ch.back.length + ch.new.length + ch.stay.length : 0;
           return (
             <Link key={t.tcode} href={`/teams/${t.tcode}?season=${PRESEASON_SEASON}`} className={styles.teamCard} style={{ "--team": t.color } as CSSProperties}>
               <div className={styles.teamName}>
@@ -53,7 +53,7 @@ export default async function TeamsPage() {
                 <div>
                   <div className={styles.statVal}>{rosterN || "-"}</div>
                   <div className={styles.statLabel}>
-                    확정 로스터{ch ? ` · 영입 ${ch.in.length + ch.new.length}` : ""}
+                    확정 로스터{ch ? ` · 영입 ${ch.in.length + ch.new.length}${ch.back.length ? ` · 복귀 ${ch.back.length}` : ""}` : ""}
                   </div>
                 </div>
               </div>

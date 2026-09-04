@@ -190,9 +190,15 @@ export async function getSeasonOutlook(season = PRESEASON_SEASON): Promise<Seaso
 // ---------------------------------------------------------------------------
 // 2. 로스터 변화 - roster_changes(파생 테이블) 그대로 + 팀별 그룹핑 + 헤드라인
 // ---------------------------------------------------------------------------
-export type ChangeKind = "stay" | "in" | "out" | "new";
+// back(복귀) = 지난 시즌 KBL 기록이 없고 그 전엔 있는 선수. 요청("군대갔다가 복귀한 선수를
+// 영입이라고 체크가 되어있더라고 ... 군대전역이나 부상복귀는 복귀라고 체크")대로 in(이적)에서
+// 떼어냈다. 군 전역인지 부상 복귀인지는 KBL 기록 어디에도 없어 구분하지 않는다 - 공백 시즌
+// 수만 note가 들고 있다(tools/build_roster_changes.py).
+export type ChangeKind = "stay" | "in" | "back" | "out" | "new";
 
 export type RosterChange = {
+  /** 이 판정이 속한 시즌("2026-2027") - 복귀 공백 계산이 상수에 묶이지 않도록 행이 직접 들고 다닌다. */
+  season: string;
   tcode: string;
   pcode: string | null;
   name: string;
@@ -212,6 +218,7 @@ export type RosterChange = {
 export type TeamRosterChanges = {
   team: TeamInfo;
   in: RosterChange[];
+  back: RosterChange[];
   new: RosterChange[];
   stay: RosterChange[];
   out: RosterChange[];
@@ -248,6 +255,7 @@ export async function getRosterChangeReport(season = PRESEASON_SEASON): Promise<
     supabase.from("roster_changes").select("*").eq("season_name", season).order("prev_ppg", { ascending: false, nullsFirst: false }),
   ]);
   const rows: RosterChange[] = (res.data ?? []).map((r) => ({
+    season: r.season_name as string,
     tcode: r.tcode as string,
     pcode: (r.pcode as string | null) ?? null,
     name: r.player_name as string,
@@ -265,12 +273,12 @@ export async function getRosterChangeReport(season = PRESEASON_SEASON): Promise<
   }));
 
   const byTeam = new Map<string, TeamRosterChanges>();
-  for (const team of teams.values()) byTeam.set(team.tcode, { team, in: [], new: [], stay: [], out: [] });
+  for (const team of teams.values()) byTeam.set(team.tcode, { team, in: [], back: [], new: [], stay: [], out: [] });
   for (const r of rows) byTeam.get(r.tcode)?.[r.change].push(r);
 
   // 로스터가 실제로 들어온 팀만(행이 하나도 없는 팀 - 해체된 옛 팀코드 등 - 은 제외), 약어순.
   const teamList = [...byTeam.values()]
-    .filter((t) => t.in.length + t.new.length + t.stay.length + t.out.length > 0)
+    .filter((t) => t.in.length + t.back.length + t.new.length + t.stay.length + t.out.length > 0)
     .sort((a, b) => a.team.abbr.localeCompare(b.team.abbr));
 
   const moves: RosterMove[] = [];
@@ -286,14 +294,14 @@ export async function getRosterChangeReport(season = PRESEASON_SEASON): Promise<
   const withTeam = (r: RosterChange) => ({ ...r, team: teams.get(r.tcode)! });
   const ins = rows.filter((r) => r.change === "in" && r.ppg != null && teams.has(r.tcode));
   const outs = rows.filter((r) => r.change === "out" && r.ppg != null && teams.has(r.tcode));
-  const counts: Record<ChangeKind, number> = { stay: 0, in: 0, out: 0, new: 0 };
+  const counts: Record<ChangeKind, number> = { stay: 0, in: 0, back: 0, out: 0, new: 0 };
   for (const r of rows) counts[r.change]++;
 
   // 국내 선수가 한 명도 없는(= role 태그가 붙지 않은 잔류/영입/신입 행이 없는) 팀 = 그 팀의
   // 국내 로스터는 아직 미입력. import_roster.py가 외국인 행에만 "외국인 1옵션/2옵션/
   // 아시아쿼터"를 role로 남기므로 role == null 이 곧 국내 선수라는 신호다.
   const domesticPendingTeams = teamList
-    .filter((t) => ![...t.in, ...t.new, ...t.stay].some((r) => r.role == null))
+    .filter((t) => ![...t.in, ...t.back, ...t.new, ...t.stay].some((r) => r.role == null))
     .map((t) => t.team.abbr);
 
   return {

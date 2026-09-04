@@ -8,6 +8,7 @@ import styles from "@/app/preseason/preseason.module.css";
 
 export const CHANGE_CHIP: Record<RosterChange["change"], { label: string; cls: string }> = {
   in: { label: "영입", cls: styles.chipIn },
+  back: { label: "복귀", cls: styles.chipBack },
   new: { label: "신입", cls: styles.chipNew },
   stay: { label: "잔류", cls: styles.chipStay },
   out: { label: "이탈", cls: styles.chipOut },
@@ -18,6 +19,11 @@ export const CHANGE_CHIP: Record<RosterChange["change"], { label: string; cls: s
  * 이 수치는 정규시즌+플레이오프 합산 평균이다(tools/build_roster_changes.py가 season_name만으로
  * 집계). 팀 전망표의 전적은 정규시즌 기준이라 분모가 다르므로, 이 값을 쓰는 화면은 캡션에
  * 그 사실을 밝힌다(예: 카이린 갤러웨이는 정규 6경기 8.0점, 합산 9경기 5.3점). */
+/** prev_season_name과 직전 시즌 사이에 통째로 빠진 시즌 수. build_roster_changes.season_gap과 같은 식. */
+function gapSeasons(season: string, prevSeason: string): number {
+  return Number(season.split("-")[0]) - 1 - Number(prevSeason.split("-")[0]);
+}
+
 export function statLine(r: RosterChange): string | null {
   if (r.gp == null || r.prevSeason == null) return null;
   return `${shortSeason(r.prevSeason)} ${r.gp}G · ${r.ppg?.toFixed(1)}P ${r.rpg?.toFixed(1)}R ${r.apg?.toFixed(1)}A`;
@@ -27,10 +33,15 @@ export function ChangeLine({ r, abbrOf }: { r: RosterChange; abbrOf: (tcode: str
   const chip = CHANGE_CHIP[r.change];
   const stat = statLine(r);
   let from: string | null = null;
-  if (r.change === "in" && r.prevTcode) {
-    const same = r.prevTcode === r.tcode;
-    const seasonNote = r.prevSeason ? `${shortSeason(r.prevSeason)} 이후 ` : "";
-    from = same ? `${seasonNote}복귀` : r.note?.includes("복귀") ? `${seasonNote}복귀 (前 ${abbrOf(r.prevTcode)})` : `← ${abbrOf(r.prevTcode)}`;
+  if (r.change === "back") {
+    // 복귀는 "몇 시즌을 비웠는가"가 핵심이다. 사유(군 전역/부상/해외)는 DB에 없으므로 적지 않는다.
+    // 마지막 소속이 지금 팀과 다르면 그것까지(최승욱 삼성 → 가스공사, 케베 알루마 현대모비스 → 가스공사).
+    const gap = r.prevSeason ? gapSeasons(r.season, r.prevSeason) : null;
+    const gapText = gap && gap > 0 ? `${gap}시즌 공백 후 복귀` : "복귀";
+    const sameTeam = !r.prevTcode || r.prevTcode === r.tcode;
+    from = sameTeam ? gapText : `${gapText} (前 ${abbrOf(r.prevTcode)})`;
+  } else if (r.change === "in" && r.prevTcode) {
+    from = `← ${abbrOf(r.prevTcode)}`;
   } else if (r.change === "out") {
     from = r.nextTcode ? `→ ${abbrOf(r.nextTcode)}` : "리그 이탈";
   } else if (r.change === "new") {

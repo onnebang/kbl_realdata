@@ -14,6 +14,16 @@ import {
   type RosterChangeReport,
   type DemoGame,
 } from "@/lib/preseason";
+import {
+  GAMES_FULL,
+  GAMES_HALF,
+  PLAYOFF_SPOTS,
+  ROUNDS_HALF,
+  ROUNDS_TOTAL,
+  getSeasonProjection,
+  type ProjectionTeam,
+  type SeasonProjection,
+} from "@/lib/seasonProjection";
 import styles from "./preseason.module.css";
 
 // 개막 리포트 - 요청: "시즌 시작전 리포트를 먼저 제공하고, 실제 시즌이 시작되면 실제 경기가
@@ -75,12 +85,118 @@ function OutlookRow({ t, rank }: { t: TeamOutlook; rank: number }) {
   );
 }
 
+// AI 예상 순위 - 시뮬레이션 10,000회의 순위 분포를 가로 10칸으로. 칸 진하기 = 그 순위가
+// 나올 확률. 행 안에서 최댓값을 1로 잡아 모양이 보이게 하고(팀마다 분포의 날카로움이 다르다),
+// 숫자는 옆 칸(1위 / PO)이 따로 말한다.
+function RankStrip({ t }: { t: ProjectionTeam }) {
+  const max = Math.max(...t.rankDist);
+  return (
+    <div className={styles.rankStrip} title={`순위 분포 · 최빈 ${t.modalRank}위`}>
+      {t.rankDist.map((p, i) => (
+        <span
+          key={i}
+          className={`${styles.rankCell} ${i === PLAYOFF_SPOTS - 1 ? styles.rankCutoff : ""}`}
+          style={{ opacity: max > 0 ? 0.12 + 0.88 * (p / max) : 0.12 }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ProjectionRow({ t, lo, hi }: { t: ProjectionTeam; lo: number; hi: number }) {
+  const span = Math.max(1, hi - lo);
+  const left = ((t.winsLo - lo) / span) * 100;
+  const width = ((t.winsHi - t.winsLo) / span) * 100;
+  const dot = ((t.fullExp - lo) / span) * 100;
+  const half = ((GAMES_FULL / 2 - lo) / span) * 100;
+  return (
+    // --tc: 팀 색을 원색 그대로 쓰면 남색 계열(부산 KCC)이 다크 배경에서 사라진다.
+    // CSS 쪽에서 잉크와 섞어 두 테마 모두 최소 대비를 갖게 한다.
+    <Link
+      href={`/teams/${t.tcode}?season=${PRESEASON_SEASON}`}
+      className={styles.projRow}
+      style={{ "--tc": t.color } as CSSProperties}
+    >
+      <div className={styles.outlookRank}>{t.expRank}</div>
+      <div className={styles.outlookTeam}>
+        <TeamBadge team={badgeOf(t)} size={22} />
+        <span>{t.name}</span>
+      </div>
+      <div className={styles.projHalf}>{t.halfExp.toFixed(1)}</div>
+      <div className={styles.projFull}>{t.fullExp.toFixed(1)}</div>
+      <div className={styles.projTrack} title={`80% 구간 ${t.winsLo}~${t.winsHi}승 · 기대 ${t.fullExp.toFixed(1)}승`}>
+        {half >= 0 && half <= 100 && <span className={styles.projEven} style={{ left: `${half}%` }} />}
+        <span className={styles.projBand} style={{ left: `${left}%`, width: `${width}%` }} />
+        <span className={styles.projDot} style={{ left: `${dot}%` }} />
+      </div>
+      <RankStrip t={t} />
+      <div className={styles.projOdds}>{Math.round(t.titleOdds * 100)}%</div>
+      <div className={styles.projOdds}>{Math.round(t.playoffOdds * 100)}%</div>
+      <div className={styles.outlookPrev}>
+        {t.prevW}-{t.prevL}
+      </div>
+    </Link>
+  );
+}
+
+function ProjectionSection({ proj, prev, cur }: { proj: SeasonProjection; prev: string; cur: string }) {
+  const lo = Math.min(...proj.teams.map((t) => t.winsLo)) - 1;
+  const hi = Math.max(...proj.teams.map((t) => t.winsHi)) + 1;
+  const m = proj.matrix;
+  return (
+    <div className={styles.panel}>
+      <div className={styles.panelTitle}>
+        <span className={styles.sectionNum}>1</span>코트사이드 시즌 전망 - 정규시즌 {GAMES_FULL}경기 기대승수와 AI 예상 순위
+      </div>
+      <p className={styles.panelLede}>
+        KBL 정규시즌은 상대별 홈 3 · 원정 3으로 {ROUNDS_TOTAL}라운드 {GAMES_FULL}경기입니다. KBL이 지금까지 공개한 일정은{" "}
+        {proj.scheduledN}경기로 팀당 24~27경기라, 그대로 더하면 팀끼리 비교가 안 됩니다. 그래서 두 기준을 나란히 놓습니다 — 전반기{" "}
+        {ROUNDS_HALF}라운드({GAMES_HALF}경기)와 정규시즌 전체({GAMES_FULL}경기).
+      </p>
+      <div className={styles.outlookGrid}>
+        <div className={`${styles.projRow} ${styles.outlookHead}`}>
+          <div />
+          <div>팀</div>
+          <div style={{ textAlign: "right" }}>전반기 {GAMES_HALF}G</div>
+          <div style={{ textAlign: "right" }}>전체 {GAMES_FULL}G</div>
+          <div>승수 80% 구간 (가운데 눈금 27승)</div>
+          <div>순위 분포 1→{proj.teams.length}위</div>
+          <div style={{ textAlign: "right" }}>1위</div>
+          <div style={{ textAlign: "right" }}>PO</div>
+          <div className={styles.outlookPrev}>{prev} 정규</div>
+        </div>
+        {proj.teams.map((t) => (
+          <ProjectionRow key={t.tcode} t={t} lo={lo} hi={hi} />
+        ))}
+      </div>
+      <div className={styles.note}>
+        전반기는 공개된 일정 {proj.scheduledN}경기에 매겨진 승률 그대로이고, 상대별 3경기를 못 채운 {proj.halfFilledN}경기만 보탠 것입니다 —
+        그 경기들은 홈/원정이 아직 안 정해져 양쪽 홈 승률의 평균을 썼습니다. 전체 {GAMES_FULL}경기는 일정과 무관하게 매치업 승률만으로
+        결정됩니다({m.tcodes.length}팀 × 9상대 × {ROUNDS_TOTAL}). 매치업 {m.tcodes.length * (m.tcodes.length - 1)}쌍 중 {m.fromModel}쌍은
+        모델이 직접 매긴 값이고, 아직 그 방향으로 편성되지 않은 {m.filled}쌍은 반대 방향 승률을 홈코트 이점(동급 팀끼리 홈{" "}
+        {Math.round(m.hcaProb * 1000) / 10}%)으로 뒤집어 채운 추정입니다.
+      </div>
+      <div className={styles.note}>
+        1위·PO 확률과 승수 구간은 같은 {GAMES_FULL}경기 일정을 {proj.sims.toLocaleString()}번 돌린 결과입니다(6강 플레이오프 기준). 기대승수가
+        비슷해도 순위 분포는 다를 수 있고, 실제 시즌은 이 분포 안 어느 한 점입니다. 단 이 모델은 {prev} 전력(넷레이팅·라인업 시너지·홈코트)으로
+        계산되어 아래 로스터 변화가 아직 반영되지 않았습니다 — {cur} 개막 후 경기가 쌓이면 다시 계산됩니다.
+      </div>
+    </div>
+  );
+}
+
 // ── 2. 로스터 이동 지도 - 한 줄 렌더(ChangeLine/statLine)는 팀 프로필과 공유(components/RosterChangeLine.tsx) ──
 function TeamCard({ t, abbrOf }: { t: TeamRosterChanges; abbrOf: (tcode: string | null) => string | null }) {
   // 국내 로스터까지 들어오면 팀당 25행 안팎이 되는데, 그중 15~18행이 "잔류"라 카드가 잔류
   // 목록에 묻힌다. 변화(영입·신입·이탈)만 펼쳐 두고 잔류는 접어 둔다(순수 <details>, JS 없음).
-  const changed = [...t.in, ...t.new, ...t.out];
-  const summary = [t.in.length && `영입 ${t.in.length}`, t.new.length && `신입 ${t.new.length}`, t.stay.length && `잔류 ${t.stay.length}`, t.out.length && `이탈 ${t.out.length}`]
+  const changed = [...t.in, ...t.back, ...t.new, ...t.out];
+  const summary = [
+    t.in.length && `영입 ${t.in.length}`,
+    t.back.length && `복귀 ${t.back.length}`,
+    t.new.length && `신입 ${t.new.length}`,
+    t.stay.length && `잔류 ${t.stay.length}`,
+    t.out.length && `이탈 ${t.out.length}`,
+  ]
     .filter(Boolean)
     .join(" · ");
   return (
@@ -143,7 +259,8 @@ function RosterSection({ report }: { report: RosterChangeReport }) {
           <div className={styles.headlineLabel}>팀 간 이동</div>
           <div className={styles.headlineVal}>{report.moves.length}건</div>
           <div className={styles.headlineSub}>
-            영입 {report.counts.in} · 신입 {report.counts.new} · 잔류 {report.counts.stay} · 이탈 {report.counts.out}
+            영입 {report.counts.in} · 복귀 {report.counts.back} · 신입 {report.counts.new} · 잔류 {report.counts.stay} · 이탈{" "}
+            {report.counts.out}
           </div>
         </div>
         {report.topIn && (
@@ -194,6 +311,12 @@ function RosterSection({ report }: { report: RosterChangeReport }) {
         성적은 {prev} 정규시즌+플레이오프 합산 평균입니다(위 시즌 전망표의 전적은 정규시즌 기준이라 분모가 다릅니다). {prev} 시즌 5경기 미만 출전
         선수는 이탈 목록에서 제외. &quot;신입&quot;은 KBL 출전 기록이 없는 선수로, 첫 경기 출전 시 프로필이 자동 연결됩니다.
       </div>
+      <div className={styles.note}>
+        &quot;복귀&quot;({report.counts.back}명)는 {prev} 시즌 KBL 기록이 없고 그 전엔 있는 선수입니다 — 상무(군) 복무 기간은 KBL 경기 기록에 남지
+        않아 두 시즌이 통째로 비고, 1년 넘는 부상 공백도 같은 모양으로 비기 때문에 그동안 &quot;영입&quot;으로 잡히던 자리입니다. 다만 군 전역인지
+        부상 복귀인지는 KBL 기록 어디에도 없어 이 페이지는 사유를 추정하지 않고 공백 시즌 수만 적습니다. 외국인 선수의 재영입(패리스 배스·게이지
+        프림·케베 알루마·라숀 토마스)도 같은 모양이라 같은 칩을 쓰되 note에 &quot;재영입&quot;으로 남습니다.
+      </div>
     </div>
   );
 }
@@ -231,12 +354,17 @@ function DemoCard({ g }: { g: DemoGame }) {
 }
 
 export default async function PreseasonPage() {
-  const [outlook, roster, demos] = await Promise.all([getSeasonOutlook(PRESEASON_SEASON), getRosterChangeReport(PRESEASON_SEASON), getDemoGames()]);
+  const [outlook, roster, demos, proj] = await Promise.all([
+    getSeasonOutlook(PRESEASON_SEASON),
+    getRosterChangeReport(PRESEASON_SEASON),
+    getDemoGames(),
+    getSeasonProjection(PRESEASON_SEASON),
+  ]);
   const dday = outlook.firstGameDate ? daysUntilKst(outlook.firstGameDate) : null;
   const ddayLabel = dday == null ? "" : dday > 0 ? `D-${dday}` : dday === 0 ? "D-DAY" : `D+${-dday}`;
   const prev = shortSeason(outlook.prevSeason);
   const cur = shortSeason(outlook.season);
-  const rosterCount = roster.counts.in + roster.counts.new + roster.counts.stay;
+  const rosterCount = roster.counts.in + roster.counts.back + roster.counts.new + roster.counts.stay;
 
   return (
     <div className={`wrap ${styles.pageRoot}`}>
@@ -275,7 +403,10 @@ export default async function PreseasonPage() {
         </div>
       </div>
 
-      {/* 1. 시즌 전망 */}
+      {/* 1. 시즌 전망 - 매치업 행렬이 완성되면 54경기 전망·예상 순위, 아니면 공개 일정 기준 표로 폴백 */}
+      {proj ? (
+        <ProjectionSection proj={proj} prev={prev} cur={cur} />
+      ) : (
       <div className={styles.panel}>
         <div className={styles.panelTitle}>
           <span className={styles.sectionNum}>1</span>코트사이드 시즌 전망 - 기대승수
@@ -303,6 +434,7 @@ export default async function PreseasonPage() {
           {outlook.lastGameDate ? fmtDate(outlook.lastGameDate) : "-"} (KBL 공개분).
         </div>
       </div>
+      )}
 
       {/* 2. 로스터 이동 지도 */}
       <RosterSection report={roster} />
