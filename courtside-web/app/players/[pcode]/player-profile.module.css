@@ -19,6 +19,9 @@
   --gold-soft: #9a6b0022;
   --hot: #e8590c;
   --line-rgb: 20, 22, 28;
+  /* 히어로 발치 커리어 결 띠의 밴드 높이. 빌더에 넘기는 height(72 뷰박스 단위)와 같은 값이라
+     데스크톱(.wrap 900px - 좌우 패딩 = 864px)에서 뷰박스가 거의 등배로 그려진다. */
+  --strip-h: 72px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .pageRoot {
@@ -74,8 +77,11 @@
   border-radius: 18px;
   margin-top: 18px;
   min-height: 320px;
+  /* 세로 스택 - 타이포 콘텐츠 아래에 커리어 결 띠가 한 줄 더 쌓인다(둘 다 밴드 바닥에 붙는다).
+     절대 배치된 배경 레이어(.heroArt/.heroScrim/.heroNum)는 이 흐름에 들어오지 않는다. */
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  justify-content: flex-end;
   background: #0b0d12;
   background: linear-gradient(
     128deg,
@@ -93,17 +99,9 @@
   height: 100%;
   opacity: 0.9;
 }
-/* 두 번째 모티프: 시즌 PPG 궤적 폴리라인(아주 옅게, 밴드 하단). */
-.heroArc {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 90px;
-  height: 72px;
-  width: 100%;
-  opacity: 0.16;
-  pointer-events: none;
-}
+/* (옛 .heroArc - 시즌 PPG 궤적 폴리라인 - 은 삭제됐다. 같은 자리(밴드 하단)에 커리어 결 띠가
+   들어오면서 두 개의 "커리어 궤적"이 겹쳐 그려졌고, 띠 쪽이 표본과 결장을 밝히는 정직한
+   버전이라 옅은 폴리라인은 남길 이유가 없다.) */
 /* 텍스트 가독성용 스크림 - 왼쪽 아래로 갈수록 어둡게. */
 .heroScrim {
   position: absolute;
@@ -208,6 +206,40 @@
   color: var(--hero-ink-soft);
 }
 
+/* ── 히어로 발치: 커리어 결 띠(lib/careerStrip.ts) ──────────────────────────────────
+   히어로 안이라 색은 전부 --hero-* 토큰(테마 토큰 금지 - 라이트에서 사라진다). 띠 SVG는
+   조각 문자열이고 뷰박스는 빌더가 주므로 여기서는 상자 크기만 정한다. */
+.heroFoot {
+  position: relative;
+  width: 100%;
+  padding: 6px 28px 20px;
+  border-top: 1px solid rgba(244, 245, 248, 0.1);
+  margin-top: 18px;
+}
+.heroFootSvg {
+  display: block;
+  width: 100%;
+  height: var(--strip-h);
+  overflow: visible;
+}
+.heroFootSvg a {
+  cursor: pointer;
+}
+.heroFootCaption {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--hero-ink-soft);
+  margin-top: 6px;
+}
+.heroFootNote {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  line-height: 1.5;
+  color: var(--hero-ink-faint);
+  margin-top: 2px;
+}
+
 /* 윈도우 토글 */
 .windowRow {
   display: flex;
@@ -271,23 +303,25 @@
   white-space: nowrap;
 }
 
-/* 퍼포먼스 차트 */
-.perfChartSvg {
-  width: 100%;
-  height: 160px;
+/* ── 최근 구간 패널: 같은 띠의 확대판(옛 PerfChart를 대체) ──────────────────────────
+   뷰박스 폭은 page.tsx가 칸 수에 딱 맞춰 요청하므로(칸 상한 9 × 칸 수 + 여백) 오른쪽에 빈
+   공간이 없다. 높이를 고정하고 meet으로 맞추면 창(L5~L30)을 바꿔도 칸의 화면 폭이 그대로라
+   같은 확대율의 같은 그림이 된다 - 왼쪽 정렬(xMinYMid)이라 짧은 창은 짧게 그려진다. */
+.stripZoomSvg {
   display: block;
+  width: 100%;
+  height: 168px;
+  overflow: visible;
 }
-.perfLegend {
-  display: flex;
-  gap: 14px;
-  font-size: 11px;
+.stripZoomSvg a {
+  cursor: pointer;
+}
+.stripCaption {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  line-height: 1.55;
   color: var(--ink-soft);
-  margin-top: 6px;
-}
-.perfLegend span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  margin-top: 8px;
 }
 .sw {
   width: 9px;
@@ -572,19 +606,22 @@
   border-color: rgba(var(--line-rgb), 0.2);
 }
 
-/* ── 커리어 아크 ─────────────────────────────────────────────────────────────── */
-.arcSvg {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
 @media (max-width: 620px) {
+  .pageRoot {
+    --strip-h: 56px;
+  }
   .heroStatRow {
     gap: 18px;
   }
   .heroContent {
     padding: 24px 18px 18px;
+  }
+  .heroFoot {
+    padding: 4px 18px 16px;
+    margin-top: 14px;
+  }
+  .stripZoomSvg {
+    height: 140px;
   }
   .pctRow {
     grid-template-columns: 40px 1fr 52px 26px;

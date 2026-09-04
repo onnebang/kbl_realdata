@@ -256,8 +256,8 @@ export function buildShotValueScatterSvg(data: ShotValueScatterData): string {
   svg += `<text x="${PAD_L + PLOT_W / 2}" y="${H - 6}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink-soft)" font-family="Pretendard, sans-serif">Morey Rate</text>`;
   svg += `<text x="${14}" y="${PAD_T + PLOT_H / 2}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink-soft)" font-family="Pretendard, sans-serif" transform="rotate(-90 14 ${PAD_T + PLOT_H / 2})">Points Per True Shot Attempt</text>`;
 
-  // 평균 기준선(가로=PSA, 세로=Morey rate) - 골드 대시, PerfChart(선수 프로필 페이지)가
-  // 보조 지표 오버레이 라인에 이미 쓰는 것과 같은 톤.
+  // 평균 기준선(가로=PSA, 세로=Morey rate) - 골드 대시. 이 사이트에서 "기준선"은 항상 골드
+  // 대시다(커리어 결 띠의 이동평균, 시즌 리본의 누적 승수와 같은 톤).
   if (avgMoreyPct >= xMin && avgMoreyPct <= xMax) {
     const ax = xPix(avgMoreyPct);
     svg += `<line x1="${ax.toFixed(1)}" y1="${PAD_T}" x2="${ax.toFixed(1)}" y2="${PAD_T + PLOT_H}" stroke="var(--gold)" stroke-width="1.4" stroke-dasharray="4 3" opacity="0.85"/>`;

@@ -8,7 +8,6 @@ import {
   getAllTeams,
   computeWindowAverages,
   WINDOWS,
-  type GameLogRow,
 } from "@/lib/playerProfile";
 import {
   getZoneExpectedPts,
@@ -47,7 +46,9 @@ import {
   prevSeasonName,
   PRESEASON_SEASON,
 } from "@/lib/seasonFocus";
-import { aggregateCareer, getPlayerWpaBySeason, type SeasonAgg } from "@/lib/playerPageData";
+import { aggregateCareer, getPlayerWpaBySeason } from "@/lib/playerPageData";
+import { getCareerGrain, type CareerNight } from "@/lib/careerGrain";
+import { buildCareerStripSvg, CELL_MAX_W, GAP_RESERVE } from "@/lib/careerStrip";
 import { displayTeamName } from "@/lib/teamNames";
 import { TeamBadge } from "@/components/TeamBadge";
 import styles from "./player-profile.module.css";
@@ -69,57 +70,23 @@ function signed(v: number, decimals = 1) {
 // 합쳐짐)는 lib/seasonFocus.ts seasonShort / lib/playerPageData.ts aggregateCareer를 그대로 쓴다 -
 // 페이지마다 다른 정의가 생기지 않도록(중복 구현 금지).
 
-// 템플릿 renderPerfChart() 포팅 - 막대=득점(홈 컬러), 선=출전시간(골드), viewBox 640x160.
-function PerfChart({ games }: { games: GameLogRow[] }) {
-  const chrono = games.slice().reverse();
-  const W = 640,
-    H = 160,
-    PAD_L = 24,
-    PAD_R = 8,
-    PAD_T = 10,
-    PAD_B = 18;
-  const plotW = W - PAD_L - PAD_R;
-  const plotH = H - PAD_T - PAD_B;
-  const n = chrono.length;
-  if (!n) return <svg className={styles.perfChartSvg} viewBox={`0 0 ${W} ${H}`} />;
-  const maxPts = Math.max(10, ...chrono.map((g) => g.pts));
-  const maxMin = Math.max(20, ...chrono.map((g) => g.min));
-  const bw = plotW / n;
-  const linePts = chrono
-    .map((g, i) => {
-      const x = PAD_L + i * bw + bw / 2;
-      const y = PAD_T + plotH - (g.min / maxMin) * plotH;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-
-  return (
-    <svg className={styles.perfChartSvg} viewBox={`0 0 ${W} ${H}`}>
-      {chrono.map((g, i) => {
-        const bh = (g.pts / maxPts) * plotH;
-        const x = PAD_L + i * bw;
-        return (
-          <rect
-            key={g.gmkey}
-            x={x + bw * 0.14}
-            y={PAD_T + plotH - bh}
-            width={bw * 0.72}
-            height={bh}
-            fill="var(--home)"
-            rx={2}
-          />
-        );
-      })}
-      <polyline points={linePts} fill="none" stroke="var(--gold)" strokeWidth={2} />
-      <line x1={PAD_L} y1={PAD_T + plotH} x2={W - PAD_R} y2={PAD_T + plotH} stroke="var(--ink-faint)" strokeWidth={1} />
-      <text x={2} y={PAD_T + 8} fontSize={9} fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
-        {maxPts}
-      </text>
-      <text x={2} y={PAD_T + plotH} fontSize={9} fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
-        0
-      </text>
-    </svg>
-  );
+// ── 커리어 결 띠(lib/careerGrain.ts + lib/careerStrip.ts)를 페이지에 붙일 때의 두 결정 ──────
+//
+// (1) 히어로 발치 밴드가 옛 "커리어 아크"(시즌별 PPG 곡선)를 대체한다. 아크는 시즌당 점 하나라
+//     결장·이적·0분 출전이 전부 평균 안으로 사라졌고, 무엇보다 커리어 기록이 있는 명단 198명
+//     전원에게 그려지지 않았다(2시즌 미만이면 "곡선을 그리지 않음" 문구만 남았다). 띠는 밤 하나가
+//     칸 하나라 1경기 커리어도 그대로 그려진다.
+// (2) §9의 L5/L10/L15/L30 토글은 그대로 살아서 recentN을 몬다. 다만 창의 단위는 "밤"이 아니라
+//     "출전"이다 - 그래야 L15가 바로 아래 '최근 15경기 평균' 패널과 같은 15경기를 가리킨다.
+//     그 15번째 출전까지 거슬러 올라가는 동안 낀 결장 칸은 함께 그린다(그게 띠의 문법이다).
+function nightsForRecentAppearances(nights: CareerNight[], wantPlayed: number): number {
+  let seen = 0;
+  for (let i = nights.length - 1; i >= 0; i--) {
+    if (nights[i].kind !== "played") continue;
+    seen += 1;
+    if (seen >= wantPlayed) return nights.length - i;
+  }
+  return nights.length;
 }
 
 // 리그 퍼센타일 바(NBA.com 스타일 - 레이더보다 축별 비교가 명확). 색은 기존 시맨틱 토큰:
@@ -262,79 +229,6 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
   );
 }
 
-// 커리어 아크 - 시즌별 PPG(굵은 선) + 출전시간(가는 선), 커리어 하이 시즌 주석.
-function CareerArcChart({ seasonsAsc }: { seasonsAsc: SeasonAgg[] }) {
-  if (seasonsAsc.length < 2) {
-    return <div className="empty-note">시즌이 2개 이상일 때 커리어 곡선을 그림 (현재 {seasonsAsc.length}시즌)</div>;
-  }
-  const W = 640,
-    H = 200,
-    PAD_L = 30,
-    PAD_R = 14,
-    PAD_T = 20,
-    PAD_B = 22;
-  const plotW = W - PAD_L - PAD_R;
-  const plotH = H - PAD_T - PAD_B;
-  const n = seasonsAsc.length;
-  const maxPpg = Math.max(10, ...seasonsAsc.map((s) => s.ppg));
-  const maxMin = Math.max(20, ...seasonsAsc.map((s) => s.minPg));
-  const xAt = (i: number) => PAD_L + (i / (n - 1)) * plotW;
-  const yPpg = (v: number) => PAD_T + plotH - (v / maxPpg) * plotH;
-  const yMin = (v: number) => PAD_T + plotH - (v / maxMin) * plotH;
-
-  const ppgPts = seasonsAsc.map((s, i) => `${xAt(i).toFixed(1)},${yPpg(s.ppg).toFixed(1)}`).join(" ");
-  const minPts = seasonsAsc.map((s, i) => `${xAt(i).toFixed(1)},${yMin(s.minPg).toFixed(1)}`).join(" ");
-  const hiIdx = seasonsAsc.reduce((best, s, i) => (s.ppg > seasonsAsc[best].ppg ? i : best), 0);
-  const hi = seasonsAsc[hiIdx];
-  const tickEvery = Math.max(1, Math.ceil(n / 8));
-  // 커리어 하이 라벨이 차트 밖으로 나가지 않게 끝 시즌이면 앵커를 당김.
-  const hiAnchor = hiIdx === 0 ? "start" : hiIdx === n - 1 ? "end" : "middle";
-
-  return (
-    <div>
-      <svg className={styles.arcSvg} viewBox={`0 0 ${W} ${H}`}>
-        <line x1={PAD_L} y1={PAD_T + plotH} x2={W - PAD_R} y2={PAD_T + plotH} stroke="var(--ink-faint)" strokeWidth={1} />
-        <polyline points={minPts} fill="none" stroke="var(--gold)" strokeWidth={1.4} opacity={0.75} />
-        <polyline points={ppgPts} fill="none" stroke="var(--home)" strokeWidth={2.6} />
-        {seasonsAsc.map((s, i) => (
-          <circle key={s.seasonName} cx={xAt(i)} cy={yPpg(s.ppg)} r={i === hiIdx ? 4.4 : 2.6} fill="var(--home)" />
-        ))}
-        <text
-          x={xAt(hiIdx)}
-          y={yPpg(hi.ppg) - 10}
-          fontSize={10.5}
-          fontWeight={700}
-          textAnchor={hiAnchor}
-          fill="var(--home)"
-          fontFamily="IBM Plex Mono, monospace"
-        >
-          커리어 하이 {hi.ppg.toFixed(1)} ({shortSeason(hi.seasonName)})
-        </text>
-        {seasonsAsc.map((s, i) =>
-          i % tickEvery === 0 || i === n - 1 ? (
-            <text key={s.seasonName} x={xAt(i)} y={H - 8} fontSize={9} textAnchor="middle" fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
-              {shortSeason(s.seasonName)}
-            </text>
-          ) : null
-        )}
-        <text x={2} y={PAD_T + 6} fontSize={9} fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
-          {maxPpg.toFixed(0)}
-        </text>
-      </svg>
-      <div className={styles.perfLegend}>
-        <span>
-          <span className={styles.sw} style={{ background: "var(--home)" }} />
-          시즌 평균 득점(PPG)
-        </span>
-        <span>
-          <span className={styles.sw} style={{ background: "var(--gold)" }} />
-          출전시간(MIN)
-        </span>
-      </div>
-    </div>
-  );
-}
-
 export default async function PlayerPage({
   params,
   searchParams,
@@ -366,7 +260,12 @@ export default async function PlayerPage({
   // recentGames[0]에서 신분을 추론하면 이적 선수가 옛 팀 배지·옛 등번호를 단 채로 렌더된다
   // (해먼즈 291698 실측: 마지막 경기 tcode 10 울산 현대모비스 #2 'FD' vs 26-27 명단 tcode 16
   // 원주 DB · back_num NULL · note '외국인 2옵션 | MOB→DB 이적'). 커리어 행은 그대로 넘겨 재조회 없음.
-  const status = await getPlayerRosterStatus(pcode, careerRows);
+  // 커리어 결 띠도 같은 careerRows를 재사용한다(출전 절반은 추가 왕복 0). 남는 비용은 팀 경기
+  // 1~2페이지 + season_roster 1건 + 공백 시즌 확인 몇 건뿐이라 로스터 상태 조회와 나란히 돈다.
+  const [status, grain] = await Promise.all([
+    getPlayerRosterStatus(pcode, careerRows),
+    getCareerGrain(pcode, careerRows),
+  ]);
   // "이번 시즌"의 정의는 lib/seasonFocus.ts 한 곳에서만 - 추정 패널(평균·퍼센타일·슛)은 statSeason을
   // 받아 개막일 밤에 1경기 평균이 시즌 수치로 승격되는 일이 없게 한다(선수 임계 10GP).
   const focus = resolvePlayerSeasons(pcode, status.seasonsPlayedDesc, status.state === "active");
@@ -430,18 +329,46 @@ export default async function PlayerPage({
   const teamColor = headerTeam?.color ?? "#d9640a";
   const onOff = onOffMap.get(pcode) ?? null;
 
-  // 히어로 배경의 두 번째 모티프 - 시즌 PPG 궤적을 아주 옅은 폴리라인으로(3시즌 이상일 때만).
-  const heroArcPts =
-    seasonsAsc.length >= 3
-      ? seasonsAsc
-          .map((s, i) => {
-            const maxPpg = Math.max(...seasonsAsc.map((x) => x.ppg), 1);
-            const x = (i / (seasonsAsc.length - 1)) * 100;
-            const y = 22 - (s.ppg / maxPpg) * 20;
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
-          })
-          .join(" ")
-      : null;
+  // ── 커리어 결 띠 ─────────────────────────────────────────────────────────────────────
+  // 팀 색은 원본(teams.color)을 그대로 넘긴다 - 빌더 안에서 lib/teamAccent.ts accentFor를 태운다
+  // (KT #1A1A1A를 날것으로 쓰면 히어로의 딥다크 배경에서 사라진다).
+  const teamColors = new Map<string, string | null | undefined>();
+  const teamAbbrs = new Map<string, string>();
+  for (const [tc, t] of teamByTcode) {
+    teamColors.set(tc, t.color);
+    teamAbbrs.set(tc, t.abbr);
+  }
+  // 히어로 발치 밴드: 폭 800 · 높이 72는 --strip-h(72px)와 1:1로 맞춘 값이라 데스크톱(.wrap 900px)
+  // 에서 뷰박스가 거의 등배로 그려진다. 밤이 0개면 빌더가 null을 돌려주고 밴드 자체를 안 그린다
+  // (커리어 기록이 없는 선수 - 26-27 명단 중 pcode가 없는 15명이 여기에 해당).
+  const heroStrip = buildCareerStripSvg(grain, {
+    uid: `hero${pcode}`,
+    teamColors,
+    teamAbbrs,
+    width: 800,
+    height: 72,
+    tone: "hero",
+  });
+  // §9 확대판: 마지막 windowN "출전"까지 거슬러 올라간 구간. 뷰박스 폭을 칸 수에 딱 맞춰 요청해
+  // (칸 상한 9 × 칸 수 + 좌우 여백) 오른쪽에 빈 공간이 남지 않게 한다. 커리어 끝에 공백 시즌
+  // 표식이 붙는 선수(배스)는 빌더가 오른쪽에 GAP_RESERVE만큼 예약하므로 그만큼 더 요청한다
+  // (숫자를 여기 베껴 두면 빌더 쪽이 바뀔 때 딱 맞는 폭이 조용히 어긋난다 - 그래서 상수를 가져온다).
+  const zoomCells = grain.nights.length ? nightsForRecentAppearances(grain.nights, windowN) : 0;
+  const lastNightYear = grain.nights.length ? Number(grain.nights[grain.nights.length - 1].seasonName.slice(0, 4)) : 0;
+  const zoomGapReserve = grain.gapSeasons.some((s) => Number(s.slice(0, 4)) > lastNightYear) ? GAP_RESERVE : 0;
+  const zoomStrip = zoomCells
+    ? buildCareerStripSvg(grain, {
+        uid: `zoom${pcode}`,
+        teamColors,
+        teamAbbrs,
+        recentN: zoomCells,
+        width: zoomCells * CELL_MAX_W + 6 + zoomGapReserve,
+        height: 92,
+        tone: "surface",
+        // 확대판은 언제나 경기 단위(칸 = 클릭 가능한 한 경기). "띠는 질감, 패널은 개별 경기".
+        detail: "cell",
+      })
+    : null;
 
   const clutchFgm = clutch ? clutch.totals.fg2m + clutch.totals.fg3m : 0;
   const clutchFga = clutch ? clutch.totals.fg2a + clutch.totals.fg3a : 0;
@@ -455,11 +382,6 @@ export default async function PlayerPage({
       {/* ── 히어로: 커리어 슛 별자리 포스터(위임적 다크 - 모든 색을 직접 칠함) ── */}
       <section className={styles.hero} style={{ "--hero-team": teamColor } as CSSProperties}>
         <svg className={styles.heroArt} viewBox="345 27 375 357" preserveAspectRatio="xMidYMid slice" aria-hidden dangerouslySetInnerHTML={{ __html: constellationSvg }} />
-        {heroArcPts && (
-          <svg className={styles.heroArc} viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden>
-            <polyline points={heroArcPts} fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
-          </svg>
-        )}
         <div className={styles.heroScrim} />
         {status.backNum && <div className={styles.heroNum}>{status.backNum}</div>}
         <div className={styles.heroContent}>
@@ -522,6 +444,22 @@ export default async function PlayerPage({
           )}
           {heroSeason && heroChip && <div className={styles.heroBasis}>{heroChip}</div>}
         </div>
+        {/* ── 히어로 발치: 커리어 결 띠 ──────────────────────────────────────────────────
+            칸 하나 = 하룻밤, 왼쪽부터 날짜순. 높이 = 그날 득점, 색 = 그날의 소속팀(이적하면 띠
+            중간에서 색이 바뀐다), 빈칸 = 등록 기간 안의 결장. SVG는 조각 문자열이라 뷰박스는
+            반드시 빌더가 준 값을 쓴다(칸이 많으면 800보다 넓어진다 - 김선형 1297.2). */}
+        {heroStrip && (
+          <div className={styles.heroFoot}>
+            <svg
+              className={styles.heroFootSvg}
+              viewBox={heroStrip.viewBox}
+              preserveAspectRatio="xMidYMid meet"
+              dangerouslySetInnerHTML={{ __html: heroStrip.svg }}
+            />
+            <div className={styles.heroFootCaption}>{heroStrip.caption}</div>
+            <div className={styles.heroFootNote}>{heroStrip.note}</div>
+          </div>
+        )}
       </section>
 
       {/* ── 1. 리그 퍼센타일 프로필 ── */}
@@ -745,11 +683,7 @@ export default async function PlayerPage({
         </div>
       </div>
 
-      {/* ── 6. 커리어 아크 ── */}
-      <div className={styles.panel}>
-        <div className={styles.panelTitle}>커리어 아크 · 시즌별 궤적</div>
-        <CareerArcChart seasonsAsc={seasonsAsc} />
-      </div>
+      {/* ── 6. 커리어 아크(시즌별 PPG 곡선)는 히어로 발치의 커리어 결 띠로 대체됨 ── */}
 
       {recentGames.length > 0 && (
         <div className={styles.windowRow}>
@@ -765,19 +699,28 @@ export default async function PlayerPage({
         </div>
       )}
 
+      {/* ── 최근 구간: 히어로 발치 띠를 그대로 확대(다른 차트가 아니라 같은 문법의 줌) ── */}
       <div className={styles.panel}>
-        <div className={styles.panelTitle}>최근 경기 득점 · 출전시간</div>
-        <PerfChart games={windowGames} />
-        <div className={styles.perfLegend}>
-          <span>
-            <span className={styles.sw} style={{ background: "var(--home)" }} />
-            득점(PTS)
-          </span>
-          <span>
-            <span className={styles.sw} style={{ background: "var(--gold)" }} />
-            출전시간(MIN)
-          </span>
-        </div>
+        {/* 제목의 숫자는 "요청한 창"이 아니라 "실제로 그린 출전 수"다 - 커리어가 창보다 짧은
+            선수(1경기 커리어)에게 '최근 15경기'라고 쓰면 없는 표본을 주장하게 된다. */}
+        <div className={styles.panelTitle}>최근 {Math.min(windowN, grain.playedCount)}경기 결 · 커리어 띠 확대</div>
+        {zoomStrip ? (
+          <>
+            <svg
+              className={styles.stripZoomSvg}
+              viewBox={zoomStrip.viewBox}
+              preserveAspectRatio="xMinYMid meet"
+              dangerouslySetInnerHTML={{ __html: zoomStrip.svg }}
+            />
+            <div className={styles.stripCaption}>{zoomStrip.caption}</div>
+            <div className={styles.pctNote}>
+              {zoomStrip.note}
+              {zoomStrip.mode === "cell" ? " · 칸 클릭 → 그 경기" : ""}
+            </div>
+          </>
+        ) : (
+          <div className="empty-note">경기 기록 없음</div>
+        )}
       </div>
 
       <div className={styles.panel}>
