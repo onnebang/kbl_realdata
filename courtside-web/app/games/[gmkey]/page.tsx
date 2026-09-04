@@ -108,8 +108,14 @@ async function getGame(gmkey: string): Promise<GameInfo | null> {
        away_team:teams!games_away_tcode_fkey(tcode, name, abbr, color, logo_url)`
     )
     .eq("gmkey", gmkey)
-    .single();
-  if (error) return null;
+    // single()이 아니라 maybeSingle()이어야 한다. single()은 "0행"도 에러(PGRST116)로 만드는데,
+    // lib/supabaseServer.ts가 에러를 던지도록 바뀌면서 그러면 **없는 경기가 404 대신 오류 화면**이
+    // 된다. maybeSingle()은 0행을 에러 없이 data=null로 주므로 아래 notFound() 경로가 살아 있고,
+    // DB가 진짜로 죽었을 때만 던진다.
+    .maybeSingle();
+  // maybeSingle()은 "그런 경기 없음"을 error 없이 data=null로 준다. single()이었을 때는 그게
+  // 에러로 와서 위의 `if (error)`가 걸러줬으므로, 여기서 null을 따로 막아야 한다.
+  if (error || !data) return null;
   const game = data as unknown as GameInfo;
   // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - 이 경기의 season_name
   // 기준으로 덮어씀. 이 함수 하나만 고치면 이 파일 전체(매치업 배너/박스스코어/슛차트
