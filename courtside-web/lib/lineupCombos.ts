@@ -1,6 +1,14 @@
 import { supabase } from "./supabase";
 import { fetchAllPagesBounded } from "./scoringExplorer";
-import { NET40_SE_CONST, net40Se } from "./wowy";
+import { getSeasonGames, num } from "./teamSeasonStats";
+import {
+  fetchSubjectStints,
+  NET40_SE_CONST,
+  net40Se,
+  per40,
+  WOWY_GROUP_MIN_MINUTES,
+  WOWY_GROUP_SIZES,
+} from "./wowy";
 
 // 선수 프로필 "시너지 임팩트"를 2인에서 3·4·5인까지 넓힌 데이터 레이어(요청: "3인/4인/5인 조합도").
 // 원본은 lib/playerDataScience.ts getTopPairCombos - n=2, 50분, net/40 내림차순 상위 3개다.
@@ -112,8 +120,14 @@ export type ComboRow = {
   netPer40: number;
   /** ±. 분만으로 정해진다 - net40Se 참고. */
   se: number;
-  /** 순위용 축소값 = netPer40 × 분/(분+K). 화면에는 막대 길이로만 나온다. */
-  shrunk: number;
+  /**
+   * 순위·막대 길이에 쓰는 값(부호는 항상 netPer40과 같은 방향).
+   * 커리어(rankKind "shrunk")는 netPer40 × 분/(분+K) - 표본 두께로 누른 net/40.
+   * 시즌(rankKind "minutes")은 함께 뛴 분 그 자체 - 한 시즌 표본으로는 net/40의 우열이
+   * 재현되지 않아(아래 getPlayerSeasonCombos 주석) net/40 대신 표본 크기로 줄을 세운다.
+   */
+  rankValue: number;
+  rankKind: "shrunk" | "minutes";
   /** |net/40| < se - 부호조차 의미가 없는 행. 색을 빼는 근거. */
   noisy: boolean;
 };
@@ -223,7 +237,8 @@ export async function getPlayerCombos(pcode: string): Promise<PlayerCombos> {
         stints: r.stints,
         netPer40: r.netPer40,
         se: r.se,
-        shrunk: r.shrunk,
+        rankValue: r.shrunk,
+        rankKind: "shrunk" as const,
         noisy: Math.abs(r.netPer40) < r.se,
       };
     }),
@@ -231,3 +246,138 @@ export async function getPlayerCombos(pcode: string): Promise<PlayerCombos> {
 
   return { blocks, any: blocks.some((b) => b.rows.length > 0), failed: false };
 }
+
+// ── 시즌 범위 ─────────────────────────────────────────────────────────────────
+
+/**
+ * 시즌 범위 "최고의 조합". 그 시즌에 라인업 로그가 아예 없으면(개막 전, 혹은 그 선수가
+ * 그 시즌에 출전하지 않음) null - "표본 미달"과 구분해야 화면이 "0개"와 "애초에 없음"을
+ * 다른 문장으로 말할 수 있다.
+ *
+ * 임계값은 lib/wowy.ts의 WOWY_GROUP_MIN_MINUTES(2:100·3:100·4:40·5:20)를 그대로 쓴다 - 같은
+ * 표본(한 시즌 온코트 스틴트)에서 나온 값이라 새로 재는 것보다 재사용이 맞다. WOWY는 "함께"와
+ * "따로" 양쪽이 이 문턱을 넘어야 하지만 여기는 "함께"만 있으면 되므로 실제 통과율은 WOWY보다
+ * 오히려 넉넉하다.
+ */
+export async function getPlayerSeasonCombos(pcode: string, season: string): Promise<PlayerCombos | null> {
+  const games = await getSeasonGames(season, { category: null });
+  if (!games.length) return null; // 개막 전 등 - 그 시즌에 끝난 경기가 없음
+
+  let stints;
+  try {
+    stints = await fetchSubjectStints(
+      pcode,
+      games.map((g) => g.gmkey)
+    );
+  } catch {
+    return { blocks: [], any: false, failed: true };
+  }
+  if (!stints.length) return null; // 그 시즌 라인업 로그에 이 선수가 없음(출전 없음 등)
+
+  // 스틴트마다 동료(최대 4명)의 부분집합을 세어 "함께"만 쌓는다 - lib/wowy.ts getWowy의
+  // groupAcc와 같은 방식이지만 "따로"는 계산하지 않는다(이 패널에 필요 없다).
+  type Acc = { members: string[]; sec: number; margin: number; stints: number };
+  const bySize = new Map<number, Map<string, Acc>>(WOWY_GROUP_SIZES.map((s) => [s, new Map<string, Acc>()]));
+  const bump = (size: number, key: string, members: string[], sec: number, margin: number) => {
+    const map = bySize.get(size)!;
+    const a = map.get(key) ?? { members, sec: 0, margin: 0, stints: 0 };
+    a.sec += sec;
+    a.margin += margin;
+    a.stints += 1;
+    map.set(key, a);
+  };
+
+  for (const s of stints) {
+    const home = s.home_lineup ?? [];
+    const away = s.away_lineup ?? [];
+    const onHome = home.includes(pcode);
+    const lineup = onHome ? home : away;
+    if (!lineup.includes(pcode)) continue; // 방어(조회 조건상 도달하지 않음)
+    const others = lineup.filter((p) => p !== pcode).sort();
+    const margin = onHome ? num(s.home_pts) - num(s.away_pts) : num(s.away_pts) - num(s.home_pts);
+    const sec = num(s.duration_sec);
+    const n = others.length;
+
+    for (const p of others) bump(2, p, [p], sec, margin);
+    for (let mask = 1; mask < 1 << n; mask++) {
+      let bits = 0;
+      for (let i = 0; i < n; i++) if (mask & (1 << i)) bits++;
+      if (bits < 2 || bits > 4) continue;
+      const members: string[] = [];
+      for (let i = 0; i < n; i++) if (mask & (1 << i)) members.push(others[i]);
+      bump(members.length + 1, members.join(","), members, sec, margin);
+    }
+  }
+
+  const picked = WOWY_GROUP_SIZES.map((size) => {
+    const minMinutes = WOWY_GROUP_MIN_MINUTES[size];
+    const all = [...bySize.get(size)!.values()]
+      .map((a) => {
+        const minutes = a.sec / 60;
+        return {
+          members: a.members,
+          minutes,
+          stints: a.stints,
+          netPer40: per40(a.margin, minutes),
+          se: net40Se(minutes),
+        };
+      })
+      .filter((r) => r.minutes >= minMinutes);
+    // 함께 뛴 시간 내림차순 - net/40이 아니다(파일 상단 주석 참고). 동률이면 스틴트 수가
+    // 많은 쪽을 위로(더 잘게 쪼개져 관측된 표본이 우연 하나에 덜 좌우된다).
+    all.sort((x, y) => y.minutes - x.minutes || y.stints - x.stints);
+    return { size: size as ComboSize, minMinutes, passed: all.length, top: all.slice(0, COMBO_TOP_N) };
+  });
+
+  const memberPcodes = Array.from(new Set(picked.flatMap((p) => p.top.flatMap((r) => r.members))));
+  const nameByPcode = new Map<string, string>();
+  const photoByPcode = new Map<string, string>();
+  if (memberPcodes.length) {
+    const { data } = await supabase.from("players").select("pcode, name, photo_url").in("pcode", memberPcodes);
+    for (const r of data ?? []) {
+      nameByPcode.set(r.pcode as string, r.name as string);
+      const url = r.photo_url as string | null;
+      if (url) photoByPcode.set(r.pcode as string, url);
+    }
+  }
+
+  const blocks: ComboSizeBlock[] = picked.map((p) => ({
+    size: p.size,
+    minMinutes: p.minMinutes,
+    passed: p.passed,
+    rows: p.top.map((r) => {
+      const members: ComboMember[] = r.members.map((mp) => {
+        const name = nameByPcode.get(mp) ?? mp;
+        return {
+          pcode: mp,
+          name,
+          href: `/players/${mp}`,
+          photoUrl: photoByPcode.get(mp) ?? null,
+          initial: (name || "?").slice(0, 1),
+        };
+      });
+      return {
+        key: [...r.members].sort().join(","),
+        size: p.size,
+        members,
+        minutes: r.minutes,
+        stints: r.stints,
+        netPer40: r.netPer40,
+        se: r.se,
+        rankValue: r.minutes,
+        rankKind: "minutes" as const,
+        noisy: Math.abs(r.netPer40) < r.se,
+      };
+    }),
+  }));
+
+  return { blocks, any: blocks.some((b) => b.rows.length > 0), failed: false };
+}
+
+/** 시즌 범위 최소 표본 문장(캡션용) - WOWY_GROUP_MIN_MINUTES를 그대로 인용한다. */
+export const SEASON_COMBO_MIN_MINUTES_SENTENCE = WOWY_GROUP_SIZES.map(
+  (s) => `${s}인 ${WOWY_GROUP_MIN_MINUTES[s]}분`
+).join(" · ");
+export const SEASON_COMBO_SE_SENTENCE = WOWY_GROUP_SIZES.map(
+  (s) => `±${Math.round(NET40_SE_CONST / Math.sqrt(WOWY_GROUP_MIN_MINUTES[s]))}`
+).join(" · ");

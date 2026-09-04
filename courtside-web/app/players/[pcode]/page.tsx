@@ -31,7 +31,7 @@ import {
   type SeasonZoneMix,
   type PercentileProfile,
 } from "@/lib/playerDataScience";
-import { getPlayerCombos } from "@/lib/lineupCombos";
+import { getPlayerCombos, getPlayerSeasonCombos } from "@/lib/lineupCombos";
 import { getPlayerOnOffRatings } from "@/lib/lineupNetRating";
 import { getPlayerRosterStatus } from "@/lib/playerStatus";
 import {
@@ -374,11 +374,17 @@ export default async function PlayerPage({
   const percentileP = shotSeason ? getPercentileProfile(pcode, shotSeason) : Promise.resolve(null);
   const glancePercentileP: Promise<PercentileProfile | null | undefined> =
     shotSeason === focus.statSeason ? percentileP : Promise.resolve(undefined);
-  const [boxTotals, percentile, wpaRank, wpaBySeason, glance] = await Promise.all([
+  // Promise.all 배열 순서 == 구조분해 순서: boxTotals, percentile, wpaRank, wpaBySeason,
+  // seasonCombos(방금 추가), glance(제일 마지막 - glancePercentileP.then(...)).
+  const [boxTotals, percentile, wpaRank, wpaBySeason, seasonCombos, glance] = await Promise.all([
     shotSeason ? getPlayerSeasonBoxTotals(pcode, shotSeason) : Promise.resolve(null),
     percentileP,
     shotSeason ? getSeasonWpaRank(pcode, shotSeason) : Promise.resolve(null),
     getPlayerWpaBySeason(pcode, seasonNames),
+    // 요청: "최고의 조합에서, 커리어 통산과 함께 시즌별 최고의 조합도 제공". lineup_combo에는
+    // 시즌 컬럼이 없어(파일 상단 주석) 이 조회만 lineup_stints에서 즉석 계산한다 - 다른 패널과
+    // 같은 shotSeason을 쓰므로 ?season=을 바꾸면 조합표도 같이 따라간다.
+    shotSeason ? getPlayerSeasonCombos(pcode, shotSeason) : Promise.resolve(null),
     // 한눈 카드: 페이지가 이미 가진 것(커리어 경기·폼·커리어 슛·클러치·커리어 결)을 전부 주입해
     // 재조회를 없앤다. 남는 조회는 온/오프 + 시즌 WPA + 분 가중 고급지표 세 갈래뿐이고, 그것도
     // 이 파도의 나머지와 동시에 돈다(직렬 waterfall 추가 없음).
@@ -812,9 +818,14 @@ export default async function PlayerPage({
             </div>
           </div>
         </div>
-        <div className={styles.pctNote}>온/오프는 15시즌 통산 · 아래 조합표도 같은 15시즌 통산 범위입니다</div>
+        <div className={styles.pctNote}>온/오프는 15시즌 통산 범위입니다 · 아래 조합표는 시즌·커리어 통산 두 범위를 같이 보여줍니다</div>
         {/* 조합표는 표본·임계값·±·정렬 근거를 자기 캡션으로 달고 나온다 - components/SynergyCombos.tsx */}
-        <SynergyCombos data={combos} playerName={info.name} />
+        <SynergyCombos
+          data={combos}
+          seasonData={shotSeason ? seasonCombos : undefined}
+          seasonLabel={shotSeason ? (statChip ?? `${shortSeason(shotSeason)} 시즌`) : undefined}
+          playerName={info.name}
+        />
       </div>
 
       {/* ── 6. 커리어 아크(시즌별 PPG 곡선)는 히어로 발치의 커리어 결 띠로 대체됨 ── */}

@@ -164,7 +164,10 @@ export type Wowy = {
   caption: string;
 };
 
-type StintRow = {
+// lib/lineupCombos.ts의 시즌별 "최고의 조합"이 이 타입과 아래 fetchSubjectStints를 그대로
+// 재사용한다(요청: "커리어 통산과 함께 시즌별 최고의 조합도 제공") - 같은 표본(온코트 스틴트)에서
+// WOWY와 조합표가 서로 다른 숫자를 내면 안 되므로 조회 로직을 하나만 둔다.
+export type StintRow = {
   gmkey: string;
   home_lineup: string[] | null;
   away_lineup: string[] | null;
@@ -181,23 +184,26 @@ const STINT_SELECT = "gmkey, home_lineup, away_lineup, duration_sec, home_pts, a
  * 두 GIN 인덱스를 각각 그대로 타기 때문. or(...)로 한 번에 묶으면 인덱스 선택이 불안정해진다.
  * 시즌 범위면 gmkey를 GMKEY_CHUNK개씩 끊어서 좁힌다(게임 테이블에만 season_name이 있다).
  */
-async function fetchSubjectStints(pcode: string, gmkeys: string[] | null): Promise<StintRow[]> {
+export async function fetchSubjectStints(pcode: string, gmkeys: string[] | null): Promise<StintRow[]> {
   const parts = gmkeys ? chunk(gmkeys, GMKEY_CHUNK) : [null];
-  const out: StintRow[] = [];
-  for (const part of parts) {
-    for (const col of ["home_lineup", "away_lineup"] as const) {
-      const rows = await fetchAllPagesBounded<StintRow>((from, to) => {
-        let q = supabase.from("lineup_stints").select(STINT_SELECT, { count: "exact" }).contains(col, [pcode]);
-        if (part) q = q.in("gmkey", part);
-        return q.range(from, to);
-      });
-      out.push(...rows);
-    }
-  }
-  return out;
+  // 청크 × 컬럼을 전부 동시에 던진다. 한 시즌이면 gmkey 3청크 × home/away 2컬럼 = 6번 왕복인데
+  // 직렬로 돌리면 그대로 6배 기다린다(같은 함수를 /lineups WOWY와 선수 프로필 시즌 조합이
+  // 같이 쓰므로 두 화면이 같이 느려진다). 서로 겹치는 행이 없는 조회라 순서도 무관하다.
+  const batches = await Promise.all(
+    parts.flatMap((part) =>
+      (["home_lineup", "away_lineup"] as const).map((col) =>
+        fetchAllPagesBounded<StintRow>((from, to) => {
+          let q = supabase.from("lineup_stints").select(STINT_SELECT, { count: "exact" }).contains(col, [pcode]);
+          if (part) q = q.in("gmkey", part);
+          return q.range(from, to);
+        })
+      )
+    )
+  );
+  return batches.flat();
 }
 
-function per40(margin: number, minutes: number): number {
+export function per40(margin: number, minutes: number): number {
   return minutes > 0 ? (margin / minutes) * 40 : 0;
 }
 

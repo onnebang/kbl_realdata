@@ -7,6 +7,8 @@ import {
   COMBO_SIZES,
   COMBO_TOP_N,
   NET40_SE_CONST,
+  SEASON_COMBO_MIN_MINUTES_SENTENCE,
+  SEASON_COMBO_SE_SENTENCE,
   type ComboMember,
   type ComboRow,
   type ComboSizeBlock,
@@ -77,7 +79,7 @@ function Row({ r, maxAbs }: { r: ComboRow; maxAbs: number }) {
   // 막대 길이는 순위를 정한 값(축소값) 그 자체다 - 인쇄된 숫자는 원시 net/40이므로, 정렬 근거가
   // 화면 어디에도 없으면 "왜 +14.2가 +46.7보다 위인가"에 답할 방법이 없다. 축척은 네 크기가
   // 공유한다(그래야 5인 막대가 2인보다 짧다는 사실이 그대로 보인다). 0 근처도 보이도록 하한 2%.
-  const pct = Math.max(2, Math.min(100, (Math.abs(r.shrunk) / maxAbs) * 100));
+  const pct = Math.max(2, Math.min(100, (Math.abs(r.rankValue) / maxAbs) * 100));
   return (
     <div className={styles.row}>
       <span className={styles.avatarStack}>
@@ -109,15 +111,21 @@ function Row({ r, maxAbs }: { r: ComboRow; maxAbs: number }) {
       </span>
       <span
         className={styles.barCell}
-        title={`표본 두께로 누른 값 ${fmtNet(r.shrunk)} = ${fmtNet(r.netPer40)} × ${fmtMin(r.minutes)}분 ÷ (${fmtMin(r.minutes)}분 + ${COMBO_SHRINK_K})`}
+        title={
+          r.rankKind === "shrunk"
+            ? `표본 두께로 누른 값 ${fmtNet(r.rankValue)} = ${fmtNet(r.netPer40)} × ${fmtMin(r.minutes)}분 ÷ (${fmtMin(r.minutes)}분 + ${COMBO_SHRINK_K})`
+            : `함께 뛴 시간 ${fmtMin(r.rankValue)}분 순 - 한 시즌 표본은 net/40이 아니라 시간으로 줄을 세운다(아래 캡션 참고)`
+        }
       >
-        {/* 숫자는 바로 왼쪽에 있으므로 막대는 장식이다(스크린리더에서 숨김). */}
+        {/* 막대 길이는 rankValue(정렬 기준), 좌우/색은 항상 netPer40 부호 - 축소값은 부호가
+            netPer40과 같지만, 시즌의 rankValue(분)는 항상 양수라 부호를 분에서 뽑으면 net/40이
+            마이너스인 조합도 초록 막대가 된다. 그래서 색은 별도로 netPer40에서 가져온다. */}
         <span className={styles.bar} aria-hidden="true">
           <span className={`${styles.barHalf} ${styles.barLeft}`}>
-            {r.shrunk < 0 && <span className={`${styles.barFill} ${styles.barFillNeg}`} style={{ width: `${pct}%` }} />}
+            {r.netPer40 < 0 && <span className={`${styles.barFill} ${styles.barFillNeg}`} style={{ width: `${pct}%` }} />}
           </span>
           <span className={`${styles.barHalf} ${styles.barRight}`}>
-            {r.shrunk > 0 && <span className={`${styles.barFill} ${styles.barFillPos}`} style={{ width: `${pct}%` }} />}
+            {r.netPer40 >= 0 && <span className={`${styles.barFill} ${styles.barFillPos}`} style={{ width: `${pct}%` }} />}
           </span>
         </span>
       </span>
@@ -152,36 +160,106 @@ function SizeBlock({ b, maxAbs }: { b: ComboSizeBlock; maxAbs: number }) {
 /**
  * 크기별 최고 조합(2·3·4·5인). 주인공을 뺀 조합원만 그린다 - 어차피 모든 행에 주인공이 있으므로
  * 같은 얼굴을 열두 번 반복하면 정보가 아니라 소음이다.
+ *
+ * 요청("최고의 조합에서, 커리어 통산과 함께 시즌별 최고의 조합도 제공")대로 두 범위를 위아래로
+ * 같이 보여준다 - 토글로 하나를 골라 보는 게 아니라, 시즌 값이 커리어 값과 얼마나 다른지(또는
+ * 같은지)가 바로 비교돼야 의미가 있어서다("이 조합이 이번 시즌 반짝했나, 원래 좋았나").
+ * seasonData가 null이면 그 시즌에 라인업 로그가 없다는 뜻(개막 전 등)이고, undefined면 호출부가
+ * 애초에 시즌을 못 정한 것이다(둘 다 커리어 섹션만 보여주고 시즌 섹션은 생략).
  */
-export function SynergyCombos({ data, playerName }: { data: PlayerCombos; playerName?: string }) {
+export function SynergyCombos({
+  data,
+  seasonData,
+  seasonLabel,
+  playerName,
+}: {
+  data: PlayerCombos;
+  seasonData?: PlayerCombos | null;
+  /** "25-26 최종"처럼 페이지의 다른 시즌 패널과 같은 형식의 기준 칩. */
+  seasonLabel?: string;
+  playerName?: string;
+}) {
   if (data.failed) {
     // 빈 결과와 조회 실패를 절대 같은 문장으로 말하지 않는다("조합 없음"은 사실 주장이다).
     return <div className={styles.wrap}>조합 표를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>;
   }
 
   const rows = data.blocks.flatMap((b) => b.rows);
-  const maxAbs = Math.max(0.5, ...rows.map((r) => Math.abs(r.shrunk)));
+  const maxAbs = Math.max(0.5, ...rows.map((r) => Math.abs(r.rankValue)));
   const who = playerName ?? "이 선수";
+
+  const seasonRows = seasonData ? seasonData.blocks.flatMap((b) => b.rows) : [];
+  const seasonMaxAbs = Math.max(0.5, ...seasonRows.map((r) => Math.abs(r.rankValue)));
 
   return (
     <div className={styles.wrap}>
       <div className={styles.head}>
         <span className={styles.headTitle}>최고의 조합</span>
-        <span className={styles.headChip}>커리어 통산</span>
-        <span className={styles.headNote}>크기별 상위 {COMBO_TOP_N}개 · 표본 두께로 누른 값 순</span>
+        <span className={styles.headNote}>크기별 상위 {COMBO_TOP_N}개</span>
       </div>
 
-      {rows.length > 0 ? (
-        data.blocks.map((b) => <SizeBlock key={b.size} b={b} maxAbs={maxAbs} />)
-      ) : (
-        <div className={styles.blockEmpty}>
-          {/* 받침에 따라 이/가가 갈린다("김선형이" vs "자밀 워니가") - lib/josa.ts를 쓴다. */}
-          {who}
-          {iGa(who)} 최소 표본({MIN_MINUTES_SENTENCE})을 넘긴 조합이 어느 크기에도 없습니다.
+      {seasonLabel !== undefined && (
+        <div className={styles.scopeSection}>
+          <div className={styles.scopeHead}>
+            <span className={styles.scopeChip}>{seasonLabel}</span>
+            <span className={styles.scopeNote}>함께 뛴 시간 순</span>
+          </div>
+
+          {seasonData === null ? (
+            <div className={styles.blockEmpty}>{seasonLabel} 시즌은 라인업 로그가 없어 조합을 계산할 수 없습니다.</div>
+          ) : seasonData?.failed ? (
+            <div className={styles.blockEmpty}>{seasonLabel} 조합을 불러오지 못했습니다.</div>
+          ) : seasonRows.length > 0 && seasonData ? (
+            seasonData.blocks.map((b) => <SizeBlock key={`s-${b.size}`} b={b} maxAbs={seasonMaxAbs} />)
+          ) : (
+            <div className={styles.blockEmpty}>
+              {who}
+              {iGa(who)} {seasonLabel} 시즌 최소 표본({SEASON_COMBO_MIN_MINUTES_SENTENCE})을 넘긴 조합이 없습니다.
+            </div>
+          )}
+
+          {seasonData && !seasonData.failed && (
+            <div className={styles.caption}>
+              <ul className={styles.captionList}>
+                <li>
+                  <b>정렬은 net/40이 아니라 함께 뛴 시간입니다.</b> 같은 시즌을 무작위로 반씩 갈라 net/40을 비교한
+                  상관이 2인 100분에서 r=+0.06, 3~5인은 0 근처거나 음수였습니다(/lineups의 3~5인 조합표와 같은
+                  실측). 한 시즌 표본으로는 조합의 우열이 재현되지 않는다는 뜻이라, 커리어처럼 표본 두께로
+                  net/40을 누르는 대신 시간 순으로만 줄을 세웁니다. 여러 시즌에 걸쳐 같은 조합이 반복해서 위에
+                  있으면 그때가 신호입니다 - 아래 <b>커리어 통산</b>이 그 비교 상대입니다.
+                </li>
+                <li>
+                  <b>최소 표본은 크기마다 다릅니다({SEASON_COMBO_MIN_MINUTES_SENTENCE}).</b> /lineups의 WOWY
+                  조합표와 같은 값을 재사용합니다 - 같은 표본(그 시즌 온코트 스틴트)에서 나온 문턱이라 새로
+                  잴 이유가 없습니다. 그 문턱에서 ±는 {SEASON_COMBO_SE_SENTENCE}입니다.
+                </li>
+                <li>
+                  <b>범위.</b> {seasonLabel} 정규시즌+플레이오프 전체(WOWY와 같은 범위 - 표본이 원래 귀해서
+                  플레이오프를 버리지 않습니다).
+                </li>
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
-      <div className={styles.caption}>
+      <div className={styles.scopeSection}>
+        <div className={styles.scopeHead}>
+          <span className={styles.scopeChip}>커리어 통산</span>
+          <span className={styles.scopeNote}>표본 두께로 누른 값 순</span>
+        </div>
+
+        {rows.length > 0 ? (
+          data.blocks.map((b) => <SizeBlock key={`c-${b.size}`} b={b} maxAbs={maxAbs} />)
+        ) : (
+          <div className={styles.blockEmpty}>
+            {/* 받침에 따라 이/가가 갈린다("김선형이" vs "자밀 워니가") - lib/josa.ts를 쓴다. */}
+            {who}
+            {iGa(who)} 최소 표본({MIN_MINUTES_SENTENCE})을 넘긴 조합이 어느 크기에도 없습니다.
+          </div>
+        )}
+
+        <div className={styles.caption}>
         <b>이 표를 읽는 법</b>
         <ul className={styles.captionList}>
           <li>
@@ -218,6 +296,7 @@ export function SynergyCombos({ data, playerName }: { data: PlayerCombos; player
             <b>실제로 같이 오래 뛴 다섯</b>의 기록으로 읽어 주세요.
           </li>
         </ul>
+        </div>
       </div>
     </div>
   );

@@ -16,7 +16,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 4px;
 }
 .headTitle {
   font-size: 11px;
@@ -284,4 +284,34 @@
     margin-left: 0;
     flex-basis: 100%;
   }
+}
+
+/* ── 범위 섹션(시즌 / 커리어 통산) ────────────────────────────────────────────────
+   요청: "최고의 조합에서, 커리어 통산과 함께 시즌별 최고의 조합도 제공". 토글이 아니라
+   위아래로 같이 보여준다 - 시즌 값과 커리어 값을 나란히 봐야 "이번 시즌 반짝했나, 원래
+   좋았나"를 바로 비교할 수 있다. */
+.scopeSection + .scopeSection {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.12);
+}
+.scopeHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.scopeChip {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  color: var(--ink);
+}
+.scopeNote {
+  font-size: 10.5px;
+  color: var(--ink-faint);
 }
