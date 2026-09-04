@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PlayerPhoto } from "@/components/PlayerPhoto";
 import type { CSSProperties } from "react";
 import { TeamBadge } from "@/components/TeamBadge";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
@@ -77,8 +78,7 @@ function Avatar({ m, size = 28 }: { m: WowyMember; size?: number }) {
       {m.photoUrl ? (
         <>
           {/* 외부 kbl.or.kr 호스팅이라 next/image 최적화 대상이 아니다(TeamBadge와 같은 이유). */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={m.photoUrl} alt="" className={styles.avatarImg} loading="lazy" />
+          <PlayerPhoto src={m.photoUrl} size={size} className={styles.avatarImg} />
           <span className={styles.avatarTint} aria-hidden="true" />
         </>
       ) : (

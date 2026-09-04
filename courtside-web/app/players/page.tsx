@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PlayerPhoto } from "@/components/PlayerPhoto";
 import type { CSSProperties } from "react";
 import { TeamBadge } from "@/components/TeamBadge";
 import { PRESEASON_SEASON, getSeasonDirectory, shortSeason, prevSeasonName, type DirectoryPlayer } from "@/lib/preseason";
@@ -21,8 +22,7 @@ function PlayerRow({ p, prev }: { p: DirectoryPlayer; prev: string }) {
   const inner = (
     <>
       {p.photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={p.photoUrl} alt="" className={styles.photo} loading="lazy" />
+        <PlayerPhoto src={p.photoUrl} size={34} className={styles.photo} />
       ) : (
         <div className={styles.photoFallback}>{p.backNum ?? "·"}</div>
       )}

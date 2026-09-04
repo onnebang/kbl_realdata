@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
-import { getSeasonsWithFormData, getFormIndexLeaderboard, type FormSortKey } from "@/lib/formIndex";
+import { getSeasonsWithFormData, getFormIndexLeaderboard, type FormSortKey, MIN_ATTEMPTS, MIN_RECENT_GAMES } from "@/lib/formIndex";
 import styles from "./form-index.module.css";
 
 // web/form_index_template.html 리디자인 이식. 원본은 정적 스냅샷(2025-26 시즌 고정, JS로
@@ -64,7 +64,7 @@ export default async function FormIndexPage({
           Form Index - 최근 5경기 동안 이 선수가 시도한 슛들의 <b>난이도 대비 기대득점(xPts)</b>과{" "}
           <b>실제 득점</b>을 비교. 양수가 클수록 &ldquo;어려운 슛도 잘 들어가는 중&rdquo;(핫), 음수가
           클수록 &ldquo;쉬운 찬스도 놓치는 중&rdquo;(콜드). {activeSeason} 시즌 각 선수의 최근 5경기
-          기준(최소 3경기 데이터거나 시도 15회 미만인 선수는 제외).
+          기준(최소 {MIN_RECENT_GAMES}경기 데이터거나 시도 {MIN_ATTEMPTS}회 미만인 선수는 제외).
         </div>
 
         <form className={styles.seasonForm}>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PlayerPhoto } from "@/components/PlayerPhoto";
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
@@ -184,8 +185,7 @@ function TeamLeadersPanel({ tl }: { tl: TeamLeaders | null }) {
             <div className={styles.leaderCat}>{l.label}</div>
             <div className={styles.leaderWho}>
               {l.photoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={l.photoUrl} alt="" className={styles.leaderPhoto} loading="lazy" />
+                <PlayerPhoto src={l.photoUrl} size={38} className={styles.leaderPhoto} />
               ) : (
                 <div className={styles.leaderFallback}>{l.backNum ?? "·"}</div>
               )}

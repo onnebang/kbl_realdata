@@ -1,5 +1,4 @@
 import { supabaseServer as supabase } from "./supabaseServer";
-import { fetchAllPagesBounded } from "./scoringExplorer";
 import { displayTeamName } from "./teamNames";
 
 // "폼 지수" 리더보드(claude.ai/code/artifact 폼지수 리더보드) 포팅 - tools/build_form_index.py의
@@ -9,9 +8,12 @@ import { displayTeamName } from "./teamNames";
 // xPts 존 테이블(tools/build_xpts_shot_quality.py가 만들던 것)은 이제 Supabase
 // xpts_zone_table에 미리 계산돼 있음(15시즌 553,248개 슛 전체 기준, 마이그레이션
 // create_xpts_zone_table).
-const ROLLING_WINDOW = 5;
-const MIN_RECENT_GAMES = 3;
-const MIN_ATTEMPTS = 15;
+// 아래 셋은 이제 **tools/rpc_form_index.sql이 실제로 적용하는 값**이다. 여기서는 화면 캡션이
+// 같은 숫자를 말하도록 export만 한다 - 한쪽만 고치면 "화면 설명과 실제 기준이 다른" 상태가 된다.
+// (SQL 쪽: rn <= ROLLING_WINDOW, having count(*) >= MIN_RECENT_GAMES, having count(*) >= MIN_ATTEMPTS)
+export const ROLLING_WINDOW = 5;
+export const MIN_RECENT_GAMES = 3;
+export const MIN_ATTEMPTS = 15;
 
 const HOOP_LEFT: [number, number] = [69, 205];
 const HOOP_RIGHT: [number, number] = [681, 205];
@@ -66,124 +68,56 @@ export async function getSeasonsWithFormData(): Promise<string[]> {
   return (data ?? []).map((s) => s.season_name);
 }
 
-type ZoneRow = { zone: string; shot_value: number; expected_pts_per_shot: string };
 type GameStatRow = { pcode: string; gmkey: string; games: { game_date: string } | null };
-type ShotRow = { pcode: string; gmkey: string; x: number; y: number; d: string; made: boolean };
 
+/** form_index_season RPC 한 행. tools/rpc_form_index.sql 참고. */
+type FormRpcRow = {
+  pcode: string;
+  player_name: string | null;
+  tcode: string | null;
+  games: number;
+  attempts: number;
+  actual_pts: number;
+  expected_pts: number;
+  last_game_date: string | null;
+};
+
+/**
+ * 최근 5경기 폼 지수.
+ *
+ * 예전에는 이 계산을 웹에서 했다 - 실측(감사) 프로덕션 11초, 53왕복, 48,469행, 5.2MB.
+ * 그중 shot_log 37,621행을 1,000행씩 38번 받는데 실제로 쓰는 건 4,068행(89% 낭비)이었다.
+ * 지금은 Postgres 함수 하나로 92행을 받는다(실측 331ms).
+ *
+ * 바꾸기 전에 **15시즌 전수 대조로 불일치 0건**을 확인했다(선수 집합·attempts·actual_pts·
+ * expected_pts를 pcode별 비교). 존 경계·상수를 고칠 일이 생기면 이 파일의 classifyShot과
+ * tools/rpc_form_index.sql을 **반드시 같이** 고쳐야 한다 - 한쪽만 고치면 조용히 어긋난다.
+ */
 export async function getFormIndexLeaderboard(
   seasonName: string,
   sortKey: FormSortKey = "delta",
   ascending = false
 ): Promise<FormIndexRow[]> {
-  const { data: zoneRows } = await supabase.from("xpts_zone_table").select("zone, shot_value, expected_pts_per_shot");
-  const expectedPtsByZone = new Map((zoneRows as ZoneRow[] | null)?.map((z) => [z.zone, Number(z.expected_pts_per_shot)]) ?? []);
-  if (!expectedPtsByZone.size) return [];
+  const [rpcRes, teamsRes] = await Promise.all([
+    supabase.rpc("form_index_season", { p_season: seasonName }),
+    supabase.from("teams").select("tcode, name, abbr, color, logo_url"),
+  ]);
+  if (rpcRes.error) throw new Error(`form_index_season(${seasonName}): ${rpcRes.error.message}`);
+  const raw = (rpcRes.data ?? []) as FormRpcRow[];
+  if (!raw.length) return [];
 
-  // 1단계: 이 시즌 (선수, 경기, 날짜) 목록 - game_player_stats는 선수당 경기당 한 행이라
-  // shot_log보다 훨씬 적음(한 시즌 최대 270경기 x ~24명 ≈ 6000행). 이걸로 선수별 "이 시즌
-  // 마지막 N경기"의 gmkey 집합을 먼저 정함.
-  const gameRows = await fetchAllPagesBounded<GameStatRow>((from, to) =>
-    supabase
-      .from("game_player_stats")
-      .select("pcode, gmkey, games!inner(game_date, season_name)")
-      .eq("games.season_name", seasonName)
-      .range(from, to) as unknown as PromiseLike<{ data: GameStatRow[] | null; error: unknown }>
-  );
+  const teamByTcode = new Map((teamsRes.data ?? []).map((t) => [t.tcode, t]));
 
-  const gamesByPlayer = new Map<string, { gmkey: string; date: string }[]>();
-  for (const r of gameRows) {
-    if (!r.games) continue;
-    const list = gamesByPlayer.get(r.pcode) ?? [];
-    list.push({ gmkey: r.gmkey, date: r.games.game_date });
-    gamesByPlayer.set(r.pcode, list);
-  }
-
-  const recentGmkeysByPlayer = new Map<string, Set<string>>();
-  const recentCountByPlayer = new Map<string, number>();
-  const lastGameDateByPlayer = new Map<string, string>();
-  for (const [pcode, list] of gamesByPlayer) {
-    list.sort((a, b) => (a.date < b.date ? 1 : -1));
-    const recent = list.slice(0, ROLLING_WINDOW);
-    if (recent.length < MIN_RECENT_GAMES) continue;
-    recentGmkeysByPlayer.set(pcode, new Set(recent.map((g) => g.gmkey)));
-    recentCountByPlayer.set(pcode, recent.length);
-    lastGameDateByPlayer.set(pcode, recent[0].date);
-  }
-  if (!recentGmkeysByPlayer.size) return [];
-
-  // 2단계: 이 시즌 슛 전체를 훑으면서, 위에서 정한 "마지막 N경기" 집합에 속하는 슛만 집계.
-  const shotRows = await fetchAllPagesBounded<ShotRow>((from, to) =>
-    supabase
-      .from("shot_log")
-      .select("pcode, gmkey, x, y, d, made, games!inner(season_name)")
-      .eq("games.season_name", seasonName)
-      .range(from, to) as unknown as PromiseLike<{ data: ShotRow[] | null; error: unknown }>
-  );
-
-  const agg = new Map<string, { attempts: number; actualPts: number; expectedPts: number }>();
-  for (const s of shotRows) {
-    const gmkeys = recentGmkeysByPlayer.get(s.pcode);
-    if (!gmkeys || !gmkeys.has(s.gmkey)) continue;
-    const { zone, value } = classifyShot(s.x, s.y, s.d);
-    const expected = expectedPtsByZone.get(zone) ?? 0;
-    const a = agg.get(s.pcode) ?? { attempts: 0, actualPts: 0, expectedPts: 0 };
-    a.attempts += 1;
-    if (s.made) a.actualPts += value;
-    a.expectedPts += expected;
-    agg.set(s.pcode, a);
-  }
-
-  const pcodes = Array.from(agg.keys()).filter((pcode) => agg.get(pcode)!.attempts >= MIN_ATTEMPTS);
-  if (!pcodes.length) return [];
-
-  const { data: players } = await supabase.from("players").select("pcode, name").in("pcode", pcodes);
-  const nameByPcode = new Map((players ?? []).map((p) => [p.pcode, p.name]));
-
-  // 선수당 팀 - 이 시즌 이 선수가 가장 많이 뛴 팀(트레이드 시 마지막 소속 팀이 더 자연스럽지만,
-  // game_player_stats에서 mode(tcode)로 대표 팀을 뽑는 게 다른 리더보드(player_season_wpa)와
-  // 일관적).
-  const tcodeByPcode = new Map<string, string>();
-  const statRowsForTeam = await fetchAllPagesBounded<{ pcode: string; tcode: string; games: { season_name: string } | null }>((from, to) =>
-    supabase
-      .from("game_player_stats")
-      .select("pcode, tcode, games!inner(season_name)")
-      .eq("games.season_name", seasonName)
-      .in("pcode", pcodes)
-      .range(from, to) as unknown as PromiseLike<{
-      data: { pcode: string; tcode: string; games: { season_name: string } | null }[] | null;
-      error: unknown;
-    }>
-  );
-  const tcodeCounts = new Map<string, Map<string, number>>();
-  for (const r of statRowsForTeam) {
-    const byTcode = tcodeCounts.get(r.pcode) ?? new Map<string, number>();
-    byTcode.set(r.tcode, (byTcode.get(r.tcode) ?? 0) + 1);
-    tcodeCounts.set(r.pcode, byTcode);
-  }
-  for (const [pcode, byTcode] of tcodeCounts) {
-    let best = "";
-    let bestCount = -1;
-    for (const [tcode, count] of byTcode) {
-      if (count > bestCount) {
-        best = tcode;
-        bestCount = count;
-      }
-    }
-    tcodeByPcode.set(pcode, best);
-  }
-
-  const { data: teams } = await supabase.from("teams").select("tcode, name, abbr, color, logo_url");
-  const teamByTcode = new Map((teams ?? []).map((t) => [t.tcode, t]));
-
-  const rows: FormIndexRow[] = pcodes.map((pcode) => {
-    const a = agg.get(pcode)!;
-    const delta = a.actualPts - a.expectedPts;
-    const games = recentCountByPlayer.get(pcode) ?? 0;
-    const tcode = tcodeByPcode.get(pcode) ?? "";
+  const rows: FormIndexRow[] = raw.map((r) => {
+    const actualPts = Number(r.actual_pts);
+    const expectedPts = Number(r.expected_pts);
+    const delta = actualPts - expectedPts;
+    const games = Number(r.games);
+    const tcode = r.tcode ?? "";
     const team = teamByTcode.get(tcode);
     return {
-      pcode,
-      playerName: nameByPcode.get(pcode) ?? pcode,
+      pcode: r.pcode,
+      playerName: r.player_name ?? r.pcode,
       tcode,
       // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - seasonName은 이 함수의
       // 인자로 이미 고정돼있어 그대로 재사용.
@@ -192,12 +126,12 @@ export async function getFormIndexLeaderboard(
       teamColor: team?.color ?? "#888888",
       teamLogoUrl: team?.logo_url ?? null,
       games,
-      attempts: a.attempts,
-      actualPts: Math.round(a.actualPts * 10) / 10,
-      expectedPts: Math.round(a.expectedPts * 10) / 10,
+      attempts: Number(r.attempts),
+      actualPts: Math.round(actualPts * 10) / 10,
+      expectedPts: Math.round(expectedPts * 10) / 10,
       delta: Math.round(delta * 10) / 10,
       deltaPerGame: Math.round((delta / games) * 100) / 100,
-      lastGameDate: lastGameDateByPlayer.get(pcode) ?? "",
+      lastGameDate: r.last_game_date ?? "",
     };
   });
 

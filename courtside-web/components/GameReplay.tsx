@@ -1,4 +1,5 @@
 "use client";
+import { PlayerPhoto } from "./PlayerPhoto";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
@@ -1249,8 +1250,7 @@ export default function GameReplay({
     const p = pcode ? playerByPcode.get(pcode) : undefined;
     if (!p) return <div className={`${cls}-fallback`}>?</div>;
     // components/TeamBadge.tsx와 같은 이유(외부 kbl.or.kr 호스팅 사진이라 next/image 최적화 대상이 아님).
-    // eslint-disable-next-line @next/next/no-img-element
-    if (p.photoUrl) return <img className={cls} src={p.photoUrl} alt={p.name} />;
+    if (p.photoUrl) return <PlayerPhoto src={p.photoUrl} alt={p.name} size={34} className={cls} />;
     return <div className={`${cls}-fallback`}>{p.backNum ? `#${p.backNum}` : (p.name || "?").slice(0, 1)}</div>;
   };
 
