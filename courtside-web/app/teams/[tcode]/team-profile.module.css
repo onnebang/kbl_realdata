@@ -299,6 +299,20 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* 순위 뒤의 "위" - Big Shoulders Display에는 한글 글리프가 없어서(globals.css의
+   .team-page-name/.player-hero 주석에 적힌, 이 저장소가 이미 두 번 밟은 함정) 같은
+   규칙 안에 한글을 두면 숫자만 콘덴스드로 그려지고 "위"는 폴백 sans-serif로 넘어가
+   글꼴 이음매가 생기고 폴백 글리프 폭이 제각각이라 tabular-nums 우측 정렬도 행마다
+   어긋난다. 한글은 본문 서체(Pretendard)로 분리하고 숫자만 Big Shoulders에 남긴다.
+   4팩터 패널(.pctNum)과 팀 전체 기록 패널(.rankNum)이 같은 모양이어야 해서 두 곳이
+   같은 클래스를 쓴다 - 크기는 숫자보다 한 단계 작게 둬서 단위로 읽히게. */
+.rankSuffix {
+  font-family: "Pretendard", sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  margin-left: 1.5px;
+}
 
 /* ── 시즌 리본(치른 경기 + 남은 경기) ─────────────────────────────────────────────
    raw SVG 문자열(lib/seasonRibbon.ts)을 dangerouslySetInnerHTML로 넣는 컨테이너.
@@ -554,5 +568,243 @@
   }
   .rosterRpgHide {
     display: none;
+  }
+}
+
+/* ── 팀 리더 5장(득점/리바운드/어시스트/스틸/블록) ────────────────────────────────
+   /players 디렉터리(components/Directory.module.css .photo/.photoFallback)와 같은
+   폴백 규칙: players.photo_url이 있는 선수가 773명 중 31명뿐이라 사진 없는 카드가
+   기본값이다. 등번호 타일이 "깨진 이미지"가 아니라 정상 상태로 보이게 같은 원형·같은
+   Big Shoulders 숫자를 쓴다. */
+/* 다섯 장을 한 줄로(요청: "five cards in a row"). auto-fit로 두면 카드 안의 줄바꿈 없는
+   선수 이름이 트랙 최소폭을 밀어올려 4+1로 접히므로 열 수를 명시하고 min-width:0을 준다. */
+.leaderGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.leaderCard {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  background: var(--surface-soft);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 13px 14px 12px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.leaderCard:hover,
+.leaderCard:focus-visible {
+  border-color: rgba(var(--line-rgb), 0.2);
+}
+.leaderCat {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.leaderWho {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.leaderPhoto {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.leaderFallback {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  display: grid;
+  place-items: center;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--ink-faint);
+  flex-shrink: 0;
+}
+.leaderNameCell {
+  min-width: 0;
+}
+.leaderName {
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.leaderPos {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
+/* 카드에서 가장 큰 요소 = 경기당 수치. 좋고나쁨 색을 쓰지 않는다 - 팀 1위라는 사실만
+   담은 값이라 초록/빨강은 없는 의미를 만든다. */
+.leaderValRow {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.leaderVal {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 38px;
+  line-height: 0.92;
+  font-variant-numeric: tabular-nums;
+}
+.leaderUnit {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+.leaderSub {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
+/* ── 팀 전체 기록 · 리그 순위 ────────────────────────────────────────────────────
+   4팩터 패널(.pctRow)과 같은 시각 언어 - 라벨 / 방향 보정 바 / 값 / 리그 평균 / 순위.
+   순위가 이 패널의 주장이라 .pctNum과 같은 Big Shoulders로 가장 크게 둔다. */
+.rankGroupTitle {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+  margin: 14px 0 6px;
+}
+.rankGrid {
+  display: grid;
+  gap: 7px;
+}
+.rankRow {
+  display: grid;
+  grid-template-columns: 96px 1fr 66px 66px 46px;
+  align-items: center;
+  gap: 10px;
+}
+.rankHead {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.rankHeadRight {
+  text-align: right;
+}
+.rankLabel {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rankTrack {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+.rankFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  opacity: 0.9;
+}
+.rankMid {
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  bottom: -1px;
+  width: 1px;
+  background: rgba(var(--line-rgb), 0.28);
+}
+.rankValue {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: right;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.rankAvg {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  text-align: right;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* 한글 "위"는 .rankSuffix(Pretendard)로 분리한다 - 위 .rankSuffix 주석 참고. */
+.rankNum {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 패널에서 다른 페이지로 보내는 한 줄 링크(베스트 유닛 → 선수별 조합) */
+.panelLink {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--away);
+  text-decoration: none;
+}
+.panelLink:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .leaderGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 620px) {
+  .rankRow {
+    grid-template-columns: 82px 1fr 52px 46px 36px;
+    gap: 6px;
+  }
+  .rankLabel {
+    font-size: 10px;
+  }
+  .rankValue,
+  .rankAvg {
+    font-size: 10.5px;
+  }
+  .rankNum {
+    font-size: 16px;
+  }
+  .leaderGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .leaderVal {
+    font-size: 32px;
   }
 }

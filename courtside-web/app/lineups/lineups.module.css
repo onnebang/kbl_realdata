@@ -1,0 +1,443 @@
+/* 선수별 조합(WOWY) 전용 스코프 - globals.css는 건드리지 않고 :root 토큰만 쓴다
+   (--gold/--positive/--negative/--ink-faint/--surface-soft/--line-rgb). 라이트/다크는
+   토큰이 알아서 뒤집힌다. .wrap/.panel/.panel-title/.table-scroll/.data-table/.empty-note/
+   .btn-primary/.team-badge는 globals.css 것을 className으로 병기해 재사용.
+
+   이 페이지에는 클라이언트 JS가 없다. 시즌·팀·선수·범위 선택은 전부 링크(쿼리스트링)와
+   GET 폼이고, 접기/펼치기는 <details>, 강조는 CSS :hover다. 발산 막대도 CSS 폭 계산이라
+   스크립트가 필요 없다(저장소 관례: win-contribution의 .barTrack/.barFill과 같은 방식). */
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 16px;
+  margin-top: 6px;
+}
+.kicker {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--ink-faint);
+}
+.lede {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+  max-width: 68ch;
+  margin: 6px 0 14px;
+}
+
+/* ── 선택 줄(시즌 폼 + 팀 칩) ────────────────────────────────────────────── */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+.seasonForm {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 10px 0 0;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  background: var(--surface);
+  color: var(--ink-soft);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.chip:hover {
+  border-color: rgba(var(--line-rgb), 0.34);
+  color: var(--ink);
+}
+.chipActive {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+.chipActive:hover {
+  color: var(--bg);
+}
+.chipLabel {
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.08em;
+  margin-right: 2px;
+}
+
+/* ── 선수 고르기(<details>) ──────────────────────────────────────────────── */
+.picker {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.pickerSummary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.pickerSummary::-webkit-details-marker {
+  display: none;
+}
+.pickerSummary::before {
+  content: "▸";
+  color: var(--gold);
+  font-size: 11px;
+}
+details[open] > .pickerSummary::before {
+  content: "▾";
+}
+.pickerCount {
+  margin-left: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-faint);
+}
+.playerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: 4px 10px;
+  margin-top: 10px;
+}
+.playerTile {
+  display: grid;
+  grid-template-columns: 32px 26px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  color: var(--ink);
+  text-decoration: none;
+}
+.playerTile:hover {
+  background: var(--surface-soft);
+}
+.playerTileActive {
+  border-color: var(--team, var(--gold));
+  background: var(--surface-soft);
+}
+.photo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top;
+  background: var(--surface-soft);
+}
+.photoFallback {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-soft);
+  display: grid;
+  place-items: center;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+.tileNum {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--ink-faint);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tileNameCell {
+  min-width: 0;
+}
+.tileName {
+  font-weight: 700;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tileSub {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── 주인공 헤더 ────────────────────────────────────────────────────────── */
+.subject {
+  margin-top: 16px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-left: 4px solid var(--team, var(--gold));
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.subjectHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.subjectName {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+  text-decoration: none;
+}
+.subjectName:hover {
+  color: var(--gold);
+}
+.subjectTeam {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.scopeSwitch {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(var(--line-rgb), 0.14);
+}
+.tileVal {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.tileLabel {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: 4px;
+}
+.pos {
+  color: var(--positive);
+}
+.neg {
+  color: var(--negative);
+}
+
+/* ── WOWY 표 ────────────────────────────────────────────────────────────── */
+.table {
+  font-size: 12.5px;
+}
+.table th {
+  font-size: 9.5px;
+  padding: 7px 8px;
+}
+.table td {
+  padding: 7px 8px;
+  vertical-align: middle;
+}
+/* globals.css의 .data-table은 1·2열을 왼쪽 정렬로 잡는다. 여기서는 1열(동료 이름)만 왼쪽이고
+   2열부터는 전부 숫자라 오른쪽으로 되돌린다. */
+.table th:nth-child(2),
+.table td:nth-child(2) {
+  text-align: right;
+}
+.mateName {
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+.mateName:hover {
+  color: var(--gold);
+}
+/* 분 + 스틴트를 한 칸에 - 표본을 값 옆에서 절대 떼어 놓지 않기 위해서다. */
+.minCell {
+  line-height: 1.25;
+}
+.minVal {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.minSub {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  color: var(--ink-faint);
+}
+.netVal {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.diffVal {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 발산 막대: 가운데 0축, 오른쪽(초록)=같이 뛸 때 더 좋다, 왼쪽(빨강)=따로일 때 더 좋다.
+   폭은 표에 오른 동료들의 |차이| 최댓값 기준 비율이라 표 안에서만 비교하면 된다
+   (시즌·선수가 바뀌면 축척도 바뀐다 - 그래서 숫자 칸을 항상 옆에 둔다). */
+.diffCell {
+  width: 168px;
+  min-width: 168px;
+}
+.diffBar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+.diffHalf {
+  display: flex;
+  height: 100%;
+  align-items: center;
+}
+.diffLeft {
+  justify-content: flex-end;
+  box-shadow: inset -1px 0 0 rgba(var(--line-rgb), 0.24);
+}
+.diffRight {
+  justify-content: flex-start;
+}
+.diffFill {
+  height: 100%;
+  min-width: 2px;
+}
+.diffFillPos {
+  background: var(--positive);
+  border-radius: 0 3px 3px 0;
+}
+.diffFillNeg {
+  background: var(--negative);
+  border-radius: 3px 0 0 3px;
+}
+.diffAxis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  margin-top: 3px;
+}
+.diffAxisLeft {
+  text-align: right;
+  padding-right: 4px;
+}
+.diffAxisRight {
+  text-align: left;
+  padding-left: 4px;
+}
+
+/* ── 캡션(이 페이지의 본체) ─────────────────────────────────────────────── */
+.caption {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.1);
+  font-size: 11.5px;
+  line-height: 1.85;
+  color: var(--ink-soft);
+}
+.caption b {
+  color: var(--ink);
+}
+.captionList {
+  margin: 0;
+  padding-left: 16px;
+}
+.captionList li {
+  margin-bottom: 3px;
+}
+.warn {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--gold) 34%, transparent);
+  background: var(--gold-soft);
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+}
+.warn b {
+  color: var(--ink);
+}
+.note {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  margin-top: 12px;
+  line-height: 1.6;
+}
+.belowSummary {
+  cursor: pointer;
+  list-style: none;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  margin-top: 14px;
+}
+.belowSummary::-webkit-details-marker {
+  display: none;
+}
+.belowSummary::before {
+  content: "▸ ";
+  color: var(--gold);
+}
+details[open] > .belowSummary::before {
+  content: "▾ ";
+}
+.belowSummary:hover {
+  color: var(--ink);
+}
+
+@media (max-width: 560px) {
+  .playerGrid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+  .table {
+    font-size: 11px;
+  }
+  .table th,
+  .table td {
+    padding: 6px 5px;
+  }
+  .diffCell {
+    width: 110px;
+    min-width: 110px;
+  }
+  .scopeSwitch {
+    margin-left: 0;
+    width: 100%;
+  }
+}

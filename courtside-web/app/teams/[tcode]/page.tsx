@@ -21,6 +21,15 @@ import {
   type BestUnit,
   type TeamZoneProfile,
 } from "@/lib/teamDataScience";
+import {
+  getTeamSeasonStats,
+  getTeamLeaders,
+  type TeamStatKey,
+  type TeamSeasonStats,
+  type TeamSeasonStatRow,
+  type TeamStatCell,
+  type TeamLeaders,
+} from "@/lib/teamSeasonStats";
 import styles from "./team-profile.module.css";
 import { ChangeLine } from "@/components/RosterChangeLine";
 import pre from "@/app/preseason/preseason.module.css";
@@ -79,7 +88,11 @@ function fmtDate(d: string) {
 }
 
 function signed(v: number, decimals = 1) {
-  return `${v > 0 ? "+" : ""}${v.toFixed(decimals)}`;
+  // 반올림한 뒤 부호를 정한다 - 그러지 않으면 -0.04가 "-0.0"으로 찍혀서, 사실상 리그 평균인
+  // 값이 음수인 것처럼 읽힌다(존 구성비 패널에서 실제로 나왔던 표시).
+  const r = Number(v.toFixed(decimals));
+  const safe = Object.is(r, -0) ? 0 : r;
+  return `${safe > 0 ? "+" : ""}${safe.toFixed(decimals)}`;
 }
 
 // 패널 제목 + 기준 시즌 칩. 칩 문구는 전부 lib/seasonFocus.ts에서 만들어 페이지마다 다른
@@ -131,8 +144,11 @@ function FourFactorsPanel({ ff, seasonName }: { ff: TeamFourFactors | null; seas
                   <div className={styles.pctValue}>
                     {a.display} <span className={styles.pctValueAvg}>({a.leagueAvgDisplay})</span>
                   </div>
+                  {/* 한글 "위"는 본문 서체 span으로 분리 - Big Shoulders Display에 한글
+                      글리프가 없어 같은 요소에 넣으면 폴백 이음매가 생긴다(css .rankSuffix). */}
                   <div className={styles.pctNum} style={{ color: percentileColor(a.pctFill) }}>
-                    {a.rank}위
+                    {a.rank}
+                    <span className={styles.rankSuffix}>위</span>
                   </div>
                 </div>
               ))}
@@ -143,6 +159,152 @@ function FourFactorsPanel({ ff, seasonName }: { ff: TeamFourFactors | null; seas
         Dean Oliver 4팩터 · {seasonName} 정규시즌 {ff.gp}경기, 리그 {ff.teamsN}팀 대비 순위(괄호는 리그 평균) · 수비 =
         같은 경기 상대 팀의 팩터(상대 eFG%·FTr·OREB%는 낮을수록, 상대 TOV% 유발은 높을수록 좋음 - 순위·바 길이는 방향
         보정) · eFG%·FTr은 시즌 원시 합계, TOV%는 턴오버/포제션 합계, OREB%만 원시 리바운드 개수 결측으로 경기당 평균
+      </div>
+    </>
+  );
+}
+
+// ── 팀 리더 5장(득점/리바운드/어시스트/스틸/블록) ──────────────────────────────────
+//    요청("팀 리더 추가")의 참고 화면(NBA 팀 페이지 Team Leaders 줄)과 같은 구성이지만
+//    사진이 있는 선수가 773명 중 31명뿐이라 등번호 타일 폴백이 사실상 기본 상태다 -
+//    /players 디렉터리(components/Directory.module.css)와 같은 원형·같은 폰트로 맞춰서
+//    "이미지 로딩 실패"로 읽히지 않게 한다.
+function TeamLeadersPanel({ tl }: { tl: TeamLeaders | null }) {
+  if (!tl) return <div className="empty-note">이 시즌 정규시즌 선수 기록 없음</div>;
+  return (
+    <>
+      <div className={styles.leaderGrid}>
+        {tl.leaders.map((l) => (
+          <Link
+            href={l.href}
+            key={l.key}
+            className={styles.leaderCard}
+            title={`${l.name} · ${tl.seasonName} 정규시즌 ${l.label} ${l.display} ${l.unit} · ${l.gp}경기 합계 ${Math.round(l.total).toLocaleString()}`}
+          >
+            <div className={styles.leaderCat}>{l.label}</div>
+            <div className={styles.leaderWho}>
+              {l.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={l.photoUrl} alt="" className={styles.leaderPhoto} loading="lazy" />
+              ) : (
+                <div className={styles.leaderFallback}>{l.backNum ?? "·"}</div>
+              )}
+              <div className={styles.leaderNameCell}>
+                <div className={styles.leaderName}>{l.name}</div>
+                {/* pos는 DB 원문(FD/GD)이 아니라 lib가 정규화해 준 posLabel(가드/포워드/센터)만 */}
+                <div className={styles.leaderPos}>
+                  {[l.backNum ? `#${l.backNum}` : null, l.posLabel || null].filter(Boolean).join(" · ")}
+                </div>
+              </div>
+            </div>
+            {/* 카드에서 가장 큰 요소 = 경기당 수치(요청: "big per-game number"). 팀 1위라는
+                사실만 담은 값이라 좋고나쁨 색은 쓰지 않는다. */}
+            <div className={styles.leaderValRow}>
+              <span className={styles.leaderVal}>{l.display}</span>
+              <span className={styles.leaderUnit}>{l.unit}</span>
+            </div>
+            <div className={styles.leaderSub}>
+              {l.gp}경기 · 합계 {Math.round(l.total).toLocaleString()}
+              {l.runnerUp ? (
+                <>
+                  <br />2위 {l.runnerUp.name} {l.runnerUp.display}
+                </>
+              ) : null}
+            </div>
+          </Link>
+        ))}
+      </div>
+      <div className={styles.pctNote}>
+        {tl.caption} · 카드 클릭 → 선수 프로필
+      </div>
+    </>
+  );
+}
+
+// ── 팀 전체 기록 · 리그 순위 ────────────────────────────────────────────────────────
+// 요청은 "공격 / 수비 / 템포·기타" 3분할이고, lib/teamSeasonStats.ts의 TeamStatGroup
+// (종합/슈팅/리바운드/소유/수비)은 산식 계보에 따른 분류라 목적이 다르다. 그래서 화면
+// 분할만 여기서 따로 정의한다 - 값·순위·리그평균·포맷은 전부 lib 셀을 그대로 쓰고
+// 이 페이지에서 다시 계산하는 숫자는 하나도 없다.
+const RANK_SECTIONS: { title: string; keys: TeamStatKey[] }[] = [
+  {
+    title: "OFFENSE - 우리 공격",
+    keys: ["pts", "ortg", "efg", "ts", "twoPct", "tpPct", "ftPct", "ftr", "ast", "astPct", "orebPct", "tov", "tovPct"],
+  },
+  { title: "DEFENSE - 우리 수비", keys: ["oppPts", "drtg", "drebPct", "stl", "blk", "fouls"] },
+  { title: "TEMPO & OVERALL - 템포·기타", keys: ["net", "diff", "pace", "tpaPg", "reb"] },
+];
+
+function RankRow({ c }: { c: TeamStatCell }) {
+  // 방향 보정은 lib이 끝냈다(rank·pctFill 모두 lowerIsBetter 반영). 여기서 "높을수록 좋다"를
+  // 가정하는 코드는 한 줄도 없어야 한다. neutral(페이스·3점 시도)은 좋고나쁨 색을 쓰지 않는다.
+  const color = c.neutral ? "var(--ink-soft)" : percentileColor(c.pctFill);
+  const title =
+    `${c.label} ${c.display} · 리그 평균 ${c.leagueAvgDisplay} (${c.vsLeagueDisplay}) · ${c.rankLabel}` +
+    (c.neutral ? " · 방향 없는 스타일 지표" : c.lowerIsBetter ? " · 낮을수록 좋음" : "") +
+    (c.note ? ` · ${c.note}` : "");
+  return (
+    <div className={styles.rankRow} title={title}>
+      <div className={styles.rankLabel}>{c.label}</div>
+      <div className={styles.rankTrack}>
+        <div
+          className={styles.rankFill}
+          style={{ width: `${Math.max(c.pctFill, 3)}%`, background: c.neutral ? "var(--ink-faint)" : percentileColor(c.pctFill) }}
+        />
+        <div className={styles.rankMid} />
+      </div>
+      <div className={styles.rankValue}>{c.display}</div>
+      <div className={styles.rankAvg}>{c.leagueAvgDisplay}</div>
+      {/* 4팩터 패널과 같은 처리 - 숫자만 Big Shoulders, 한글 "위"는 Pretendard span. */}
+      <div className={styles.rankNum} style={{ color }}>
+        {c.rank}
+        <span className={styles.rankSuffix}>위</span>
+      </div>
+    </div>
+  );
+}
+
+function TeamRankPanel({ stats, row }: { stats: TeamSeasonStats | null; row: TeamSeasonStatRow | null }) {
+  if (!stats || !row) return <div className="empty-note">이 시즌 정규시즌 팀 집계 없음</div>;
+  // lib에 지표가 추가돼도 화면에서 조용히 사라지지 않게, 3분할에 배정되지 않은 지표는
+  // 마지막 섹션에 그대로 붙인다.
+  const used = new Set<TeamStatKey>(RANK_SECTIONS.flatMap((s) => s.keys));
+  const leftovers = row.cells.filter((c) => !used.has(c.key));
+  const sections = RANK_SECTIONS.map((s, i) => ({
+    title: s.title,
+    cells: [
+      ...s.keys.map((k) => row.cellByKey[k]).filter((c): c is TeamStatCell => !!c),
+      ...(i === RANK_SECTIONS.length - 1 ? leftovers : []),
+    ],
+  })).filter((s) => s.cells.length > 0);
+
+  return (
+    <>
+      {sections.map((s) => (
+        <div key={s.title}>
+          <div className={styles.rankGroupTitle}>{s.title}</div>
+          <div className={styles.rankGrid}>
+            <div className={`${styles.rankRow} ${styles.rankHead}`}>
+              <div>지표</div>
+              {/* 바 칸은 머리글을 비운다 - 요청한 컬럼은 지표/값/리그 평균/순위 네 개이고,
+                  바는 그 순위를 눈으로 읽게 하는 보조 장치라 캡션에서 한 번만 설명한다
+                  (좁은 화면에서 머리글이 두 줄로 접혀 행 높이가 흔들리는 문제도 함께 해결). */}
+              <div />
+              <div className={styles.rankHeadRight}>값</div>
+              <div className={styles.rankHeadRight}>리그 평균</div>
+              <div className={styles.rankHeadRight}>순위</div>
+            </div>
+            {s.cells.map((c) => (
+              <RankRow c={c} key={c.key} />
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className={styles.pctNote}>
+        {stats.caption} · 이 팀 {row.gp}경기 {row.wins}승 {row.losses}패 · 바 길이 = 방향 보정 후 리그 내 위치(1위가 가장 김,
+        가운데 눈금 = 리그 중간) · 마우스를 올리면 지표별 산식과 리그 평균 대비 차이 · 2P%는 이 DB의 fga/fgm이 2점
+        전용이라 총 야투율이 아님(3점은 3P%로 따로) · OREB%/DREB%는 원시 리바운드 개수가 결측이라 경기별 비율의 평균
+        · TOV%는 턴오버/포제션으로 위 4팩터 패널과 같은 분모(테이블의 tov_pct 컬럼값과는 다름)
       </div>
     </>
   );
@@ -194,14 +356,24 @@ function RosterPanel({ roster }: { roster: RosterRow[] }) {
 }
 
 // ── 베스트 유닛(15시즌 통산 lineup_combo를 이 시즌 로스터로 제한 - 캡션에 정직하게) ────
-function BestUnitsPanel({ units }: { units: BestUnit[] }) {
+function BestUnitsPanel({ units, tcode, season }: { units: BestUnit[]; tcode: string; season: string }) {
   const pairs = units.filter((u) => u.n === 2);
   const fives = units.filter((u) => u.n === 5);
+  // 조합이 하나도 없어도 "선수별 조합" 링크는 남긴다 - 이 패널은 통산 라인업 표본이고,
+  // /lineups는 시즌 표본(주인공 ON + 동료 ON/OFF)이라 여기서 빈 팀도 저쪽엔 있을 수 있다.
+  const wowyLink = (
+    <Link className={styles.panelLink} href={`/lineups?team=${tcode}&season=${season}`}>
+      이 팀의 선수별 조합 자세히 보기 →
+    </Link>
+  );
   if (!pairs.length && !fives.length) {
     return (
-      <div className="empty-note">
-        최소 출전시간(2인 {UNIT_MIN_MINUTES_2MAN}분 / 5인 {UNIT_MIN_MINUTES_5MAN}분)을 넘는 조합 없음
-      </div>
+      <>
+        <div className="empty-note">
+          최소 출전시간(2인 {UNIT_MIN_MINUTES_2MAN}분 / 5인 {UNIT_MIN_MINUTES_5MAN}분)을 넘는 조합 없음
+        </div>
+        {wowyLink}
+      </>
     );
   }
   return (
@@ -237,6 +409,7 @@ function BestUnitsPanel({ units }: { units: BestUnit[] }) {
         데이터에 시즌 구분이 없음 - 이번 시즌 한정 수치가 아님) · 최소 함께 뛴 시간: 2인 {UNIT_MIN_MINUTES_2MAN}분, 5인{" "}
         {UNIT_MIN_MINUTES_5MAN}분
       </div>
+      {wowyLink}
     </>
   );
 }
@@ -361,8 +534,22 @@ export default async function TeamPage({
 
   // 2차 병렬: 사실은 factSeason, 추정은 estSeason. 두 시즌이 다르면 지난 시즌 일정도 함께
   // 가져온다(개막 전 히어로 전적·별자리의 폴백 표본).
-  const [fixtures, prevFixtures, opponents, fourFactors, roster, units, zoneProfile, standingsFact, standingsEst, rosterChanges] =
-    await Promise.all([
+  // 팀 기록표(getTeamSeasonStats)는 리그 10팀 전체를 집계해야 순위가 나오므로 팀 하나가 아니라
+  // 시즌 하나를 받는다(1.1초). 팀 행은 byTcode에서 꺼내 쓴다.
+  const [
+    fixtures,
+    prevFixtures,
+    opponents,
+    fourFactors,
+    roster,
+    units,
+    zoneProfile,
+    standingsFact,
+    standingsEst,
+    rosterChanges,
+    seasonStats,
+    teamLeaders,
+  ] = await Promise.all([
       getTeamSeasonFixtures(tcode, factSeason),
       estSeason !== factSeason ? getTeamSeasonFixtures(tcode, estSeason) : Promise.resolve<TeamFixture[]>([]),
       supabase.from("teams").select("tcode, name, abbr, color, logo_url").then((r) => r.data ?? []),
@@ -373,7 +560,10 @@ export default async function TeamPage({
       getStandingsAsOf(factSeason, "9999-12-31"),
       estSeason !== factSeason ? getStandingsAsOf(estSeason, "9999-12-31") : Promise.resolve<StandingsRow[]>([]),
       factSeason === PRESEASON_SEASON ? Promise.resolve(preseasonChanges) : getTeamRosterChanges(factSeason, tcode),
+      getTeamSeasonStats(estSeason),
+      getTeamLeaders(tcode, estSeason),
     ]);
+  const statRow = seasonStats?.byTcode[tcode] ?? null;
 
   const { played, next, lastDate } = splitFixtures(fixtures);
   const playedGmkeys = played.map((f) => f.gmkey);
@@ -519,13 +709,25 @@ export default async function TeamPage({
         </button>
       </form>
 
-      {/* ── 0. 로스터 변화(개막 전에만 - 아래 조회가 null이면 렌더 안 함) ── */}
+      {/* ── 0. 팀 리더(추정 - estSeason). 히어로 바로 다음: 이 페이지에서 가장 빨리 읽히는 정보 ── */}
+      <div className={styles.panel}>
+        <PanelTitle title="팀 리더 · 경기당" chips={[basis, progress]} />
+        <TeamLeadersPanel tl={teamLeaders} />
+      </div>
+
+      {/* ── 0-1. 로스터 변화(개막 전에만 - 아래 조회가 null이면 렌더 안 함) ── */}
       {rosterChanges && <RosterChangesPanel rc={rosterChanges} abbrOf={(t) => (t ? (oppByTcode.get(t)?.abbr ?? t) : null)} />}
 
       {/* ── 1. 4팩터 vs 리그(추정 - estSeason) ── */}
       <div className={styles.panel}>
         <PanelTitle title="4팩터 vs 리그" chips={[basis, progress]} />
         <FourFactorsPanel ff={fourFactors} seasonName={estSeason} />
+      </div>
+
+      {/* ── 1-1. 팀 전체 기록 · 리그 순위(추정 - estSeason). 4팩터가 못 담는 24개 지표 전부 ── */}
+      <div className={styles.panel}>
+        <PanelTitle title="팀 전체 기록 · 리그 순위" chips={[basis, progress]} />
+        <TeamRankPanel stats={seasonStats} row={statRow} />
       </div>
 
       {/* ── 2. 시즌 리본(사실 - factSeason. 치른 칸 + 남은 고스트 칸) ── */}
@@ -595,7 +797,7 @@ export default async function TeamPage({
       {/* ── 4. 베스트 유닛 ── */}
       <div className={styles.panel}>
         <PanelTitle title="베스트 유닛 · 이 시즌 로스터 조합" chips={[basis]} />
-        <BestUnitsPanel units={units} />
+        <BestUnitsPanel units={units} tcode={tcode} season={estSeason} />
       </div>
 
       {/* ── 5. 슛 프로필(추정 - estSeason) ── */}
