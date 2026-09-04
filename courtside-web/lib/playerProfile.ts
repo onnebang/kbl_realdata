@@ -36,7 +36,10 @@ export type SeasonLine = {
   spg: number;
   bpg: number;
   tovPg: number;
+  /** 진짜 야투 성공률 = (fgm+tpm)/(fga+tpa). 아래 fg2Pct와 혼동 금지. */
   fgPct: number | null;
+  /** 2점 성공률 = fgm/fga. 이 DB의 fgm/fga가 2점 전용이라 이것만 쓰면 FG%가 아니라 2P%다. */
+  fg2Pct: number | null;
   tpPct: number | null;
   ftPct: number | null;
   // 히어로 헤드라인 TS% 계산용 - TS% = PPG / (2*(FGA/G + TPA/G + 0.44*FTA/G)). 이 DB의
@@ -163,7 +166,12 @@ export async function getPlayerCareerBySeason(pcode: string): Promise<{ seasons:
         spg: sum((r) => r.stl ?? 0) / gp,
         bpg: sum((r) => r.blk ?? 0) / gp,
         tovPg: sum((r) => r.turnovers ?? 0) / gp,
-        fgPct: fga > 0 ? fgm / fga : null,
+        // 버그 수정(2026-09-04): fgm/fga는 이 DB에서 2점 전용이라 그대로 쓰면 화면의 'FG%'가
+        // 사실은 2P%였다. lib/seasonLeaders.ts fgPct가 이미 쓰고 있는 정의로 통일한다.
+        // 실측(25-26 300분+ 111명 L15): 2P%가 진짜 FG%보다 중앙값 +7.2%p 부풀고, 61.3%가
+        // 5%p 이상, 최대 +73.3%p. 워니(291248) L5는 46.3 vs 진짜 37.8.
+        fgPct: fga + tpa > 0 ? (fgm + tpm) / (fga + tpa) : null,
+        fg2Pct: fga > 0 ? fgm / fga : null,
         tpPct: tpa > 0 ? tpm / tpa : null,
         ftPct: fta > 0 ? ftm / fta : null,
         fgaPg: fga / gp,
@@ -207,7 +215,10 @@ export function computeWindowAverages(games: GameLogRow[], windowN: number) {
     stl: sum((g) => g.stl) / gp,
     blk: sum((g) => g.blk) / gp,
     tov: sum((g) => g.tov) / gp,
-    fgPct: fga > 0 ? (fgm / fga) * 100 : null,
+    // 같은 버그 수정(2026-09-04) - 위 getPlayerCareerBySeason 주석 참고. 값 단위는 %(0~100).
+    fgPct: fga + tpa > 0 ? ((fgm + tpm) / (fga + tpa)) * 100 : null,
+    // 2점 성공률은 지우지 않고 별도 필드로 남긴다(기존 필드 의미를 조용히 바꾸지 않기 위해).
+    fg2Pct: fga > 0 ? (fgm / fga) * 100 : null,
     tpPct: tpa > 0 ? (tpm / tpa) * 100 : null,
     ftPct: fta > 0 ? (ftm / fta) * 100 : null,
   };

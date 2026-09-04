@@ -29,6 +29,49 @@ import { aggregateSeasonPlayers, fetchSeasonPlayerGameRows } from "./seasonLeade
 /** 동료 한 명이 표에 오르려면 "함께"와 "따로" 양쪽 모두 이 분 이상이어야 한다. */
 export const WOWY_MIN_MINUTES = 100;
 
+/** 표에 올리는 조합 크기(주인공 포함). 2인은 기존 그대로, 3~5인이 추가된 것. */
+export const WOWY_GROUP_SIZES = [2, 3, 4, 5] as const;
+export type WowyGroupSize = (typeof WOWY_GROUP_SIZES)[number];
+
+/**
+ * net/40의 표준오차. 실측(2026-09-04, 25-26 리그 전체 조합)으로 "관측 SD × √분"이 조합 크기와
+ * 무관하게 100 근처에서 거의 일정했다: 20분 99 / 32분 98 / 50분 104 / 80분 103 / 200분 106.
+ * 그래서 분만 알면 그 행의 오차 폭을 바로 찍을 수 있다 - 25분 표본이면 ±20으로, 숫자가 스스로
+ * 얼마나 못 미더운지 말하게 된다.
+ */
+export const NET40_SE_CONST = 100;
+export function net40Se(minutes: number): number {
+  return minutes > 0 ? NET40_SE_CONST / Math.sqrt(minutes) : Infinity;
+}
+
+/**
+ * 조합 크기별로 표에 남기는 최대 행 수.
+ * 임계값 몇 분 차이로 통과 개수가 두 배씩 바뀌는 구간이 있어(k=3의 중앙 통과 수가 100분 15개,
+ * 60분 27개) 하한만으로는 화면 분량이 선수마다 널뛴다. 하한 + 상위 N 컷을 같이 쓴다.
+ */
+export const WOWY_GROUP_TOP_N: Record<WowyGroupSize, number> = { 2: 999, 3: 12, 4: 10, 5: 8 };
+
+/**
+ * 조합 크기별 최소 "함께" 분.
+ *
+ * 왜 크기마다 다른가: 한 스틴트는 2인 조합 4개, 3인 6개, 4인 4개, 5인 1개를 동시에 만든다.
+ * 같은 온코트 시간을 조합 수로 나눠 갖는 셈이라 k가 커질수록 조합 하나에 쌓이는 시간이
+ * 급격히 준다. 2인 기준선(100분)을 5인에 그대로 적용하면 표가 통째로 비고, 반대로 5인
+ * 기준선을 2인에 적용하면 노이즈가 표를 덮는다.
+ *
+ * "따로"(조합원 전원 OFF) 쪽은 k가 커져도 안 무너진다 - 주인공의 시즌 동료가 15~19명이라
+ * 그 넷이 전원 벤치인 시간이 흔하다(실측: 함께 25분 이상 조합의 따로 분 중앙값이 k=5에서도
+ * 37분, 따로 0분인 조합은 k=2~5 통틀어 0개). 무너지는 쪽은 함께다(k=5 조합 분 중앙값 3.0분).
+ * 하한은 양쪽에 같은 값으로 둔다 - 어느 한쪽만 두꺼운 비교는 비교가 아니다.
+ *
+ * 값의 근거(후보 111명 중 '5개 이상 남는' 비율, 함께&따로 양쪽 기준):
+ *   k=3 100분 77% · k=4 40분 88% · k=5 20분 64%.
+ */
+export const WOWY_GROUP_MIN_MINUTES: Record<WowyGroupSize, number> = { 2: 100, 3: 100, 4: 40, 5: 20 };
+
+/** 2단계 계산에서 "따로"까지 재 볼 후보를 크기별로 이만큼만 남긴다(함께 분 상위). */
+const GROUP_CANDIDATE_CAP = 80;
+
 /** 주인공이 될 수 있는 최소 출전 시간(분). 저장소 선례 재사용 - lib/seasonFocus.ts ONOFF_MIN.on. */
 export const WOWY_SUBJECT_MIN_MINUTES = ONOFF_MIN.on;
 
@@ -45,25 +88,52 @@ export type WowySplit = {
   stints: number;
   margin: number;
   netPer40: number;
+  /** net/40의 표준오차(±). 분만으로 정해진다 - net40Se 주석 참고. */
+  se: number;
   /** "1,114분 · 331스틴트" */
   sample: string;
 };
 
-export type WowyMate = {
+/** 조합원 한 명(주인공 제외). 사진은 players.photo_url - 대부분 null이라 폴백이 기본값이다. */
+export type WowyMember = {
   pcode: string;
+  name: string;
+  href: string;
+  photoUrl: string | null;
+  /** 그 시즌 등번호(경기 기록 최빈값). 커리어 범위에서는 null. */
+  backNum: string | null;
+  /** 등번호도 없을 때 원형 타일에 넣을 글자(한글 이름의 성 한 글자). */
+  initial: string;
+};
+
+export type WowyMate = {
+  /** 조합 키 - 주인공을 뺀 조합원 pcode를 정렬해 콤마로 이은 값. React key로 쓴다. */
+  key: string;
+  /** 주인공 포함 인원(2~5). */
+  size: WowyGroupSize;
+  /** 주인공을 뺀 조합원. 2인 조합이면 한 명. */
+  members: WowyMember[];
+  /** 2인 조합의 동료 pcode(하위 호환 - 3인 이상에서는 첫 조합원). */
+  pcode: string;
+  /** 2인이면 동료 이름, 3인 이상이면 "안영준 · 최원혁" 같은 나열. */
   name: string;
   href: string;
   with: WowySplit;
   without: WowySplit;
-  /** 함께 net/40 - 따로 net/40. 양수면 "이 동료와 있을 때 더 좋다". */
+  /** 함께 net/40 - 따로 net/40. 양수면 "이 조합과 있을 때 더 좋다". */
   diff: number;
-  /** 양쪽 다 WOWY_MIN_MINUTES를 넘었는가. */
+  /** 차이의 표준오차 = √(함께 SE² + 따로 SE²). |차이| < 이 값이면 부호조차 의미가 없다. */
+  diffSe: number;
+  /** 함께가 크기별 하한을, 따로가 WOWY_MIN_MINUTES를 넘었는가. */
   qualified: boolean;
 };
 
 export type WowySubject = {
   pcode: string;
   name: string;
+  photoUrl: string | null;
+  backNum: string | null;
+  initial: string;
   tcode: string | null;
   teamName: string | null;
   teamAbbr: string | null;
@@ -81,10 +151,14 @@ export type WowySubject = {
 export type Wowy = {
   scope: WowyScope;
   subject: WowySubject;
-  /** 자격을 통과한 동료. diff 내림차순(같이 뛸 때 좋은 동료가 위). */
+  /** 자격을 통과한 2인 조합. diff 내림차순(같이 뛸 때 좋은 동료가 위). */
   mates: WowyMate[];
-  /** 표본 미달 동료(참고용, 같은 필드. UI는 접어두거나 생략해도 된다). */
+  /** 표본 미달 2인 조합(참고용, 같은 필드. UI는 접어두거나 생략해도 된다). */
   belowThreshold: WowyMate[];
+  /** 3·4·5인 조합. 크기를 키로, 각 배열은 diff 내림차순. 자격 통과분만. */
+  groups: Record<number, WowyMate[]>;
+  /** 크기별로 실제로 만들어진 조합 수(자격 통과 전) - 캡션이 "몇 개 중 몇 개"를 말할 수 있게. */
+  groupCounts: Record<number, number>;
   minMinutes: number;
   definition: string;
   caption: string;
@@ -133,8 +207,13 @@ function makeSplit(minutes: number, stints: number, margin: number): WowySplit {
     stints,
     margin,
     netPer40: per40(margin, minutes),
+    se: net40Se(minutes),
     sample: `${minutes.toLocaleString(undefined, { maximumFractionDigits: 0 })}분 · ${stints.toLocaleString()}스틴트`,
   };
+}
+
+function diffSeOf(w: WowySplit, o: WowySplit): number {
+  return Math.sqrt(w.se * w.se + o.se * o.se);
 }
 
 /**
@@ -186,11 +265,71 @@ export async function getWowy(pcode: string, scope: WowyScope = WOWY_CAREER): Pr
   }
 
   const codes = [pcode, ...withAcc.keys()];
-  const names = new Map<string, string>();
-  for (const part of chunk(codes, 200)) {
-    const { data } = await supabase.from("players").select("pcode, name").in("pcode", part);
-    for (const p of data ?? []) names.set(p.pcode as string, p.name as string);
+
+  // 시즌 범위일 때 game_player_stats를 한 번 훑어 두 가지를 같이 얻는다:
+  // (1) 주인공의 그 시즌 소속 팀, (2) 조합원 전원의 등번호(원형 타일 폴백).
+  // 조합원이 15~20명이라 청크당 1,000행을 넘길 수 있어 페이지네이션이 필요하다.
+  let tcode: string | null = null;
+  const backNums = new Map<string, string>();
+  if (!isCareer) {
+    const minByTeam = new Map<string, number>();
+    const numSeen = new Map<string, Map<string, number>>();
+    for (const part of chunk(games.map((g) => g.gmkey), GMKEY_CHUNK)) {
+      const rows = await fetchAllPagesBounded<{ pcode: string; tcode: string; min_played: number | null; back_num: string | null }>(
+        (from, to) =>
+          supabase
+            .from("game_player_stats")
+            .select("pcode, tcode, min_played, back_num", { count: "exact" })
+            .in("pcode", codes)
+            .in("gmkey", part)
+            .range(from, to)
+      );
+      for (const r of rows) {
+        if (r.pcode === pcode) {
+          minByTeam.set(r.tcode, (minByTeam.get(r.tcode) ?? 0) + num(r.min_played) + 0.001);
+        }
+        const bn = (r.back_num ?? "").trim();
+        if (!bn) continue;
+        const m = numSeen.get(r.pcode) ?? new Map<string, number>();
+        m.set(bn, (m.get(bn) ?? 0) + 1);
+        numSeen.set(r.pcode, m);
+      }
+    }
+    let best = -1;
+    for (const [tc, m] of minByTeam)
+      if (m > best) {
+        tcode = tc;
+        best = m;
+      }
+    // 최빈 등번호. 동률이면 문자열 순으로 갈라 실행마다 값이 흔들리지 않게.
+    for (const [pc, m] of numSeen) {
+      const pick = [...m.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0];
+      if (pick) backNums.set(pc, pick[0]);
+    }
   }
+
+  const names = new Map<string, string>();
+  const photos = new Map<string, string | null>();
+  for (const part of chunk(codes, 200)) {
+    const { data } = await supabase.from("players").select("pcode, name, photo_url").in("pcode", part);
+    for (const p of data ?? []) {
+      names.set(p.pcode as string, p.name as string);
+      photos.set(p.pcode as string, (p.photo_url as string | null) ?? null);
+    }
+  }
+  const memberOf = (mate: string): WowyMember => {
+    const nm = names.get(mate) ?? mate;
+    return {
+      pcode: mate,
+      name: nm,
+      href: `/players/${mate}`,
+      photoUrl: photos.get(mate) ?? null,
+      backNum: backNums.get(mate) ?? null,
+      // 사진도 등번호도 없을 때만 쓰는 2차 폴백. 성 한 글자는 김 13명·이 12명·최 10명으로
+      // 충돌하므로(실측) 식별은 항상 옆의 이름 라벨이 맡는다.
+      initial: (nm || "?").trim().slice(0, 1),
+    };
+  };
 
   const all: WowyMate[] = [...withAcc.entries()].map(([mate, a]) => {
     const wMin = a.sec / 60;
@@ -199,36 +338,106 @@ export async function getWowy(pcode: string, scope: WowyScope = WOWY_CAREER): Pr
     const oStints = mine.length - a.stints;
     const w = makeSplit(wMin, a.stints, a.margin);
     const o = makeSplit(oMin, oStints, oMargin);
+    const member = memberOf(mate);
     return {
+      key: mate,
+      size: 2 as WowyGroupSize,
+      members: [member],
       pcode: mate,
-      name: names.get(mate) ?? mate,
-      href: `/players/${mate}`,
+      name: member.name,
+      href: member.href,
       with: w,
       without: o,
       diff: w.netPer40 - o.netPer40,
+      diffSe: diffSeOf(w, o),
       qualified: wMin >= WOWY_MIN_MINUTES && oMin >= WOWY_MIN_MINUTES,
     };
   });
   all.sort((x, y) => y.diff - x.diff);
 
-  // 주인공의 시즌 소속 팀 - 시즌 범위일 때만. game_player_stats를 같은 gmkey 청크로 좁혀 읽는다.
-  let tcode: string | null = null;
-  if (!isCareer) {
-    const minByTeam = new Map<string, number>();
-    for (const part of chunk(games.map((g) => g.gmkey), GMKEY_CHUNK)) {
-      const { data } = await supabase
-        .from("game_player_stats")
-        .select("tcode, min_played")
-        .eq("pcode", pcode)
-        .in("gmkey", part);
-      for (const r of data ?? []) {
-        const tc = r.tcode as string;
-        minByTeam.set(tc, (minByTeam.get(tc) ?? 0) + num(r.min_played) + 0.001);
-      }
+  // ── 3·4·5인 조합(요청: "3인 ,4인, 5인 조합도 보이면 좋을것 같아") ────────────────
+  // 정의는 2인과 완전히 같다. "함께" = 주인공 + 조합원 전원이 동시에 코트 위. "따로" =
+  // 주인공은 코트 위인데 조합원이 한 명도 없는 시간. 그래서 2인 표에서 배운 읽는 법이
+  // 그대로 통하고, 같은 검산(함께 + 따로 ≤ 온코트)도 계속 성립한다.
+  //   ! 2인과 달리 "함께 + 따로 = 온코트"가 아니다. 조합원이 일부만 있는 시간이 어느 쪽에도
+  //     들어가지 않기 때문. 3인 이상 표의 캡션이 그 사실을 직접 말해야 한다.
+  //
+  // 1단계: 스틴트마다 동료 4명의 부분집합(크기 2~4)을 전부 세어 "함께"를 쌓는다.
+  //        스틴트당 11개(4C2+4C3+4C4)라 2,000스틴트여도 22,000번이면 끝난다.
+  type GroupAcc = { members: string[]; sec: number; margin: number; stints: number };
+  const groupAcc = new Map<string, GroupAcc>();
+  for (const m of mine) {
+    const others = m.lineup.filter((p) => p !== pcode).sort();
+    const n = others.length;
+    if (n < 2) continue;
+    for (let mask = 1; mask < 1 << n; mask++) {
+      let bits = 0;
+      for (let i = 0; i < n; i++) if (mask & (1 << i)) bits++;
+      if (bits < 2 || bits > 4) continue;
+      const members: string[] = [];
+      for (let i = 0; i < n; i++) if (mask & (1 << i)) members.push(others[i]);
+      const key = members.join(",");
+      const a = groupAcc.get(key) ?? { members, sec: 0, margin: 0, stints: 0 };
+      a.sec += m.sec;
+      a.margin += m.margin;
+      a.stints += 1;
+      groupAcc.set(key, a);
     }
-    let best = -1;
-    for (const [tc, m] of minByTeam) if (m > best) { tcode = tc; best = m; }
   }
+
+  // 2단계: 크기별로 "함께" 상위 후보만 남겨 "따로"를 실제로 훑어 센다. 후보를 자르는 이유는
+  //        비용(후보 × 스틴트)뿐이고, 자른 건 전부 함께 분이 가장 짧은 것들이라 어차피
+  //        하한에 걸린다.
+  const groupCounts: Record<number, number> = {};
+  const bySize = new Map<number, GroupAcc[]>();
+  for (const a of groupAcc.values()) {
+    const size = a.members.length + 1;
+    groupCounts[size] = (groupCounts[size] ?? 0) + 1;
+    const list = bySize.get(size) ?? [];
+    list.push(a);
+    bySize.set(size, list);
+  }
+  const groups: Record<number, WowyMate[]> = {};
+  for (const [size, list] of bySize) {
+    list.sort((x, y) => y.sec - x.sec);
+    const minWith = WOWY_GROUP_MIN_MINUTES[size as WowyGroupSize] ?? WOWY_MIN_MINUTES;
+    const rows: WowyMate[] = [];
+    for (const a of list.slice(0, GROUP_CANDIDATE_CAP)) {
+      const set = new Set(a.members);
+      let oSec = 0;
+      let oMargin = 0;
+      let oStints = 0;
+      for (const m of mine) {
+        if (m.lineup.some((p) => set.has(p))) continue;
+        oSec += m.sec;
+        oMargin += m.margin;
+        oStints += 1;
+      }
+      const w = makeSplit(a.sec / 60, a.stints, a.margin);
+      const o = makeSplit(oSec / 60, oStints, oMargin);
+      const members = a.members.map(memberOf);
+      rows.push({
+        key: a.members.join(","),
+        size: size as WowyGroupSize,
+        members,
+        pcode: a.members[0],
+        name: members.map((x) => x.name).join(" · "),
+        href: members[0].href,
+        with: w,
+        without: o,
+        diff: w.netPer40 - o.netPer40,
+        diffSe: diffSeOf(w, o),
+        qualified: w.minutes >= minWith && o.minutes >= minWith,
+      });
+    }
+    // 3인 이상은 net/40 차이가 아니라 '함께 분'으로 줄 세운다. 실측된 split-half 상관이
+    // k=3~5에서 0 근처라(순열 자료와 산포가 거의 같다) 차이로 정렬하면 노이즈를 순위로
+    // 승격시키게 된다. 많이 뛴 조합이 위에 오는 건 표본이 지지하는 유일한 주장이다.
+    rows.sort((x, y) => y.with.minutes - x.with.minutes);
+    groups[size] = rows.filter((r) => r.qualified).slice(0, WOWY_GROUP_TOP_N[size as WowyGroupSize] ?? 12);
+  }
+
+  // (주인공 소속 팀 tcode는 위 등번호 조회에서 같이 구했다.)
   const teams = isCareer ? null : await getTeams(scope);
   const team = tcode && teams ? teams.get(tcode) : undefined;
 
@@ -241,6 +450,9 @@ export async function getWowy(pcode: string, scope: WowyScope = WOWY_CAREER): Pr
     subject: {
       pcode,
       name: names.get(pcode) ?? pcode,
+      photoUrl: photos.get(pcode) ?? null,
+      backNum: backNums.get(pcode) ?? null,
+      initial: (names.get(pcode) ?? "?").trim().slice(0, 1),
       tcode,
       teamName: team?.name ?? null,
       teamAbbr: team?.abbr ?? null,
@@ -254,6 +466,8 @@ export async function getWowy(pcode: string, scope: WowyScope = WOWY_CAREER): Pr
     },
     mates: all.filter((m) => m.qualified),
     belowThreshold: all.filter((m) => !m.qualified),
+    groups,
+    groupCounts,
     minMinutes: WOWY_MIN_MINUTES,
     definition: WOWY_DEFINITION,
     caption:

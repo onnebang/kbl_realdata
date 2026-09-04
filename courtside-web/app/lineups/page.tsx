@@ -5,12 +5,18 @@ import { supabase } from "@/lib/supabase";
 import { PRESEASON_SEASON, getSeasonOpener, shortSeason } from "@/lib/preseason";
 import { getLeaderboardSeasons } from "@/lib/seasonLeaders";
 import {
+  NET40_SE_CONST,
   WOWY_CAREER,
+  WOWY_GROUP_MIN_MINUTES,
+  WOWY_GROUP_SIZES,
+  WOWY_GROUP_TOP_N,
   WOWY_MIN_MINUTES,
   WOWY_SUBJECT_MIN_MINUTES,
   getWowy,
   getWowyPlayers,
+  type WowyGroupSize,
   type WowyMate,
+  type WowyMember,
   type WowyPickPlayer,
   type WowyTeamGroup,
 } from "@/lib/wowy";
@@ -37,15 +43,49 @@ const fmtNet = (v: number) => {
   return v > 0 ? `+${s}` : s;
 };
 const signClass = (v: number) => (v >= 0.005 ? styles.pos : v <= -0.005 ? styles.neg : undefined);
+// 오차 폭. 실측상 SE(net/40) ≈ 100/√분이라 25분 표본이면 ±20이 찍힌다 - 숫자가 스스로
+// 못 미더움을 말하게 하는 게 이 표기의 목적이다.
+const fmtSe = (se: number) => (Number.isFinite(se) ? `±${se.toFixed(se >= 10 ? 0 : 1)}` : "±?");
 
-type Query = { season: string; team?: string | null; player?: string | null; scope?: string | null };
+type Query = { season: string; team?: string | null; player?: string | null; scope?: string | null; k?: number | null };
 
 function hrefFor(q: Query): string {
   const p = new URLSearchParams({ season: q.season });
   if (q.team) p.set("team", q.team);
   if (q.player) p.set("player", q.player);
   if (q.scope) p.set("scope", q.scope);
-  return `/lineups?${p.toString()}`;
+  if (q.k && q.k !== 2) p.set("k", String(q.k));
+  return `/lineups?${p.toString()}#combo`;
+}
+
+/**
+ * 원형 선수 타일. 참고 사이트(databallr WOWY)처럼 조합원을 동그란 얼굴로 세운다.
+ *
+ * 실측(2026-09-04)이 이 디자인을 정한다: players.photo_url은 773명 중 31명(4.0%)뿐이고
+ * 25-26 출전시간 1~20위가 전원 사진이 없다. 즉 "사진 없음"이 예외가 아니라 기본값이다.
+ * 그래서 사진을 특별한 카드로 취급하지 않는다 - 모든 선수에게 같은 지름·같은 팀 컬러 링·
+ * 같은 중립 디스크를 먼저 그리고, 사진이 있는 소수만 디스크의 '채움'이 사진으로 바뀐다.
+ * 사진 위에는 팀 색 반투명 오버레이를 깔아 KBL 원본 31장의 배경·조도 편차를 눌러
+ * 번호 디스크와 같은 톤으로 맞춘다.
+ * 폴백 글자는 등번호(그 시즌 경기 기록 최빈값 - 300분 이상 111명을 100% 채운다). 등번호가
+ * 없으면 성 한 글자로 내려가는데, 성은 김 13명·이 12명·최 10명으로 충돌하므로 식별은
+ * 언제나 옆의 이름이 맡는다.
+ */
+function Avatar({ m, size = 28 }: { m: WowyMember; size?: number }) {
+  return (
+    <span className={styles.avatar} style={{ width: size, height: size }} title={m.name}>
+      {m.photoUrl ? (
+        <>
+          {/* 외부 kbl.or.kr 호스팅이라 next/image 최적화 대상이 아니다(TeamBadge와 같은 이유). */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={m.photoUrl} alt="" className={styles.avatarImg} loading="lazy" />
+          <span className={styles.avatarTint} aria-hidden="true" />
+        </>
+      ) : (
+        <span className={styles.avatarNum}>{m.backNum ?? m.initial}</span>
+      )}
+    </span>
+  );
 }
 
 /**
@@ -77,12 +117,10 @@ function PlayerTile({
 }) {
   return (
     <Link href={href} className={`${styles.playerTile} ${active ? styles.playerTileActive : ""}`}>
-      {photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoUrl} alt="" className={styles.photo} loading="lazy" />
-      ) : (
-        <div className={styles.photoFallback}>{p.backNum ?? "·"}</div>
-      )}
+      <Avatar
+        m={{ pcode: p.pcode, name: p.name, href: p.href, photoUrl, backNum: p.backNum, initial: (p.name || "?").slice(0, 1) }}
+        size={34}
+      />
       <div className={styles.tileNum}>{p.backNum ?? ""}</div>
       <div className={styles.tileNameCell}>
         <div className={styles.tileName}>{p.name}</div>
@@ -101,9 +139,23 @@ function MateRow({ m, maxAbs }: { m: WowyMate; maxAbs: number }) {
   return (
     <tr>
       <td>
-        <Link href={m.href} className={styles.mateName}>
-          {m.name}
-        </Link>
+        <div className={styles.mateCell}>
+          <span className={styles.avatarStack}>
+            {m.members.map((mm) => (
+              <Avatar key={mm.pcode} m={mm} />
+            ))}
+          </span>
+          <span className={styles.mateNames}>
+            {m.members.map((mm, i) => (
+              <span key={mm.pcode}>
+                {i > 0 && <span className={styles.mateSep}> · </span>}
+                <Link href={mm.href} className={styles.mateName}>
+                  {mm.name}
+                </Link>
+              </span>
+            ))}
+          </span>
+        </div>
       </td>
       <td>
         <div className={styles.minCell}>
@@ -111,15 +163,27 @@ function MateRow({ m, maxAbs }: { m: WowyMate; maxAbs: number }) {
           <div className={styles.minSub}>{m.with.stints.toLocaleString()}스틴트</div>
         </div>
       </td>
-      <td className={`${styles.netVal} ${signClass(m.with.netPer40) ?? ""}`}>{fmtNet(m.with.netPer40)}</td>
+      <td className={styles.netCell}>
+        <div className={`${styles.netVal} ${signClass(m.with.netPer40) ?? ""}`}>{fmtNet(m.with.netPer40)}</div>
+        <div className={styles.seVal}>{fmtSe(m.with.se)}</div>
+      </td>
       <td>
         <div className={styles.minCell}>
           <div className={styles.minVal}>{fmtMin(m.without.minutes)}분</div>
           <div className={styles.minSub}>{m.without.stints.toLocaleString()}스틴트</div>
         </div>
       </td>
-      <td className={`${styles.netVal} ${signClass(m.without.netPer40) ?? ""}`}>{fmtNet(m.without.netPer40)}</td>
-      <td className={`${styles.diffVal} ${signClass(m.diff) ?? ""}`}>{fmtNet(m.diff)}</td>
+      <td className={styles.netCell}>
+        <div className={`${styles.netVal} ${signClass(m.without.netPer40) ?? ""}`}>{fmtNet(m.without.netPer40)}</div>
+        <div className={styles.seVal}>{fmtSe(m.without.se)}</div>
+      </td>
+      <td className={styles.netCell}>
+        {/* |차이| < 오차 폭이면 부호조차 의미가 없다 - 색을 빼서 그 사실이 눈에 먼저 들어오게. */}
+        <div className={`${styles.diffVal} ${Math.abs(m.diff) >= m.diffSe ? (signClass(m.diff) ?? "") : styles.diffMuted}`}>
+          {fmtNet(m.diff)}
+        </div>
+        <div className={styles.seVal}>{fmtSe(m.diffSe)}</div>
+      </td>
       <td className={styles.diffCell}>
         {/* 숫자를 바로 왼쪽 칸에 두었으므로 막대는 장식이다(스크린리더에서 숨김). */}
         <div className={styles.diffBar} aria-hidden="true">
@@ -135,18 +199,18 @@ function MateRow({ m, maxAbs }: { m: WowyMate; maxAbs: number }) {
   );
 }
 
-function MateTable({ mates, maxAbs }: { mates: WowyMate[]; maxAbs: number }) {
+function MateTable({ mates, maxAbs, head = "동료" }: { mates: WowyMate[]; maxAbs: number; head?: string }) {
   return (
     <div className="table-scroll">
       <table className={`data-table ${styles.table}`}>
         <thead>
           <tr>
-            <th>동료</th>
+            <th>{head}</th>
             <th>같이 뛴 시간</th>
             <th>같이 NET/40</th>
             <th>따로 뛴 시간</th>
             <th>따로 NET/40</th>
-            <th>차이</th>
+            <th>차이 ±</th>
             <th>
               <div className={styles.diffAxis}>
                 <span className={styles.diffAxisLeft}>따로일 때 ←</span>
@@ -157,7 +221,7 @@ function MateTable({ mates, maxAbs }: { mates: WowyMate[]; maxAbs: number }) {
         </thead>
         <tbody>
           {mates.map((m) => (
-            <MateRow key={m.pcode} m={m} maxAbs={maxAbs} />
+            <MateRow key={m.key} m={m} maxAbs={maxAbs} />
           ))}
         </tbody>
       </table>
@@ -168,7 +232,7 @@ function MateTable({ mates, maxAbs }: { mates: WowyMate[]; maxAbs: number }) {
 export default async function LineupsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string; team?: string; player?: string; scope?: string }>;
+  searchParams: Promise<{ season?: string; team?: string; player?: string; scope?: string; k?: string }>;
 }) {
   const sp = await searchParams;
   const seasons = await getLeaderboardSeasons();
@@ -195,6 +259,9 @@ export default async function LineupsPage({
 
   const careerScope = sp.scope === WOWY_CAREER;
   const playerCode = sp.player?.trim() || null;
+  // 조합 크기. 검증한 값만 받는다(2가 기본이자 요청받은 "너무 잘 보이는" 표).
+  const kRaw = Number(sp.k);
+  const groupSize: WowyGroupSize = (WOWY_GROUP_SIZES as readonly number[]).includes(kRaw) ? (kRaw as WowyGroupSize) : 2;
 
   // 두 조회 모두 6,000행 안팎을 읽는다(각 2.5초 내외). 반드시 병렬로 한 번씩만 부른다.
   const [picker, wowy] = await Promise.all([
@@ -219,14 +286,18 @@ export default async function LineupsPage({
       : null;
   const accent = badgeTeam?.color ?? null;
 
-  const mates = wowy?.mates ?? [];
+  // 표에 올릴 행 - 2인이면 기존 mates(계산·정의 그대로), 3인 이상이면 groups[k].
+  const mates = groupSize === 2 ? (wowy?.mates ?? []) : (wowy?.groups?.[groupSize] ?? []);
   const maxAbs = Math.max(0.5, ...mates.map((m) => Math.abs(m.diff)));
-  const below = wowy?.belowThreshold ?? [];
+  const below = groupSize === 2 ? (wowy?.belowThreshold ?? []) : [];
   const belowMax = Math.max(0.5, ...below.map((m) => Math.abs(m.diff)));
+  const minWith = WOWY_GROUP_MIN_MINUTES[groupSize];
   const thin = wowy != null && wowy.subject.onCourt.minutes < WOWY_SUBJECT_MIN_MINUTES;
 
   return (
-    <div className="wrap">
+    // --team을 페이지 루트에 둔다 - 원형 타일의 링과 사진 오버레이가 표·선수 고르기·주인공
+    // 헤더 어디에 있든 같은 팀 색을 쓰게(예전엔 .subject 안에서만 정의돼 있었다).
+    <div className="wrap" style={accent ? ({ "--team": accent } as CSSProperties) : undefined}>
       <div className={styles.head}>
         <div className="title">선수별 조합</div>
         <span className={styles.kicker}>
@@ -308,7 +379,7 @@ export default async function LineupsPage({
                   key={p.pcode}
                   p={p}
                   photoUrl={photos.get(p.pcode) ?? null}
-                  href={hrefFor({ season, team: group.tcode, player: p.pcode, scope: careerScope ? WOWY_CAREER : null })}
+                  href={hrefFor({ season, team: group.tcode, player: p.pcode, scope: careerScope ? WOWY_CAREER : null, k: groupSize })}
                   active={playerCode === p.pcode}
                 />
               ))}
@@ -338,7 +409,18 @@ export default async function LineupsPage({
         <>
           <section className={styles.subject} style={accent ? ({ "--team": accent } as CSSProperties) : undefined}>
             <div className={styles.subjectHead}>
-              {badgeTeam && <TeamBadge team={badgeTeam} size={30} />}
+              <Avatar
+                m={{
+                  pcode: wowy.subject.pcode,
+                  name: wowy.subject.name,
+                  href: wowy.subject.href,
+                  photoUrl: wowy.subject.photoUrl,
+                  backNum: wowy.subject.backNum,
+                  initial: wowy.subject.initial,
+                }}
+                size={40}
+              />
+              {badgeTeam && <TeamBadge team={badgeTeam} size={26} />}
               <Link href={wowy.subject.href} className={styles.subjectName}>
                 {wowy.subject.name}
               </Link>
@@ -351,13 +433,13 @@ export default async function LineupsPage({
               </span>
               <div className={styles.scopeSwitch}>
                 <Link
-                  href={hrefFor({ season, team: teamCode, player: playerCode })}
+                  href={hrefFor({ season, team: teamCode, player: playerCode, k: groupSize })}
                   className={`${styles.chip} ${!careerScope ? styles.chipActive : ""}`}
                 >
                   {shortSeason(season)}
                 </Link>
                 <Link
-                  href={hrefFor({ season, team: teamCode, player: playerCode, scope: WOWY_CAREER })}
+                  href={hrefFor({ season, team: teamCode, player: playerCode, scope: WOWY_CAREER, k: groupSize })}
                   className={`${styles.chip} ${careerScope ? styles.chipActive : ""}`}
                 >
                   커리어
@@ -402,15 +484,37 @@ export default async function LineupsPage({
             </div>
           )}
 
-          <div className="panel">
+          <div className="panel" id="combo">
+            {/* 조합 크기 전환(요청: "3인 ,4인, 5인 조합도"). 클라이언트 상태 없이 URL로만.
+                주인공 포함 인원이라 5인은 코트 위 라인업 그 자체다. */}
+            <div className={styles.sizeRow}>
+              <span className={styles.chipLabel}>조합 크기</span>
+              {WOWY_GROUP_SIZES.map((k) => {
+                const n = k === 2 ? (wowy.mates?.length ?? 0) : (wowy.groups?.[k]?.length ?? 0);
+                return (
+                  <Link
+                    key={k}
+                    href={hrefFor({ season, team: teamCode, player: playerCode, scope: careerScope ? WOWY_CAREER : null, k })}
+                    className={`${styles.chip} ${groupSize === k ? styles.chipActive : ""}`}
+                  >
+                    {k}인<span className={styles.sizeCount}>{n}</span>
+                  </Link>
+                );
+              })}
+            </div>
             <div className="panel-title">
-              동료별 조합 · 차이 내림차순 {mates.length > 0 && `· ${mates.length}명`}
+              {/* 정렬 기준을 제목이 직접 말한다 - 3인 이상은 차이가 아니라 함께 뛴 시간 순이다. */}
+              {groupSize === 2 ? "동료별 조합 · 차이 내림차순" : `${groupSize}인 조합(주인공 포함) · 함께 뛴 시간 순`}{" "}
+              {mates.length > 0 && `· ${mates.length}${groupSize === 2 ? "명" : "개"}`}
             </div>
             {mates.length > 0 ? (
-              <MateTable mates={mates} maxAbs={maxAbs} />
+              <MateTable mates={mates} maxAbs={maxAbs} head={groupSize === 2 ? "동료" : `함께 뛴 ${groupSize - 1}명`} />
             ) : (
               <div className="empty-note">
-                함께·따로 양쪽 {WOWY_MIN_MINUTES}분을 모두 넘긴 동료가 없습니다.
+                {groupSize === 2
+                  ? `함께·따로 양쪽 ${WOWY_MIN_MINUTES}분을 모두 넘긴 동료가 없습니다.`
+                  : `함께 ${minWith}분 · 따로 ${WOWY_MIN_MINUTES}분을 모두 넘긴 ${groupSize}인 조합이 없습니다` +
+                    (wowy.groupCounts?.[groupSize] ? ` (실제로 코트에 나온 조합은 ${wowy.groupCounts[groupSize].toLocaleString()}개).` : ".")}
                 {below.length > 0 && ` 표본이 모자란 동료 ${below.length}명은 아래에서 볼 수 있습니다.`}
               </div>
             )}
@@ -425,13 +529,44 @@ export default async function LineupsPage({
                   &quot;이 둘이 잘 맞는다&quot;의 증거가 아니라 &quot;그 시간대에 팀 마진이 이랬다&quot;는 기록으로 읽어야 합니다.
                 </li>
                 <li>
-                  <b>최소 표본 {WOWY_MIN_MINUTES}분.</b> 함께와 따로 양쪽 모두 {WOWY_MIN_MINUTES}분을 넘긴 동료만 표에
-                  올립니다. 행마다 분과 스틴트 수를 값 옆에 적어 두었습니다 - 표본을 빼고 차이만 읽으면 정확히 반대
-                  결론이 납니다.
+                  <b>최소 표본.</b>{" "}
+                  {groupSize === 2
+                    ? `함께와 따로 양쪽 모두 ${WOWY_MIN_MINUTES}분을 넘긴 동료만 표에 올립니다.`
+                    : `함께 ${minWith}분 · 따로 ${WOWY_MIN_MINUTES}분을 넘긴 조합만 올립니다. 한 스틴트가 2인 조합 4개, 3인 6개, 4인 4개, 5인 1개를 동시에 만들기 때문에 인원이 늘수록 조합 하나에 쌓이는 시간이 급격히 줄어, 하한도 크기별로 다르게 둡니다.`}{" "}
+                  행마다 분과 스틴트 수를 값 옆에 적어 두었습니다 - 표본을 빼고 차이만 읽으면 정확히 반대 결론이 납니다.
                 </li>
                 <li>
-                  <b>검산.</b> 모든 행에서 같이 뛴 시간 + 따로 뛴 시간 = 주인공 온코트 {wowy.subject.onCourt.sample}
-                  입니다. 따로 쪽 분이 클수록 그 동료와 겹친 시간이 적었다는 뜻입니다.
+                  <b>검산.</b>{" "}
+                  {groupSize === 2 ? (
+                    <>
+                      모든 행에서 같이 뛴 시간 + 따로 뛴 시간 = 주인공 온코트 {wowy.subject.onCourt.sample}입니다. 따로 쪽
+                      분이 클수록 그 동료와 겹친 시간이 적었다는 뜻입니다.
+                    </>
+                  ) : (
+                    <>
+                      2인과 달리 <b>같이 + 따로 &lt; 주인공 온코트</b>({wowy.subject.onCourt.sample})입니다. 조합원이 일부만
+                      코트에 있던 시간은 &quot;전원 함께&quot;도 &quot;전원 없이&quot;도 아니라 어느 쪽에도 들어가지 않기
+                      때문입니다. 그 시간이 얼마나 되는지는 두 값을 더해 온코트에서 빼면 나옵니다.
+                    </>
+                  )}
+                </li>
+                <li>
+                  <b>정렬.</b>{" "}
+                  {groupSize === 2
+                    ? "차이 내림차순입니다."
+                    : `함께 뛴 시간 내림차순이고, 하한(양쪽 ${minWith}분)을 넘긴 조합 중 상위 ${WOWY_GROUP_TOP_N[groupSize]}개만 남깁니다. 차이순으로 줄 세우지 않는 이유는 바로 아래에 있습니다.`}
+                </li>
+                <li>
+                  <b>±는 장식이 아닙니다.</b> 25-26 리그 전체 조합으로 재 보니 net/40의 표준오차가 조합 크기와 무관하게{" "}
+                  <b>약 {NET40_SE_CONST} ÷ √(분)</b>이었습니다(20분 ±22, 50분 ±15, 200분 ±7). 그래서 값 아래에 그 폭을 같이
+                  찍습니다 - <b>차이가 자기 ± 안에 들어가면 부호조차 의미가 없어</b> 색을 빼 두었습니다.
+                </li>
+                <li>
+                  <b>한 시즌 표본으로는 조합의 우열이 재현되지 않습니다.</b> 같은 시즌을 무작위로 반씩 갈라 두 net/40을
+                  비교한 상관이 2인 100분에서 r=+0.04, 3~5인은 0 근처였습니다. 스틴트 마진을 무작위로 섞은 자료의 산포도
+                  실제와 거의 같았습니다(5인은 참분산 0~2%). 즉 이 표는 <b>&quot;누가 잘 맞는가&quot;의 증거가 아니라
+                  &quot;그 시간대에 팀 마진이 이랬다&quot;는 기록</b>입니다. 여러 시즌에 걸쳐 같은 방향이 반복될 때만 신호로
+                  읽으세요 - 위 <b>커리어</b> 칩이 그 용도입니다.
                 </li>
                 <li>
                   <b>범위.</b> {wowy.caption}

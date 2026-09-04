@@ -144,7 +144,10 @@ export async function getSeasonPlayerMetrics(seasonName: string): Promise<Metric
         spg: sum((r) => r.stl ?? 0) / gp,
         bpg: sum((r) => r.blk ?? 0) / gp,
         tovpg: sum((r) => r.turnovers ?? 0) / gp,
-        fgPct: fga > 0 ? (fgm / fga) * 100 : 0,
+        // 버그 수정(2026-09-04): 이 DB의 fgm/fga는 2점 전용이라 fgm/fga를 'FG%'로 쓰면 사실은
+        // 2P%다(실측 25-26 L15 코호트에서 중앙값 +7.2%p 부풀림, 최대 +73.3%p). z-score의 입력이
+        // 통째로 어긋나므로 커스텀 지표 순위까지 흔들린다. lib/seasonLeaders.ts fgPct와 같은 정의로.
+        fgPct: fga + tpa > 0 ? ((fgm + tpm) / (fga + tpa)) * 100 : 0,
         tpPct: tpa > 0 ? (tpm / tpa) * 100 : 0,
         ftPct: fta > 0 ? (ftm / fta) * 100 : 0,
       },

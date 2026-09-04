@@ -18,6 +18,14 @@
   --gold: #9a6b00;
   --gold-soft: #9a6b0022;
   --hot: #e8590c;
+  /* 슈팅 DNA 5단 램프 - 림에서 3점까지 '거리 순서'를 색으로 옮긴 것.
+     예전엔 림/근거리/중거리가 전부 주황 계열(#e8590c/#d9640a/#9a6b00)이라 구분이 안 됐다.
+     인접 색끼리 색상만이 아니라 명도도 벌려 색각 이상에서도 순서가 남게 했다. */
+  --dna-rim: #c2255c;
+  --dna-close: #e8590c;
+  --dna-mid: #b58200;
+  --dna-long: #2f9e44;
+  --dna-three: #3b5bdb;
   --line-rgb: 20, 22, 28;
   /* 히어로 발치 커리어 결 띠의 밴드 높이. 빌더에 넘기는 height(72 뷰박스 단위)와 같은 값이라
      데스크톱(.wrap 900px - 좌우 패딩 = 864px)에서 뷰박스가 거의 등배로 그려진다. */
@@ -38,6 +46,11 @@
     --gold: #ffd166;
     --gold-soft: #ffd16626;
     --hot: #ff8c5a;
+    --dna-rim: #f06595;
+    --dna-close: #ff922b;
+    --dna-mid: #ffd43b;
+    --dna-long: #51cf66;
+    --dna-three: #748ffc;
     --line-rgb: 242, 243, 247;
   }
 }
@@ -55,6 +68,11 @@
   --gold: #ffd166;
   --gold-soft: #ffd16626;
   --hot: #ff8c5a;
+  --dna-rim: #f06595;
+  --dna-close: #ff922b;
+  --dna-mid: #ffd43b;
+  --dna-long: #51cf66;
+  --dna-three: #748ffc;
   --line-rgb: 242, 243, 247;
 }
 
@@ -582,9 +600,23 @@
 }
 .dnaSingleBar {
   display: flex;
-  height: 26px;
+  height: 30px;
   border-radius: 8px;
   overflow: hidden;
+  gap: 1px;
+}
+/* 100% 바에서도 색만으로 읽히지 않게, 칸이 충분히 넓으면 그 안에 비율을 직접 적는다. */
+.dnaSingleSeg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  white-space: nowrap;
 }
 .dnaLegend {
   display: flex;
@@ -598,6 +630,17 @@
   display: flex;
   align-items: center;
   gap: 5px;
+}
+.dnaLegend b {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  color: var(--ink);
+}
+.dnaLegend .sw {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex: none;
 }
 
 /* ── 클러치 시그니처 순간 카드 ────────────────────────────────────────────────── */

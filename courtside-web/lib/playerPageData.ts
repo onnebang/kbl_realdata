@@ -338,7 +338,10 @@ export async function getPlayerHeadline(pcode: string): Promise<PlayerHeadline |
 
 // ── 커리어 경기 행 집계(순수 함수) ────────────────────────────────────────────────────────
 // GP는 행 수(0분 DNP 포함 - 기존 getPlayerCareerBySeason 관례)이고 gpPlayed가 0분 초과 수.
-// FG%는 2점 야투(2P%) - game_player_stats.fga가 2점 시도만이라는 프로젝트 관례(lib/shotImpactChart.ts).
+// FG%는 2점+3점을 합친 진짜 야투 성공률 = (fgm+tpm)/(fga+tpa)다. game_player_stats.fga/fgm이
+// 2점 전용이라(lib/shotImpactChart.ts) 예전에는 fgm/fga를 그대로 fgPct로 내보냈고, 시즌별 기록표의
+// 'FG%' 열이 사실은 2P%였다(버그, 2026-09-04 수정). 실측: 25-26 300분+ 111명의 L15 창에서 2P%가
+// 진짜 FG%보다 중앙값 +7.2%p 높고 61.3%가 5%p 이상 부풀었다. 2P%는 fg2Pct로 따로 남겨 둔다.
 export type BoxAgg = {
   gp: number;
   gpPlayed: number;
@@ -350,7 +353,10 @@ export type BoxAgg = {
   spg: number;
   bpg: number;
   tovPg: number;
+  /** 진짜 야투 성공률 = (fgm+tpm)/(fga+tpa). */
   fgPct: number | null;
+  /** 2점 성공률 = fgm/fga. 'FG%'라고 라벨을 붙이면 안 되는 값이다. */
+  fg2Pct: number | null;
   tpPct: number | null;
   ftPct: number | null;
   tsPct: number | null;
@@ -379,7 +385,8 @@ export function aggBox(rows: CareerGameRow[]): BoxAgg | null {
     spg: sum((r) => r.stl) / gp,
     bpg: sum((r) => r.blk) / gp,
     tovPg: sum((r) => r.tov) / gp,
-    fgPct: fga > 0 ? fgm / fga : null,
+    fgPct: fga + tpa > 0 ? (fgm + tpm) / (fga + tpa) : null,
+    fg2Pct: fga > 0 ? fgm / fga : null,
     tpPct: tpa > 0 ? tpm / tpa : null,
     ftPct: fta > 0 ? ftm / fta : null,
     tsPct: tsa > 0 ? pts / (2 * tsa) : null,

@@ -1,0 +1,408 @@
+/* 최근 N경기 패널 - app/globals.css의 :root 토큰(--surface / --surface-soft / --ink / --ink-soft /
+   --ink-faint / --home / --gold / --positive / --negative / --line-rgb)을 var()로 소비만 한다.
+   새 색을 만들지 않으므로 :root / @media dark / [data-theme=dark] 세 블록을 건드릴 일이 없고,
+   전역 파일과 선수 페이지 CSS 모듈도 손대지 않는다(다른 에이전트와 동시 편집 충돌 방지).
+
+   폰트 규칙(이 저장소가 세 번 깨진 자리):
+     "Big Shoulders Display"에는 한글 글리프가 없다 -> 숫자와 라틴 약어만 들어가는
+     .vMain / .short 에서만 쓴다. 한글이 한 글자라도 들어갈 수 있는 클래스는 전부 본문
+     폰트(Pretendard, body 상속)로 둔다. */
+
+.panel {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 14px;
+  padding: 16px 18px 14px;
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0;
+}
+
+/* ── 창 사실 헤더 ───────────────────────────────────────────────────────────────────
+   이 패널에서 가장 먼저 읽혀야 하는 줄이다. 요청한 N이 아니라 실제로 집계한 경기 수·날짜
+   범위·시즌·정규/PO 구성·결장 수를 칩으로 편다(다음 시즌 박스스코어가 들어오면 창의 구성이
+   조용히 바뀌는데, 그때 화면이 스스로 달라진 사실을 말하게 하려는 것). */
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.fact {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  border: 1px solid rgba(var(--line-rgb), 0.1);
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.fact b {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+/* 결장 칩만 금색 - 평균을 희석하는 유일한 구성 요소라 눈에 걸려야 한다. */
+.factWarn {
+  background: var(--gold-soft);
+  border-color: rgba(var(--line-rgb), 0.08);
+  color: var(--gold);
+}
+.factWarn b {
+  color: var(--gold);
+}
+/* 플레이오프 칩. 창 안 PO 경기는 스트립의 금색 테두리 점과 같은 색으로 묶인다. */
+.factPo b {
+  color: var(--gold);
+}
+
+.lede {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin: 0 0 10px;
+}
+.lede b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* ── 단위 토글(쿼리스트링 링크 - 클라이언트 상태 없음) ────────────────────────────── */
+.toggleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.toggle {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  background: var(--surface);
+  color: var(--ink-soft);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.toggle:hover,
+.toggle:focus-visible {
+  color: var(--ink);
+  border-color: rgba(var(--line-rgb), 0.32);
+}
+.toggleActive {
+  background: var(--home);
+  border-color: var(--home);
+  color: #fff;
+}
+/* 36분당을 만들 수 없는 창(합계 20분 미만)에서는 링크가 아니라 비활성 칩으로 그린다 -
+   누를 수 없는 이유를 옆에 적는 편이 조용히 되돌아가는 것보다 정직하다. */
+.toggleOff {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px dashed rgba(var(--line-rgb), 0.2);
+  background: transparent;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.toggleNote {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+/* ── 범례 ──────────────────────────────────────────────────────────────────────── */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  padding: 7px 0 9px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.08);
+}
+.legItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.legDot,
+.legPo,
+.legDnp {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.legDot {
+  background: var(--home);
+}
+.legPo {
+  background: var(--home);
+  box-shadow: 0 0 0 1.5px var(--gold);
+}
+.legDnp {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--ink-soft);
+}
+.legTri {
+  width: 0;
+  height: 0;
+  flex: none;
+  border-left: 4.5px solid transparent;
+  border-right: 4.5px solid transparent;
+  border-bottom: 7px solid var(--home);
+}
+.legLine {
+  width: 2px;
+  height: 11px;
+  flex: none;
+  background: repeating-linear-gradient(to bottom, var(--ink-soft) 0 3px, transparent 3px 6px);
+}
+
+/* ── 지표 행 ───────────────────────────────────────────────────────────────────────
+   타일 10개가 아니라 행 10개인 이유: 타일은 값 하나만 들어가는 그릇이라 표본(시도 수)·분포·
+   커리어 대비를 붙일 자리가 없다. 행은 [라벨][값][Δ][점 스트립][실제 범위]를 한 줄에 세운다. */
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 74px 96px 76px minmax(0, 1fr) 88px;
+  grid-template-areas: "lab val del str rng";
+  align-items: center;
+  gap: 4px 10px;
+  padding: 7px 0;
+  border-top: 1px solid rgba(var(--line-rgb), 0.07);
+}
+.row:first-child {
+  border-top: none;
+}
+/* 슈팅 세 행은 위 카운팅 행들과 성격이 다르다(분모가 경기가 아니라 시도다) - 구분선을 진하게. */
+.rowSplit {
+  border-top: 1px solid rgba(var(--line-rgb), 0.18);
+  margin-top: 3px;
+  padding-top: 10px;
+}
+
+.lab {
+  grid-area: lab;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.short {
+  font-family: "Big Shoulders Display", "IBM Plex Mono", monospace;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.name {
+  font-size: 10.5px;
+  line-height: 1.2;
+  color: var(--ink-faint);
+}
+
+.val {
+  grid-area: val;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.vMain {
+  font-family: "Big Shoulders Display", "IBM Plex Mono", monospace;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+/* 표본이 모자란 퍼센트 행(시도 10회 미만)은 값을 회색으로 눌러 둔다 - 지우지는 않는다. */
+.vDim {
+  color: var(--ink-faint);
+}
+.vAlt {
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vAltNum {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+}
+
+.del {
+  grid-area: del;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.dVal {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+.dGood {
+  color: var(--positive);
+}
+.dBad {
+  color: var(--negative);
+}
+/* 노이즈와 구분되지 않는 차이(|Δ| < 창 내부 표준오차)와 방향이 없는 행(출전 시간)은 색을 뺀다.
+   숫자와 부호는 그대로 인쇄한다 - 숨기는 게 아니라 '변화'라고 주장하지 않는 것이다. */
+.dFlat {
+  color: var(--ink-faint);
+}
+.dRole {
+  color: var(--ink);
+}
+.dNoise {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  line-height: 1.2;
+  color: var(--ink-faint);
+}
+
+.str {
+  grid-area: str;
+  min-width: 0;
+}
+.strip {
+  display: block;
+  width: 100%;
+  max-width: 340px;
+  height: auto;
+  overflow: visible;
+}
+.strEmpty {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+.rng {
+  grid-area: rng;
+  text-align: right;
+  min-width: 0;
+}
+.rngVal {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.rngLab {
+  display: block;
+  font-size: 9.5px;
+  line-height: 1.3;
+  color: var(--ink-faint);
+}
+
+/* 행 경고(시도 부족·시도 없는 경기)는 스트립 칸 안, 그림 바로 아래에 둔다. 별도 그리드 칸을
+   만들면 좁은 화면과 넓은 화면에서 서로 다른 자리로 튄다. */
+.rowNote {
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--ink-faint);
+  margin-top: 1px;
+}
+
+/* 좁은 화면: 한 줄에 다섯 칸은 들어가지 않는다. 라벨/값/Δ를 윗줄에, 스트립을 아랫줄 전폭으로,
+   실제 범위를 스트립 오른쪽 아래에 둔다(그림과 숫자가 붙어 있어야 서로를 설명한다). */
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "lab del"
+      "val rng"
+      "str str";
+    gap: 2px 10px;
+    padding: 9px 0;
+  }
+  .lab {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .del {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .strip {
+    max-width: none;
+  }
+  .rng {
+    align-self: end;
+  }
+}
+
+/* ── 각주 ──────────────────────────────────────────────────────────────────────── */
+.notes {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.note {
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--ink-faint);
+}
+/* 창 자체가 무의미해지는 경우(커리어가 창보다 짧다·결장이 섞였다)는 각주가 아니라 경고다. */
+.noteWarn {
+  color: var(--ink-soft);
+}
+.noteWarn::before {
+  content: "! ";
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  color: var(--gold);
+}
+
+.empty {
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding: 6px 0;
+}

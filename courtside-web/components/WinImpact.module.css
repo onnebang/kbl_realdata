@@ -1,0 +1,192 @@
+/* 승률을 올린 순간(커리어) 패널.
+   선수 프로필 안에 들어가므로 색은 페이지가 이미 정의한 토큰만 소비한다(자체 정의 없음).
+   숫자에만 Big Shoulders Display를 쓴다 - 그 폰트에는 한글 글리프가 없다. */
+
+.lede {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin-bottom: 12px;
+}
+.lede b {
+  color: var(--ink);
+}
+
+/* 클러치 안 / 밖 두 덩이. 이 패널의 헤드라인은 합계가 아니라 이 '어디서 나왔나'다. */
+.splitBar {
+  display: flex;
+  height: 26px;
+  border-radius: 8px;
+  overflow: hidden;
+  gap: 1px;
+  margin-bottom: 6px;
+}
+.splitSeg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.segOutside {
+  background: var(--away);
+}
+.segClutch {
+  background: var(--gold);
+}
+.splitLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-bottom: 14px;
+}
+.splitLegend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+
+/* 득점 유형별 - 이 지표가 실제로 반응하는 유일한 이벤트들 */
+.typeRow {
+  display: grid;
+  grid-template-columns: 68px 1fr 96px;
+  align-items: center;
+  gap: 9px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+.typeLabel {
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.typeTrack {
+  height: 9px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+.typeFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--away);
+  opacity: 0.85;
+}
+.typeVal {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  text-align: right;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.typeVal b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.momentsHead {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 16px 0 7px;
+}
+/* 카드는 두 칸이다: 승률 변화 폭 + 그 순간의 설명. 클러치 여부는 목록 자체가 말하므로
+   행마다 배지를 달지 않는다(두 목록이 나란히 있다). */
+.card {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(var(--line-rgb), 0.1);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  margin-bottom: 5px;
+}
+.card:hover {
+  border-color: rgba(var(--line-rgb), 0.28);
+  background: var(--surface-soft);
+}
+.wpa {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 21px;
+  line-height: 1;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--positive);
+}
+.body {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.when {
+  color: var(--ink-faint);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+}
+.more {
+  cursor: pointer;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  padding: 4px 0;
+}
+.note {
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--ink-faint);
+  margin-top: 12px;
+}
+.note b {
+  color: var(--ink-soft);
+}
+
+@media (max-width: 560px) {
+  .typeRow {
+    grid-template-columns: 58px 1fr 82px;
+  }
+}
+
+/* 클러치 밖 / 클러치 두 목록을 나란히. 한 목록에 섞어 정렬하면 주전은 상위가 전부
+   클러치라 요청한 '클러치가 아니더라도'가 화면에서 사라진다. */
+.momentCols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 4px;
+}
+.callout {
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: var(--gold-soft);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.callout b {
+  color: var(--ink);
+}
+@media (max-width: 720px) {
+  .momentCols {
+    grid-template-columns: 1fr;
+  }
+}

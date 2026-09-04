@@ -55,6 +55,8 @@ import { displayTeamName } from "@/lib/teamNames";
 import { TeamBadge } from "@/components/TeamBadge";
 import { PlayerGlanceCard } from "@/components/PlayerGlance";
 import { PlayerFormPanel, resolveFormUnit } from "@/components/PlayerForm";
+import { WinImpactPanel } from "@/components/WinImpact";
+import { getWinImpact } from "@/lib/winImpact";
 import styles from "./player-profile.module.css";
 
 // "데이터 사이언스 + 데이터로 아름다움" 대개편(요청) - sportsjobs.online 레퍼런스의
@@ -136,12 +138,17 @@ function PercentilePanel({ profile, seasonName }: { profile: PercentileProfile |
 }
 
 // 슈팅 DNA - 시즌별 존 구성비 스택 밴드(존 색: 림→3점 순서로 아래에서 위로 쌓음).
+// 요청: "림과 근거리 중거리 색상이 비슷해서, 구분이 조금 어려움, 좀더 다채로운 색상으로".
+// 실제로 그랬다 - 예전 값은 림 --hot(#e8590c) / 근거리 --home(#d9640a) / 중거리 --gold(#9a6b00)로
+// 셋 다 주황·갈색이었다(색상 23°/27°/42°). 이제 거리 순서를 그대로 따라가는 5단 램프를 쓴다:
+// 진홍 → 주황 → 호박 → 초록 → 남색. 토큰 정의는 player-profile.module.css(두 테마 각각).
+// 색만으로 읽히지 않도록 밴드 오른쪽 끝과 100% 바 안에 이름·비율을 직접 적는다.
 const DNA_COLORS: Record<(typeof DNA_ZONES)[number], string> = {
-  rim: "var(--hot)",
-  close: "var(--home)",
-  midShort: "var(--gold)",
-  midLong: "var(--ink-faint)",
-  three: "var(--away)",
+  rim: "var(--dna-rim)",
+  close: "var(--dna-close)",
+  midShort: "var(--dna-mid)",
+  midLong: "var(--dna-long)",
+  three: "var(--dna-three)",
 };
 
 function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
@@ -156,7 +163,15 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
         <div className={styles.dnaSingleBar}>
           {DNA_ZONES.map((z) =>
             m.shares[z] > 0 ? (
-              <div key={z} style={{ width: `${m.shares[z] * 100}%`, background: DNA_COLORS[z] }} title={`${DNA_ZONE_LABELS[z]} ${(m.shares[z] * 100).toFixed(1)}%`} />
+              <div
+                key={z}
+                className={styles.dnaSingleSeg}
+                style={{ width: `${m.shares[z] * 100}%`, background: DNA_COLORS[z] }}
+                title={`${DNA_ZONE_LABELS[z]} ${(m.shares[z] * 100).toFixed(1)}%`}
+              >
+                {/* 칸이 좁으면 글자가 잘려 오히려 안 읽힌다 - 8% 이상일 때만 안에 적는다. */}
+                {m.shares[z] >= 0.08 ? `${Math.round(m.shares[z] * 100)}%` : ""}
+              </div>
             ) : null
           )}
         </div>
@@ -164,7 +179,7 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
           {DNA_ZONES.map((z) => (
             <span key={z}>
               <span className={styles.sw} style={{ background: DNA_COLORS[z] }} />
-              {DNA_ZONE_LABELS[z]} {(m.shares[z] * 100).toFixed(0)}%
+              {DNA_ZONE_LABELS[z]} <b>{(m.shares[z] * 100).toFixed(0)}%</b>
             </span>
           ))}
         </div>
@@ -176,9 +191,10 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
   }
 
   const W = 640,
-    H = 220,
+    H = 230,
     PAD_L = 30,
-    PAD_R = 10,
+    // 오른쪽에 밴드 이름·최신 비율을 직접 적는다(범례와 스와치를 눈으로 맞추지 않게).
+    PAD_R = 78,
     PAD_T = 10,
     PAD_B = 22;
   const plotW = W - PAD_L - PAD_R;
@@ -198,11 +214,40 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
   };
 
   const tickEvery = Math.max(1, Math.ceil(n / 8));
+
+  // 오른쪽 끝 라벨 - 마지막 시즌 기준 밴드의 세로 중앙에 존 이름과 비율. 3% 미만 밴드는
+  // 적을 자리가 없어 생략하고(범례가 대신 든다), 남은 라벨끼리 겹치면 아래로 밀어 뗀다.
+  const last = n - 1;
+  const labels = DNA_ZONES.map((z, zi) => {
+    const top = cumAt(last, zi);
+    const bottom = zi === 0 ? 0 : cumAt(last, zi - 1);
+    return { z, share: mix[last].shares[z], y: yAt((top + bottom) / 2) };
+  })
+    .filter((l) => l.share >= 0.03)
+    .sort((a, b) => a.y - b.y);
+  for (let i = 1; i < labels.length; i++) {
+    if (labels[i].y - labels[i - 1].y < 12) labels[i].y = labels[i - 1].y + 12;
+  }
+
   return (
     <div>
       <svg className={styles.dnaSvg} viewBox={`0 0 ${W} ${H}`}>
+        {/* 밴드 사이에 패널색 실선을 얇게 둘러 인접 밴드가 서로 번지지 않게. */}
         {DNA_ZONES.map((z, zi) => (
-          <path key={z} d={bandPath(zi)} fill={DNA_COLORS[z]} opacity={0.82} />
+          <path key={z} d={bandPath(zi)} fill={DNA_COLORS[z]} opacity={0.9} stroke="var(--surface)" strokeWidth={0.7} />
+        ))}
+        {labels.map((l) => (
+          <text
+            key={l.z}
+            x={W - PAD_R + 6}
+            y={l.y + 3.5}
+            fontSize={10}
+            fill={DNA_COLORS[l.z]}
+            fontFamily="IBM Plex Mono, monospace"
+            fontWeight={700}
+          >
+            {DNA_ZONE_LABELS[l.z]} {Math.round(l.share * 100)}%
+          </text>
         ))}
         {[0.25, 0.5, 0.75].map((g) => (
           <line key={g} x1={PAD_L} y1={yAt(g)} x2={W - PAD_R} y2={yAt(g)} stroke="var(--surface)" strokeWidth={0.6} opacity={0.5} />
@@ -228,6 +273,7 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
             {DNA_ZONE_LABELS[z]}
           </span>
         ))}
+        <span>오른쪽 라벨 = {shortSeason(mix[n - 1].season)} 비율</span>
       </div>
     </div>
   );
@@ -255,7 +301,7 @@ export default async function PlayerPage({
   // 1차: 시즌 선택과 무관한 조회(클러치/시너지/온오프/존 기대값 포함)를 전부 병렬로. 커리어 경기
   // 행(getPlayerCareerGames)은 로스터 상태 판정·히어로 타일·커리어 아크·시즌별 기록표가 모두
   // 공유하므로 한 번만 읽는다(기존 getPlayerCareerBySeason과 중복 조회하지 않기 위해 교체).
-  const [careerRows, recentGames, teamByTcode, careerShots, clutch, combos, onOffMap, zoneExpectedPts] =
+  const [careerRows, recentGames, teamByTcode, careerShots, clutch, combos, onOffMap, zoneExpectedPts, winImpact] =
     await Promise.all([
       getPlayerCareerGames(pcode),
       getPlayerRecentGames(pcode),
@@ -265,6 +311,8 @@ export default async function PlayerPage({
       getTopPairCombos(pcode),
       getPlayerOnOffRatings([pcode]),
       getZoneExpectedPts(),
+      // 미리 구운 1행(tools/build_player_win_impact.py) - 실시간 집계는 콜드 1.1~2.1초라 못 얹는다.
+      getWinImpact(pcode),
     ]);
 
   // 2차: 확정 명단(season_roster) 대조 - 히어로 정체성(팀·등번호·포지션)의 유일한 출처다.
@@ -712,6 +760,19 @@ export default async function PlayerPage({
           <div className="empty-note">클러치 상황 기록 없음</div>
         )}
       </div>
+
+      {/* ── 4-B. 결정적 순간 득점(커리어) - 요청: "클러치가 아니더라도, 승률 올랐던 내용들에
+             대해서 표시". 위 패널은 마지막 5분·5점차 안만 보므로 그 바깥을 여기서 채운다.
+             이름을 "승률 기여"라 하지 않는 이유는 components/WinImpact.tsx 상단 주석 참고. ── */}
+      {winImpact && (
+        <div className={styles.panel}>
+          <div className={styles.panelTitle}>결정적 순간 득점 · 커리어</div>
+          <WinImpactPanel
+            impact={winImpact}
+            teamNameByTcode={new Map([...teamByTcode].map(([tc, t]) => [tc, t.name]))}
+          />
+        </div>
+      )}
 
       {/* ── 5. 시너지 & 임팩트 ── */}
       <div className={styles.panel}>
