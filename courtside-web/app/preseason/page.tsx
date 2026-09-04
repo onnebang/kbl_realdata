@@ -31,6 +31,14 @@ import { getDepartureReport } from "@/lib/departureImpact";
 import { getImportRuleReport } from "@/lib/importRule";
 import styles from "./preseason.module.css";
 
+/**
+ * 26-27 신인 드래프트일(사용자 확인 2026-09-05). 이 날 이후 신인이 각 팀 명부에 들어온다.
+ * 그때는 tools/fetch_kbl_roster.py -> import_roster -> build_roster_changes ->
+ * build_strength_adjustment 순으로 다시 돌리면 자동으로 반영된다(신인은 KBL 기록이 없어
+ * 팀 뎁스 수준으로 채워지는데, 실측상 신인 PER 11.0이 뎁스 평균 9.8과 비슷해 타당한 처리다).
+ */
+const DRAFT_DATE = "11월 9일";
+
 // 개막 리포트 - 요청: "시즌 시작전 리포트를 먼저 제공하고, 실제 시즌이 시작되면 실제 경기가
 // 보일 수 있게, 그동안은 실제경기 10경기정도만 테스트로 보여주고, 이렇게 중계가 보일거다라는
 // 것을 알려주면". 세 단락: 1) 시즌 전망(경기 전 모델 기대승수) 2) 로스터 이동 지도(확정
@@ -120,6 +128,8 @@ function ProjectionRow({ t, lo, hi }: { t: ProjectionTeam; lo: number; hi: numbe
   const dot = (((a ? a.fullExp : t.fullExp) - lo) / span) * 100;
   const half = ((GAMES_FULL / 2 - lo) / span) * 100;
   const delta = a ? a.fullExp - t.fullExp : 0;
+  // 순위는 작을수록 위다. 기본 3위 -> 조정 5위면 -2(두 계단 내려감).
+  const rankMove = a ? t.expRank - a.expRank : 0;
   return (
     // --tc: 팀 색을 원색 그대로 쓰면 남색 계열(부산 KCC)이 다크 배경에서 사라진다.
     // CSS 쪽에서 잉크와 섞어 두 테마 모두 최소 대비를 갖게 한다.
@@ -128,27 +138,42 @@ function ProjectionRow({ t, lo, hi }: { t: ProjectionTeam; lo: number; hi: numbe
       className={styles.projRow}
       style={{ "--tc": t.color } as CSSProperties}
     >
-      <div className={styles.outlookRank}>{a ? a.expRank : t.expRank}</div>
+      {/* 순위 변동은 스포츠 순위표에서 누구나 아는 기호라 설명 없이 읽힌다.
+          "기본 2위"라는 개발자 어휘를 여기서 대체한다. */}
+      <div className={styles.projRankCell}>
+        <span className={styles.outlookRank}>{a ? a.expRank : t.expRank}</span>
+        {a && rankMove !== 0 && (
+          <span className={`${styles.projMove} ${rankMove > 0 ? styles.deltaUp : styles.deltaDown}`}>
+            {rankMove > 0 ? "▲" : "▼"}
+            {Math.abs(rankMove)}
+          </span>
+        )}
+      </div>
       <div className={styles.outlookTeam}>
         <TeamBadge team={badgeOf(t)} size={22} />
         <span>{t.name}</span>
-        {/* 기본과 조정의 순위가 다를 때만 - 같으면 잡음이다. */}
-        {a && a.expRank !== t.expRank && <span className={styles.projBaseRank}>기본 {t.expRank}위</span>}
       </div>
-      <div className={styles.projHalf}>{t.halfExp.toFixed(1)}</div>
-      <div className={styles.projBase}>{t.fullExp.toFixed(1)}</div>
+      {/* 두 숫자를 한 칸에 넣어 "무엇에서 무엇으로"가 화살표 하나로 읽히게. */}
       {a ? (
-        <div className={styles.projFull}>
-          {a.fullExp.toFixed(1)}
+        <div className={styles.projWins}>
+          <span className={styles.projWinsBase}>{t.fullExp.toFixed(1)}</span>
+          <span className={styles.projWinsArrow}>→</span>
           <span
-            className={`${styles.projDelta} ${delta > 0.05 ? styles.deltaUp : delta < -0.05 ? styles.deltaDown : styles.deltaFlat}`}
+            className={`${styles.projWinsFinal} ${delta > 0.05 ? styles.deltaUp : delta < -0.05 ? styles.deltaDown : ""}`}
           >
-            {delta > 0.05 ? "▲" : delta < -0.05 ? "▼" : "="}
-            {Math.abs(delta).toFixed(1)}
+            {a.fullExp.toFixed(1)}
           </span>
+          {Math.abs(delta) > 0.05 && (
+            <span className={`${styles.projMove} ${delta > 0 ? styles.deltaUp : styles.deltaDown}`}>
+              {delta > 0 ? "▲" : "▼"}
+              {Math.abs(delta).toFixed(1)}
+            </span>
+          )}
         </div>
       ) : (
-        <div className={styles.projFull}>-</div>
+        <div className={styles.projWins}>
+          <span className={styles.projWinsFinal}>{t.fullExp.toFixed(1)}</span>
+        </div>
       )}
       <div
         className={styles.projTrack}
@@ -180,6 +205,19 @@ function AdjBreakdown({ proj, cur, prev }: { proj: SeasonProjection; cur: string
     .flatMap((t) => (t.adj as NonNullable<typeof t.adj>).team.slots.filter((sl) => sl.tier).map((sl) => `${t.abbr} ${sl.name}(${sl.tier})`))
     .join(" · ");
   // 0.005 미만은 그냥 0으로 - "+0.00"은 부호가 있는 것처럼 읽힌다.
+  // 뎁스 범위는 살아 있는 값에서 읽는다(하드코딩하면 팀 로스터가 바뀔 때 조용히 낡는다).
+  const depths = [...adj.teams.values()].map((t) => t.depthPer).filter((v) => v > 0);
+  const depthLo = depths.length ? Math.min(...depths).toFixed(1) : "-";
+  const depthHi = depths.length ? Math.max(...depths).toFixed(1) : "-";
+  const depthAvg = depths.length ? (depths.reduce((a2, b2) => a2 + b2, 0) / depths.length).toFixed(1) : "-";
+  const thinTeams = [...adj.teams.values()]
+    .sort((a2, b2) => a2.depthPer - b2.depthPer)
+    .slice(0, 2)
+    .map((t) => {
+      const info = proj.teams.find((x) => x.tcode === t.tcode);
+      return `${info?.name ?? t.tcode} ${t.depthPer.toFixed(1)}`;
+    })
+    .join(" · ");
   const sign = (v: number) => (Math.abs(v) < 0.005 ? "0.00" : `${v > 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}`);
   return (
     <>
@@ -238,6 +276,19 @@ function AdjBreakdown({ proj, cur, prev }: { proj: SeasonProjection; cur: string
           25%) · 아시아쿼터 16.2(중앙값). <b>이 등급은 측정이 아니라 스카우팅 판단입니다.</b>
         </div>
       )}
+      {/* 신인 드래프트 - 사용자: "11월 9일날 신인 드래프트가 있어서 그 이후로 신인이 들어오긴
+          할건데 ... 작년에 신입들이 활약했던걸 생각하면 추가를 해야할것 같아".
+          아직 누구인지 모르므로 넣을 수 없다. 대신 "빠져 있다"는 사실과, 들어왔을 때 얼마나
+          움직일지를 실측으로 말한다. 신인 수치는 15시즌 집계(데이터 시작 왜곡이 있는 첫 두
+          시즌 제외): 국내 출전시간의 1.4~14.0%, 25-26은 9.0%(6명이 500분 이상), 분가중 PER 11.0. */}
+      <div className={styles.note}>
+        <b>신인 드래프트({DRAFT_DATE}) 선수는 아직 이 표에 없습니다.</b> 누가 어느 팀에 갈지 정해지지 않아 넣을 수가 없습니다. 다만 얼마나
+        움직일지는 지난 기록으로 가늠할 수 있습니다 — 최근 시즌 신인들은 국내 출전시간의 1.4~14.0%를 가져갔고({prev}은 9.0%로 그중 6명이
+        500분 이상 뛰었습니다), 그때 신인들의 분가중 PER은 11.0이었습니다. 이 표가 빈자리를 메우는 데 쓰는 <b>팀 뎁스</b>가{" "}
+        {depthLo}~{depthHi}(평균 {depthAvg})이라 <b>신인의 수준과 비슷합니다</b>. 그래서 신인이 합류해도 순서가 크게 바뀌지는 않을 것으로
+        봅니다. 다만 뎁스가 특히 얇은 팀에서는 신인 한 명이 차지하는 몫이 상대적으로 큽니다({thinTeams}). 드래프트 후 명부가 갱신되면 이 표도
+        다시 계산됩니다.
+      </div>
       <div className={styles.note}>
         나머지 자리는 실측입니다: {prev} 기록이 있으면 그 값을, 공백 후 복귀면 마지막 KBL 시즌 값을 쓰되, 둘 다 &quot;다음 시즌 PER&quot;
         회귀를 통과시킵니다(비국내 연속 4.65+0.789p · n=131, 공백 복귀 12.29+0.491p · n=38, 국내 연속 3.76+0.690p · n=824). 공백이 있으면
@@ -265,6 +316,13 @@ function ProjectionSection({
   const hi = Math.max(...proj.teams.map((t) => Math.max(t.winsHi, t.adj?.winsHi ?? t.winsHi))) + 1;
   const m = proj.matrix;
   const hasAdj = !!proj.adjustment;
+  // 전반기/전체 비율 - 열을 뺀 근거를 각주가 숫자로 말한다(하드코딩하지 않는다).
+  const halfRatios = proj.teams.filter((t) => t.fullExp > 0).map((t) => t.halfExp / t.fullExp);
+  const halfRatioLo = halfRatios.length ? Math.min(...halfRatios).toFixed(3) : "-";
+  const halfRatioHi = halfRatios.length ? Math.max(...halfRatios).toFixed(3) : "-";
+  const halfMaxErr = proj.teams.length
+    ? Math.max(...proj.teams.map((t) => Math.abs(t.halfExp - t.fullExp / 2))).toFixed(2)
+    : "-";
   // 조정이 있으면 조정 기준 순위로 정렬한다 - 요청("AI 예상순위를 변경해줘").
   const ordered = hasAdj
     ? [...proj.teams].sort((a, b) => (a.adj?.expRank ?? a.expRank) - (b.adj?.expRank ?? b.expRank))
@@ -279,59 +337,89 @@ function ProjectionSection({
         {proj.scheduleComplete ? (
           <>
             {cur} 정규시즌 {proj.scheduledN}경기 일정이 전부 공개되어 있어(
-            {proj.firstGameDate ? fmtDate(proj.firstGameDate) : "-"} ~ {proj.lastGameDate ? fmtDate(proj.lastGameDate) : "-"}), 두 기준을
-            그대로 계산했습니다 — 각 팀의 앞 {GAMES_HALF}경기(전반기 {ROUNDS_HALF}라운드)와 정규시즌 전체 {GAMES_FULL}경기.
+            {proj.firstGameDate ? fmtDate(proj.firstGameDate) : "-"} ~ {proj.lastGameDate ? fmtDate(proj.lastGameDate) : "-"}) 그대로
+            계산했습니다.
           </>
         ) : (
           <>
-            공개된 일정은 {proj.scheduledN}경기로 팀마다 경기 수가 달라 그대로 더하면 비교가 안 됩니다. 그래서 두 기준을 나란히 놓습니다 —
-            전반기 {ROUNDS_HALF}라운드({GAMES_HALF}경기)와 정규시즌 전체({GAMES_FULL}경기).
+            공개된 일정은 {proj.scheduledN}경기뿐이라 팀마다 경기 수가 달라, 모자란 만큼은 매치업 승률로 채워 {GAMES_FULL}경기 기준으로
+            맞췄습니다.
           </>
         )}
       </p>
       {hasAdj && (
         <div className={styles.adjWarn}>
-          <b>&quot;조정&quot; 열은 측정이 아니라 시나리오입니다 — 정확도가 낮습니다.</b> 확정 결장 13명, 2·3쿼터 외국인 2명 허용, 그리고 KBL
-          기록이 없는 신입 선수 {proj.adjustment?.priorSlots}명의 스카우팅 등급을 넣어 로스터를 다시 조립한 값입니다. 이 프로젝트가 KBL
-          15시즌으로 확인한 바로는 <b>이탈 정보만으로 다음 시즌 득실차 변화를 설명한 설명력이 0.1% 미만</b>이었고, 그래서 아래 &quot;조정&quot;
-          숫자는 순서를 말하는 용도이지 맞힐 값이 아닙니다. 재미로 보시고, 진짜 예측은 개막 후 경기가 쌓이면 모델이 실제 결과로 다시
-          계산합니다.
+          <b>이 표는 맞히려고 만든 게 아닙니다.</b> 오른쪽 승수는 확정 결장 13명, 2·3쿼터 외국인 2명 허용, KBL 기록이 없는 신입 선수{" "}
+          {proj.adjustment?.priorSlots}명의 스카우팅 등급을 넣어 로스터를 다시 조립한 <b>시나리오</b>입니다. KBL 15시즌을 확인해 보니{" "}
+          <b>이탈 정보만으로 다음 시즌을 설명한 설명력은 0.1% 미만</b>이었습니다 — 순서를 보는 용도로만 봐 주세요. 그리고{" "}
+          <b>신인 드래프트(11월 9일) 선수는 아직 이 표에 없습니다.</b> 개막 후 경기가 쌓이면 모델이 실제 결과로 다시 계산합니다.
+        </div>
+      )}
+      {hasAdj && (
+        <div className={styles.readMe}>
+          <div className={styles.readMeItem}>
+            <span className={styles.readMeChip}>
+              <span className={styles.projWinsBase}>30.8</span>
+              <span className={styles.projWinsArrow}>→</span>
+              <span className={`${styles.projWinsFinal} ${styles.deltaUp}`}>31.0</span>
+            </span>
+            <span>
+              왼쪽은 <b>작년 전력 그대로</b> 계산한 승수, 오른쪽은 <b>올해 변화를 반영</b>한 승수입니다.
+            </span>
+          </div>
+          <div className={styles.readMeItem}>
+            <span className={styles.readMeChip}>
+              <span className={styles.outlookRank}>3</span>
+              <span className={`${styles.projMove} ${styles.deltaUp}`}>▲2</span>
+            </span>
+            <span>
+              순위는 <b>올해 변화를 반영한 기준</b>이고, 화살표는 작년 전력 기준 순위에서 몇 계단 움직였는지입니다.
+            </span>
+          </div>
+          <div className={styles.readMeItem}>
+            <span className={styles.readMeChip}>
+              <span className={styles.readMeBar}>
+                <span className={styles.readMeBarFill} />
+              </span>
+            </span>
+            <span>
+              막대는 <b>10번 중 8번이 들어가는 승수 범위</b>입니다. 길수록 어떻게 될지 모른다는 뜻입니다.
+            </span>
+          </div>
+          <div className={styles.readMeItem}>
+            <span className={styles.readMeChip}>
+              <span className={styles.readMeStrip}>
+                {[0.95, 0.7, 0.45, 0.3, 0.2, 0.14, 0.1, 0.07, 0.05, 0.04].map((o, i) => (
+                  <span key={i} style={{ opacity: o }} />
+                ))}
+              </span>
+            </span>
+            <span>
+              칸이 진할수록 <b>그 순위가 될 가능성이 큽니다</b>. 맨 왼쪽이 1위, 맨 오른쪽이 {proj.teams.length}위입니다.
+            </span>
+          </div>
         </div>
       )}
       <div className={styles.outlookGrid}>
         <div className={`${styles.projRow} ${styles.outlookHead}`}>
           <div />
           <div>팀</div>
-          <div style={{ textAlign: "right" }}>전반기 {GAMES_HALF}G</div>
-          <div style={{ textAlign: "right" }}>기본 {GAMES_FULL}G</div>
-          <div style={{ textAlign: "right" }}>{hasAdj ? "조정" : `전체 ${GAMES_FULL}G`}</div>
-          <div>승수 80% 구간 (가운데 눈금 27승){hasAdj ? " · 조정 기준" : ""}</div>
-          <div>순위 분포 1→{proj.teams.length}위</div>
-          <div style={{ textAlign: "right" }}>1위</div>
-          <div style={{ textAlign: "right" }}>PO</div>
-          <div className={styles.outlookPrev}>{prev} 정규</div>
+          <div>{hasAdj ? `예상 승수 (${GAMES_FULL}경기)` : `기대 승수 (${GAMES_FULL}경기)`}</div>
+          <div>승수 범위</div>
+          <div>순위 가능성</div>
+          <div style={{ textAlign: "right" }}>정규 1위</div>
+          <div style={{ textAlign: "right" }}>6강</div>
+          <div className={styles.outlookPrev}>{prev} 성적</div>
         </div>
         {ordered.map((t) => (
           <ProjectionRow key={t.tcode} t={t} lo={lo} hi={hi} />
         ))}
       </div>
       <div className={styles.note}>
-        {proj.scheduleComplete ? (
-          <>
-            전반기는 각 팀의 날짜순 앞 {GAMES_HALF}경기에 모델이 매긴 승률을 그대로 더한 값입니다 — 추정이 없습니다. 팀마다 그 안의 홈경기
-            수가 갈리는데(
-            {[...proj.teams]
-              .sort((a, b) => a.halfHomeN - b.halfHomeN || a.abbr.localeCompare(b.abbr))
-              .map((t) => `${t.abbr} ${t.halfHomeN}`)
-              .join(" · ")}
-            ), 승률 자체가 홈/원정을 반영하므로 별도 보정은 하지 않습니다.
-          </>
-        ) : (
-          <>
-            전반기는 공개된 일정 {proj.scheduledN}경기에 매겨진 승률 그대로이고, 상대별 {ROUNDS_HALF}경기를 못 채운 {proj.halfFilledN}
-            경기만 보탠 것입니다 — 그 경기들은 홈/원정이 아직 안 정해져 양쪽 홈 승률의 평균을 썼습니다.
-          </>
-        )}{" "}
+        {/* 전반기 열을 뺀 이유를 숫자로 밝힌다 - 사용자가 "데이터 중복 같다"고 했고 실제로 그랬다. */}
+        전반기({ROUNDS_HALF}라운드 {GAMES_HALF}경기) 기대승수는 따로 두지 않았습니다. 각 팀의 날짜순 앞 {GAMES_HALF}경기로 실제로
+        계산해 보면 전체 {GAMES_FULL}경기 값의 {halfRatioLo}~{halfRatioHi}배로, <b>사실상 정확히 절반</b>이기 때문입니다(절반으로 봤을 때
+        최대 오차 {halfMaxErr}승). 일정이 균형이라 그렇습니다 — 앞 {GAMES_HALF}경기 안에 상대별 {ROUNDS_HALF}경기가 들어갑니다.{" "}
         전체 {GAMES_FULL}경기는 일정 편성과 무관하게 매치업 승률만으로 결정됩니다({m.tcodes.length}팀 × 9상대 × {ROUNDS_TOTAL}). 매치업{" "}
         {m.tcodes.length * (m.tcodes.length - 1)}쌍{" "}
         {m.filled === 0 ? (

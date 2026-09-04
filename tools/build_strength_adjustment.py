@@ -38,6 +38,16 @@
   · 남는 분 -> 그 팀 뎁스 PER
   · 아시아쿼터를 등록하지 않은 팀(26-27 KCC)은 그 슬롯 분이 통째로 뎁스로 간다
 
+## 신인 드래프트 이후 (2026-11-09)
+드래프트 선수는 KBL 기록이 없어 이 조립에서 "남는 분"으로 흘러 팀 뎁스 PER로 채워진다.
+그게 타당한 처리인지 실측했다 - 최근 시즌 신인의 분가중 PER은 11.0이고 팀 뎁스는 7.2~12.0
+(평균 9.8)이라 거의 같은 자리다. 신인이 국내 출전시간에서 차지한 몫은 시즌마다 1.4~14.0%
+(25-26은 9.0%, 500분 이상 6명)였다. 그러니 드래프트가 끝나면 특별한 코드 변경 없이
+    fetch_kbl_roster.py -> import_roster.py -> build_roster_changes.py -> 이 스크립트
+순서로 다시 돌리기만 하면 된다. (신인을 스카우팅 등급으로 따로 다루고 싶으면
+tools/data/import_scouting_*.csv 와 같은 방식으로 표를 하나 더 두면 되지만, 위 실측을 보면
+뎁스로 채우는 것과 큰 차이가 없다.)
+
 ## 사용
     python build_strength_adjustment.py --season 2026-2027
     python build_strength_adjustment.py --season 2026-2027 --dry-run

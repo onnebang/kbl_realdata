@@ -603,8 +603,10 @@
    요점이 "숫자"가 아니라 "폭"이라서). */
 .projRow {
   display: grid;
-  /* 순위 / 팀 / 전반기 / 기본 / 조정 / 승수 구간 / 순위 분포 / 1위 / PO / 지난 시즌 */
-  grid-template-columns: 26px minmax(72px, 1fr) 44px 48px 64px minmax(108px, 1.3fr) 104px 42px 42px 54px;
+  /* 순위(+변동) / 팀 / 예상 승수 / 승수 범위 / 순위 가능성 / 정규 1위 / 6강 / 지난 시즌.
+     전반기 열은 뺐다 - 실측상 전체 기대승수의 0.4928~0.5040배(최대 오차 0.15승)라
+     다른 열의 절반을 반복하고 있었다. 기본/조정 두 열은 "30.8 → 31.0" 한 칸으로 합쳤다. */
+  grid-template-columns: 48px minmax(78px, 1fr) 128px minmax(104px, 1.3fr) 104px 48px 44px 54px;
   align-items: center;
   gap: 8px;
   padding: 5px 8px;
@@ -627,6 +629,112 @@
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
+/* 순위 + 변동 화살표를 한 칸에 */
+.projRankCell {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+.projMove {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+/* 예상 승수 - "작년 전력 → 올해 반영"을 한 줄로 */
+.projWins {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+.projWinsBase {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.projWinsArrow {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.projWinsFinal {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 19px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 읽는 법 - 주석을 안 읽는다는 전제에서, 표 바로 위에 실제 조각을 놓고 한 줄씩 설명한다 */
+.readMe {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px 16px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  word-break: keep-all;
+}
+.readMeItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.readMeChip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  flex-shrink: 0;
+}
+.readMeBar {
+  position: relative;
+  display: block;
+  width: 62px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(var(--line-rgb), 0.12);
+  align-self: center;
+}
+.readMeBarFill {
+  position: absolute;
+  left: 22%;
+  width: 46%;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 999px;
+  background: var(--ink-soft);
+  opacity: 0.75;
+}
+/* 순위 분포 예시 조각 - 표의 .rankStrip과 같은 모양을 축소해 보여준다 */
+.readMeStrip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 1px;
+  width: 62px;
+  height: 12px;
+  align-self: center;
+}
+.readMeStrip > span {
+  border-radius: 1px;
+  background: var(--ink-soft);
+}
+.readMe b {
+  color: var(--ink);
+}
+
 .projHalf {
   color: var(--ink-soft);
   font-size: 15px;
@@ -811,22 +919,20 @@
 
 @media (max-width: 900px) {
   .projRow {
-    grid-template-columns: 24px minmax(64px, 1fr) 42px 44px 58px minmax(84px, 1fr) 84px 40px 40px;
+    grid-template-columns: 44px minmax(66px, 1fr) 118px minmax(80px, 1fr) 84px 44px 40px;
   }
-  /* 지난 시즌 전적부터 접는다 */
+  /* 지난 시즌 성적부터 접는다 */
   .projRow > :last-child {
     display: none;
   }
 }
 @media (max-width: 640px) {
   .projRow {
-    grid-template-columns: 22px minmax(60px, 1fr) 58px minmax(66px, 1fr) 72px 38px;
+    grid-template-columns: 40px minmax(62px, 1fr) 116px minmax(70px, 1fr) 40px;
   }
-  /* 좁은 화면에서는 전반기(3)·기본(4)·1위(8)를 접고, 조정 승수 / 구간 / 순위 분포 / PO만 남긴다.
-     기본 승수는 넓은 화면에서만 - 이 표의 요점은 "조정 후 어디쯤인가"라서. */
-  .projRow > :nth-child(3),
-  .projRow > :nth-child(4),
-  .projRow > :nth-child(8) {
+  /* 순위 가능성 스트립(5)과 정규 1위(6)를 접는다 - 좁은 화면에선 승수와 6강 확률이 요점. */
+  .projRow > :nth-child(5),
+  .projRow > :nth-child(6) {
     display: none;
   }
 }
