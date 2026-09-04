@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { TAG, TTL, cachedFn, cachedMap } from "./cachePolicy";
 import { displayTeamName } from "./teamNames";
 

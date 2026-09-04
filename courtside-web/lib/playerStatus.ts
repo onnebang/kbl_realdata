@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { TAG, TTL, cached } from "./cachePolicy";
 import { displayTeamName } from "./teamNames";
 import { DEPARTURE_LABEL, PRESEASON_SEASON, prevSeasonName, roleFromNote, type ChangeKind } from "./preseason";

@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { TAG, TTL, cached } from "./cachePolicy";
 import { getPlayerCareerGames, type CareerGameRow } from "./playerProfile";
 import { buildSeasonAxis, seasonStartYear, PLAYOFF_CATEGORY } from "./playerPageData";

@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { TAG, TTL, cachedMap } from "./cachePolicy";
 
 // tools/build_synergy_matchup.py가 15시즌 전체 라인업 스틴트를 미리 집계해둔

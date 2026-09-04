@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { displayTeamName } from "./teamNames";
 
 // 시즌 브라우저(app/season-browser) 데이터 레이어 - web/season_browser_template.html 포팅.

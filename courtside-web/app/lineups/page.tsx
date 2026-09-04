@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { TeamBadge } from "@/components/TeamBadge";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer as supabase } from "@/lib/supabaseServer";
 import { PRESEASON_SEASON, getSeasonOpener, shortSeason } from "@/lib/preseason";
 import { getLeaderboardSeasons } from "@/lib/seasonLeaders";
 import {

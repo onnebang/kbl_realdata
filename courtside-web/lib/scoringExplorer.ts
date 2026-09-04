@@ -1,4 +1,9 @@
-import { supabase } from "./supabase";
+import { GRID, buildHeatmapSvg, type Dimension, type EntityOption, type EntitySeasonGrids, type GridCell, type GridResult } from "./scoringExplorerShape";
+import { supabaseServer as supabase } from "./supabaseServer";
+
+// 클라이언트도 쓰는 모양은 ./scoringExplorerShape에 있다(그쪽은 Supabase를 import하지 않는다).
+export { GRID, buildHeatmapSvg };
+export type { Dimension, EntityOption, EntitySeasonGrids, GridCell, GridResult };
 import { drawCourtMarkings } from "./zoneCompare";
 import { currentTeamName } from "./teamNames";
 
@@ -11,7 +16,7 @@ import { currentTeamName } from "./teamNames";
 // 그 엔티티의 전체 이력을 한 번에 그리드로 뭉쳐서 내려주고, 이후 재생/이전/다음/슬라이더 조작은
 // 전부 클라이언트 메모리 안에서만 일어남(추가 서버 왕복 없음 - components/GameReplay.tsx가 이미
 // 로드된 events 배열을 스크럽하는 것과 같은 패턴).
-export const GRID = { cols: 15, rows: 15, xMin: 345, xMax: 720, yMin: 27, yMax: 384, hoopX: 681, hoopY: 205 };
+
 
 // (엔티티, 시즌) 조합의 시도가 이 미만이면 표본 부족으로 취급 - 원본 아티팩트의 Python 빌드
 // 스크립트가 DATA JSON을 구울 때 적용했던 것과 동일한 기준(minAttempts:30). 원본은 이 기준
@@ -21,10 +26,7 @@ export const GRID = { cols: 15, rows: 15, xMin: 345, xMax: 720, yMin: 27, yMax: 
 // 필요해서 새로 정의하지 않고 그대로 재사용(기준을 사이트 전체에서 하나로 유지).
 export const MIN_SAMPLE = 30;
 
-export type GridCell = { row: number; col: number; att: number; made: number };
-export type GridResult = { cells: GridCell[]; totalAtt: number; totalMade: number };
-export type Dimension = "player" | "team" | "coach" | "league";
-export type EntityOption = { id: string; label: string };
+
 
 // 실측 버그(rarity.ts, winContributionLeaderboard.ts에 이어 이 파일에서도 세 번째) - Supabase
 // 기본 max_rows(1000)에 range 없는 select가 조용히 잘림. 이 함수는 그 위에 "전체 페이지를
@@ -266,7 +268,6 @@ export async function getShotGrid(dim: Dimension, entityId: string, seasonName: 
   return toGrid(shots);
 }
 
-export type EntitySeasonGrids = { seasons: string[]; grids: Record<string, GridResult> };
 
 // 리그 전체(15시즌 55만행)를 이 페이지 방식대로(엔티티 하나의 전체 이력을 한 번에) 끌어오면
 // 얼마나 느린지 실측함(병렬 페이지네이션, 동시성 8 기준) - 70개 배치 중 21번째(16만9천행)에서
@@ -332,27 +333,3 @@ export async function getEntitySeasonGrids(dim: Dimension, entityId: string): Pr
 // lib/zoneCompare.ts와 상수·공식이 완전히 동일해 재사용(출력이 바이트 단위로 같음 - 중복 구현
 // 아님). drawHoop만은 템플릿 로컬 버전이 zoneCompare.ts 버전(두 골대짜리 전체 코트용, 그물 표시
 // 있음)과 달라서 이 파일에 템플릿 그대로 복사.
-function drawHoop(hx: number, hy: number): string {
-  let svg = `<line x1="${hx + 13}" y1="${hy - 19}" x2="${hx + 13}" y2="${hy + 19}" stroke="var(--ink-soft)" stroke-width="4.5" stroke-linecap="round"/>`;
-  svg += `<circle cx="${hx}" cy="${hy}" r="9.5" fill="none" stroke="#e8590c" stroke-width="3.2"/>`;
-  return svg;
-}
-
-export function buildHeatmapSvg(grid: GridResult): string {
-  const maxAtt = Math.max(1, ...grid.cells.map((c) => c.att));
-  const cellW = (GRID.xMax - GRID.xMin) / GRID.cols;
-  const cellH = (GRID.yMax - GRID.yMin) / GRID.rows;
-
-  let svg = `<rect x="${GRID.xMin}" y="${GRID.yMin}" width="${GRID.xMax - GRID.xMin}" height="${GRID.yMax - GRID.yMin}" fill="#d9b98a" stroke="var(--ink-faint)" stroke-width="2"/>`;
-  for (const cell of grid.cells) {
-    if (cell.att === 0) continue;
-    const x = GRID.xMin + cell.col * cellW;
-    const y = GRID.yMin + cell.row * cellH;
-    const ratio = Math.pow(cell.att / maxAtt, 0.6);
-    const pct = cell.att ? Math.round((cell.made / cell.att) * 100) : 0;
-    svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${cellW.toFixed(1)}" height="${cellH.toFixed(1)}" fill="var(--hot)" opacity="${(ratio * 0.88).toFixed(2)}"><title>${cell.att}회 시도, ${cell.made}회 성공(${pct}%)</title></rect>`;
-  }
-  svg += drawCourtMarkings(GRID.hoopX, GRID.xMax, -1, "#fff", 1.4);
-  svg += drawHoop(GRID.hoopX, GRID.hoopY);
-  return svg;
-}

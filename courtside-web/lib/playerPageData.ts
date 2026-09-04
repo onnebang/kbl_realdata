@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { TAG, TTL, cachedMap } from "./cachePolicy";
 import { displayTeamName } from "./teamNames";
 import { PRESEASON_SEASON, isRealGmkey, getPregameProb } from "./preseason";

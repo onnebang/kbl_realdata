@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { TAG, TTL, cachedFn } from "./cachePolicy";
 
 // 결정적 순간 득점(커리어) - 요청: "클러치 프로필에서, 승률에 + 되는 행동이 재미있는데,

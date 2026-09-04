@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer as supabase } from "@/lib/supabaseServer";
 import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBox } from "@/lib/postgameReport";
 import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights";
 import { getGameRarity } from "@/lib/rarity";

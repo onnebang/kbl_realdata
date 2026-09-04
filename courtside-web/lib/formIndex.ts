@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { displayTeamName } from "./teamNames";
 
 // "폼 지수" 리더보드(claude.ai/code/artifact 폼지수 리더보드) 포팅 - tools/build_form_index.py의

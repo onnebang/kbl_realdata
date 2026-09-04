@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { TeamBadge } from "./TeamBadge";
-import { METRIC_COMPONENTS, type ComponentKey, type MetricPlayerRow } from "@/lib/customMetric";
+// lib/customMetric.ts가 아니라 여기서 가져온다 - 그쪽은 Supabase를 import해서 브라우저
+// 번들에 공개 키까지 끌고 들어온다(이 화면은 Supabase를 호출하지 않는다).
+import { METRIC_COMPONENTS, type ComponentKey, type MetricPlayerRow } from "@/lib/customMetricShape";
 
 const DEFAULT_WEIGHTS: Record<ComponentKey, number> = Object.fromEntries(
   METRIC_COMPONENTS.map((c) => [c.key, 1])

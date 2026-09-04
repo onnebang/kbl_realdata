@@ -11,9 +11,14 @@
 // 서버 컴포넌트인 page.tsx가 이 클라이언트 컴포넌트로 children(서버 렌더 결과)을 감싸는
 // 형태 - RSC에서 정상적인 패턴이고, 페이지 본문은 그대로 서버 렌더된다.
 
-import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
-import { useLiveGame, type UseLiveGameResult } from "@/lib/useLiveGame";
+import { createContext, useContext, type ReactNode } from "react";
+import dynamic from "next/dynamic";
+import type { UseLiveGameResult } from "@/lib/useLiveGame";
+
+// 진행 중일 때만 불러온다. 정적 import면 종료된 경기 페이지에도 @supabase/supabase-js와
+// 공개 키가 실려 나간다(조회의 대부분이 종료 경기다). ssr:false인 이유 - 이 컴포넌트는
+// 웹소켓/타이머를 여는 브라우저 전용 계층이라 서버에서 실행할 이유가 없다.
+const LiveGameTransport = dynamic(() => import("./LiveGameTransport"), { ssr: false });
 
 const OFF: UseLiveGameResult = { rows: [], score: null, ended: false, lateNames: {} };
 
@@ -35,19 +40,14 @@ export default function LiveGameProvider({
   initialLastOrder: number;
   children: ReactNode;
 }) {
-  const value = useLiveGame({ gmkey, enabled: live, initialLastOrder });
-  const router = useRouter();
-  const refreshedRef = useRef(false);
+  // 진행 중이 아니면 전송 계층을 아예 만들지 않는다 - 훅도, 구독도, Supabase 청크도 없다.
+  if (!live) return <LiveGameContext.Provider value={OFF}>{children}</LiveGameContext.Provider>;
 
-  // E. 경기 종료 전환 - is_ended가 true로 뒤집히면 서버 컴포넌트를 다시 굴린다. 그러면
-  // deriveGameStatus가 "final"이 되면서 3막(경기후 AI 리포트)이 열리고, live prop이 false로
-  // 내려가 훅이 스스로 구독/폴링을 정리한다. 한 번만(refreshedRef) - refresh 후에도 잠깐
-  // ended 상태가 남아 있어서 가드가 없으면 새로고침 루프가 된다.
-  useEffect(() => {
-    if (!live || !value.ended || refreshedRef.current) return;
-    refreshedRef.current = true;
-    router.refresh();
-  }, [live, value.ended, router]);
-
-  return <LiveGameContext.Provider value={value}>{children}</LiveGameContext.Provider>;
+  return (
+    <LiveGameTransport
+      gmkey={gmkey}
+      initialLastOrder={initialLastOrder}
+      render={(value) => <LiveGameContext.Provider value={value}>{children}</LiveGameContext.Provider>}
+    />
+  );
 }

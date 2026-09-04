@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { TAG, TTL, cachedFn } from "./cachePolicy";
 import { classifyShot } from "./formIndex";
 import { fetchAllPagesBounded } from "./scoringExplorer";

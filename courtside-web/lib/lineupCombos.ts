@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { TAG, TTL, cachedFn } from "./cachePolicy";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import { getSeasonGames, num } from "./teamSeasonStats";

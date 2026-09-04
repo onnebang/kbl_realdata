@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { classifyShot } from "./formIndex";
 import { computeTSA, computePSA, computeMoreyPct } from "./shotImpactChart";
 import { fetchAllPagesBounded, getSeasonsWithShots, MIN_SAMPLE } from "./scoringExplorer";

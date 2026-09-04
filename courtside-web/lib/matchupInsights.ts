@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { classifyShot } from "./formIndex";
 import { isCornerThree } from "./zoneCompare";
 import { computeFinalPlusMinus, type PlayerStartInfo } from "./gameLineups";

@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { teamTopPerformer, bestBenchPerformer, type PlayerBox } from "./postgameReport";
 import { getStandingsAsOf, type StandingsRow } from "./matchups";
 import { displayTeamName } from "./teamNames";

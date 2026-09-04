@@ -1,5 +1,5 @@
 import { PRESEASON_SEASON, getTeams, isRealGmkey, prevSeasonName, type TeamInfo } from "./preseason";
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { MARGIN_TO_LOGIT, getStrengthAdjustment, type StrengthAdjustment, type TeamAdjustment } from "./strengthAdjustment";
 import { TAG, TTL, cachedFn } from "./cachePolicy";
 

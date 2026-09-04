@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { getTeams, prevSeasonName, roleFromNote, type TeamInfo } from "./preseason";
 
 // 26-27 외국인 출전 규정 변경 - 요청의 두 번째 절반.

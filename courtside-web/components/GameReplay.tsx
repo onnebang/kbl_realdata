@@ -17,7 +17,9 @@ import {
   type PlayerBox,
   type StreakEvent,
 } from "@/lib/postgameReport";
-import { mergeEventRows, type LiveEventRow } from "@/lib/useLiveGame";
+// lib/useLiveGame이 아니라 여기서 - 그쪽은 Supabase 클라이언트를 만들어서 종료된 경기
+// 페이지에도 공개 키를 실어 보낸다.
+import { mergeEventRows, type LiveEventRow } from "@/lib/liveEventMerge";
 import { useLiveGameContext } from "./LiveGameProvider";
 import {
   buildRecentFeed,

@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { TAG, TTL, cached } from "./cachePolicy";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import { getPlayerCareerGames, type CareerGameRow } from "./playerProfile";

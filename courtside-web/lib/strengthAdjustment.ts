@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 
 // 전력 조정 - 요청: "주전선수들의 군/해외행의 이탈과 바뀐 용병제도를 포함해서 시즌 전망의
 // AI 예상순위를 변경해줘 ... 바뀐 규정에 대한 데이터가 부족해서 정확도가 낮습니다.

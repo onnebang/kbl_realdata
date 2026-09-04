@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer as supabase } from "@/lib/supabaseServer";
 
 // 시즌 브라우저 박스스코어 모달(components/SeasonBrowserModal.tsx)이 여는 시점에만 부르는
 // 엔드포인트 - web/season_browser_template.html의 openBoxScore()가 미리 구운

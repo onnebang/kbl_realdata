@@ -1,4 +1,5 @@
-import { supabase } from "./supabase";
+import { METRIC_COMPONENTS, type ComponentKey, type MetricPlayerRow } from "./customMetricShape";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { displayTeamName } from "./teamNames";
 
 // "커스텀 지표 빌더"(perthirtysix.com의 create-advanced-metric 페이지 레퍼런스) - 원본은
@@ -29,31 +30,8 @@ const MIN_GP = 10;
 // (invert:true) "높은 CUSTOM 값 = 좋은 기여"라는 일관된 방향을 유지(원본 아티팩트도 같은
 // 관례 - "이 스탯이 커질수록 좋다"는 방향으로 전부 정렬해야 슬라이더 가중치의 부호가
 // 직관적임).
-export const METRIC_COMPONENTS = [
-  { key: "ppg", label: "PPG", invert: false },
-  { key: "rpg", label: "RPG", invert: false },
-  { key: "apg", label: "APG", invert: false },
-  { key: "spg", label: "SPG", invert: false },
-  { key: "bpg", label: "BPG", invert: false },
-  { key: "tovpg", label: "TOV", invert: true },
-  { key: "fgPct", label: "FG%", invert: false },
-  { key: "tpPct", label: "3P%", invert: false },
-  { key: "ftPct", label: "FT%", invert: false },
-] as const;
-export type ComponentKey = (typeof METRIC_COMPONENTS)[number]["key"];
+export { METRIC_COMPONENTS, type ComponentKey, type MetricPlayerRow } from "./customMetricShape";
 
-export type MetricPlayerRow = {
-  pcode: string;
-  name: string;
-  tcode: string;
-  teamName: string;
-  teamAbbr: string;
-  teamColor: string;
-  teamLogoUrl: string | null;
-  gp: number;
-  raw: Record<ComponentKey, number>;
-  z: Record<ComponentKey, number>;
-};
 
 export async function getSeasonsWithMetricData(): Promise<string[]> {
   const { data } = await supabase.from("seasons").select("season_name").order("season_name", { ascending: false });

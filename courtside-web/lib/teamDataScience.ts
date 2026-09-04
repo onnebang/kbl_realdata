@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import type { TeamSeasonGame } from "./matchups";
 

@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { getTeams, prevSeasonName, type TeamInfo } from "./preseason";
 
 // 확정 이탈이 각 팀에서 무엇을 가져갔는가 - 요청("해당 인원들을 제외하고 ... 시즌 리포트와

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer as supabase } from "@/lib/supabaseServer";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getStandingsAsOf, getTeamSeasonFixtures, getTeamPlayedRegCount, type TeamFixture, type StandingsRow } from "@/lib/matchups";
 import { displayTeamName } from "@/lib/teamNames";

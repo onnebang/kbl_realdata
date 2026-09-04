@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { PRESEASON_SEASON, isRealGmkey, type RosterChange, type TeamRosterChanges } from "./preseason";
 import { getHeadToHead, type TeamFixture } from "./matchups";
 import { normalizePos, type PlayerPos } from "./playerStatus";

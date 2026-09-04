@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import type { GameRarity } from "./postgameReport";
 
 // PostgREST는 abs(home_score-away_score) 같은 계산식 필터를 지원하지 않아서(컬럼 값

@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { displayTeamName } from "./teamNames";
 
 // "승리 기여도 리더보드" 아티팩트(claude.ai/code/artifact/97168d9d...) 포팅. 원본은

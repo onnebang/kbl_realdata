@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabaseServer as supabase } from "./supabaseServer";
 import { displayTeamName } from "./teamNames";
 import { deriveGameStatus, type GameStatus } from "./gameStatus";
 import { PRESEASON_SEASON, isRealGmkey } from "./preseason";

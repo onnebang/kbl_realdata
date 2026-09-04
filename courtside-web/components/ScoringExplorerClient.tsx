@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchEntitySeasonGridsAction } from "@/lib/scoringExplorerActions";
-import { GRID, buildHeatmapSvg, type Dimension, type EntityOption, type EntitySeasonGrids, type GridResult } from "@/lib/scoringExplorer";
+// lib/scoringExplorer.ts가 아니라 여기서 가져온다 - 그쪽은 Supabase를 import해서 브라우저
+// 번들에 공개 키까지 끌고 들어온다(이 화면의 조회는 Server Action이 한다).
+import { GRID, buildHeatmapSvg, type Dimension, type EntityOption, type EntitySeasonGrids, type GridResult } from "@/lib/scoringExplorerShape";
 import styles from "@/app/leaderboards/scoring-explorer/scoring-explorer.module.css";
 
 // web/scoring_distribution_template.html의 <script> 전체(el.* 이벤트 리스너들, pickEntity,
