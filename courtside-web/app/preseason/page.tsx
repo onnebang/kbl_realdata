@@ -20,6 +20,7 @@ import {
   PLAYOFF_SPOTS,
   ROUNDS_HALF,
   ROUNDS_TOTAL,
+  formatOdds,
   getSeasonProjection,
   type ProjectionTeam,
   type SeasonProjection,
@@ -134,8 +135,10 @@ function ProjectionRow({ t, lo, hi }: { t: ProjectionTeam; lo: number; hi: numbe
         <span className={styles.projDot} style={{ left: `${dot}%` }} />
       </div>
       <RankStrip t={t} />
-      <div className={styles.projOdds}>{Math.round(t.titleOdds * 100)}%</div>
-      <div className={styles.projOdds}>{Math.round(t.playoffOdds * 100)}%</div>
+      {/* 반올림해서 "0%"로 적으면 "1위 불가능"으로 읽힌다. 10만 번 돌려도 못 본 값은
+          0이 아니라 "0.01% 미만"이다(lib/seasonProjection.ts formatOdds). */}
+      <div className={styles.projOdds}>{formatOdds(t.titleOdds)}</div>
+      <div className={styles.projOdds}>{formatOdds(t.playoffOdds)}</div>
       <div className={styles.outlookPrev}>
         {t.prevW}-{t.prevL}
       </div>
@@ -164,9 +167,19 @@ function ProjectionSection({
         <span className={styles.sectionNum}>1</span>코트사이드 시즌 전망 - 정규시즌 {GAMES_FULL}경기 기대승수와 AI 예상 순위
       </div>
       <p className={styles.panelLede}>
-        KBL 정규시즌은 상대별 홈 3 · 원정 3으로 {ROUNDS_TOTAL}라운드 {GAMES_FULL}경기입니다. KBL이 지금까지 공개한 일정은{" "}
-        {proj.scheduledN}경기로 팀당 24~27경기라, 그대로 더하면 팀끼리 비교가 안 됩니다. 그래서 두 기준을 나란히 놓습니다 — 전반기{" "}
-        {ROUNDS_HALF}라운드({GAMES_HALF}경기)와 정규시즌 전체({GAMES_FULL}경기).
+        KBL 정규시즌은 상대별 홈 3 · 원정 3으로 {ROUNDS_TOTAL}라운드 {GAMES_FULL}경기입니다.{" "}
+        {proj.scheduleComplete ? (
+          <>
+            {cur} 정규시즌 {proj.scheduledN}경기 일정이 전부 공개되어 있어(
+            {proj.firstGameDate ? fmtDate(proj.firstGameDate) : "-"} ~ {proj.lastGameDate ? fmtDate(proj.lastGameDate) : "-"}), 두 기준을
+            그대로 계산했습니다 — 각 팀의 앞 {GAMES_HALF}경기(전반기 {ROUNDS_HALF}라운드)와 정규시즌 전체 {GAMES_FULL}경기.
+          </>
+        ) : (
+          <>
+            공개된 일정은 {proj.scheduledN}경기로 팀마다 경기 수가 달라 그대로 더하면 비교가 안 됩니다. 그래서 두 기준을 나란히 놓습니다 —
+            전반기 {ROUNDS_HALF}라운드({GAMES_HALF}경기)와 정규시즌 전체({GAMES_FULL}경기).
+          </>
+        )}
       </p>
       <div className={styles.outlookGrid}>
         <div className={`${styles.projRow} ${styles.outlookHead}`}>
@@ -185,15 +198,37 @@ function ProjectionSection({
         ))}
       </div>
       <div className={styles.note}>
-        전반기는 공개된 일정 {proj.scheduledN}경기에 매겨진 승률 그대로이고, 상대별 3경기를 못 채운 {proj.halfFilledN}경기만 보탠 것입니다 —
-        그 경기들은 홈/원정이 아직 안 정해져 양쪽 홈 승률의 평균을 썼습니다. 전체 {GAMES_FULL}경기는 일정과 무관하게 매치업 승률만으로
-        결정됩니다({m.tcodes.length}팀 × 9상대 × {ROUNDS_TOTAL}). 매치업 {m.tcodes.length * (m.tcodes.length - 1)}쌍 중 {m.fromModel}쌍은
-        모델이 직접 매긴 값이고, 아직 그 방향으로 편성되지 않은 {m.filled}쌍은 반대 방향 승률을 홈코트 이점(동급 팀끼리 홈{" "}
-        {Math.round(m.hcaProb * 1000) / 10}%)으로 뒤집어 채운 추정입니다.
+        {proj.scheduleComplete ? (
+          <>
+            전반기는 각 팀의 날짜순 앞 {GAMES_HALF}경기에 모델이 매긴 승률을 그대로 더한 값입니다 — 추정이 없습니다. 팀마다 그 안의 홈경기
+            수가 갈리는데(
+            {[...proj.teams]
+              .sort((a, b) => a.halfHomeN - b.halfHomeN || a.abbr.localeCompare(b.abbr))
+              .map((t) => `${t.abbr} ${t.halfHomeN}`)
+              .join(" · ")}
+            ), 승률 자체가 홈/원정을 반영하므로 별도 보정은 하지 않습니다.
+          </>
+        ) : (
+          <>
+            전반기는 공개된 일정 {proj.scheduledN}경기에 매겨진 승률 그대로이고, 상대별 {ROUNDS_HALF}경기를 못 채운 {proj.halfFilledN}
+            경기만 보탠 것입니다 — 그 경기들은 홈/원정이 아직 안 정해져 양쪽 홈 승률의 평균을 썼습니다.
+          </>
+        )}{" "}
+        전체 {GAMES_FULL}경기는 일정 편성과 무관하게 매치업 승률만으로 결정됩니다({m.tcodes.length}팀 × 9상대 × {ROUNDS_TOTAL}). 매치업{" "}
+        {m.tcodes.length * (m.tcodes.length - 1)}쌍{" "}
+        {m.filled === 0 ? (
+          <>전부 모델이 직접 매긴 값입니다(동급 팀끼리 홈 {Math.round(m.hcaProb * 1000) / 10}%).</>
+        ) : (
+          <>
+            중 {m.fromModel}쌍은 모델이 직접 매긴 값이고, 아직 그 방향으로 편성되지 않은 {m.filled}쌍은 반대 방향 승률을 홈코트 이점(동급
+            팀끼리 홈 {Math.round(m.hcaProb * 1000) / 10}%)으로 뒤집어 채운 추정입니다.
+          </>
+        )}
       </div>
       <div className={styles.note}>
         1위·PO 확률과 승수 구간은 같은 {GAMES_FULL}경기 일정을 {proj.sims.toLocaleString()}번 돌린 결과입니다(6강 플레이오프 기준). 기대승수가
-        비슷해도 순위 분포는 다를 수 있고, 실제 시즌은 이 분포 안 어느 한 점입니다.
+        비슷해도 순위 분포는 다를 수 있고, 실제 시즌은 이 분포 안 어느 한 점입니다. 확률이 낮은 팀은 &quot;0%&quot;로 적지 않고{" "}
+        <b>&lt;0.01%</b>로 적습니다 — {proj.sims.toLocaleString()}번 중 한 번도 안 나왔다는 뜻이지 불가능하다는 뜻이 아니기 때문입니다.
       </div>
       <div className={styles.note}>
         <b>이 표가 아직 모르는 것.</b> 승률은 {prev} 전력(넷레이팅·라인업 시너지·홈코트)으로만 계산됩니다. 그래서{" "}

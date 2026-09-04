@@ -1,6 +1,5 @@
 import { supabase } from "./supabase";
 import { getTeams, prevSeasonName, type TeamInfo } from "./preseason";
-import { GMKEY_CHUNK, SEASON_CATEGORY_REGULAR, chunk, getSeasonGames, num } from "./teamSeasonStats";
 
 // 확정 이탈이 각 팀에서 무엇을 가져갔는가 - 요청("해당 인원들을 제외하고 ... 시즌 리포트와
 // 예상을 적어줘야 할 것 같아")의 첫 절반.
@@ -17,13 +16,12 @@ import { GMKEY_CHUNK, SEASON_CATEGORY_REGULAR, chunk, getSeasonGames, num } from
 // 뒤집힌다 - KCC는 포워드 출전시간의 48.3%, 포워드 득점의 55.9%를 한꺼번에 잃었다(실측
 // 2026-09-04). 총량은 "얼마나 빠졌나"를, 포지션은 "그 구멍을 메울 사람이 있나"를 말한다.
 //
-// ── 실측에서 나온 함정 세 가지(전부 아래 코드가 처리한다) ──────────────────────────
-// 1. game_player_stats에는 결장 행(min_played = 0)이 섞여 있다. 경기 수를 행 수로 세면
-//    문가온이 "20경기 출전"으로 찍히는데 실제 출전은 5경기다. 그래서 gp와 gpPlayed를 나눠 센다.
-// 2. 25-26 출전이 0인 이탈자가 있다(두경민 - 24-25가 마지막). 그 팀의 몫은 0.0%가 되는데,
-//    이건 "잃은 게 없다"가 아니라 "지난 시즌 기준으로는 잴 수 없다"이다. zeroKind로 구분한다.
-// 3. 외국인·아시아쿼터는 season_roster의 pos가 비어 있어 포지션 분모에 안 들어간다. 그래서
-//    포지션 몫은 "같은 분류(국내 GD/FD/C) 안에서"라고 화면이 밝혀야 한다.
+// ── 왜 미리 구운 표를 읽는가 ────────────────────────────────────────────────────
+// 처음엔 이 계산을 페이지에서 직접 했다. 그런데 분모가 "직전 시즌 팀 합계"라 game_player_stats
+// 6,480행을 매 요청마다 끌어와야 했고, 개막 리포트 서버 렌더가 1초에서 9초로 늘었다(실측
+// 2026-09-05). 값은 끝난 시즌 + 사람이 확인한 명단이라 변하지 않으므로
+// tools/build_departure_impact.py 가 한 번 접어 두고 여기서는 팀 10행 + 선수 13행만 읽는다.
+// **명단(tools/data/departures_*.csv)을 고치면 그 스크립트를 다시 돌려야 화면에 반영된다.**
 
 /** 이탈 사유. tools/load_departures.py의 값과 같다. */
 export type DepartureReason = "military" | "overseas" | "unsigned" | "retired" | "other";
@@ -72,7 +70,7 @@ export type TeamDeparture = {
   /** 팀 합계 원자료(분자/분모를 화면이 그대로 인용할 수 있게). */
   lost: DepartureShare;
   total: DepartureShare;
-  /** 선발 슬롯(54경기 × 5) 대비 이탈자 선발 횟수. */
+  /** 선발 슬롯(경기 수 × 5) 대비 이탈자 선발 횟수. */
   startShare: number;
   starts: number;
   startSlots: number;
@@ -104,30 +102,8 @@ export type DepartureReport = {
   provenMinutes: number;
 };
 
-/** "얇은 로스터"를 인원수가 아니라 이 문턱으로 센다 - 인원수만 보면 이탈 0인 팀이 더 얇아 보인다. */
+/** "얇은 로스터"를 인원수가 아니라 이 문턱으로 센다. tools/build_departure_impact.py와 같은 값. */
 export const PROVEN_MINUTES = 500;
-
-const EMPTY: DepartureShare = { minutes: 0, pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, fga: 0, tpa: 0 };
-const addTo = (a: DepartureShare, b: DepartureShare) => {
-  a.minutes += b.minutes;
-  a.pts += b.pts;
-  a.reb += b.reb;
-  a.ast += b.ast;
-  a.stl += b.stl;
-  a.blk += b.blk;
-  a.fga += b.fga;
-  a.tpa += b.tpa;
-};
-const ratio = (lost: DepartureShare, total: DepartureShare): DepartureShare => ({
-  minutes: total.minutes > 0 ? lost.minutes / total.minutes : 0,
-  pts: total.pts > 0 ? lost.pts / total.pts : 0,
-  reb: total.reb > 0 ? lost.reb / total.reb : 0,
-  ast: total.ast > 0 ? lost.ast / total.ast : 0,
-  stl: total.stl > 0 ? lost.stl / total.stl : 0,
-  blk: total.blk > 0 ? lost.blk / total.blk : 0,
-  fga: total.fga > 0 ? lost.fga / total.fga : 0,
-  tpa: total.tpa > 0 ? lost.tpa / total.tpa : 0,
-});
 
 const LABEL: Record<string, string> = {
   military: "군 입대",
@@ -137,206 +113,108 @@ const LABEL: Record<string, string> = {
   other: "이탈",
 };
 
-type StatRow = {
-  pcode: string;
-  tcode: string;
-  pos: string | null;
-  is_starter: boolean | null;
-  min_played: number | null;
-  pts: number | null;
-  reb: number | null;
-  ast: number | null;
-  stl: number | null;
-  blk: number | null;
-  fga: number | null;
-  tpa: number | null;
-};
+const n = (v: unknown): number => (v == null ? 0 : Number(v));
 
-const STAT_SELECT = "pcode, tcode, pos, is_starter, min_played, pts, reb, ast, stl, blk, fga, tpa";
+type Row = Record<string, unknown>;
+
+const shareOf = (r: Row, prefix: "lost" | "tot"): DepartureShare => ({
+  minutes: n(r[`${prefix}_minutes`]),
+  pts: n(r[`${prefix}_pts`]),
+  reb: n(r[`${prefix}_reb`]),
+  ast: n(r[`${prefix}_ast`]),
+  stl: n(r[`${prefix}_stl`]),
+  blk: n(r[`${prefix}_blk`]),
+  fga: n(r[`${prefix}_fga`]),
+  tpa: n(r[`${prefix}_tpa`]),
+});
+
+const EMPTY = (): DepartureShare => ({ minutes: 0, pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, fga: 0, tpa: 0 });
+const KEYS = Object.keys(EMPTY()) as (keyof DepartureShare)[];
+const ratio = (lost: DepartureShare, total: DepartureShare): DepartureShare => {
+  const out = EMPTY();
+  for (const k of KEYS) out[k] = total[k] > 0 ? lost[k] / total[k] : 0;
+  return out;
+};
+const addTo = (a: DepartureShare, b: DepartureShare) => {
+  for (const k of KEYS) a[k] += b[k];
+};
 
 /**
  * 확정 이탈이 팀별로 가져간 몫. 표본은 직전 시즌 정규시즌뿐이다(플레이오프는 팀마다 경기 수가
  * 달라 "팀 합계 대비 몫"의 분모가 팀마다 다른 뜻이 된다).
+ * 집계 표가 아직 없는 시즌이면 null - 화면은 이 섹션만 빼고 그린다.
  */
 export async function getDepartureReport(season: string): Promise<DepartureReport | null> {
   const prevSeason = prevSeasonName(season);
-  const [teamMap, depRes, games] = await Promise.all([
+  const [teamMap, teamRes, playerRes] = await Promise.all([
     getTeams(season),
-    supabase.from("roster_departure").select("pcode, player_name, tcode, reason, detail").eq("season_name", season),
-    getSeasonGames(prevSeason, { category: SEASON_CATEGORY_REGULAR }),
+    supabase.from("departure_impact_team").select("*").eq("season_name", season),
+    supabase.from("departure_impact_player").select("*").eq("season_name", season),
   ]);
-  const deps = depRes.data ?? [];
-  if (!deps.length || !games.length) return null;
+  const teamRows = (teamRes.data ?? []) as Row[];
+  const playerRows = (playerRes.data ?? []) as Row[];
+  if (!teamRows.length || !playerRows.length) return null;
 
-  // 직전 시즌 정규시즌 선수 행 전부. 팀 합계와 포지션 합계의 분모가 여기서 나온다.
-  const rows: StatRow[] = [];
-  for (const part of chunk(games.map((g) => g.gmkey), GMKEY_CHUNK)) {
-    let from = 0;
-    for (;;) {
-      const { data } = await supabase.from("game_player_stats").select(STAT_SELECT).in("gmkey", part).range(from, from + 999);
-      const page = (data ?? []) as StatRow[];
-      rows.push(...page);
-      if (page.length < 1000) break;
-      from += 1000;
-    }
-  }
-  if (!rows.length) return null;
-
-  const depByPcode = new Map(deps.map((d) => [d.pcode as string, d]));
-
-  // 팀 합계 · 포지션 합계 · 선수별 합계를 한 번에 접는다.
-  const teamTotal = new Map<string, DepartureShare>();
-  const posTotal = new Map<string, DepartureShare>(); // "tcode|pos"
-  type Agg = { tcode: string; pos: string | null; gp: number; gpPlayed: number; starts: number; s: DepartureShare };
-  const byPlayer = new Map<string, Agg>();
-
-  for (const r of rows) {
-    const one: DepartureShare = {
-      minutes: num(r.min_played),
-      pts: num(r.pts),
-      reb: num(r.reb),
-      ast: num(r.ast),
-      stl: num(r.stl),
-      blk: num(r.blk),
-      fga: num(r.fga) + num(r.tpa), // 이 DB의 fga는 2점 전용이라 총 야투시도는 둘의 합이다
-      tpa: num(r.tpa),
-    };
-    const t = teamTotal.get(r.tcode) ?? { ...EMPTY };
-    addTo(t, one);
-    teamTotal.set(r.tcode, t);
-
-    const pos = (r.pos ?? "").trim() || null;
-    if (pos) {
-      const key = `${r.tcode}|${pos}`;
-      const p = posTotal.get(key) ?? { ...EMPTY };
-      addTo(p, one);
-      posTotal.set(key, p);
-    }
-
-    const a = byPlayer.get(r.pcode) ?? { tcode: r.tcode, pos, gp: 0, gpPlayed: 0, starts: 0, s: { ...EMPTY } };
-    a.gp += 1;
-    if (one.minutes > 0) a.gpPlayed += 1;
-    if (r.is_starter) a.starts += 1;
-    if (!a.pos && pos) a.pos = pos;
-    addTo(a.s, one);
-    byPlayer.set(r.pcode, a);
-  }
-
-  // 팀 내 출전시간 순위(이탈자가 그 팀에서 몇 번째로 많이 뛴 선수였나).
-  const rankByTeam = new Map<string, string[]>();
-  for (const [pcode, a] of byPlayer) {
-    const list = rankByTeam.get(a.tcode) ?? [];
-    list.push(pcode);
-    rankByTeam.set(a.tcode, list);
-  }
-  for (const list of rankByTeam.values()) list.sort((x, y) => (byPlayer.get(y)?.s.minutes ?? 0) - (byPlayer.get(x)?.s.minutes ?? 0));
-
-  // 이탈 제외 후 등록 인원 + 직전 시즌 검증된 인원.
-  const { data: rosterRows } = await supabase.from("season_roster").select("tcode, pcode").eq("season_name", season);
-  const rosterN = new Map<string, number>();
-  const provenN = new Map<string, number>();
-  for (const r of rosterRows ?? []) {
-    const tc = r.tcode as string;
-    const pc = r.pcode as string | null;
-    if (pc && depByPcode.has(pc)) continue; // 이탈자는 인원에서 뺀다 - 명부에 남아 있다고 전력이 아니다
-    rosterN.set(tc, (rosterN.get(tc) ?? 0) + 1);
-    if (pc && (byPlayer.get(pc)?.s.minutes ?? 0) >= PROVEN_MINUTES) provenN.set(tc, (provenN.get(tc) ?? 0) + 1);
-  }
-
-  const players: DepartedPlayer[] = [];
-  const lostByTeam = new Map<string, DepartureShare>();
-  const lostByPos = new Map<string, DepartureShare>();
-  const startsByTeam = new Map<string, number>();
-
-  for (const d of deps) {
-    const pcode = d.pcode as string;
-    const tcode = d.tcode as string;
-    const a = byPlayer.get(pcode);
-    const reason = d.reason as DepartureReason;
-    const teamRank = rankByTeam.get(a?.tcode ?? tcode) ?? [];
-    players.push({
-      pcode,
-      name: d.player_name as string,
-      tcode,
-      reason,
-      label: LABEL[reason] ?? "이탈",
-      detail: (d.detail as string | null) ?? null,
-      played: !!a && a.gpPlayed > 0,
-      gp: a?.gp ?? 0,
-      gpPlayed: a?.gpPlayed ?? 0,
-      starts: a?.starts ?? 0,
-      minutes: a?.s.minutes ?? 0,
-      pts: a?.s.pts ?? 0,
-      reb: a?.s.reb ?? 0,
-      ast: a?.s.ast ?? 0,
-      pos: a?.pos ?? null,
-      minutesRank: a ? teamRank.indexOf(pcode) + 1 : null,
-      teamPlayers: teamRank.length,
-    });
-    if (!a) continue;
-    // 몫은 "그 선수가 실제로 뛴 팀" 기준으로 쌓는다(시즌 중 이적자 대비 - 실측상 이번 13명은
-    // 전원 한 팀에서만 뛰었지만, 규칙을 코드에 남겨 둔다).
-    const lt = lostByTeam.get(a.tcode) ?? { ...EMPTY };
-    addTo(lt, a.s);
-    lostByTeam.set(a.tcode, lt);
-    startsByTeam.set(a.tcode, (startsByTeam.get(a.tcode) ?? 0) + a.starts);
-    if (a.pos) {
-      const key = `${a.tcode}|${a.pos}`;
-      const lp = lostByPos.get(key) ?? { ...EMPTY };
-      addTo(lp, a.s);
-      lostByPos.set(key, lp);
-    }
-  }
-
-  const gamesPerTeam = new Map<string, number>();
-  for (const g of games) {
-    gamesPerTeam.set(g.homeTcode, (gamesPerTeam.get(g.homeTcode) ?? 0) + 1);
-    gamesPerTeam.set(g.awayTcode, (gamesPerTeam.get(g.awayTcode) ?? 0) + 1);
-  }
+  const players: DepartedPlayer[] = playerRows
+    .map((r) => {
+      const reason = r.reason as DepartureReason;
+      return {
+        pcode: r.pcode as string,
+        name: r.player_name as string,
+        tcode: r.tcode as string,
+        reason,
+        label: LABEL[reason] ?? "이탈",
+        detail: (r.detail as string | null) ?? null,
+        played: !!r.played,
+        gp: n(r.gp),
+        gpPlayed: n(r.gp_played),
+        starts: n(r.starts),
+        minutes: n(r.minutes),
+        pts: n(r.pts),
+        reb: n(r.reb),
+        ast: n(r.ast),
+        pos: (r.pos as string | null) ?? null,
+        minutesRank: r.minutes_rank == null ? null : n(r.minutes_rank),
+        teamPlayers: n(r.team_players),
+      };
+    })
+    .sort((a, b) => b.minutes - a.minutes);
 
   const teams: TeamDeparture[] = [];
-  for (const [tcode, team] of teamMap) {
-    const total = teamTotal.get(tcode);
-    if (!total) continue; // 해체된 옛 팀코드
-    const lost = lostByTeam.get(tcode) ?? { ...EMPTY };
-    const mine = players.filter((p) => p.tcode === tcode);
-    const startSlots = (gamesPerTeam.get(tcode) ?? 0) * 5;
-    const starts = startsByTeam.get(tcode) ?? 0;
-
-    // 같은 분류 안에서 가장 크게 빈 포지션. 총량이 아니라 여기가 "메울 사람이 있나"를 말한다.
-    let topPos: TeamDeparture["topPos"] = null;
-    for (const [key, lp] of lostByPos) {
-      if (!key.startsWith(`${tcode}|`)) continue;
-      const pos = key.slice(tcode.length + 1);
-      const pt = posTotal.get(key);
-      if (!pt || pt.minutes <= 0) continue;
-      const share = lp.minutes / pt.minutes;
-      if (!topPos || share > topPos.minuteShare) {
-        topPos = {
-          pos,
-          minuteShare: share,
-          ptsShare: pt.pts > 0 ? lp.pts / pt.pts : 0,
-          lostMinutes: lp.minutes,
-          posMinutes: pt.minutes,
-        };
-      }
-    }
-
+  for (const r of teamRows) {
+    const tcode = r.tcode as string;
+    const team = teamMap.get(tcode);
+    if (!team) continue; // 해체된 옛 팀코드
+    const lost = shareOf(r, "lost");
+    const total = shareOf(r, "tot");
+    const startSlots = n(r.start_slots);
+    const posMinutes = n(r.top_pos_minutes);
+    const posPts = n(r.top_pos_pts);
     teams.push({
       team,
-      players: mine.sort((a, b) => b.minutes - a.minutes),
+      players: players.filter((p) => p.tcode === tcode),
       share: ratio(lost, total),
       lost,
       total,
-      starts,
+      starts: n(r.starts),
       startSlots,
-      startShare: startSlots > 0 ? starts / startSlots : 0,
-      topPos,
-      zeroKind: lost.minutes > 0 ? null : mine.length === 0 ? "none" : "notPlayed",
-      rosterN: rosterN.get(tcode) ?? 0,
-      provenN: provenN.get(tcode) ?? 0,
+      startShare: startSlots > 0 ? n(r.starts) / startSlots : 0,
+      topPos:
+        r.top_pos && posMinutes > 0
+          ? {
+              pos: r.top_pos as string,
+              minuteShare: n(r.top_pos_lost_minutes) / posMinutes,
+              ptsShare: posPts > 0 ? n(r.top_pos_lost_pts) / posPts : 0,
+              lostMinutes: n(r.top_pos_lost_minutes),
+              posMinutes,
+            }
+          : null,
+      zeroKind: (r.zero_kind as "none" | "notPlayed" | null) ?? null,
+      rosterN: n(r.roster_n),
+      provenN: n(r.proven_n),
     });
   }
+
   // 결장자가 있는 팀을 먼저. 두경민처럼 직전 시즌 출전이 0인 경우 몫도 0이 되는데, 그 0을
   // 결장자가 아예 없는 팀의 0과 같은 자리에 두면 "잴 수 없다"가 "없다"로 읽힌다.
   teams.sort(
@@ -346,15 +224,13 @@ export async function getDepartureReport(season: string): Promise<DepartureRepor
       a.team.abbr.localeCompare(b.team.abbr)
   );
 
-  const leagueLost = { ...EMPTY };
-  const leagueTotal = { ...EMPTY };
+  const leagueLost = EMPTY();
+  const leagueTotal = EMPTY();
   for (const t of teams) {
     addTo(leagueLost, t.lost);
     addTo(leagueTotal, t.total);
   }
-  const lostMinutesSorted = teams.map((t) => t.lost.minutes).sort((a, b) => b - a);
-  const topTwo = (lostMinutesSorted[0] ?? 0) + (lostMinutesSorted[1] ?? 0);
-
+  const sorted = teams.map((t) => t.lost.minutes).sort((a, b) => b - a);
   const reasonCounts: Record<string, number> = {};
   for (const p of players) reasonCounts[p.reason] = (reasonCounts[p.reason] ?? 0) + 1;
 
@@ -362,9 +238,9 @@ export async function getDepartureReport(season: string): Promise<DepartureRepor
     season,
     prevSeason,
     teams,
-    players: players.sort((a, b) => b.minutes - a.minutes),
+    players,
     leagueShare: ratio(leagueLost, leagueTotal),
-    topTwoConcentration: leagueLost.minutes > 0 ? topTwo / leagueLost.minutes : 0,
+    topTwoConcentration: leagueLost.minutes > 0 ? ((sorted[0] ?? 0) + (sorted[1] ?? 0)) / leagueLost.minutes : 0,
     reasonCounts,
     provenMinutes: PROVEN_MINUTES,
   };

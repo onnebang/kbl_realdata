@@ -5,23 +5,25 @@ import { supabase } from "./supabase";
 // 9경기씩 6라운드 총 54경기인데, 전반기 3라운드까지와, 6라운드 54경기 전체 기대승수와 AI 예상
 // 순위를 적어줘".
 //
-// ── 왜 지금 값이 팀마다 다른가 ────────────────────────────────────────────────────
-// KBL이 공개한 26-27 일정은 2027-01-02까지 131경기뿐이고, 팀당 24~27경기로 제각각이다.
-// 그 일정에 매긴 승률을 그냥 더하면 SK(24경기)와 KT(27경기)의 기대승수를 나란히 놓을 수 없다.
-// 실측(2026-09-04)으로 확인한 공개 일정의 구조:
-//   · 모든 팀이 모든 상대와 정확히 3번씩 만나도록 짜여 있다 = 3라운드(전반기)분이다.
-//   · 딱 4경기가 비어 있다 - DB↔소노 1, 삼성↔SK 1, SK↔가스공사 2. 131 + 4 = 135 = 45 × 3.
-// 즉 "전반기 27경기"는 추정이 아니라 공개 일정 + 4경기다. 그리고 KBL 정규시즌은 상대별
-// 홈 3 · 원정 3으로 완전히 균형 잡힌 54경기라(25-26 실측: 90개 순서쌍 전부 정확히 3경기),
-// 전체 54경기 기대승수는 일정 편성과 무관하게 매치업 승률만으로 결정된다.
+// ── 일정은 이제 전부 있다 (2026-09-05) ───────────────────────────────────────────
+// 한동안 이 모듈은 "KBL 공개분이 131경기뿐"이라는 전제 위에 서 있었다. 실제로는 KBL이 270경기를
+// 다 올려 뒀고, 우리 수집기(tools/sync_upcoming_games.py)의 조회 창이 120일이라 2027-01-02에서
+// 잘렸던 것이다. 창을 넓혀 받으니 정규시즌 270경기 전부가 들어왔다(2026-10-03 ~ 2027-04-11,
+// 팀당 54경기, 홈 27 · 원정 27, 90개 순서쌍이 전부 정확히 3경기 - 전수 확인).
+//
+// 그래서 전반기도 추정이 아니다. 각 팀의 날짜순 앞 27경기를 그대로 세면 된다. 실측하면 8팀은
+// 그 27경기가 상대별 정확히 3경기이고, 삼성·SK만 한 상대와 2경기/다른 상대와 4경기다 - 그것도
+// 실제 편성이라 보정 대상이 아니다.
+//
+// 보정 경로(아래 filled / halfFilled)는 지우지 않고 남긴다. 다음 시즌 개막 전엔 다시 일정이
+// 부분 공개될 수 있고, 그때 이 모듈이 조용히 틀린 값을 내는 것보다 낫다. 지금은 0이다.
 //
 // ── 승률의 출처 ──────────────────────────────────────────────────────────────────
-// pregame_features.home_win_prob(경기 전 모델)은 같은 순서쌍이면 값이 사실상 같다
-// (실측: 86개 순서쌍의 min/max 차이가 최대 0.002 - 휴식일 같은 미세 피처 차이). 그래서
-// "순서쌍 -> 승률"이 이 모델의 실체다. 90개 순서쌍 중 86개는 모델이 매긴 값을 그대로 쓴다.
-// 나머지 4개(아직 그 방향으로 편성되지 않은 대진)는 반대 방향 값을 홈코트 이점으로 뒤집어
-// 채운다: logit p(A홈) + logit p(B홈) = 2h 이므로 p(A홈) = sigmoid(2h - logit p(B홈)).
-// h는 양방향이 다 있는 41쌍의 평균에서 뽑는다. 추정한 4쌍은 화면이 반드시 그 수를 밝힌다.
+// pregame_features.home_win_prob(경기 전 모델)은 같은 순서쌍이면 값이 사실상 같다(실측: 순서쌍
+// 안 min/max 차이가 최대 0.002 - 휴식일 같은 미세 피처 차이). 그래서 "순서쌍 -> 승률"이 이
+// 모델의 실체이고, 이제 90쌍 전부가 모델이 직접 매긴 값이다. 순서쌍이 비었을 때만 반대 방향
+// 값을 홈코트 이점으로 뒤집어 채운다: logit p(A홈) + logit p(B홈) = 2h 이므로
+// p(A홈) = sigmoid(2h - logit p(B홈)). h는 양방향이 다 있는 쌍의 평균에서 뽑는다.
 //
 // ── AI 예상 순위 ────────────────────────────────────────────────────────────────
 // 기대승수 순위는 "평균적으로 몇 승"만 말하고 "1위 할 확률"은 말하지 못한다. 그래서 완전
@@ -36,8 +38,25 @@ export const ROUNDS_HALF = 3;
 export const GAMES_HALF = 27;
 /** 6강 플레이오프 - 정규시즌 6위까지 진출. */
 export const PLAYOFF_SPOTS = 6;
-/** 시뮬레이션 횟수. 10,000이면 확률의 표준오차가 최대 0.5%p라 소수점 없이 쓰기에 충분하다. */
-export const SIMS = 10000;
+/**
+ * 시뮬레이션 횟수. 10만이면 해상도가 0.001%라 "1위 확률 0.03%" 같은 값을 두 자리로 적을 수 있다
+ * (1만이면 해상도가 0.01%뿐이라 낮은 확률이 통째로 0으로 뭉갠다). 측정: 1만 94ms / 10만 838ms.
+ */
+export const SIMS = 100000;
+
+/**
+ * 확률 표기 - 요청: "1위확률이 0%인데 살짝 위험한 느낌이 들어서, 소수점 1자리까지 표시,
+ * 혹시 0.1%보다 낮다면 소수점 2자리까지".
+ *
+ * 0%로 적으면 안 되는 이유: 시뮬레이션에서 한 번도 안 나왔다는 뜻이지 불가능하다는 뜻이 아니다.
+ * 10만 번을 돌려도 못 본 값은 "0"이 아니라 "0.01% 미만"이 정확한 표현이다.
+ */
+export function formatOdds(p: number): string {
+  const pct = p * 100;
+  if (pct >= 0.1) return `${pct.toFixed(1)}%`;
+  if (pct >= 0.005) return `${pct.toFixed(2)}%`; // 0.01% ~ 0.09%
+  return "<0.01%";
+}
 
 const logit = (p: number) => Math.log(p / (1 - p));
 const sigmoid = (z: number) => 1 / (1 + Math.exp(-z));
@@ -147,8 +166,10 @@ function mulberry32(seed: number): () => number {
 export type ProjectionTeam = TeamInfo & {
   /** 공개 일정에서 이 팀에 실제로 편성된 경기 수(승률이 있는 것만). */
   schedN: number;
-  /** 전반기 27경기를 채우려고 대칭으로 보탠 경기 수. */
+  /** 전반기 27경기를 채우려고 대칭으로 보탠 경기 수(일정이 다 있으면 0). */
   halfFilledN: number;
+  /** 전반기 27경기 중 홈경기 수 - 팀마다 13 또는 14로 갈린다. */
+  halfHomeN: number;
   /** 전반기 3라운드(27경기) 기대승수. */
   halfExp: number;
   /** 정규시즌 전체 54경기 기대승수. */
@@ -181,8 +202,10 @@ export type SeasonProjection = {
   matrix: MatchupMatrix;
   /** 공개 일정 경기 수(승률이 매겨진 것만). */
   scheduledN: number;
-  /** 전반기 3라운드를 채우려고 보탠 경기 수(리그 전체). */
+  /** 전반기를 채우려고 보탠 경기 수(리그 전체). 일정이 전부 공개되면 0. */
   halfFilledN: number;
+  /** 모든 팀이 54경기를 다 갖고 있는가 - 화면 문구가 이걸로 갈린다. */
+  scheduleComplete: boolean;
   firstGameDate: string | null;
   lastGameDate: string | null;
   sims: number;
@@ -218,40 +241,51 @@ export async function getSeasonProjection(season = PRESEASON_SEASON): Promise<Se
 
   const p = (h: string, a: string) => matrix.prob.get(pairKey(h, a)) as number;
 
-  // ── 전반기: 공개 일정 그대로 + 상대별 3경기를 못 채운 만큼 보탠다 ──────────────────
-  // 보탠 경기의 홈/원정은 알 수 없다(3라운드 안에서 2:1도 3:0도 실제로 나온다). 그래서
-  // 양쪽 홈 승률의 평균을 쓴다 - 실측상 리그 전체에서 4경기뿐이라 영향은 팀당 최대 2경기.
+  // ── 전반기: 각 팀의 날짜순 앞 27경기 ─────────────────────────────────────────────
+  // 일정이 전부 있으므로 실제로 편성된 27경기를 그대로 센다. 상대별 3경기가 아니어도 손대지
+  // 않는다 - 삼성·SK는 앞 27경기에서 한 상대와 2번, 다른 상대와 4번 만나는데 그게 실제 달력이다.
   const halfExp = new Map<string, number>();
   const schedN = new Map<string, number>();
   const filledN = new Map<string, number>();
-  const met = new Map<string, number>(); // "팀|상대" -> 편성된 맞대결 수
+  const halfHomeN = new Map<string, number>();
+  const byTeam = new Map<string, ScheduledGame[]>();
   for (const t of tcodes) {
     halfExp.set(t, 0);
     schedN.set(t, 0);
     filledN.set(t, 0);
+    halfHomeN.set(t, 0);
+    byTeam.set(t, []);
   }
-  const bump = (t: string, add: number) => halfExp.set(t, (halfExp.get(t) as number) + add);
   for (const g of priced) {
-    const ph = probs.get(g.gmkey) as number;
-    bump(g.home, ph);
-    bump(g.away, 1 - ph);
     schedN.set(g.home, (schedN.get(g.home) as number) + 1);
     schedN.set(g.away, (schedN.get(g.away) as number) + 1);
-    for (const [a, b] of [
-      [g.home, g.away],
-      [g.away, g.home],
-    ]) {
-      met.set(`${a}|${b}`, (met.get(`${a}|${b}`) ?? 0) + 1);
-    }
+    (byTeam.get(g.home) as ScheduledGame[]).push(g);
+    (byTeam.get(g.away) as ScheduledGame[]).push(g);
   }
+  const bump = (t: string, add: number) => halfExp.set(t, (halfExp.get(t) as number) + add);
   for (const t of tcodes) {
+    const mine = (byTeam.get(t) as ScheduledGame[])
+      .slice()
+      .sort((a, b) => a.gameDate.localeCompare(b.gameDate) || a.gmkey.localeCompare(b.gmkey));
+    const met = new Map<string, number>(); // 앞 27경기 안에서 상대별 맞대결 수
+    for (const g of mine.slice(0, GAMES_HALF)) {
+      const ph = probs.get(g.gmkey) as number;
+      const isHome = g.home === t;
+      bump(t, isHome ? ph : 1 - ph);
+      if (isHome) halfHomeN.set(t, (halfHomeN.get(t) as number) + 1);
+      const opp = isHome ? g.away : g.home;
+      met.set(opp, (met.get(opp) ?? 0) + 1);
+    }
+    // 일정이 부분 공개인 시즌을 위한 보정 경로. 27경기가 다 있으면 여기는 아무것도 하지 않는다.
+    // (보탠 경기의 홈/원정은 알 수 없으니 양쪽 홈 승률의 평균을 쓴다.)
+    let short = GAMES_HALF - Math.min(mine.length, GAMES_HALF);
     for (const o of tcodes) {
-      if (t === o) continue;
-      const short = ROUNDS_HALF - (met.get(`${t}|${o}`) ?? 0);
-      if (short <= 0) continue;
-      const neutral = (p(t, o) + (1 - p(o, t))) / 2;
-      bump(t, short * neutral);
-      filledN.set(t, (filledN.get(t) as number) + short);
+      if (t === o || short <= 0) continue;
+      const need = Math.min(short, ROUNDS_HALF - (met.get(o) ?? 0));
+      if (need <= 0) continue;
+      bump(t, need * ((p(t, o) + (1 - p(o, t))) / 2));
+      filledN.set(t, (filledN.get(t) as number) + need);
+      short -= need;
     }
   }
 
@@ -355,6 +389,7 @@ export async function getSeasonProjection(season = PRESEASON_SEASON): Promise<Se
       logoUrl: info?.logoUrl ?? null,
       schedN: schedN.get(t) as number,
       halfFilledN: filledN.get(t) as number,
+      halfHomeN: halfHomeN.get(t) as number,
       halfExp: halfExp.get(t) as number,
       fullExp: fullExp.get(t) as number,
       fullPct: (fullExp.get(t) as number) / GAMES_FULL,
@@ -384,6 +419,7 @@ export async function getSeasonProjection(season = PRESEASON_SEASON): Promise<Se
     matrix,
     scheduledN: priced.length,
     halfFilledN: halfFilledTotal / 2, // 두 팀 양쪽에서 세었으니 절반이 실제 경기 수
+    scheduleComplete: rows.every((t) => t.schedN === GAMES_FULL) && matrix.filled === 0,
     firstGameDate: games.length ? games[0].gameDate : null,
     lastGameDate: games.length ? games[games.length - 1].gameDate : null,
     sims: SIMS,
