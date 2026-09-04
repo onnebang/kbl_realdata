@@ -748,6 +748,66 @@ table.data-table td:nth-child(2) {
   color: var(--ink);
 }
 
+/* ── 리포트 안의 팀 구분 ──────────────────────────────────────────────────────
+   요청: "신주영 같은경우 GAS 소속이니 색상을 좀 더 변경해주고, 팀에 대한 구분이 조금 더
+   되도록". 색만 쓰면 색각 이상·흑백에서 무력하고, 대비를 맞추려 보정하면 팀끼리 오히려
+   닮는다(가스공사 vs 소노). 그래서 약어 칩(텍스트 단서) + 팀색(스캔 단서)을 같이 쓴다.
+
+   이 사이트엔 테마 토글이 없어 서버가 테마를 모른다. lib/postgameReport.ts가 인라인으로
+   --ti-l(라이트용) / --ti-d(다크용) 두 색을 주고, 아래 미디어쿼리가 고른다. 두 색 모두
+   본문 기준 4.5:1 이상이 되도록 lib/teamAccent.ts의 teamInkPair()가 계산한다. */
+/* 특이도 주의 - 위의 `.report-text b`(--gold)와 `.report-list b`(--ink)가 클래스+요소라
+   `.report-team`(클래스 하나)을 이긴다. 실측에서 팀명이 전부 금색으로 나왔다. 그래서
+   부모까지 붙여 특이도를 한 단계 올린다. */
+.report-text .report-team,
+.report-list .report-team,
+.report-team {
+  color: var(--ti-l, inherit);
+}
+/* li는 마커만 팀 색이다. color를 주면 문장 전체가 상속받아, 그 안의 상대 팀 이름과
+   구분이 사라진다. */
+.report-list li.report-li::marker,
+.report-list .report-team::marker,
+.report-team::marker {
+  color: var(--ti-l, var(--ink-faint));
+}
+.report-text .report-player,
+.report-list .report-player,
+.report-player {
+  color: inherit;
+  font-weight: 700;
+}
+/* 약어 칩 - 배경을 팀 원색으로 칠하면 다크에서 6팀이 배경에 녹는다. 배경은 중립으로 두고
+   왼쪽 2px 보더만 팀 색으로. */
+.report-team-abbr {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  padding: 0 4px;
+  margin-right: 4px;
+  border-radius: 3px;
+  border-left: 2px solid currentColor;
+  background: var(--surface-soft);
+  color: inherit;
+  vertical-align: 1.5px;
+  white-space: nowrap;
+}
+@media (prefers-color-scheme: dark) {
+  .report-text .report-team,
+  .report-list .report-team,
+  .report-team {
+    color: var(--ti-d, inherit);
+  }
+  .report-list li.report-li::marker,
+  .report-list .report-team::marker,
+  .report-team::marker {
+    color: var(--ti-d, var(--ink-faint));
+  }
+}
+
 /* 프리뷰 스카우팅 인사이트 카드(요청 항목 1~7, lib/matchupInsights.ts) - 기존
    .report-text/.report-list(문자열 HTML)와 달리 타입이 있는 구조화 데이터를 렌더하는 자리라
    .panel 안 리스트로 살짝 구분되게 카드화. 어느 팀 얘기인지 왼쪽 보더를 그 팀의 실제 브랜드

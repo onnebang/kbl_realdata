@@ -458,10 +458,18 @@ export default async function GamePage({
     reportSections = buildPostgameReport({
       events: derivedEvents,
       box,
-      homeTcode: game.home_team.tcode,
-      awayTcode: game.away_team.tcode,
-      homeTname: game.home_team.name,
-      awayTname: game.away_team.name,
+      homeTeam: {
+        tcode: game.home_team.tcode,
+        name: game.home_team.name,
+        abbr: game.home_team.abbr,
+        color: game.home_team.color,
+      },
+      awayTeam: {
+        tcode: game.away_team.tcode,
+        name: game.away_team.name,
+        abbr: game.away_team.abbr,
+        color: game.away_team.color,
+      },
       homeScore: game.home_score,
       awayScore: game.away_score,
       rarity,

@@ -110,3 +110,86 @@ export function accentFor(tcode: string, color: string | null | undefined): stri
 export function usesAccent(tcode: string, color: string | null | undefined): boolean {
   return accentFor(tcode, color) !== (color ?? "#888888");
 }
+
+// ── 텍스트용 팀 색 ────────────────────────────────────────────────────────────
+// 요청: "경기후 AI 코트사이드 리포트에서, 신주영 같은경우 GAS 소속이니 색상을 좀 더 변경해주고,
+// 팀에 대한 구분이 조금 더 되도록".
+//
+// 위 accentFor()는 못 쓴다. 그건 "딥다크 히어로 위의 별자리 점"용이라 명도 0.08 미만만 손대고
+// 결과를 0.58로 고정한다. 본문 텍스트 기준(4.5:1)으로 보면 그 문턱을 통과한 현대모비스(L .090)·
+// 정관장(.128)·SK(.167)가 다크 배경에서 각각 2.25 / 2.87 / 3.48로 떨어진다.
+//
+// 그리고 이 사이트에는 테마 토글이 없다 - globals.css의 @media (prefers-color-scheme: dark)
+// 하나뿐이라 **서버는 사용자의 테마를 모른다.** 그래서 hex 하나를 인라인 color로 박으면 반드시
+// 한쪽 테마가 깨진다. 두 색을 같이 내려보내고 미디어쿼리가 고르게 한다(개막 리포트의 --tc 패턴과
+// 같은 사상, 등급만 텍스트용으로 올린 것).
+//
+// 표를 캐시로 두지 않는 이유: 이 계산은 팀당 이분탐색 40회라 렌더 비용이 사실상 0이고,
+// 캐시 표는 팀이 색을 바꾸면 조용히 낡는다. TEAM_ACCENT는 이미 그 위험을 안고 있어서
+// "살아 있는 color로 먼저 계산" 규칙을 붙여야 했다 - 여기서는 표를 아예 만들지 않는다.
+
+/** 본문 텍스트 기준. 굵은 12.5px는 WCAG "large text"가 아니므로 3:1이 아니라 4.5:1이다. */
+export const TEXT_CONTRAST_TARGET = 4.5;
+/** 각 테마에서 가장 불리한 면(--surface-soft). 여기서 통과하면 --surface/--bg에서도 통과한다. */
+export const LIGHT_TEXT_BG = "#ECEEF3";
+export const DARK_TEXT_BG = "#23272F";
+
+/** WCAG 2.x 대비비(1~21). hex가 아니면 null. */
+export function contrastRatio(a: string, b: string): number | null {
+  const la = relativeLuminance(a);
+  const lb = relativeLuminance(b);
+  if (la == null || lb == null) return null;
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+/**
+ * 색상(hue)·채도는 그대로 두고 HSL 명도만 옮겨 배경 대비 target을 만족시킨다.
+ * 이미 만족하면 원색을 그대로 돌려준다 - 필요 없는 보정은 팀 색을 왜곡할 뿐이다.
+ * lighten이 true면 밝은 쪽으로(다크 배경용), false면 어두운 쪽으로 찾는다.
+ */
+export function readableInk(color: string, bg: string, lighten: boolean, target = TEXT_CONTRAST_TARGET): string {
+  const cur = contrastRatio(color, bg);
+  if (cur == null) return color; // hex가 아니면 손대지 않는다
+  if (cur >= target) return color;
+  // 이분탐색: lighten이면 [현재 명도, 1], 아니면 [0, 현재 명도].
+  const startL = hslLightness(color);
+  if (startL == null) return color;
+  let lo = lighten ? startL : 0;
+  let hi = lighten ? 1 : startL;
+  let best = withLightness(color, lighten ? 1 : 0);
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    const c = withLightness(color, mid);
+    const r = contrastRatio(c, bg) ?? 0;
+    if (r >= target) {
+      best = c; // 조건을 만족하는 것 중 원색에 가장 가까운 쪽을 계속 좁힌다
+      if (lighten) hi = mid;
+      else lo = mid;
+    } else if (lighten) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return best;
+}
+
+/** 한 팀의 두 테마용 잉크 한 쌍. 색이 없으면 중립 잉크로 폴백한다(팀 색을 지어내지 않는다). */
+export function teamInkPair(color: string | null | undefined): { light: string; dark: string } {
+  if (!color || relativeLuminance(color) == null) return { light: "#5B5F6E", dark: "#9297A8" };
+  return {
+    light: readableInk(color, LIGHT_TEXT_BG, false),
+    dark: readableInk(color, DARK_TEXT_BG, true),
+  };
+}
+
+/** withLightness가 쓰는 것과 같은 변환의 명도 성분만. */
+function hslLightness(hex: string): number | null {
+  const m = hex.trim().match(/^#?([0-9a-f]{6})$/i);
+  if (!m) return null;
+  const v = parseInt(m[1], 16);
+  const r = ((v >> 16) & 255) / 255;
+  const g = ((v >> 8) & 255) / 255;
+  const b = (v & 255) / 255;
+  return (Math.max(r, g, b) + Math.min(r, g, b)) / 2;
+}

@@ -1,4 +1,5 @@
 import { eunNeun, iGa } from "./josa";
+import { teamInkPair } from "./teamAccent";
 
 // courtside_template.html(35차, "경기가 종료되면 주요 이벤트들을 하나의 보고서로")의
 // A1-A8 분석 엔진을 TypeScript로 포팅 - 원본은 클라이언트에 미리 구운 JSON(timeline 배열)을
@@ -526,20 +527,61 @@ function findNotableSubSparks(events: GameEvent[], homeTcode: string): { idx: nu
   return out;
 }
 
+/** 리포트가 선수·팀 이름에 색과 약어를 붙이는 데 필요한 최소 정보. */
+export type ReportTeamMeta = { tcode: string; name: string; abbr: string; color: string | null };
+
 export type BuildReportInput = {
   events: GameEvent[]; // event_order 오름차순, attachDerivedFields() 이미 적용된 것
   box: PlayerBox[]; // game_player_stats(이 경기 최종 박스스코어)
-  homeTcode: string;
-  awayTcode: string;
-  homeTname: string;
-  awayTname: string;
+  homeTeam: ReportTeamMeta;
+  awayTeam: ReportTeamMeta;
   homeScore: number;
   awayScore: number;
   rarity: GameRarity | null;
 };
 
+const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
 export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
-  const { events, box, homeTcode, awayTcode, homeTname, awayTname, homeScore, awayScore, rarity } = input;
+  const { events, box, homeTeam, awayTeam, homeScore, awayScore, rarity } = input;
+  const homeTcode = homeTeam.tcode;
+  const awayTcode = awayTeam.tcode;
+  const homeTname = homeTeam.name;
+  const awayTname = awayTeam.name;
+
+  // ── 팀 색 태그 ──────────────────────────────────────────────────────────────
+  // 두 색을 같이 내려보내고 CSS 미디어쿼리가 고른다(서버는 테마를 모른다 - teamAccent.ts 참고).
+  const inkVars = (t: ReportTeamMeta) => {
+    const ink = teamInkPair(t.color);
+    return `--ti-l:${ink.light};--ti-d:${ink.dark}`;
+  };
+  const metaOf = (tcode: string | null): ReportTeamMeta | null =>
+    tcode === homeTcode ? homeTeam : tcode === awayTcode ? awayTeam : null;
+
+  /** 선수 이름 - 약어 칩 + 팀색. 색만으로는 색각 이상·흑백에서 무력해서 약어를 같이 붙인다. */
+  const playerTag = (name: string, tcode: string | null): string => {
+    const t = metaOf(tcode);
+    if (!t) return escHtml(name);
+    return (
+      `<span class="report-team" style="${inkVars(t)}">` +
+      `<span class="report-team-abbr" title="${escHtml(t.name)}">${escHtml(t.abbr)}</span>` +
+      `<b class="report-player">${escHtml(name)}</b></span>`
+    );
+  };
+  /** 문장 속 팀 이름 - 칩 없이 색만(팀명 자체가 이미 텍스트 단서다). */
+  const teamTag = (tcode: string | null, text: string): string => {
+    const t = metaOf(tcode);
+    return t ? `<b class="report-team" style="${inkVars(t)}">${escHtml(text)}</b>` : escHtml(text);
+  };
+  /**
+   * 그 줄의 주체 팀 - **마커만** 팀 색으로. 본문까지 칠하면 문장 전체가 팀 색이 되어
+   * 안에 있는 상대 팀 이름과 구분이 사라진다(실측에서 그렇게 나왔다). 그래서 색을 상속시키지
+   * 않는 전용 클래스(.report-li)를 쓴다.
+   */
+  const liOpen = (tcode: string | null): string => {
+    const t = metaOf(tcode);
+    return t ? `<li class="report-li" style="${inkVars(t)}">` : "<li>";
+  };
   const homeWon = homeScore > awayScore;
   const winnerTcode = homeWon ? homeTcode : awayTcode;
   const loserTcode = homeWon ? awayTcode : homeTcode;
@@ -554,13 +596,14 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
   // 1. 경기 결과 + 예측 적중/실패 + 마진 희귀도
   {
     const predictedWinner = preActPct >= 50 ? homeTname : awayTname;
+    const predictedWinnerTcode = preActPct >= 50 ? homeTcode : awayTcode;
     const predictionCorrect = predictedWinner === winnerTname;
     const predictedWinnerPct = predictedWinner === homeTname ? preActPct : 100 - preActPct;
     let html =
-      `<p class="report-text">최종 스코어 <b>${winnerTname} ${winnerScore} : ${loserScore} ${loserTname}</b>. 예측은 <b>${predictionCorrect ? "적중" : "빗나감"}</b>` +
+      `<p class="report-text">최종 스코어 ${teamTag(winnerTcode, winnerTname)} <b>${winnerScore} : ${loserScore}</b> ${teamTag(loserTcode, loserTname)}. 예측은 <b>${predictionCorrect ? "적중" : "빗나감"}</b>` +
       (predictionCorrect
-        ? ` - 경기 전 ${predictedWinner}${iGa(predictedWinner)} 이길 확률을 ${predictedWinnerPct}%로 더 높게 봤고, 실제로 그대로 됨.`
-        : ` - 경기 전엔 ${predictedWinner}${iGa(predictedWinner)} 더 유력했지만(${predictedWinnerPct}%), 실제로는 ${winnerTname}${iGa(winnerTname)} 이김. 확률 예측은 100% 확신이 아니라 "이 정도 비율로 이런 결과가 나온다"는 뜻이라, 이런 이변도 정상적인 범위임.`) +
+        ? ` - 경기 전 ${teamTag(predictedWinnerTcode, predictedWinner)}${iGa(predictedWinner)} 이길 확률을 ${predictedWinnerPct}%로 더 높게 봤고, 실제로 그대로 됨.`
+        : ` - 경기 전엔 ${teamTag(predictedWinnerTcode, predictedWinner)}${iGa(predictedWinner)} 더 유력했지만(${predictedWinnerPct}%), 실제로는 ${teamTag(winnerTcode, winnerTname)}${iGa(winnerTname)} 이김. 확률 예측은 100% 확신이 아니라 "이 정도 비율로 이런 결과가 나온다"는 뜻이라, 이런 이변도 정상적인 범위임.`) +
       `</p>`;
     if (rarity) {
       const marginPct = Math.round((rarity.marginPercentile || 0) * 100);
@@ -583,16 +626,16 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     const loserTop = teamTopPerformer(box, loserTcode);
     let html = "";
     if (winnerTop) {
-      html += `<p class="report-text">🏆 <b>${winnerTname}</b> 스포트라이트 - ${winnerTop.name} ${spotlightLine(winnerTop)}.</p>`;
+      html += `<p class="report-text">🏆 ${teamTag(winnerTcode, winnerTname)} 스포트라이트 - ${playerTag(winnerTop.name, winnerTop.tcode)} ${spotlightLine(winnerTop)}.</p>`;
     }
     if (loserTop) {
-      html += `<p class="report-text">🥈 <b>${loserTname}</b> 스포트라이트 - ${loserTop.name} ${spotlightLine(loserTop)}.</p>`;
+      html += `<p class="report-text">🥈 ${teamTag(loserTcode, loserTname)} 스포트라이트 - ${playerTag(loserTop.name, loserTop.tcode)} ${spotlightLine(loserTop)}.</p>`;
     }
     const overallMvp = gameWideTopPerformer(box, homeScore, awayScore, homeTcode, awayTcode);
     if (overallMvp && overallMvp.tcode === loserTcode) {
       const reasons = explainLosingDespiteTopPerformer(events, box, winnerTcode, loserTcode, homeTcode, awayTcode);
       if (reasons.length) {
-        html += `<p class="report-text">최고 활약(${overallMvp.name})에도 <b>${loserTname}</b>${eunNeun(loserTname)} 진 이유 - ${reasons.join(", ")}.</p>`;
+        html += `<p class="report-text">최고 활약(${playerTag(overallMvp.name, overallMvp.tcode)})에도 ${teamTag(loserTcode, loserTname)}${eunNeun(loserTname)} 진 이유 - ${reasons.join(", ")}.</p>`;
       }
     }
     if (html) sections.push({ title: "팀별 스포트라이트", html });
@@ -613,7 +656,10 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
         const beneficiary = homeBenefits ? homeTname : awayTname;
         const beforeProb = Math.round((homeBenefits ? beforeHomeProb : 1 - beforeHomeProb) * 100);
         const afterProb = Math.round((homeBenefits ? afterHomeProb : 1 - afterHomeProb) * 100);
-        return `<li>${jumpLink(s.idx, clockStr(row))}, ${row.home_score}-${row.away_score} 상황 ${row.player_name}의 ${row.action_label} - ${beneficiary} 승률 ${beforeProb}%→${afterProb}%로 상승.</li>`;
+        // 득점한 선수와 승률이 오른 팀이 다를 수 있다(자책성 상황·자유투 유도 등). 그래서
+        // 두 조각을 각자의 tcode로 따로 칠한다. li 마커는 득점한 선수 쪽 팀 색.
+        const benefitTcode = homeBenefits ? homeTcode : awayTcode;
+        return `${liOpen(row.tcode)}${jumpLink(s.idx, clockStr(row))}, ${row.home_score}-${row.away_score} 상황 ${playerTag(row.player_name ?? "", row.tcode)}의 ${row.action_label} - ${teamTag(benefitTcode, beneficiary)} 승률 ${beforeProb}%→${afterProb}%로 상승.</li>`;
       })
       .join("");
     sections.push({ title: "결정적 장면들", html: `<ul class="report-list">${items}</ul>` });
@@ -626,7 +672,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     if (best) {
       sections.push({
         title: "AI 선정 베스트 장면",
-        html: `<p class="report-text">✨ ${jumpLink(best.idx, clockStr(best.row))}, ${best.row.player_name}의 ${best.row.action_label} - 이 경기에서 가장 짜릿했던 순간.</p>`,
+        html: `<p class="report-text">✨ ${jumpLink(best.idx, clockStr(best.row))}, ${playerTag(best.row.player_name ?? "", best.row.tcode)}의 ${best.row.action_label} - 이 경기에서 가장 짜릿했던 순간.</p>`,
       });
     }
   }
@@ -648,9 +694,9 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       sections.push({
         title: "극적인 흐름",
         html:
-          `<p class="report-text">⚡ ${jumpLink(dramatic.startIdx, clockStr(fromRow))}부터 ${jumpLink(dramatic.endIdx, clockStr(toRow))}까지, 단 ${fmtDuration(dramatic.durationSec)} 만에 ${beneficiary} 승률이 ${fromPct}%에서 ${toPct}%로 요동침` +
-          `(이 구간 ${homeTname} ${homeGain}점, ${awayTname} ${awayGain}점) - ` +
-          `${beneficiary}${iGa(beneficiary)} 이 짧은 구간에 경기 흐름을 완전히 뒤집어놓음.</p>`,
+          `<p class="report-text">⚡ ${jumpLink(dramatic.startIdx, clockStr(fromRow))}부터 ${jumpLink(dramatic.endIdx, clockStr(toRow))}까지, 단 ${fmtDuration(dramatic.durationSec)} 만에 ${teamTag(homeBenefits ? homeTcode : awayTcode, beneficiary)} 승률이 ${fromPct}%에서 ${toPct}%로 요동침` +
+          `(이 구간 ${teamTag(homeTcode, homeTname)} ${homeGain}점, ${teamTag(awayTcode, awayTname)} ${awayGain}점) - ` +
+          `${teamTag(homeBenefits ? homeTcode : awayTcode, beneficiary)}${iGa(beneficiary)} 이 짧은 구간에 경기 흐름을 완전히 뒤집어놓음.</p>`,
       });
     }
   }
@@ -664,7 +710,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       const { delta, afterDur, homeGain, awayGain } = sixthMan.spark;
       sections.push({
         title: "이 경기의 식스맨",
-        html: `<p class="report-text">🔋 <b>${p?.name ?? ""}</b>${iGa(p?.name ?? "")} ${jumpLink(sixthMan.idx, clockStr(sixthMan.row))} 투입된 뒤 팀 흐름이 확실히 좋아짐(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${homeTname} ${homeGain}점 · ${awayTname} ${awayGain}점) - 이 경기 최고의 벤치 임팩트.</p>`,
+        html: `<p class="report-text">🔋 ${playerTag(p?.name ?? "", p?.tcode ?? null)}${iGa(p?.name ?? "")} ${jumpLink(sixthMan.idx, clockStr(sixthMan.row))} 투입된 뒤 팀 흐름이 확실히 좋아짐(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${teamTag(homeTcode, homeTname)} ${homeGain}점 · ${teamTag(awayTcode, awayTname)} ${awayGain}점) - 이 경기 최고의 벤치 임팩트.</p>`,
       });
     }
   }
@@ -678,7 +724,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
         .map((b) => {
           const p = boxByPcode.get(b.key);
           const name = p?.name ?? b.key;
-          return `<li>${name}${iGa(name)} ${b.label} ${b.count}개를 ${fmtDuration(b.durationSec)} 만에 몰아침(${jumpLink(b.startIdx, clockStr(b.startRow))}~${jumpLink(b.endIdx, clockStr(b.endRow))}).</li>`;
+          return `${liOpen(p?.tcode ?? null)}${playerTag(name, p?.tcode ?? null)}${iGa(name)} ${b.label} ${b.count}개를 ${fmtDuration(b.durationSec)} 만에 몰아침(${jumpLink(b.startIdx, clockStr(b.startRow))}~${jumpLink(b.endIdx, clockStr(b.endRow))}).</li>`;
         })
         .join("");
       sections.push({ title: "스탯 폭발", html: `<ul class="report-list">${items}</ul>` });
@@ -696,15 +742,17 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       const name = boxByPcode.get(s.pcode)?.name ?? "";
       const dir = s.spark.delta > 0 ? "좋아짐" : "나빠짐";
       const { delta, afterDur, homeGain, awayGain } = s.spark;
+      const sTcode = boxByPcode.get(s.pcode)?.tcode ?? null;
       items.push(
-        `<li>${name}${iGa(name)} ${jumpLink(s.idx, clockStr(s.row))} 투입된 뒤 팀 흐름이 뚜렷하게 ${dir}(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${homeTname} ${homeGain}점 · ${awayTname} ${awayGain}점).</li>`
+        `${liOpen(sTcode)}${playerTag(name, sTcode)}${iGa(name)} ${jumpLink(s.idx, clockStr(s.row))} 투입된 뒤 팀 흐름이 뚜렷하게 ${dir}(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${teamTag(homeTcode, homeTname)} ${homeGain}점 · ${teamTag(awayTcode, awayTname)} ${awayGain}점).</li>`
       );
     }
     for (const fe of findFoulTroubleEvents(events)) {
       const runInfo = checkOpponentRunAfterFoulTrouble(events, fe, homeTcode);
       if (!runInfo) continue;
       const name = boxByPcode.get(fe.key)?.name ?? "";
-      items.push(`<li>${name}${iGa(name)} ${jumpLink(fe.endIdx, clockStr(fe.endRow))} 무렵 파울트러블(${fmtDuration(fe.durationSec)} 만에 파울 ${fe.count}개)에 걸린 뒤, 상대가 ${runInfo.maxOppRun}점 런을 탐.</li>`);
+      const feTcode = boxByPcode.get(fe.key)?.tcode ?? null;
+      items.push(`${liOpen(feTcode)}${playerTag(name, feTcode)}${iGa(name)} ${jumpLink(fe.endIdx, clockStr(fe.endRow))} 무렵 파울트러블(${fmtDuration(fe.durationSec)} 만에 파울 ${fe.count}개)에 걸린 뒤, 상대가 ${runInfo.maxOppRun}점 런을 탐.</li>`);
     }
     if (items.length) sections.push({ title: "교체·파울트러블 연관 분석", html: `<ul class="report-list">${items.join("")}</ul>` });
   }
