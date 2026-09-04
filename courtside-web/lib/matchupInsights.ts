@@ -36,9 +36,12 @@ export type PreviewInsight =
       theirName: string;
       theirPlusMinus: number;
       theirMinutesPlayed: number;
-      ourTargetPcode: string; // 상대팀(theirTeam의 반대편)에서 이 약점을 노릴 만한 선수
+      /** 상대팀(theirTeam의 반대편)에서 **같은 포지션 분류** 중 usage가 가장 높은 선수. */
+      ourTargetPcode: string;
       ourTargetName: string;
       ourTargetUsage: number;
+      /** 두 선수의 공통 포지션 분류. 같은 분류가 아니면 이 카드는 만들어지지 않는다. */
+      pos: KblPos;
       reason: string;
     }
   | {
@@ -72,7 +75,23 @@ export type PriorGameData = {
   players: PlayerStartInfo[];
   minutesByPcode: Map<string, number>;
   usageByPcode: Map<string, number>;
+  /** pcode -> game_player_stats.pos (GD/FD/C). 25-26 정규시즌 6,480행 전부 값이 있다. */
+  posByPcode: Map<string, string>;
 };
+
+// KBL 등록 표기는 세 분류뿐이다(game_player_stats.pos 100,921행 전부 non-NULL, 선수당 시즌 내
+// 값 1개 고정). season_roster는 같은 값을 G/F/C로 적으므로 둘 다 받는다.
+export type KblPos = "GD" | "FD" | "C";
+export const POS_LABEL_KO: Record<KblPos, string> = { GD: "가드", FD: "포워드", C: "센터" };
+
+/** 모르면 null - 추측하지 않는다(그 경우 카드를 만들지 않는다). */
+export function normalizeKblPos(raw: string | null | undefined): KblPos | null {
+  const v = (raw ?? "").trim().toUpperCase();
+  if (v === "GD" || v === "G") return "GD";
+  if (v === "FD" || v === "F") return "FD";
+  if (v === "C") return "C";
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // 임계값(전부 문서화 - 검증 리포트에 그대로 인용) - "your call, document it" 요구 반영.
@@ -81,6 +100,13 @@ const MIN_SHOTS_FOR_ZONE_SAMPLE = 5; // 이보다 적으면 존 성향 자체를
 const CORNER_THREE_MIN_ATTEMPTS = 2;
 const CORNER_THREE_MIN_SHARE_OF_THREES = 0.4; // 3점 시도의 40%+ 가 코너면 "코너 3점 조심"으로 특정
 const MIN_MINUTES_FOR_WEAK_DEFENDER = 15; // 이보다 적게 뛴 선수의 +/-는 가비지타임 노이즈로 취급해 제외
+// 대응 후보를 같은 포지션 분류로만 제한한다. 실측(25-26 270경기에 옛 규칙을 재현): 제한해도
+// 카드는 425 -> 415장(경기 254 -> 252)뿐 줄어드는 반면, 인접 포지션까지 허용하면 다시 usage
+// 최고를 골라 56.7%가 교차 포지션으로 돌아간다.
+// 주의 - 이건 정확도 개선이 아니다. 같은 분류로 묶어도 두 선수가 실제로 맞붙은 시간은
+// 880초 vs 882초로 같다(포지션 태그는 매치업 프록시가 아니다). 목적은 "가드의 약점을 센터가
+// 공략"처럼 앞뒤가 안 맞는 문장을 만들지 않는 것뿐이고, 그래서 문구에서 인과 단언도 뺐다.
+const REQUIRE_SAME_POS_FOR_TARGET = true;
 const MIN_COMBO_SECONDS_TOGETHER = 120; // 2분 미만 동반 출전은 표본 부족으로 제외
 const MIN_COMBO_TOTAL_STAT = 15; // 합산 PTS+AST+REB가 이보다 낮으면 "주목할 만한 조합"이 아님
 const OREB_WATCH_MARGIN_PP = 4; // 리그 평균보다 +4%p 이상일 때만 "오펜스 리바운드 조심"
@@ -240,11 +266,16 @@ function buildWeakDefenderInsight(
 
   const theirName = theirPriorGame.box.find((b) => b.pcode === worst!.pcode)?.name ?? worst.pcode;
   const theirMinutes = theirPriorGame.minutesByPcode.get(worst.pcode) ?? 0;
+  // 포지션을 모르면 카드를 만들지 않는다 - 추측한 매치업을 보여주느니 비워 두는 게 낫다.
+  const theirPos = normalizeKblPos(theirPriorGame.posByPcode.get(worst.pcode));
+  if (REQUIRE_SAME_POS_FOR_TARGET && !theirPos) return null;
 
   if (!ourPriorGame) return null;
   let ourTarget: { pcode: string; name: string; usage: number } | null = null;
   for (const p of ourPriorGame.players) {
     if (p.tcode !== ourTcode || ourDeparted?.has(p.pcode)) continue;
+    // 같은 포지션 분류만 후보로 둔다(위 REQUIRE_SAME_POS_FOR_TARGET 주석 참고).
+    if (REQUIRE_SAME_POS_FOR_TARGET && normalizeKblPos(ourPriorGame.posByPcode.get(p.pcode)) !== theirPos) continue;
     // usage_rtg는 출전시간이 짧을수록 폭주한다(실측: 12초 뛴 가비지타임 선수가 264.1로 1위).
     // "이 약점을 노릴 우리 선수"로 그런 선수를 지목하면 인사이트가 통째로 무의미해지므로,
     // 상대 쪽 약점 판정과 같은 출전시간 하한(MIN_MINUTES_FOR_WEAK_DEFENDER)을 여기도 적용.
@@ -262,6 +293,7 @@ function buildWeakDefenderInsight(
 
   return {
     kind: "weak_defender",
+    pos: (theirPos ?? "FD") as KblPos,
     theirTeam,
     theirPcode: worst.pcode,
     theirName,

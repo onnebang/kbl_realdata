@@ -74,6 +74,9 @@ type PlayerStatRow = {
   // 직전 경기 로스터에서 "우리팀 usage_rtg 최고 선수"를 타깃으로 고르는 데 씀. 이미 이 쿼리(선수당
   // 한 행)에 열만 얹어서 해결 - N+1 쿼리 방지.
   usage_rtg: number | null;
+  // KBL 등록 표기 3분류(GD/FD/C). game_player_stats 100,921행 전부 non-NULL이라 폴백이 필요 없다.
+  // 수비 공략 포인트가 "가드의 약점을 센터가 공략"하는 문장을 만들지 않게 하는 데만 쓴다.
+  pos: string | null;
   player: { name: string; photo_url: string | null } | null;
 };
 
@@ -134,7 +137,7 @@ async function getPlayerStats(gmkey: string) {
   const { data } = await supabase
     .from("game_player_stats")
     .select(
-      "pcode, tcode, pts, reb, ast, stl, blk, turnovers, fouls, is_starter, min_played, fgm, fga, tpm, tpa, ftm, fta, back_num, usage_rtg, player:players(name, photo_url)"
+      "pcode, tcode, pts, reb, ast, stl, blk, turnovers, fouls, is_starter, min_played, fgm, fga, tpm, tpa, ftm, fta, back_num, usage_rtg, pos, player:players(name, photo_url)"
     )
     .eq("gmkey", gmkey)
     .order("pts", { ascending: false });
@@ -208,6 +211,7 @@ function buildGameData(
   players: PlayerStartInfo[];
   minutesByPcode: Map<string, number>;
   usageByPcode: Map<string, number>;
+  posByPcode: Map<string, string>;
 } {
   const nameMap = new Map(playerStats.map((p) => [p.pcode, p.player?.name ?? p.pcode]));
   const rawEvents = events.map((e) => ({
@@ -247,7 +251,8 @@ function buildGameData(
   const players: PlayerStartInfo[] = playerStats.map((p) => ({ pcode: p.pcode, tcode: p.tcode, isStarter: p.is_starter }));
   const minutesByPcode = new Map(playerStats.map((p) => [p.pcode, p.min_played ?? 0]));
   const usageByPcode = new Map(playerStats.map((p) => [p.pcode, p.usage_rtg ?? 0]));
-  return { box, derivedEvents, players, minutesByPcode, usageByPcode };
+  const posByPcode = new Map(playerStats.map((p) => [p.pcode, (p.pos ?? "").trim()]));
+  return { box, derivedEvents, players, minutesByPcode, usageByPcode, posByPcode };
 }
 
 // 위 buildGameData 하나로 "직전 경기" 전체(양 팀 box/events/players)를 PriorGameData로 조립.
@@ -264,8 +269,8 @@ async function buildPriorGameData(
   if (!gmkey || !gameDate || !priorHomeTcode || !priorAwayTcode) return null;
   const [pStats, pEvents] = await Promise.all([getPlayerStats(gmkey), getEvents(gmkey)]);
   if (!pStats.length || !pEvents.length) return null;
-  const { box, derivedEvents, players, minutesByPcode, usageByPcode } = buildGameData(pStats, pEvents, actionLabels);
-  return { gmkey, gameDate, seasonName: seasonName ?? undefined, homeTcode: priorHomeTcode, awayTcode: priorAwayTcode, box, events: derivedEvents, players, minutesByPcode, usageByPcode };
+  const { box, derivedEvents, players, minutesByPcode, usageByPcode, posByPcode } = buildGameData(pStats, pEvents, actionLabels);
+  return { gmkey, gameDate, seasonName: seasonName ?? undefined, homeTcode: priorHomeTcode, awayTcode: priorAwayTcode, box, events: derivedEvents, players, minutesByPcode, usageByPcode, posByPcode };
 }
 
 // 요청: "팀별 색상을 해놨듯이, 스탯표에도 색상으로 비교" - 이 아래 바 차트들은 전부

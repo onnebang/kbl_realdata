@@ -637,7 +637,7 @@
   font-weight: 700;
   font-size: 15px;
   text-align: right;
-  color: var(--ink-faint);
+  color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
@@ -654,7 +654,7 @@
 .projBaseRank {
   font-family: "IBM Plex Mono", monospace;
   font-size: 9px;
-  color: var(--ink-faint);
+  color: var(--ink-soft);
   white-space: nowrap;
 }
 
@@ -713,7 +713,7 @@
   text-align: right;
   font-family: "IBM Plex Mono", monospace;
   font-size: 11px;
-  color: var(--ink-faint);
+  color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
 .adjTotal {

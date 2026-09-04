@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { PreviewInsight } from "@/lib/matchupInsights";
+import { POS_LABEL_KO, type PreviewInsight } from "@/lib/matchupInsights";
 
 // 프리뷰 스카우팅 인사이트(요청 항목 1~6) 카드 + 경기 후 채점(항목 7, actual prop) - 기존
 // .report-text/.report-list(문자열 HTML을 dangerouslySetInnerHTML로 렌더)와 달리
@@ -53,11 +53,20 @@ export function InsightCard({
       const tname = insight.theirTeam === "home" ? homeTname : awayTname;
       const ourTname = insight.theirTeam === "home" ? awayTname : homeTname;
       borderColor = insight.theirTeam === "home" ? hColor : aColor;
-      title = `${tname} - ${insight.theirName} 수비 공략 포인트`;
+      title = `${tname} - ${insight.theirName} 온코트 열세 (${POS_LABEL_KO[insight.pos]})`;
       body = (
         <>
           {insight.reason}
-          <br />→ <b>{ourTname}</b>의 {insight.ourTargetName}(usage {insight.ourTargetUsage.toFixed(1)})가 노릴 만함.
+          <br />
+          같은 {POS_LABEL_KO[insight.pos]} 자리의 <b>{ourTname}</b> 최다 볼 소유는 {insight.ourTargetName}(usage{" "}
+          {insight.ourTargetUsage.toFixed(1)})입니다.
+          <br />
+          {/* 이 데이터셋에는 온볼 수비 매치업 기록이 없다. 같은 포지션으로 묶어도 두 선수가 실제로
+              맞붙은 시간은 880초 vs 882초로 차이가 없었다(25-26 실측) - 그래서 "노릴 만함" 같은
+              인과 문장을 쓰지 않고 무엇을 세었는지만 적는다. */}
+          <span style={{ opacity: 0.7 }}>
+            누가 누구를 막았는지는 이 데이터에 없습니다. 두 숫자를 같은 포지션끼리 나란히 놓은 것뿐입니다.
+          </span>
         </>
       );
       break;
