@@ -423,7 +423,8 @@
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: 999px;
-  background: var(--home);
+  /* 팀 색(대비 보정 쌍). page.tsx가 --ti-l/--ti-d를 인라인으로 내려준다. */
+  background: var(--ti-l, var(--home));
   opacity: 0.85;
 }
 .rosterCell {
@@ -806,5 +807,105 @@
   }
   .leaderVal {
     font-size: 32px;
+  }
+}
+
+/* ── 팀 색 막대·상위 강조(다크 대응) ─────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  .rosterBarFill {
+    background: var(--ti-d, var(--home));
+  }
+}
+/* 승리기여 상위 3명 - 팀 색으로. 나머지는 기본 잉크색 그대로 둔다. */
+.rosterWpaTop {
+  color: var(--ti-l, inherit);
+  font-weight: 800;
+}
+@media (prefers-color-scheme: dark) {
+  .rosterWpaTop {
+    color: var(--ti-d, inherit);
+  }
+}
+
+/* ── 베스트 유닛 - 넷레이팅을 주인공으로 ───────────────────────────────────────
+   제보: "표는 정갈한데 눈에 안 들어옴". 원인은 위계였다 - 이름이 가장 크고 정작 이 카드가
+   하려는 말(넷레이팅)은 11px 보조 줄 안에 있었다. 숫자를 카드의 머리로 끌어올린다. */
+.unitTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.unitNet {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 일정표 ──────────────────────────────────────────────────────────────────── */
+.schedProbHead,
+.schedProb {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* 정규시즌이 아닐 때만 붙는 칩(플레이오프 등) - 컬럼 하나를 없앤 자리를 대신한다. */
+.schedCat {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ── 모바일(≤430px) ──────────────────────────────────────────────────────────
+   제보: "전체적으로 작음". 이 페이지는 9~10.5px 라벨이 많아 폰에서 읽히지 않는다.
+   숫자는 그대로 두고 **라벨과 캡션만** 키운다(레이아웃이 흔들리지 않는 선에서). */
+@media (max-width: 430px) {
+  .pctNote,
+  .rankGroupTitle,
+  .ffSideTitle {
+    font-size: 11.5px;
+    line-height: 1.7;
+  }
+  .rosterHead,
+  .rankHead {
+    font-size: 10.5px;
+  }
+  .rosterNameMain {
+    font-size: 13px;
+  }
+  .rosterPos,
+  .leaderCat,
+  .leaderPos,
+  .leaderSub {
+    font-size: 10.5px;
+  }
+  .unitLabel {
+    font-size: 10.5px;
+  }
+  .unitNames {
+    font-size: 13px;
+    word-break: keep-all;
+  }
+  .unitSub {
+    font-size: 11px;
+  }
+  .unitNet {
+    font-size: 24px;
+  }
+  .journeyLegend,
+  .sw,
+  .swGhost {
+    font-size: 11px;
+  }
+  .schedCat {
+    font-size: 10px;
   }
 }

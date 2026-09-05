@@ -17,7 +17,6 @@ const LINKS = [
   { href: "/leaderboards/scoring-explorer", label: "득점 분포" },
   { href: "/leaderboards/form-index", label: "폼 지수" },
   { href: "/leaderboards/custom-metric", label: "커스텀 지표" },
-  { href: "/pricing", label: "요금제" },
 ];
 
 export function NavBar() {

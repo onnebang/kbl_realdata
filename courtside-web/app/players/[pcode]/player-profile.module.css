@@ -716,3 +716,24 @@
     gap: 7px;
   }
 }
+
+/* ── 모바일(≤430px) ──────────────────────────────────────────────────────────
+   제보: "전체적으로 작음". 이 파일의 폭 미디어쿼리는 620px 하나뿐이었고 그 안에서 손대는
+   선택자가 6개라 375px 화면에서는 9~10.5px 라벨이 그대로 렌더됐다.
+   숫자·레이아웃은 건드리지 않고 **라벨과 캡션만** 키운다. */
+@media (max-width: 430px) {
+  .sl,
+  .pctNote,
+  .panelNote,
+  .heroStatLabel {
+    font-size: 11.5px;
+    line-height: 1.7;
+  }
+  .pctLabel,
+  .pctValue {
+    font-size: 11px;
+  }
+  .statGrid {
+    gap: 8px;
+  }
+}

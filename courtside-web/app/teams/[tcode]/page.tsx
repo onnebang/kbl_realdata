@@ -56,7 +56,7 @@ import {
   GAME_TAG_LABELS,
   type GameTag,
 } from "@/lib/teamPageData";
-import { accentFor } from "@/lib/teamAccent";
+import { accentFor, teamInkPair } from "@/lib/teamAccent";
 import { normalizePos } from "@/lib/playerStatus";
 
 // 팀 프로필 "데이터 사이언스 + 데이터로 아름다움" 대개편(요청) - 선수 프로필과 같은 디자인
@@ -311,10 +311,15 @@ function TeamRankPanel({ stats, row }: { stats: TeamSeasonStats | null; row: Tea
 }
 
 // ── 로스터 기여도 - 출전시간 순 로스터(이 페이지의 로스터 목록을 겸함) ────────────────
-function RosterPanel({ roster }: { roster: RosterRow[] }) {
+function RosterPanel({ roster, accent }: { roster: RosterRow[]; accent: string }) {
   if (!roster.length) return <div className="empty-note">이 시즌 로스터 기록 없음</div>;
   const maxMinPg = Math.max(...roster.map((r) => r.minPg), 1);
   const hasWpa = roster.some((r) => r.totalWpa != null);
+  // 요청: "높은 사람에게 색상 표시". 상위 3명만 - 전원에 색을 주면 색이 정보를 잃는다.
+  // 동점이면 같이 들어간다(3명을 넘을 수 있다).
+  const wpaValues = roster.map((r) => r.totalWpa).filter((v): v is number => v != null);
+  const wpaCut = wpaValues.length > 3 ? [...wpaValues].sort((a, b) => b - a)[2] : null;
+  const ink = teamInkPair(accent);
   return (
     <>
       <div className={styles.rosterGrid}>
@@ -323,7 +328,8 @@ function RosterPanel({ roster }: { roster: RosterRow[] }) {
           <div>MIN/경기</div>
           <div className={`${styles.rosterCell} ${styles.rosterRpgHide}`}>GP</div>
           <div className={styles.rosterCell}>PPG</div>
-          <div className={styles.rosterCell}>{hasWpa ? "WPA" : ""}</div>
+          {/* 요청: "WPA를 사람들이 잘 모를 것 같다". 머리글은 우리말로, 정의는 아래 캡션에서. */}
+          <div className={styles.rosterCell}>{hasWpa ? "승리기여" : ""}</div>
         </div>
         {roster.map((r) => (
           <Link href={`/players/${r.pcode}`} className={styles.rosterRow} key={r.pcode}>
@@ -335,24 +341,50 @@ function RosterPanel({ roster }: { roster: RosterRow[] }) {
                 {r.backNum ? `#${r.backNum}` : ""} {normalizePos(r.pos) ?? ""}
               </span>
             </div>
+            {/* 막대는 팀 색으로(요청: "그래프 색상 팀에 맞게"). 원색을 그대로 쓰면 어두운 팀 색이
+                다크 모드 트랙에 묻히므로 lib/teamAccent.ts의 대비 보정 쌍을 쓴다. */}
             <div className={styles.rosterBarTrack} title={`경기당 ${r.minPg.toFixed(1)}분`}>
-              <div className={styles.rosterBarFill} style={{ width: `${(r.minPg / maxMinPg) * 100}%` }} />
+              <div
+                className={styles.rosterBarFill}
+                style={{ width: `${(r.minPg / maxMinPg) * 100}%`, ["--ti-l"]: ink.light, ["--ti-d"]: ink.dark } as React.CSSProperties}
+              />
             </div>
             <div className={`${styles.rosterCell} ${styles.rosterRpgHide}`}>{r.gp}</div>
             <div className={styles.rosterCell}>{r.ppg.toFixed(1)}</div>
-            {/* 부호 색(양수 초록 / 음수 빨강)을 쓰지 않는다 - player_season_wpa 2,591행 중 음수가
-                32행뿐이고 최솟값이 -0.057이라 빨간 분기가 사실상 한 번도 발화하지 않는다. 늘 초록인
-                색은 정보를 전혀 담지 않으면서 인코딩처럼 보이는 가짜 신호다(실측 지적). */}
-            <div className={styles.rosterWpa}>{r.totalWpa != null ? signed(r.totalWpa) : "-"}</div>
+            {/* 부호 색(양수 초록 / 음수 빨강)은 여전히 쓰지 않는다 - player_season_wpa 2,591행 중
+                음수가 32행뿐이고 최솟값이 -0.057이라 빨간 분기가 사실상 발화하지 않는다. 늘 초록인
+                색은 정보를 안 담으면서 인코딩처럼 보이는 가짜 신호다(실측 지적).
+                대신 **팀 안에서 상위 3명**만 팀 색으로 —— 이건 실제로 구분이 되는 신호다. */}
+            <div
+              className={`${styles.rosterWpa} ${wpaCut != null && r.totalWpa != null && r.totalWpa >= wpaCut ? styles.rosterWpaTop : ""}`}
+              style={{ ["--ti-l"]: ink.light, ["--ti-d"]: ink.dark } as React.CSSProperties}
+            >
+              {r.totalWpa != null ? signed(r.totalWpa) : "-"}
+            </div>
           </Link>
         ))}
       </div>
       <div className={styles.pctNote}>
-        이 시즌 이 팀 소속으로 뛴 전 선수, 총 출전시간 순 · WPA = 시즌 승리 기여(플레이별 팀 승률 변화 누적, 집계 없는
-        선수는 -) · 행 클릭 → 선수 프로필
+        이 시즌 이 팀 소속으로 뛴 전 선수, 총 출전시간 순 · <b>승리기여</b>(WPA) = 그 선수의 플레이가 팀 승률을
+        올린 양을 시즌 내내 더한 값 —— 예를 들어 +2.5는 &quot;혼자서 2.5승어치를 만들었다&quot;로 읽으면 된다(집계 없는
+        선수는 -) · 팀 색으로 표시된 상위 3명이 이 팀을 이기게 만든 선수다 · 행 클릭 → 선수 프로필
       </div>
     </>
   );
+}
+
+/**
+ * 승률과 실제 결과를 **같은 색 언어**로 묶는다(요청: "승률별 색상, 그리고 실제 결과도 색상이 동일하도록").
+ * 예전에는 예정 경기의 모델 승률에 색이 아예 없었고, 실제 W/L은 --home(주황)/--away(파랑)이라
+ * "홈/원정" 팔레트를 결과에 잘못 빌려 쓰고 있었다 - 주황이 승리를 뜻하는지 홈을 뜻하는지 알 수 없었다.
+ * 이제 둘 다 승리 가능성 축(초록 ↔ 빨강) 하나만 쓴다. 실제 결과는 그 축의 양 끝(승=1, 패=0)이다.
+ */
+function outcomeTone(p: number): { color: string; weight: number } {
+  if (p >= 0.65) return { color: "var(--positive)", weight: 800 };
+  if (p >= 0.55) return { color: "var(--positive)", weight: 700 };
+  if (p > 0.45) return { color: "var(--ink-soft)", weight: 700 };
+  if (p > 0.35) return { color: "var(--negative)", weight: 700 };
+  return { color: "var(--negative)", weight: 800 };
 }
 
 // ── 베스트 유닛(15시즌 통산 lineup_combo를 이 시즌 로스터로 제한 - 캡션에 정직하게) ────
@@ -381,25 +413,39 @@ function BestUnitsPanel({ units, tcode, season }: { units: BestUnit[]; tcode: st
       <div className={styles.unitGrid}>
         {pairs.map((u, i) => (
           <div className={styles.unitCard} key={u.pcodes.join(",")}>
-            <div className={styles.unitLabel}>2인 조합 #{i + 1}</div>
+            <div className={styles.unitTop}>
+              <span className={styles.unitLabel}>2인 조합 #{i + 1}</span>
+              {/* 이 카드의 주장은 넷레이팅이다. 예전에는 이름이 13.5px/700이고 NET이 11px 모노 안의
+                  인라인 span이라 위계가 뒤집혀 있었다(제보: "표는 정갈한데 눈에 안 들어옴"). */}
+              <span
+                className={styles.unitNet}
+                style={{ color: u.netRatingPer40 >= 0 ? "var(--positive)" : "var(--negative)" }}
+              >
+                {signed(u.netRatingPer40)}
+              </span>
+            </div>
             <div className={styles.unitNames}>{u.names.join(" · ")}</div>
             <div className={styles.unitSub}>
-              <span style={{ color: u.netRatingPer40 >= 0 ? "var(--positive)" : "var(--negative)" }}>
-                NET {signed(u.netRatingPer40)}
-              </span>{" "}
-              /40분 · 함께 {Math.round(u.minutes)}분
+              40분당 득실 · 함께 {Math.round(u.minutes)}분
             </div>
           </div>
         ))}
         {fives.map((u, i) => (
           <div className={styles.unitCard} key={u.pcodes.join(",")}>
-            <div className={styles.unitLabel}>5인 라인업 #{i + 1}</div>
+            <div className={styles.unitTop}>
+              <span className={styles.unitLabel}>5인 라인업 #{i + 1}</span>
+              {/* 이 카드의 주장은 넷레이팅이다. 예전에는 이름이 13.5px/700이고 NET이 11px 모노 안의
+                  인라인 span이라 위계가 뒤집혀 있었다(제보: "표는 정갈한데 눈에 안 들어옴"). */}
+              <span
+                className={styles.unitNet}
+                style={{ color: u.netRatingPer40 >= 0 ? "var(--positive)" : "var(--negative)" }}
+              >
+                {signed(u.netRatingPer40)}
+              </span>
+            </div>
             <div className={styles.unitNames}>{u.names.join(" · ")}</div>
             <div className={styles.unitSub}>
-              <span style={{ color: u.netRatingPer40 >= 0 ? "var(--positive)" : "var(--negative)" }}>
-                NET {signed(u.netRatingPer40)}
-              </span>{" "}
-              /40분 · 함께 {Math.round(u.minutes)}분
+              40분당 득실 · 함께 {Math.round(u.minutes)}분
             </div>
           </div>
         ))}
@@ -792,7 +838,7 @@ export default async function TeamPage({
       {/* ── 3. 로스터 기여도(추정 - estSeason) ── */}
       <div className={styles.panel}>
         <PanelTitle title="로스터 기여도" chips={[basis, progress]} />
-        <RosterPanel roster={roster} />
+        <RosterPanel roster={roster} accent={accent} />
       </div>
 
       {/* ── 4. 베스트 유닛 ── */}
@@ -816,11 +862,14 @@ export default async function TeamPage({
           <div className="table-scroll">
             <table className="data-table">
               <thead>
+                {/* 컬럼 순서를 바꿨다(제보: "예상 승률이 화면을 스크롤해야 나온다").
+                    예상 승률을 결과 앞으로 당기고, '구분'은 정규시즌이 아닐 때만 날짜 옆 칩으로
+                    붙인다 - 한 컬럼을 통째로 쓰던 값의 대부분이 "정규시즌" 반복이었다. */}
                 <tr>
                   <th>날짜</th>
-                  <th>구분</th>
                   <th>상대</th>
-                  <th>결과 / 예정</th>
+                  <th className={styles.schedProbHead}>예상 승률</th>
+                  <th>결과</th>
                 </tr>
               </thead>
               <tbody>
@@ -838,25 +887,41 @@ export default async function TeamPage({
                       <td>
                         <Link href={`/games/${g.gmkey}`}>{fmtDate(g.gameDate)}</Link>
                         {!isFinal && start ? <span className={styles.schedStart}> {start}</span> : null}
+                        {g.seasonCategory !== "정규시즌" ? (
+                          <span className={styles.schedCat}>{g.seasonCategory}</span>
+                        ) : null}
                       </td>
-                      <td>{g.seasonCategory}</td>
                       <td className={styles.schedOppCell}>
                         {g.isHome ? "vs" : "@"}
                         <TeamBadge team={opp ? { ...opp, logoUrl: opp.logo_url } : null} size={16} />
                         {opp?.name ?? g.oppName}
                       </td>
+                      <td className={styles.schedProb}>
+                        {prob != null ? (
+                          <span style={{ color: outcomeTone(prob).color, fontWeight: outcomeTone(prob).weight }}>
+                            {(prob * 100).toFixed(0)}%
+                          </span>
+                        ) : (
+                          <span className={styles.schedPending}>-</span>
+                        )}
+                      </td>
                       <td>
                         {isFinal ? (
                           <>
-                            <span className={`sched-result ${won ? "win" : "loss"}`}>{won ? "W" : "L"}</span> {g.teamScore}-
-                            {g.oppScore}
+                            {/* 승/패도 승률과 같은 축의 양 끝 색을 쓴다(요청: "실제 결과도 색상이 동일하도록"). */}
+                            <span
+                              className="sched-result"
+                              style={{ color: outcomeTone(won ? 1 : 0).color, fontWeight: 800 }}
+                            >
+                              {won ? "W" : "L"}
+                            </span>{" "}
+                            {g.teamScore}-{g.oppScore}
                             {tag ? <span className={styles.schedTag}>{GAME_TAG_LABELS[tag.key]}</span> : null}
                           </>
                         ) : (
                           <span className={styles.schedPending}>
                             {g.status === "live" ? "진행 중" : "예정"}
                             {g.stadium ? ` · ${g.stadium}` : ""}
-                            {prob != null ? ` · 모델 승률 ${(prob * 100).toFixed(0)}%` : ""}
                           </span>
                         )}
                       </td>
@@ -868,7 +933,9 @@ export default async function TeamPage({
           </div>
         )}
         <div className={styles.pctNote}>
-          예정 경기의 모델 승률은 pregame_features(경기 전 예측) 기준 · {PREGAME_MODEL_CAPTION}
+          <b>예상 승률</b>은 이 팀 기준이고 색이 곧 승리 가능성이다(초록 유리 · 회색 반반 · 빨강 불리).
+          결과의 W/L도 같은 축의 양 끝 색이다. 치른 경기는 경기 전 시점의 예측값을 그대로 남겨 두므로,
+          예측이 맞았는지 틀렸는지를 같은 줄에서 바로 비교할 수 있다 · {PREGAME_MODEL_CAPTION}
           {lastDate ? ` · 현재 수록된 마지막 경기 ${lastDate}(이후 일정은 적재되면 자동으로 채워짐)` : ""}
         </div>
       </div>

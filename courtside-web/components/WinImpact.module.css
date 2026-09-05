@@ -78,7 +78,13 @@
   background: var(--surface-soft);
   overflow: hidden;
 }
+/* .typeFill은 <span>이다. 부모(.typeTrack)가 평범한 블록이라 blockify가 안 걸려 display:inline으로
+   남았고, 인라인 비대체 요소에는 width/height가 적용되지 않는다 - 그래서 막대가 **모든 행·모든
+   선수·모든 화면에서 0x0**으로 렌더돼 회색 트랙만 남았다(제보: "표가 비어있음").
+   브라우저 실측: display를 주기 전 fillW=0, 준 뒤 81x9. 같은 파일의 .splitSeg/.swatch는 부모가
+   flex라 우연히 살아 있었다. */
 .typeFill {
+  display: block;
   height: 100%;
   border-radius: 999px;
   background: var(--away);
@@ -211,5 +217,17 @@
   .callout {
     font-size: 12.5px;
     line-height: 1.75;
+  }
+}
+
+/* ── 모바일(≤430px) 글자 크기 ────────────────────────────────────────────────
+   제보: "전체적으로 작음". 9~11px 라벨은 폰에서 읽히지 않는다. */
+@media (max-width: 430px) {
+  .typeLabel {
+    font-size: 12px;
+  }
+  .momentsHead,
+  .splitLegend {
+    font-size: 11.5px;
   }
 }
