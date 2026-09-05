@@ -1,5 +1,7 @@
 import { eunNeun, iGa } from "./josa";
 import { teamInkPair } from "./teamAccent";
+import { teamZoneStats, type ShotRow } from "./zoneCompare";
+import type { H2H, SeasonStats } from "./matchups";
 
 // courtside_template.html(35차, "경기가 종료되면 주요 이벤트들을 하나의 보고서로")의
 // A1-A8 분석 엔진을 TypeScript로 포팅 - 원본은 클라이언트에 미리 구운 JSON(timeline 배열)을
@@ -652,7 +654,125 @@ export type BuildReportInput = {
   homeScore: number;
   awayScore: number;
   rarity: GameRarity | null;
+  // ── 아래는 전부 선택 - 없으면 해당 섹션만 조용히 생략된다 (새 왕복 0회: page.tsx가 이미 들고 있던 것들) ──
+  /** 이 경기 슛 로그(page.tsx getShots) - '경기를 가른 구역'. */
+  shots?: ShotRow[];
+  /**
+   * game_team_stats의 3점 공식 기록. 좌표로 역산한 3점 판정은 팀-경기 단위로 공식 tpa와
+   * |차이|<=1이 73%뿐이라(정확히 일치 51.3%) 3점 구역만은 이걸 쓴다. 2점 4개 구역은 좌표.
+   */
+  teamThrees?: { tcode: string; tpm: number; tpa: number }[];
+  /** 이 경기 이전 역대 맞대결 - '맞대결의 매듭'. */
+  h2h?: H2H | null;
+  /** 이 경기 이전 정규시즌 누적(리크프리) - '평소의 그 팀이 아니었다'. */
+  homeSeason?: SeasonStats | null;
+  awaySeason?: SeasonStats | null;
 };
+
+// ---------------------------------------------------------------------------
+// 추가 섹션 6개의 임계값 - 전부 25-26 정규시즌 270경기 전수 실측으로 정했다.
+// 원칙: '가끔 뜨는 진짜 사건'(대략 경기의 15~40%)이어야 리포트다. 60%를 넘으면 배경 소음이고
+// 5% 밑이면 만들 가치가 없다. 각 줄의 숫자가 그 근거다.
+// ---------------------------------------------------------------------------
+/** 승자의 최저 승률. 분포 p10=0.125 / p25=0.216 / p50=0.353 - 30%면 41%(흔함), 10%면 7.8%(희귀). 20%에서 21.5%. */
+const CRISIS_MAX_PROB = 0.2;
+/** '극적인 흐름'(98.5%에서 뜬다)의 시작점과 이 안이면 같은 사건이라 생략 - 58건 중 11건. */
+const CRISIS_DEDUP_SEC = 60;
+/** 최다 사용 5인의 함께 뛴 시간 - 중앙 618초, 10%분위 388초. 300초는 하위 5%만 자른다. */
+const CORE_FIVE_MIN_SEC = 300;
+/** 그 5인이 있을 때의 득실차 - ±10이면 30%, ±12면 23%, ±14면 16%. */
+const CORE_FIVE_MIN_DIFF = 12;
+/** 에이스 오프코트 시간 - 중앙 509초, 25%분위 326초. */
+const ONOFF_MIN_OFF_SEC = 300;
+/** 오프코트 득실차 - >=6이면 40%, >=8이면 29%, >=10이면 19%. */
+const ONOFF_MIN_DIFF = 8;
+/** 최대 구역 득점차 - p50 12 / p75 18 / p90 24. '최종 마진보다 크다' 조건과 함께 15면 33.7%. */
+const ZONE_MIN_DIFF = 15;
+/** 맞대결 연승 - >=3이면 31%, >=4면 21%, >=5면 14%. 시즌에 6번 만나므로 4연승이면 '한 시즌 내내'가 사실인 최소. */
+const H2H_MIN_STREAK = 4;
+/** 5경기 미만의 '시즌 최다'는 의미가 없다. */
+const SEASON_EXTREME_MIN_GP = 5;
+
+// ---------------------------------------------------------------------------
+// 라인업 세그먼트 - '주력 5인'과 '그가 코트에 없던 시간'이 나눠 쓴다.
+//
+// 교체(101 IN / 102 OUT)마다 구간을 끊고, 각 구간에 (양 팀 온코트 5인, 초, 양 팀 득점)을 붙인다.
+// 모든 초와 모든 점수가 정확히 한 구간에 들어가므로 어떻게 나눠 더해도 최종 스코어와 맞는다 -
+// lineup_stints 테이블은 그렇지 않다(실측: S47G01N53에서 76점≠78점, S47G01N157에서 94≠95).
+// 그래서 테이블을 조회하지 않고 이벤트에서 다시 만든다(왕복 0, 라이브 경기에도 안전).
+// ---------------------------------------------------------------------------
+export type LineupSegment = { homeOn: string[]; awayOn: string[]; seconds: number; homePts: number; awayPts: number };
+
+export function buildLineupSegments(events: GameEvent[], box: PlayerBox[], homeTcode: string, awayTcode: string): LineupSegment[] {
+  const homeOn = new Set(box.filter((b) => b.tcode === homeTcode && b.is_starter).map((b) => b.pcode));
+  const awayOn = new Set(box.filter((b) => b.tcode === awayTcode && b.is_starter).map((b) => b.pcode));
+  const segs: LineupSegment[] = [];
+  let cur: LineupSegment = { homeOn: [...homeOn], awayOn: [...awayOn], seconds: 0, homePts: 0, awayPts: 0 };
+  let prevT = 0;
+  let prevH = events.length ? events[0].home_score : 0;
+  let prevA = events.length ? events[0].away_score : 0;
+  for (const row of events) {
+    const t = row.quarter === "PRE" ? 0 : row.elapsed;
+    // 시계가 뒤로 가는 행(49/270경기)은 시간을 더하지 않는다 - 음수를 더하면 합계가 틀어진다.
+    if (t > prevT) {
+      cur.seconds += t - prevT;
+      prevT = t;
+    }
+    cur.homePts += row.home_score - prevH;
+    cur.awayPts += row.away_score - prevA;
+    prevH = row.home_score;
+    prevA = row.away_score;
+    if (row.pcode && (row.action_code === "101" || row.action_code === "102")) {
+      segs.push(cur);
+      const set = row.tcode === homeTcode ? homeOn : row.tcode === awayTcode ? awayOn : null;
+      if (set) {
+        if (row.action_code === "101") set.add(row.pcode);
+        else set.delete(row.pcode);
+      }
+      cur = { homeOn: [...homeOn], awayOn: [...awayOn], seconds: 0, homePts: 0, awayPts: 0 };
+    }
+  }
+  segs.push(cur);
+  return segs;
+}
+
+type Split = { seconds: number; my: number; opp: number };
+
+/** 조건을 만족하는 구간 / 아닌 구간으로 시간·득점을 둘로 나눈다. 둘을 합치면 항상 경기 전체다. */
+function splitSegments(segs: LineupSegment[], side: "home" | "away", pred: (lineup: string[]) => boolean): { on: Split; off: Split } {
+  const on: Split = { seconds: 0, my: 0, opp: 0 };
+  const off: Split = { seconds: 0, my: 0, opp: 0 };
+  for (const s of segs) {
+    const lu = side === "home" ? s.homeOn : s.awayOn;
+    const my = side === "home" ? s.homePts : s.awayPts;
+    const opp = side === "home" ? s.awayPts : s.homePts;
+    const t = pred(lu) ? on : off;
+    t.seconds += s.seconds;
+    t.my += my;
+    t.opp += opp;
+  }
+  return { on, off };
+}
+
+/** 함께 뛴 시간이 가장 긴 5인 - **결과가 아니라 시간으로** 고른다(결과로 고르면 선택편향으로 94%에서 뜬다). */
+function mostUsedFive(segs: LineupSegment[], side: "home" | "away"): { key: string; pcodes: string[]; seconds: number } | null {
+  const acc = new Map<string, { pcodes: string[]; seconds: number }>();
+  for (const s of segs) {
+    const lu = side === "home" ? s.homeOn : s.awayOn;
+    if (lu.length !== 5) continue;
+    const sorted = [...lu].sort();
+    const key = sorted.join(",");
+    const cur = acc.get(key) ?? { pcodes: sorted, seconds: 0 };
+    cur.seconds += s.seconds;
+    acc.set(key, cur);
+  }
+  let best: { key: string; pcodes: string[]; seconds: number } | null = null;
+  for (const [key, v] of acc) if (!best || v.seconds > best.seconds) best = { key, ...v };
+  return best;
+}
+
+const ZONE_LABEL: Record<string, string> = { rim: "림", close: "근거리", midShort: "중거리", midLong: "롱2", three: "3점" };
+const sign = (v: number) => (v > 0 ? `+${v}` : `${v}`);
 
 const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -755,6 +875,93 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     if (html) sections.push({ title: "팀별 스포트라이트", html });
   }
 
+  // 2-1. 경기를 가른 구역 - 5개 구역 중 두 팀 득점차가 가장 컸던 한 곳. 그 구역 한 곳의 차이가
+  // 최종 마진보다 클 때만 말한다('마진보다 크다'가 서술을 주장으로 바꿔주는 조건이고, 없이는 79.6%에서
+  // 떠서 아무 말도 아니게 된다). 그 구역을 이기고도 진 경기면 그 역설을 그대로 보여준다.
+  if (input.shots && input.shots.length) {
+    const zh = teamZoneStats(input.shots, homeTcode);
+    const za = teamZoneStats(input.shots, awayTcode);
+    const th = input.teamThrees?.find((t) => t.tcode === homeTcode);
+    const ta = input.teamThrees?.find((t) => t.tcode === awayTcode);
+    type Z = { key: string; h: { att: number; made: number; pts: number }; a: { att: number; made: number; pts: number } };
+    const zones: Z[] = ["rim", "close", "midShort", "midLong"].map((key) => ({
+      key,
+      h: { att: zh[key].att, made: zh[key].made, pts: zh[key].made * 2 },
+      a: { att: za[key].att, made: za[key].made, pts: za[key].made * 2 },
+    }));
+    // 3점만 공식 기록으로(좌표 판정 오차 회피 - BuildReportInput.teamThrees 주석).
+    zones.push(
+      th && ta
+        ? { key: "three", h: { att: th.tpa, made: th.tpm, pts: th.tpm * 3 }, a: { att: ta.tpa, made: ta.tpm, pts: ta.tpm * 3 } }
+        : { key: "three", h: { att: zh.three.att, made: zh.three.made, pts: zh.three.made * 3 }, a: { att: za.three.att, made: za.three.made, pts: za.three.made * 3 } }
+    );
+    const best = zones.reduce((b, z) => (Math.abs(z.h.pts - z.a.pts) > Math.abs(b.h.pts - b.a.pts) ? z : b));
+    const diff = best.h.pts - best.a.pts;
+    const margin = homeScore - awayScore;
+    if (Math.abs(diff) >= ZONE_MIN_DIFF && Math.abs(diff) > Math.abs(margin)) {
+      const zoneHomeWon = diff > 0;
+      const zw = zoneHomeWon ? { tcode: homeTcode, name: homeTname, s: best.h } : { tcode: awayTcode, name: awayTname, s: best.a };
+      const zl = zoneHomeWon ? { tcode: awayTcode, name: awayTname, s: best.a } : { tcode: homeTcode, name: homeTname, s: best.h };
+      const label = ZONE_LABEL[best.key];
+      let html: string;
+      if (zoneHomeWon === homeWon) {
+        html =
+          `<p class="report-text">🗺️ ${label}에서 ${teamTag(zw.tcode, zw.name)} ${zw.s.made}/${zw.s.att}, ${teamTag(zl.tcode, zl.name)} ${zl.s.made}/${zl.s.att} - ` +
+          `이 구역 하나에서만 ${Math.abs(diff)}점 차가 났고, 최종 마진 ${Math.abs(margin)}점보다 컸음.</p>`;
+      } else {
+        // 그 구역을 이기고도 진 경기 - 승자가 그보다 더 크게 벌린 구역을 같이 보여준다.
+        const winnerHome = homeWon;
+        const madeUp = zones
+          .filter((z) => z.key !== best.key)
+          .map((z) => ({ z, d: winnerHome ? z.h.pts - z.a.pts : z.a.pts - z.h.pts }))
+          .filter((x) => x.d >= 6)
+          .sort((x, y) => y.d - x.d)
+          .slice(0, 2)
+          .map((x) => {
+            const ws = winnerHome ? x.z.h : x.z.a;
+            const ls = winnerHome ? x.z.a : x.z.h;
+            return `${ZONE_LABEL[x.z.key]}(${ls.made}/${ls.att} vs ${ws.made}/${ws.att})`;
+          });
+        html =
+          `<p class="report-text">🗺️ ${label}에서 ${teamTag(zw.tcode, zw.name)} ${zw.s.made}/${zw.s.att}, ${teamTag(zl.tcode, zl.name)} ${zl.s.made}/${zl.s.att} - ` +
+          `${teamTag(zw.tcode, zw.name)}${iGa(zw.name)} 이 구역 하나에서만 ${Math.abs(diff)}점을 더 넣고도 ${Math.abs(margin)}점 차로 짐` +
+          (madeUp.length ? `. ${madeUp.join("과 ")}에서 그보다 더 크게 밀렸기 때문.` : ".") +
+          `</p>`;
+      }
+      html += `<p class="report-caveat">구역은 슛 좌표에서 거리로 역산한 것이라 공식 기록이 아님(3점만 공식 기록). 자유투는 슛 로그에 없어 제외.</p>`;
+      sections.push({ title: "경기를 가른 구역", html });
+    }
+  }
+
+  // 2-2. 평소의 그 팀이 아니었다 - 이 경기 팀 기록이 그 팀 자신의 시즌 기록(이 경기 이전, 정규시즌)을
+  // 깼을 때만. '평균 대비 차이' 임계로 하면 아무 경기나 걸린다 - 실측에서 최다득점 5.9% / 최소실점
+  // 4.5% / 최다3점 4.5%라 셋을 합쳐도 경기의 21%에서만 뜬다.
+  {
+    const lines: string[] = [];
+    for (const [tcode, tname, season, pts, oppPts] of [
+      [homeTcode, homeTname, input.homeSeason, homeScore, awayScore],
+      [awayTcode, awayTname, input.awaySeason, awayScore, homeScore],
+    ] as const) {
+      if (!season || season.gp < SEASON_EXTREME_MIN_GP) continue;
+      const tpm = input.teamThrees?.find((t) => t.tcode === tcode)?.tpm;
+      if (pts > season.maxPts) {
+        lines.push(`${liOpen(tcode)}${teamTag(tcode, tname)} ${pts}점 - 이 경기 전까지 ${season.gp}경기 평균 ${season.ppg.toFixed(1)}점이던 팀이 시즌 최다 득점을 새로 씀(종전 ${season.maxPts}점).</li>`);
+      }
+      if (oppPts < season.minOppPts) {
+        lines.push(`${liOpen(tcode)}${teamTag(tcode, tname)}${iGa(tname)} 내준 ${oppPts}점은 이 경기 전까지 ${season.gp}경기 평균 ${season.oppPpg.toFixed(1)}점이던 이 팀의 시즌 최소 실점(종전 ${season.minOppPts}점).</li>`);
+      }
+      if (tpm != null && tpm > season.maxTpm) {
+        lines.push(`${liOpen(tcode)}${teamTag(tcode, tname)} 3점 ${tpm}개 - 시즌 평균 ${season.threePg.toFixed(1)}개의 ${(tpm / Math.max(0.1, season.threePg)).toFixed(1)}배, 시즌 최다(종전 ${season.maxTpm}개).</li>`);
+      }
+    }
+    if (lines.length) {
+      sections.push({
+        title: "평소의 그 팀이 아니었다",
+        html: `<ul class="report-list">${lines.join("")}</ul><p class="report-caveat">이 경기 이전 정규시즌 누적 기준.</p>`,
+      });
+    }
+  }
+
   // 3. 결정적 장면들 - 요청: "승률 60%→48%인데 정관장이 유리해졌다는 표현이 이상하다" -
   // 항상 홈팀 승률만 보여주면서 "유리해짐" 문구를 붙이면, 원정팀이 유리해질 때 숫자가
   // 거꾸로 떨어지는 것처럼 읽힘. 유리해지는 팀 자신의 승률(원정팀이면 100-확률)로 보여줘서
@@ -815,6 +1022,45 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     }
   }
 
+  // 5-1. 승자의 최대 위기 - 이긴 팀의 승률이 경기 중 가장 낮게 떨어진 지점. '극적인 흐름'은
+  // 승률 스윙의 크기를, 이건 바닥의 깊이를 말한다. 그래도 그 스윙의 시작점과 60초 이내면 같은
+  // 사건이라 생략한다.
+  {
+    const winnerTcode = homeWon ? homeTcode : awayTcode;
+    const winnerName = homeWon ? homeTname : awayTname;
+    let lowIdx = -1;
+    let low = 1;
+    events.forEach((e, i) => {
+      if (e.quarter === "PRE" || e.home_win_prob == null) return;
+      const pr = homeWon ? e.home_win_prob : 1 - e.home_win_prob;
+      if (pr < low) {
+        low = pr;
+        lowIdx = i;
+      }
+    });
+    if (lowIdx >= 0 && low <= CRISIS_MAX_PROB) {
+      const dramatic = findDramaticProbSwing(events);
+      const dup = !!dramatic && Math.abs(events[lowIdx].elapsed - events[dramatic.startIdx].elapsed) <= CRISIS_DEDUP_SEC;
+      if (!dup) {
+        const row = events[lowIdx];
+        let deficit = 0;
+        for (const e of events) {
+          if (e.quarter === "PRE") continue;
+          const d = homeWon ? e.away_score - e.home_score : e.home_score - e.away_score;
+          if (d > deficit) deficit = d;
+        }
+        const ws = homeWon ? homeScore : awayScore;
+        const ls = homeWon ? awayScore : homeScore;
+        sections.push({
+          title: "승자의 최대 위기",
+          html:
+            `<p class="report-text">🌡️ ${jumpLink(lowIdx, clockStr(row))}, ${row.home_score}-${row.away_score} - ${teamTag(winnerTcode, winnerName)} 승률이 ` +
+            `<b>${(low * 100).toFixed(1)}%</b>까지 떨어진 순간${deficit > 0 ? `(이 경기 최대 열세 ${deficit}점)` : ""}. 거기서 ${ws}-${ls}로 이김.</p>`,
+        });
+      }
+    }
+  }
+
   // 6. 이 경기의 식스맨 - 요청: "그래서 이 투입 이후 상황이 어떻게 흘러갔는지" - 넷레이팅
   // 변화 숫자만이 아니라 투입 후 실제 관찰 구간 동안 양 팀이 각각 몇 점을 냈는지도 표시.
   {
@@ -827,6 +1073,53 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
         html: `<p class="report-text">🔋 ${playerTag(p?.name ?? "", p?.tcode ?? null)}${iGa(p?.name ?? "")} ${jumpLink(sixthMan.idx, clockStr(sixthMan.row))} 투입된 뒤 팀 흐름이 확실히 좋아짐(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${teamTag(homeTcode, homeTname)} ${homeGain}점 · ${teamTag(awayTcode, awayTname)} ${awayGain}점) - 이 경기 최고의 벤치 임팩트.</p>`,
       });
     }
+  }
+
+  // 6-1. 이 경기의 주력 5인 / 6-2. 그가 코트에 없던 시간 - 같은 세그먼트를 나눠 쓴다.
+  // 둘 다 문장은 "있을 때 이랬고 없을 때 저랬다"까지만. 상대 라인업을 통제하지 않은 한 경기
+  // 스플릿이라 "이 조합이 잘했다"는 인과로 쓰지 않는다. 원시 점수만 쓰고 per-40 환산은 하지
+  // 않는다 - 300~600초 표본을 2400초로 늘리면 노이즈가 4~8배가 된다.
+  {
+    const segs = buildLineupSegments(events, box, homeTcode, awayTcode);
+    const nameOf = (pcode: string) => box.find((b) => b.pcode === pcode)?.name ?? pcode;
+    const fmtSplit = (s: Split) => `${fmtDuration(s.seconds)} 동안 ${s.my}-${s.opp}(${sign(s.my - s.opp)})`;
+
+    const coreItems: string[] = [];
+    const onoffItems: string[] = [];
+    for (const [side, tcode, tname] of [
+      ["home", homeTcode, homeTname],
+      ["away", awayTcode, awayTname],
+    ] as const) {
+      // 주력 5인 - 시간으로 사전 선택(결과로 고르면 94%에서 뜬다).
+      const top = mostUsedFive(segs, side);
+      if (top && top.seconds >= CORE_FIVE_MIN_SEC) {
+        const { on, off } = splitSegments(segs, side, (lu) => lu.length === 5 && [...lu].sort().join(",") === top.key);
+        const onD = on.my - on.opp;
+        const offD = off.my - off.opp;
+        if (Math.abs(onD) >= CORE_FIVE_MIN_DIFF && onD * offD <= 0) {
+          const names = top.pcodes.map((pc) => playerTag(nameOf(pc), tcode)).join(" · ");
+          coreItems.push(
+            `${liOpen(tcode)}${teamTag(tcode, tname)}${iGa(tname)} 이 경기에 가장 오래 붙인 5인 - ${names}. ` +
+              `이 다섯이 함께 있던 ${fmtSplit(on)}, 조합이 깨져 있던 ${fmtSplit(off)}.</li>`
+          );
+        }
+      }
+      // 온/오프 - 주체는 스포트라이트와 같은 사람(teamTopPerformer). 팀 전원에서 |온-오프| 최댓값을
+      // 고르면 다중비교로 80~91%에서 뜬다. 주체를 결과로 고르지 않는 게 이 섹션의 핵심 설계.
+      const star = teamTopPerformer(box, tcode);
+      if (star) {
+        const { on, off } = splitSegments(segs, side, (lu) => lu.includes(star.pcode));
+        const onD = on.my - on.opp;
+        const offD = off.my - off.opp;
+        if (off.seconds >= ONOFF_MIN_OFF_SEC && Math.abs(offD) >= ONOFF_MIN_DIFF && onD * offD <= 0) {
+          onoffItems.push(
+            `${liOpen(tcode)}${playerTag(star.name, tcode)}(${star.pts}점)${iGa(star.name)} 코트에 있던 ${fmtSplit(on)}, 벤치에 있던 ${fmtSplit(off)}.</li>`
+          );
+        }
+      }
+    }
+    if (coreItems.length) sections.push({ title: "이 경기의 주력 5인", html: `<ul class="report-list">${coreItems.join("")}</ul>` });
+    if (onoffItems.length) sections.push({ title: "그가 코트에 없던 시간", html: `<ul class="report-list">${onoffItems.join("")}</ul>` });
   }
 
   // 7. 스탯 폭발
@@ -869,6 +1162,31 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       items.push(`${liOpen(feTcode)}${playerTag(name, feTcode)}${iGa(name)} ${jumpLink(fe.endIdx, clockStr(fe.endRow))} 무렵 파울트러블(${fmtDuration(fe.durationSec)} 만에 파울 ${fe.count}개)에 걸린 뒤, 상대가 ${runInfo.maxOppRun}점 런을 탐.</li>`);
     }
     if (items.length) sections.push({ title: "교체·파울트러블 연관 분석", html: `<ul class="report-list">${items.join("")}</ul>` });
+  }
+
+  // 9. 역대 맞대결의 매듭 - 이 경기 이전까지 이어지던 맞대결 연승이 끊겼는지 이어졌는지.
+  // getHeadToHead는 원래 전 맞대결을 받아 놓고 5경기만 쓰고 버렸다 - 그 행에서 연승만 더 센다.
+  if (input.h2h?.streak && input.h2h.streak.length >= H2H_MIN_STREAK) {
+    const st = input.h2h.streak;
+    const nth = input.h2h.meetings + 1;
+    const winnerTcode = homeWon ? homeTcode : awayTcode;
+    const winnerName = homeWon ? homeTname : awayTname;
+    const loserTcode = homeWon ? awayTcode : homeTcode;
+    const loserName = homeWon ? awayTname : homeTname;
+    const ws = homeWon ? homeScore : awayScore;
+    const ls = homeWon ? awayScore : homeScore;
+    let html: string;
+    if (winnerTcode === st.winnerTcode) {
+      html = `<p class="report-text">🔗 ${teamTag(winnerTcode, winnerName)}${iGa(winnerName)} ${ws}-${ls} 승리로 ${teamTag(loserTcode, loserName)} 상대 맞대결 연승을 <b>${st.length + 1}</b>로 늘림(역대 ${nth}번째 만남).</p>`;
+    } else {
+      const lastWin = input.h2h.lastWinDate[winnerTcode];
+      html =
+        `<p class="report-text">✂️ ${teamTag(winnerTcode, winnerName)}${iGa(winnerName)} ${ws}-${ls} 승리로 ${teamTag(loserTcode, loserName)} 상대 맞대결 <b>${st.length}연패</b>를 끊음` +
+        (lastWin ? ` - 이 카드에서 ${teamTag(winnerTcode, winnerName)}${iGa(winnerName)} 마지막으로 이긴 건 ${lastWin}` : ` - 이 카드에서 ${teamTag(winnerTcode, winnerName)}의 첫 승`) +
+        `(역대 ${nth}번째 만남).</p>`;
+    }
+    html += `<p class="report-caveat">정규시즌·플레이오프 전체 맞대결 기준.</p>`;
+    sections.push({ title: "역대 맞대결의 매듭", html });
   }
 
   return sections;

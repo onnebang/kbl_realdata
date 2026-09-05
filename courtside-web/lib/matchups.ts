@@ -25,6 +25,13 @@ export type SeasonStats = {
   // (공격리바운드율, 0~100 스케일)는 100% 채워져 있어서 그걸로 대체. lib/matchupInsights.ts가
   // 리그 평균과 비교해 "genuinely notable"할 때만 오펜스 리바운드 인사이트를 띄우는 데 씀.
   orebPct: number;
+  /**
+   * 시즌 최다 득점 / 최소 실점 / 최다 3점 - '평소의 그 팀이 아니었다' 리포트 섹션용.
+   * 이미 받아 오는 같은 행에서 나오므로 왕복이 늘지 않는다. 이 경기 이전(리크프리) 정규시즌만.
+   */
+  maxPts: number;
+  minOppPts: number;
+  maxTpm: number;
 };
 
 export type ScheduleGame = {
@@ -39,10 +46,15 @@ export type ScheduleGame = {
 };
 
 export type H2H = {
+  /** 이 경기 **이전** 맞대결 횟수. 이 경기는 meetings + 1 번째다. */
   meetings: number;
   homeWins: number;
   awayWins: number;
   recentMeetings: { gmkey: string; gameDate: string; homeTcode: string; awayTcode: string; homeScore: number; awayScore: number }[];
+  /** 직전까지 이어지던 맞대결 연승 - 누가 몇 연승 중이었나. 맞대결 0회면 null. */
+  streak: { winnerTcode: string; length: number } | null;
+  /** 각 팀이 마지막으로 이 상대를 이긴 날짜. 한 번도 못 이겼으면 null. */
+  lastWinDate: Record<string, string | null>;
 };
 
 export type StandingsRow = { tcode: string; wins: number; losses: number; pct: number };
@@ -91,6 +103,9 @@ export async function getSeasonStatsAsOf(tcode: string, seasonName: string, befo
     stlPg: sum((s) => s.stl ?? 0) / gp,
     blkPg: sum((s) => s.blk ?? 0) / gp,
     tovPg: sum((s) => s.turnovers ?? 0) / gp,
+    maxPts: Math.max(...rows.map((s) => teamScoreByGmkey.get(s.gmkey) ?? 0)),
+    minOppPts: Math.min(...rows.map((s) => oppScoreByGmkey.get(s.gmkey) ?? Number.POSITIVE_INFINITY)),
+    maxTpm: Math.max(...rows.map((s) => s.tpm ?? 0)),
     orebPct: sum((s) => s.oreb_pct ?? 0) / gp,
   };
 }
@@ -204,10 +219,29 @@ export async function getHeadToHead(homeTcode: string, awayTcode: string, before
   const homeWins = rows.filter((r) =>
     r.home_tcode === homeTcode ? (r.home_score as number) > (r.away_score as number) : (r.away_score as number) > (r.home_score as number)
   ).length;
+  // rows는 날짜 내림차순이라 앞에서부터 같은 승자가 이어지는 길이가 곧 '직전 연승'이다.
+  // 이 함수는 예전부터 전 맞대결을 통째로 받아 놓고 5경기만 쓰고 버렸다 - 여기서 마저 쓴다.
+  const winnerOf = (r: (typeof rows)[number]) =>
+    (r.home_score as number) > (r.away_score as number) ? (r.home_tcode as string) : (r.away_tcode as string);
+  let streak: H2H["streak"] = null;
+  for (const r of rows) {
+    const w = winnerOf(r);
+    if (!streak) streak = { winnerTcode: w, length: 1 };
+    else if (streak.winnerTcode === w) streak.length += 1;
+    else break;
+  }
+  const lastWinDate: Record<string, string | null> = { [homeTcode]: null, [awayTcode]: null };
+  for (const r of rows) {
+    const w = winnerOf(r);
+    if (lastWinDate[w] == null) lastWinDate[w] = r.game_date as string;
+    if (lastWinDate[homeTcode] && lastWinDate[awayTcode]) break;
+  }
   return {
     meetings: rows.length,
     homeWins,
     awayWins: rows.length - homeWins,
+    streak,
+    lastWinDate,
     recentMeetings: rows.slice(0, 5).map((r) => ({
       gmkey: r.gmkey as string,
       gameDate: r.game_date as string,

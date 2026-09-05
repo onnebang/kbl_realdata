@@ -2783,3 +2783,13 @@ footer.foot {
   color: var(--ink-soft);
   word-break: keep-all;
 }
+
+/* 리포트 섹션 아래 한 줄 캡션 - "이 숫자는 어디까지 믿어도 되는가". 본문(.report-text)보다
+   한 단계 작고 흐리게. 프록시/추정을 사실처럼 읽히지 않게 하는 장치라 절대 숨기지 않는다. */
+.report-caveat {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  word-break: keep-all;
+}

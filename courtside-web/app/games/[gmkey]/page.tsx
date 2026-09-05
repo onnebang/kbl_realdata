@@ -459,29 +459,6 @@ export default async function GamePage({
       : new Map<string, string>();
   const { box, derivedEvents, players: currentGamePlayers } = buildGameData(playerStats, events, actionLabels, liveNames);
 
-  let reportSections: { title: string; html: string }[] = [];
-  if (status === "final" && game.home_score != null && game.away_score != null && derivedEvents.length > 0 && game.home_team && game.away_team) {
-    const rarity = await getGameRarity(game.home_score, game.away_score);
-    reportSections = buildPostgameReport({
-      events: derivedEvents,
-      box,
-      homeTeam: {
-        tcode: game.home_team.tcode,
-        name: game.home_team.name,
-        abbr: game.home_team.abbr,
-        color: game.home_team.color,
-      },
-      awayTeam: {
-        tcode: game.away_team.tcode,
-        name: game.away_team.name,
-        abbr: game.away_team.abbr,
-        color: game.away_team.color,
-      },
-      homeScore: game.home_score,
-      awayScore: game.away_score,
-      rarity,
-    });
-  }
 
   // pregameLines는 아래 최근 일정(homeSchedule)이 있어야 "이 폼 수치가 지난 시즌 것인지"를
   // 알 수 있어서, 일정 조회가 끝난 뒤에 계산한다(선언 위치가 내려간 이유).
@@ -510,6 +487,36 @@ export default async function GamePage({
       // 상단에 15시즌 3,993경기 실측 근거 - 휴식일 차이의 설명력이 R2=0.0011이다).
       getScheduleContext(game.gmkey, game.season_name, game.game_date, game.home_team.tcode, game.away_team.tcode),
     ]);
+  }
+  let reportSections: { title: string; html: string }[] = [];
+  if (status === "final" && game.home_score != null && game.away_score != null && derivedEvents.length > 0 && game.home_team && game.away_team) {
+    const rarity = await getGameRarity(game.home_score, game.away_score);
+    reportSections = buildPostgameReport({
+      events: derivedEvents,
+      box,
+      homeTeam: {
+        tcode: game.home_team.tcode,
+        name: game.home_team.name,
+        abbr: game.home_team.abbr,
+        color: game.home_team.color,
+      },
+      awayTeam: {
+        tcode: game.away_team.tcode,
+        name: game.away_team.name,
+        abbr: game.away_team.abbr,
+        color: game.away_team.color,
+      },
+      homeScore: game.home_score,
+      awayScore: game.away_score,
+      rarity,
+      // 추가 섹션 6개의 재료 - 전부 이 위에서 이미 받아 둔 것이라 새 왕복이 없다. 그래서 이 블록을
+      // 시즌 스탯·맞대결 조회 뒤로 옮겼다(예전에는 그 앞에 있었다).
+      shots,
+      teamThrees: teamStats.map((t) => ({ tcode: t.tcode, tpm: t.tpm ?? 0, tpa: t.tpa ?? 0 })),
+      h2h,
+      homeSeason: homeSeasonStats,
+      awaySeason: awaySeasonStats,
+    });
   }
   // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - allTeams는 teams 전체를 시즌
   // 문맥 없이 가져온 정적 목록이라, 지금 보고 있는 이 경기의 season_name 기준으로
