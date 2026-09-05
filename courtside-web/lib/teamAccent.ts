@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 // 팀 색 보조 액센트(프로필 개편 1단계, shared_design_language (8)).
 //
 // 두 프로필의 히어로는 라이트/다크 어느 테마에서도 딥다크(--hero-team = teams.color 인라인 주입,
@@ -192,4 +193,16 @@ function hslLightness(hex: string): number | null {
   const g = ((v >> 8) & 255) / 255;
   const b = (v & 255) / 255;
   return (Math.max(r, g, b) + Math.min(r, g, b)) / 2;
+}
+
+/**
+ * 팀 색을 **글자색**으로 쓸 때의 인라인 스타일. 원색을 그대로 color에 넣으면 안 된다 -
+ * 예: 부산 KCC #0C2340(남색)은 다크 모드 배경에서 사실상 안 보인다(실기기 제보).
+ * lib/postgameReport.ts가 리포트 문장에서 쓰는 --ti-l/--ti-d 규약을 그대로 공유한다:
+ * 서버는 테마를 모르므로 두 색을 같이 내려보내고 CSS 미디어쿼리가 고른다.
+ */
+export function teamInkStyle(color: string | null | undefined): CSSProperties {
+  const ink = teamInkPair(color);
+  // CSS 사용자 정의 속성은 CSSProperties에 없어서 단언이 필요하다(React가 그대로 내보낸다).
+  return { "--ti-l": ink.light, "--ti-d": ink.dark } as CSSProperties;
 }

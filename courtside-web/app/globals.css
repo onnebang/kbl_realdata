@@ -2856,3 +2856,19 @@ footer.foot {
     font-size: 11.5px;
   }
 }
+
+/* ── 팀 색을 글자색으로 쓰는 곳 ────────────────────────────────────────────────
+   원색을 color에 그대로 넣으면 한쪽 테마에서 안 보인다(실기기 제보: 다크 모드에서
+   부산 KCC #0C2340 남색 팀명이 배경에 묻혀 사라졌다). lib/teamAccent.ts의
+   teamInkStyle()이 배경 대비를 맞춘 두 색을 --ti-l/--ti-d로 내려보내고 여기서 고른다.
+   (리포트 문장의 .report-team이 쓰던 규약과 같다.) */
+.team-name,
+.team-ink {
+  color: var(--ti-l, inherit);
+}
+@media (prefers-color-scheme: dark) {
+  .team-name,
+  .team-ink {
+    color: var(--ti-d, inherit);
+  }
+}

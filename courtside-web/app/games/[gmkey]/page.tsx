@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
 import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBox } from "@/lib/postgameReport";
+import { teamInkStyle } from "@/lib/teamAccent";
 import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights";
 import { getGameRarity } from "@/lib/rarity";
 import { getSeasonStatsAsOf, getRecentSchedule, getHeadToHead, getStandingsAsOf, getLeagueAvgOrebPct } from "@/lib/matchups";
@@ -808,8 +809,8 @@ export default async function GamePage({
                 <div className="preview-subsection">
                   <div className="panel-title">시즌 평균 비교 ({(homeSeasonStats ?? awaySeasonStats)?.gp}경기 기준, 이 경기 이전)</div>
                   <div className="ts-header">
-                    <span style={{ color: game.home_team?.color }}>{game.home_team?.name}</span>
-                    <span style={{ color: game.away_team?.color }}>{game.away_team?.name}</span>
+                    <span className="team-ink" style={teamInkStyle(game.home_team?.color)}>{game.home_team?.name}</span>
+                    <span className="team-ink" style={teamInkStyle(game.away_team?.color)}>{game.away_team?.name}</span>
                   </div>
                   {tsAvgRow("경기당 득점", homeSeasonStats?.ppg ?? 0, awaySeasonStats?.ppg ?? 0, hColor, aColor)}
                   {tsAvgRow("경기당 실점", homeSeasonStats?.oppPpg ?? 0, awaySeasonStats?.oppPpg ?? 0, hColor, aColor)}

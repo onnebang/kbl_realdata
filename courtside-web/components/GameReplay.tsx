@@ -1,5 +1,6 @@
 "use client";
 import { PlayerPhoto } from "./PlayerPhoto";
+import { teamInkStyle } from "@/lib/teamAccent";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
@@ -943,7 +944,7 @@ export default function GameReplay({
     const nameOf = (pcode: string) => nameByPcode.get(pcode) ?? pcode;
     return (
       <div className="replay-lineup-col" key={team.tcode}>
-        <div className="replay-lineup-team" style={{ color: team.color }}>
+        <div className="replay-lineup-team team-ink" style={teamInkStyle(team.color)}>
           {team.name}
         </div>
         {five ? (
@@ -1252,7 +1253,7 @@ export default function GameReplay({
     const bench = roster.filter((p) => !onCourt.has(p.pcode)).sort(byLivePts);
     return (
       <div className="replay-court-col" key={team.tcode}>
-        <div className="replay-court-col-label" style={{ color: team.color }}>
+        <div className="replay-court-col-label team-ink" style={teamInkStyle(team.color)}>
           {team.name}
         </div>
         <div className="table-scroll">
@@ -1538,7 +1539,7 @@ export default function GameReplay({
         <div className="replay-scoreboard-main">
           <div className="replay-team-col">
             <TeamBadge team={homeTeam} size={56} />
-            <div className="replay-team-name" style={{ color: homeTeam.color }}>
+            <div className="replay-team-name team-ink" style={teamInkStyle(homeTeam.color)}>
               {homeTeam.name}
             </div>
             <div className="replay-team-score">{row.home_score}</div>
@@ -1546,7 +1547,7 @@ export default function GameReplay({
           <div className="replay-sb-sep">:</div>
           <div className="replay-team-col">
             <TeamBadge team={awayTeam} size={56} />
-            <div className="replay-team-name" style={{ color: awayTeam.color }}>
+            <div className="replay-team-name team-ink" style={teamInkStyle(awayTeam.color)}>
               {awayTeam.name}
             </div>
             <div className="replay-team-score">{row.away_score}</div>
@@ -1557,13 +1558,13 @@ export default function GameReplay({
           <>
             <div className="replay-prob-row">
               <div>
-                <span className="replay-prob-pct" style={{ color: homeTeam.color }}>
+                <span className="replay-prob-pct team-ink" style={teamInkStyle(homeTeam.color)}>
                   {Math.round(row.home_win_prob * 100)}%
                 </span>
                 <span className="replay-prob-label">승리확률</span>
               </div>
               <div style={{ textAlign: "right" }}>
-                <span className="replay-prob-pct" style={{ color: awayTeam.color }}>
+                <span className="replay-prob-pct team-ink" style={teamInkStyle(awayTeam.color)}>
                   {Math.round((1 - row.home_win_prob) * 100)}%
                 </span>
                 <span className="replay-prob-label">승리확률</span>

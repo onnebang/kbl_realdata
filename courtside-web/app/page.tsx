@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
+import { teamInkStyle } from "@/lib/teamAccent";
 import { getSeasons, getTeamsForSeason, getGames, getPregameWinProbs, getLiveWinProbs, getGameMvps, getGameTags, getSeasonWinPcts } from "@/lib/homeGames";
 import { deriveGameStatus } from "@/lib/gameStatus";
 import HomeLiveRefresher from "@/components/HomeLiveRefresher";
@@ -106,7 +107,7 @@ export default async function HomePage({
                 <Link
                   href={`/teams/${g.home_team?.tcode}?season=${activeSeason}`}
                   className={`team-name home ${homeWon ? "win" : ""}`}
-                  style={{ color: g.home_team?.color }}
+                  style={teamInkStyle(g.home_team?.color)}
                 >
                   {g.home_team?.name ?? g.gmkey}
                 </Link>
@@ -137,7 +138,7 @@ export default async function HomePage({
                 <Link
                   href={`/teams/${g.away_team?.tcode}?season=${activeSeason}`}
                   className={`team-name away ${status === "final" && !homeWon ? "win" : ""}`}
-                  style={{ color: g.away_team?.color }}
+                  style={teamInkStyle(g.away_team?.color)}
                 >
                   {g.away_team?.name ?? ""}
                 </Link>
