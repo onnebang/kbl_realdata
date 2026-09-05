@@ -29,12 +29,18 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serverKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const fallbackKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-if (!serverKey && process.env.NODE_ENV !== "test") {
-  // 값은 절대 찍지 않는다 - 어느 키를 쓰는지만.
-  console.warn(
-    "[supabaseServer] SUPABASE_SERVICE_ROLE_KEY가 없어 공개 키로 폴백합니다. " +
-      "이 상태에서는 DB 정책을 좁히면 안 됩니다(사이트 전체가 읽기 불가가 됩니다)."
-  );
+if (process.env.NODE_ENV !== "test") {
+  // 값은 절대 찍지 않는다 - 어느 키를 쓰는지만. 두 경우 모두 찍는 이유: "경고가 없다"는 부재
+  // 신호는 다른 배포의 로그를 보고 있어도 성립해서 약하다. 실제로 2026-09-05 Vercel 로그에서
+  // 폴백 경고를 발견해 락다운을 막았고, 그 다음 단계(키가 들어갔는지)는 긍정 신호로 확인해야 했다.
+  if (serverKey) {
+    console.log("[supabaseServer] 서버 전용 키(SUPABASE_SERVICE_ROLE_KEY) 사용 중 - DB 정책을 좁혀도 됩니다.");
+  } else {
+    console.warn(
+      "[supabaseServer] SUPABASE_SERVICE_ROLE_KEY가 없어 공개 키로 폴백합니다. " +
+        "이 상태에서는 DB 정책을 좁히면 안 됩니다(사이트 전체가 읽기 불가가 됩니다)."
+    );
+  }
 }
 
 // ── 일시적 실패는 던지기 전에 다시 해본다 ─────────────────────────────────────────
