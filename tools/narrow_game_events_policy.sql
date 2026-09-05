@@ -11,12 +11,19 @@
 -- 예정 경기(is_ended=false/NULL)의 event_order=0 경기 전 행도 계속 읽힌다(coalesce).
 --
 -- 실행 전 확인: 프로덕션 /api/health 가 readyForLockdown:true (서버가 service_role).
+-- **적용됨 2026-09-06.** 검증: 종료 경기 anon PostgREST 0행 / 트랜잭션 안에서 종료 경기 하나를
+-- is_ended=false로 바꾸고 set local role anon으로 조회 -> 595행 통과 -> 롤백(DB 흔적 없음).
+-- 주의: 26-27 예정 경기는 아직 이벤트 행이 0개라 "예정 경기 -> 행 있음"으로는 검증할 수 없다
+-- (첫 실행 때 그 오라클 때문에 자동 롤백됐다).
+-- 되돌리기: create policy "public read game_events" on public.game_events for select using (true);
+--           drop policy "public read live game_events" on public.game_events;
 begin;
+drop policy if exists "public read live game_events" on public.game_events;
 create policy "public read live game_events" on public.game_events
   for select to anon, authenticated
   using (exists (select 1 from public.games g
                   where g.gmkey = game_events.gmkey and coalesce(g.is_ended, false) = false));
-drop policy "public read game_events" on public.game_events;
+drop policy if exists "public read game_events" on public.game_events;
 commit;
 
 -- 검증(공개 키로): 종료 경기 → [] , 예정/진행 경기 → 행 있음
