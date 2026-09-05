@@ -190,3 +190,26 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── 모바일(≤430px) ────────────────────────────────────────────────────────
+   실측 제보: "점수차 구간별" 표가 화면을 넘어가고 값이 잘렸다. .typeRow의 값 칸이 96px
+   고정인데 내용은 "+23.9 · 821점 (47%)"로 그보다 넓다. 값 칸을 내용에 맞추고(auto) 막대가
+   대신 줄어들게 한다 - 막대는 길이 비교용이라 조금 짧아져도 뜻이 유지된다. */
+@media (max-width: 430px) {
+  .typeRow {
+    grid-template-columns: 54px minmax(28px, 1fr) auto;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .typeVal {
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+  .momentsHead {
+    font-size: 11px;
+  }
+  .callout {
+    font-size: 12.5px;
+    line-height: 1.75;
+  }
+}

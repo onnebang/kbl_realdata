@@ -936,3 +936,46 @@
     display: none;
   }
 }
+
+/* ── 모바일(≤430px) ────────────────────────────────────────────────────────
+   기존 미디어쿼리는 640px에서 멈췄는데 실제 폰은 360~430px이다. 카드 안쪽 가용 폭이
+   ~328px이라 그 아래 한 단계가 더 필요하다. */
+@media (max-width: 430px) {
+  /* 예상 승수: 640px 규칙(5열, 최소 328px)이 딱 화면 폭이라 팀명이 "창원 L"로 잘렸다.
+     승수 범위(4번째)까지 접는다 - 범위는 바로 아래 각주가 말로 설명하고 있고, 이 화면에서
+     사람들이 먼저 보는 건 승수와 6강 확률이다. */
+  .projRow {
+    grid-template-columns: 26px minmax(0, 1fr) 100px 42px;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .projRow > :nth-child(4) {
+    display: none;
+  }
+  .outlookTeam {
+    white-space: normal;
+    word-break: keep-all;
+    line-height: 1.25;
+  }
+
+  /* 조정의 내역: 7열 최소 496px. 여기서 열을 접으면 이 표의 존재 이유인 이탈·슬롯·기타·규정
+     세부가 통째로 사라지므로, 접지 않고 가로 스크롤로 넘긴다. */
+  .adjGrid {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .adjHead,
+  .adjRow {
+    min-width: 520px;
+  }
+
+  /* 작은 글자 상향 - 9~10.5px는 한글에서 읽히지 않는다. */
+  .panelLede,
+  .note {
+    font-size: 12px;
+    line-height: 1.75;
+  }
+  .actBody {
+    font-size: 12.5px;
+  }
+}
