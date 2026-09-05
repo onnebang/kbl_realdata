@@ -29,9 +29,28 @@ export type GameEvent = {
   elapsed: number;
   runHome: number;
   runAway: number;
+  /** 지금 진행 중인 "몰아치기" - 상대 무득점이 아니어도 잡는다. 없으면 null. 아래 SURGE_* 참고. */
+  surge: Surge | null;
 };
 
-type RawGameEvent = Omit<GameEvent, "elapsed" | "runHome" | "runAway">;
+/**
+ * 상대 무득점을 요구하지 않는 런.
+ *
+ * 왜 필요한가(사용자 지적): 기존 runHome/runAway는 상대가 1점만 넣어도 0으로 리셋된다.
+ * "10-0 런을 하고 있어도 상대 득점이 나오면 바로 끝나는데, 0득점이 아니더라도 큰 점수로
+ * 지고 있으면(5분동안 23-3) 이런식으로도 표현" - 그 요청을 그대로 구현한 것.
+ */
+export type Surge = {
+  side: "home" | "away";
+  /** 몰아친 쪽이 그 구간에 넣은 점수. */
+  lead: number;
+  /** 같은 구간에 상대가 넣은 점수. 0이면 기존 런과 같은 사건이다. */
+  opp: number;
+  /** 구간 길이(초). */
+  seconds: number;
+};
+
+type RawGameEvent = Omit<GameEvent, "elapsed" | "runHome" | "runAway" | "surge">;
 
 // 주의: game_player_stats.fgm/fga는(원본 KBL 소스 자체가 그렇게 나뉘어 있어서) 2점슛
 // 전용이고, 3점은 tpm/tpa에 따로 있음 - courtside_template.html의 event-replay 기반
@@ -114,7 +133,7 @@ export function fmtRating(r: number): string {
 // 원본과 동일하게 시간 스캔 함수들에서는 PRE 행을 명시적으로 건너뜀(둘 다 같은 동작
 // 유지 - 정적 페이지와 이 사이트 사이의 결과 차이를 만들지 않기 위해).
 export function attachDerivedFields(rawEvents: RawGameEvent[]): GameEvent[] {
-  const events: GameEvent[] = rawEvents.map((e) => ({ ...e, elapsed: 0, runHome: 0, runAway: 0 }));
+  const events: GameEvent[] = rawEvents.map((e) => ({ ...e, elapsed: 0, runHome: 0, runAway: 0, surge: null }));
   let homeRun = 0,
     awayRun = 0;
   for (let i = 0; i < events.length; i++) {
@@ -134,8 +153,96 @@ export function attachDerivedFields(rawEvents: RawGameEvent[]): GameEvent[] {
     }
     e.runHome = homeRun;
     e.runAway = awayRun;
+    e.surge = computeSurgeAt(events, i);
   }
   return events;
+}
+
+// ---------------------------------------------------------------------------
+// 서지(상대 무득점을 요구하지 않는 런)
+// ---------------------------------------------------------------------------
+//
+// 정의: 최근 SURGE_WINDOW_SEC 안에서 **점수차가 가장 나빴던 시점** 이후로 벌린 폭.
+//     m[i] = home[i] - away[i]
+//     홈의 서지 = m[i] - min{ m[j] : 0 <= elapsed[i] - elapsed[j] <= W }
+// 상대가 0점이면 기존 런과 정확히 같은 값이 나오므로(하위호환), 새 규칙이 옛 규칙을 포함한다.
+//
+// 창을 W로 자르는 이유: 자르지 않으면 시작부터 앞서간 팀의 "런"이 최종 점수차와 같아진다.
+// 그건 런이 아니라 그냥 경기 결과다.
+//
+// ── 임계값을 이렇게 정한 근거 (25-26 정규시즌 270경기 전수 실측) ──────────────────
+// 창/임계를 8가지로 돌려 "경기당 발동 횟수"와 "그중 상대가 득점한 비율"(= 기존 0-런
+// 규칙이었다면 아예 안 떴을 구간)을 쟀다:
+//     300초/12점  1.97회/경기   상대 1점+ 88%
+//     300초/14점  0.73회/경기   상대 1점+ 85%,  상대 3점+ 60%   <- 채택
+//     300초/16점  0.21회/경기   상대 1점+ 71%
+//     360초/16점  0.48회/경기   상대 1점+ 90%
+//     480초/16점  0.97회/경기   상대 1점+ 97%
+// 300초/14점을 고른 이유: (1) 경기당 0.73회라 "가끔 뜨는 진짜 사건"이고, 12점은 2회 가까이
+// 떠서 흔해진다. (2) 발동의 85%가 상대 득점을 포함하므로 기존 0-런이 못 잡던 것을 실제로
+// 잡는다. (3) 5분이라는 창이 사용자가 든 예시("5분동안 23-3")와 같다.
+// 실제로 잡힌 구간 예: 25-11(4분47초), 23-9(5분00초), 22-6(4분59초).
+// 같은 구간 안의 기존 0-런 최댓값은 10~14점이라, 옛 규칙으로는 훨씬 약하게 보이거나 안 보였다.
+export const SURGE_WINDOW_SEC = 300;
+export const SURGE_MIN_DIFF = 14;
+
+/** events[0..i]까지 elapsed/점수가 채워져 있다는 전제. i 시점에 진행 중인 서지. */
+function computeSurgeAt(events: GameEvent[], i: number): Surge | null {
+  const cur = events[i];
+  if (cur.quarter === "PRE") return null;
+  const mNow = cur.home_score - cur.away_score;
+
+  // 창 안에서 마진이 가장 낮았던 곳(홈 관점 바닥)과 가장 높았던 곳(원정 관점 바닥)을 찾는다.
+  //
+  // **break가 아니라 continue인 이유**: elapsed가 단조증가라는 보장이 없다. 25-26 정규시즌
+  // 270경기를 훑어보니 **49경기에서 51번 시계가 뒤로 간다**(같은 쿼터 안에서 대부분 1~3초,
+  // 최대 240초 - KBL 원본 피드의 흔들림이다). break는 첫 창밖 행에서 스캔을 끝내므로 그
+  // 지점에서 창이 잘린다.
+  //
+  // 정직하게 적자면 **이 시즌에서는 두 방식의 결과가 완전히 같았다**(164,501행 전수 대조,
+  // 서지가 켜진 1,999행 포함해 차이 0건). 흔들림이 1~3초라 300초 창의 최소/최대를 바꾸지
+  // 못했기 때문이다. 그래도 continue로 두는 이유는, break가 **데이터에서 이미 거짓인 가정**에
+  // 기대고 있어서다 - 다음 시즌 피드가 조금만 더 흔들려도 조용히 틀린 숫자가 나온다.
+  // 비용은 무시할 만하다: 경기당 500~800행이라 최악이어도 30만 회 비교이고, 이 파일이 이미
+  // 하는 다른 전수 스캔과 같은 수준이다.
+  let lowIdx = i,
+    highIdx = i;
+  for (let j = i - 1; j >= 0; j--) {
+    const p = events[j];
+    if (p.quarter === "PRE") continue;
+    if (cur.elapsed - p.elapsed > SURGE_WINDOW_SEC) continue;
+    const m = p.home_score - p.away_score;
+    if (m < events[lowIdx].home_score - events[lowIdx].away_score) lowIdx = j;
+    if (m > events[highIdx].home_score - events[highIdx].away_score) highIdx = j;
+  }
+
+  const homeSurge = mNow - (events[lowIdx].home_score - events[lowIdx].away_score);
+  const awaySurge = events[highIdx].home_score - events[highIdx].away_score - mNow;
+  const homeSide = homeSurge >= awaySurge;
+  const diff = homeSide ? homeSurge : awaySurge;
+  if (diff < SURGE_MIN_DIFF) return null;
+
+  const start = events[homeSide ? lowIdx : highIdx];
+  const dHome = cur.home_score - start.home_score;
+  const dAway = cur.away_score - start.away_score;
+  return {
+    side: homeSide ? "home" : "away",
+    lead: homeSide ? dHome : dAway,
+    opp: homeSide ? dAway : dHome,
+    seconds: Math.max(0, cur.elapsed - start.elapsed),
+  };
+}
+
+/** "25-11" 또는 "14-0" - 화면 어디서든 같은 모양으로. */
+export function surgeScoreText(s: Surge): string {
+  return `${s.lead}-${s.opp}`;
+}
+
+/** "4분 47초" / "58초" */
+export function fmtSurgeDuration(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return m > 0 ? `${m}분 ${s}초` : `${s}초`;
 }
 
 function marginRefAt(
@@ -367,7 +474,14 @@ function findDramaticProbSwing(events: GameEvent[]): { startIdx: number; endIdx:
 // 가중치를 씀 - 실제 리그 평균 오펜시브 리바운드 비중(전체 리바운드의 대략 1/4)을 반영해
 // 0.7*0.25 + 0.3*0.75 ≈ 0.4로 블렌딩(완전히 동일하진 않지만, 순위를 크게 뒤집을 만큼
 // 큰 항도 아니라서 - 득점/슈팅효율이 이 공식을 지배함).
-function gameScore(b: PlayerBox): number {
+// 인자를 PlayerBox 전체가 아니라 실제로 쓰는 스탯 칸만 받는다 - lib/matchupInsights.ts가
+// game_player_stats 원본 행에서 시즌 누적 게임스코어를 만들 때 pcode/tcode/name 같은
+// 신원 필드까지 지어내지 않아도 되게. 기존 호출부(PlayerBox를 넘기는 곳)는 그대로 통과한다.
+export type GameScoreStats = Pick<
+  PlayerBox,
+  "pts" | "fgm" | "fga" | "ftm" | "fta" | "reb" | "ast" | "stl" | "blk" | "fouls" | "turnovers"
+>;
+export function gameScore(b: GameScoreStats): number {
   return (
     b.pts + 0.4 * b.fgm - 0.7 * b.fga - 0.4 * (b.fta - b.ftm) + 0.4 * b.reb +
     b.stl + 0.7 * b.ast + 0.7 * b.blk - 0.4 * b.fouls - b.turnovers

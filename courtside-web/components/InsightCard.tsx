@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { POS_LABEL_KO, type PreviewInsight } from "@/lib/matchupInsights";
+import { POS_LABEL_KO, type AceEntry, type PreviewInsight } from "@/lib/matchupInsights";
 
 // 프리뷰 스카우팅 인사이트(요청 항목 1~6) 카드 + 경기 후 채점(항목 7, actual prop) - 기존
 // .report-text/.report-list(문자열 HTML을 dangerouslySetInnerHTML로 렌더)와 달리
@@ -13,6 +13,7 @@ const KIND_ICON: Record<PreviewInsight["kind"], string> = {
   trend: "\u{1F4C8}",
   oreb_watch: "\u{1F501}",
   block_watch: "\u{1F9F1}",
+  season_ace: "\u{2B50}",
   win_prob: "\u{1F52E}",
 };
 
@@ -102,6 +103,50 @@ export function InsightCard({
       borderColor = insight.team === "home" ? hColor : aColor;
       title = `${tname} - ${insight.name} 블록 주의`;
       body = <>{insight.reason}</>;
+      break;
+    }
+    case "season_ace": {
+      const tname = insight.team === "home" ? homeTname : awayTname;
+      borderColor = insight.team === "home" ? hColor : aColor;
+      title = `${tname} 시즌 에이스`;
+      // watch_player가 "직전 경기 한 판"을 보는 반면 이 카드는 같은 자(게임스코어)를 시즌
+      // 전체에 댄 것이다. 둘이 같은 선수를 가리키면 그 자체가 "반짝이 아니다"라는 뜻이 된다.
+      const row = (label: string, e: AceEntry | null) =>
+        e ? (
+          <div className="ace-row" key={label}>
+            <span className="ace-tag">{label}</span>
+            <b className="ace-name">{e.name}</b>
+            {e.isAsianQuota && <span className="ace-aq">아시아쿼터</span>}
+            <span className="ace-num">게임스코어 {e.gameScorePg.toFixed(1)}</span>
+            <span className="ace-sub">
+              {e.gp}경기 · {e.minutes.toLocaleString()}분
+            </span>
+          </div>
+        ) : (
+          <div className="ace-row" key={label}>
+            <span className="ace-tag">{label}</span>
+            {/* 왜 비었는지를 정확히 말한다. 개막 전에 외국선수를 전원 교체한 팀(실측: KT·현대모비스)은
+                "기준 미달"이 아니라 "지난 시즌 KBL 기록 자체가 없음"이라, 같은 문구를 쓰면 오해가 된다. */}
+            <span className="ace-sub">
+              {insight.priorSeasonLabel
+                ? `지난 시즌(${insight.priorSeasonLabel}) 기록이 남아 있는 선수가 없습니다(전원 교체).`
+                : "15경기 또는 300분을 채운 선수가 아직 없습니다."}
+            </span>
+          </div>
+        );
+      body = (
+        <>
+          {row("국내", insight.domestic)}
+          {row("외국", insight.foreign)}
+          <div className="ace-note">
+            {insight.priorSeasonLabel
+              ? `이번 시즌 경기가 아직 없어 지난 시즌(${insight.priorSeasonLabel}) 기준입니다.`
+              : "이 경기 직전까지의 시즌 누적 기준입니다."}{" "}
+            게임스코어는 득점·리바운드·어시스트·스틸·블록에서 야투 실패와 실책을 뺀 한 줄짜리
+            활약도로, 위 &lsquo;주의&rsquo; 카드와 같은 식을 시즌 전체에 적용한 값입니다.
+          </div>
+        </>
+      );
       break;
     }
     case "win_prob": {

@@ -11,7 +11,7 @@ import { displayTeamName } from "@/lib/teamNames";
 import { collectAllOnCourtLineups, subComboKeys, type PlayerStartInfo } from "@/lib/gameLineups";
 import { getLineupRatings, getPlayerOnOffRatings, type LineupRating, type PlayerOnOff } from "@/lib/lineupNetRating";
 import { buildMatchupInsights, gradeMatchupInsights, type PreviewInsight, type PriorGameData } from "@/lib/matchupInsights";
-import { getDepartedByTeam } from "@/lib/preseason";
+import { getDepartedByTeam, prevSeasonName } from "@/lib/preseason";
 import { TeamBadge } from "@/components/TeamBadge";
 import GameReplay from "@/components/GameReplay";
 import { InsightCard } from "@/components/InsightCard";
@@ -599,6 +599,9 @@ export default async function GamePage({
       homeTcode: game.home_team.tcode,
       awayTcode: game.away_team.tcode,
       seasonName: game.season_name,
+      // 개막 전(이 시즌 경기 0건)이면 시즌 누적 인사이트가 통째로 사라진다 - 그때 물러설 시즌.
+      // 폴백을 쓰면 카드가 "지난 시즌 기준"이라고 스스로 밝힌다.
+      prevSeasonName: prevSeasonName(game.season_name),
       gameDate: game.game_date,
       homeSchedule,
       awaySchedule,

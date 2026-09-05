@@ -858,6 +858,55 @@ table.data-table td:nth-child(2) {
   font-weight: 600;
 }
 
+/* 시즌 에이스 카드(season_ace) - 국내/외국 두 줄. 한 카드 안에 두 명을 담아서, 카드 수가
+   팀당 2장 늘어나지 않게 했다(Act 1은 접이식 밖 항상 보이는 자리다). */
+.ace-row {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 3px 0;
+}
+.ace-row + .ace-row {
+  border-top: 1px solid rgba(var(--line-rgb), 0.07);
+}
+.ace-tag {
+  flex: none;
+  min-width: 30px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+.ace-name {
+  font-size: 13px;
+}
+.ace-aq {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+.ace-num {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ace-sub {
+  font-size: 11px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.ace-note {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  word-break: keep-all;
+}
+
 /* 매치업 패널(최근 결과) - lib/matchups.ts */
 .matchup-schedule-grid {
   display: grid;

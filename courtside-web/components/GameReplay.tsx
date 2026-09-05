@@ -14,6 +14,8 @@ import {
   gameWideTopPerformer,
   QUARTER_ORDER,
   quarterLenSec,
+  surgeScoreText,
+  fmtSurgeDuration,
   type GameEvent,
   type PlayerBox,
   type StreakEvent,
@@ -178,10 +180,22 @@ function computePushNotifications(
   // 사이 무득점 이벤트(리바운드/파울 등)에서도 이 함수가 매번 불려서, 이전 idx 값과 비교
   // 안 하면 같은 알림이 계속 중복 발사됨(레퍼런스가 실제로 겪은 버그 - 그대로 재도입 안 함).
   const prevRow = prevIdx >= 0 ? events[prevIdx] : null;
-  if (row.runHome >= PUSH_RUN_THRESHOLD && (!prevRow || prevRow.runHome < PUSH_RUN_THRESHOLD)) {
+
+  // 서지(상대가 득점해도 크게 밀리는 구간)가 먼저다 - 같은 순간에 0-런 알림까지 쏘면
+  // 같은 사건을 두 번 알리는 꼴이라, 서지가 떴으면 아래 0-런 알림은 건너뛴다.
+  const surgeSide = row.surge?.side ?? null;
+  if (row.surge && prevRow?.surge?.side !== surgeSide) {
+    const t = row.surge.side === "home" ? homeTeam : awayTeam;
+    const body =
+      row.surge.opp > 0
+        ? `${fmtSurgeDuration(row.surge.seconds)} 동안 ${surgeScoreText(row.surge)} - 상대가 넣고 있는데도 점수차가 벌어지는 중입니다.`
+        : `${fmtSurgeDuration(row.surge.seconds)} 동안 ${surgeScoreText(row.surge)} - 지금 흐름이 넘어가고 있습니다.`;
+    out.push({ icon: "🔥", title: `${t.name} 몰아치기!`, msg: body });
+  }
+  if (!row.surge && row.runHome >= PUSH_RUN_THRESHOLD && (!prevRow || prevRow.runHome < PUSH_RUN_THRESHOLD)) {
     out.push({ icon: "🔥", title: `${homeTeam.name} 런!`, msg: `상대 무득점 구간에 ${row.runHome}점 연속 - 지금 흐름이 넘어가고 있습니다.` });
   }
-  if (row.runAway >= PUSH_RUN_THRESHOLD && (!prevRow || prevRow.runAway < PUSH_RUN_THRESHOLD)) {
+  if (!row.surge && row.runAway >= PUSH_RUN_THRESHOLD && (!prevRow || prevRow.runAway < PUSH_RUN_THRESHOLD)) {
     out.push({ icon: "🔥", title: `${awayTeam.name} 런!`, msg: `상대 무득점 구간에 ${row.runAway}점 연속 - 지금 흐름이 넘어가고 있습니다.` });
   }
 
@@ -255,14 +269,14 @@ type ShotWithQuarter = ShotWithMeta;
 // (Q3/Q4 격자선까지 미리 그려서 '아직 두 쿼터가 남았다'가 한눈에 보이게) + 곡선의 맨 앞에
 // 진행중 마커를 찍는다. 종료 경기는 live=false로 예전 경로를 그대로 타서 픽셀 단위로 동일.
 // 라이브로 들어온 raw game_events 행을 서버(app/games/[gmkey]/page.tsx의 buildGameData)와
-// 똑같은 모양의 GameEvent로. 파생 3필드(elapsed/runHome/runAway)는 호출부가 채운 뒤
+// 똑같은 모양의 GameEvent로. 파생 필드(elapsed/runHome/runAway/surge)는 호출부가 채운 뒤
 // attachDerivedFields가 배열 전체에 대해 다시 계산한다.
 function toGameEventShape(
   r: LiveEventRow,
   actionLabels: Record<string, string>,
   names: Record<string, string>,
   lateNames: Record<string, string>
-): Omit<GameEvent, "elapsed" | "runHome" | "runAway"> {
+): Omit<GameEvent, "elapsed" | "runHome" | "runAway" | "surge"> {
   return {
     event_order: r.event_order,
     quarter: r.quarter,
@@ -523,12 +537,13 @@ export default function GameReplay({
       const cur = byOrder.get(r.event_order);
       return {
         ...toGameEventShape(r, liveActionLabels ?? {}, liveNames ?? {}, liveCtx.lateNames),
-        // 파생 3필드는 아래 attachDerivedFields가 어차피 전부 다시 계산한다. 다만 기존 행과
-        // "값이 같은지" 비교할 때 이 3개 때문에 매번 달라 보이면 무의미한 재계산이 나므로
+        // 파생 필드는 아래 attachDerivedFields가 어차피 전부 다시 계산한다. 다만 기존 행과
+        // "값이 같은지" 비교할 때 이것들 때문에 매번 달라 보이면 무의미한 재계산이 나므로
         // 기존 값을 그대로 실어 보낸다(mergeEventRows가 참조 동일성을 유지할 수 있게).
         elapsed: cur?.elapsed ?? 0,
         runHome: cur?.runHome ?? 0,
         runAway: cur?.runAway ?? 0,
+        surge: cur?.surge ?? null,
       };
     });
     const merged = mergeEventRows(serverEvents, incoming);
@@ -844,8 +859,18 @@ export default function GameReplay({
   if (droughts.awaySec >= DROUGHT_MIN_SEC) {
     flowChips.push({ key: "drought-away", text: `${awayTeam.abbr} ${Math.floor(droughts.awaySec / 60)}분 ${droughts.awaySec % 60}초 무득점` });
   }
-  if (row.runHome >= RUN_THRESHOLD) flowChips.push({ key: "run-home", text: `🔥 ${homeTeam.abbr} ${row.runHome}-0 런` });
-  if (row.runAway >= RUN_THRESHOLD) flowChips.push({ key: "run-away", text: `🔥 ${awayTeam.abbr} ${row.runAway}-0 런` });
+  // 서지가 있으면 그걸 쓴다 - 서지는 0-런을 포함하는 개념이라(상대 0점이면 값이 같다) 둘 다
+  // 띄우면 같은 사건이 칩 두 개로 보인다.
+  if (row.surge) {
+    const t = row.surge.side === "home" ? homeTeam : awayTeam;
+    flowChips.push({
+      key: `surge-${row.surge.side}`,
+      text: `🔥 ${t.abbr} ${surgeScoreText(row.surge)} 몰아치기 (${fmtSurgeDuration(row.surge.seconds)})`,
+    });
+  } else {
+    if (row.runHome >= RUN_THRESHOLD) flowChips.push({ key: "run-home", text: `🔥 ${homeTeam.abbr} ${row.runHome}-0 런` });
+    if (row.runAway >= RUN_THRESHOLD) flowChips.push({ key: "run-away", text: `🔥 ${awayTeam.abbr} ${row.runAway}-0 런` });
+  }
 
   // 요청: "현 시점 game leaders를 보여줌" - 위 box(computeBoxScore, 이미 as-of-idx로
   // 계산됨)에서 팀별 최고 득점/리바운드/어시스트만 뽑음.
@@ -1109,9 +1134,14 @@ export default function GameReplay({
   };
   // 상단 고정 바의 한 줄짜리 "지금 흐름". 점수차는 항상, 런은 6-0 이상일 때만
   // (아래 flow-chip의 RUN_THRESHOLD와 같은 기준 - 같은 화면에서 두 기준이 달라지면 안 된다).
+  // 서지 우선순위도 flow-chip과 동일하게 맞춘다.
   const stickyFlow = (() => {
     const diff = row.home_score - row.away_score;
     const lead = diff === 0 ? "동점" : `${diff > 0 ? homeTeam.abbr : awayTeam.abbr} +${Math.abs(diff)}`;
+    if (row.surge) {
+      const t = row.surge.side === "home" ? homeTeam : awayTeam;
+      return `${lead} · ${t.abbr} ${surgeScoreText(row.surge)} 몰아치기`;
+    }
     if (row.runHome >= PUSH_RUN_THRESHOLD) return `${lead} · ${homeTeam.abbr} ${row.runHome}-0 런`;
     if (row.runAway >= PUSH_RUN_THRESHOLD) return `${lead} · ${awayTeam.abbr} ${row.runAway}-0 런`;
     return lead;

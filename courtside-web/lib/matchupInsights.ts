@@ -2,7 +2,7 @@ import { supabaseServer as supabase } from "./supabaseServer";
 import { classifyShot } from "./formIndex";
 import { isCornerThree } from "./zoneCompare";
 import { computeFinalPlusMinus, type PlayerStartInfo } from "./gameLineups";
-import { teamTopPerformer, type GameEvent, type PlayerBox } from "./postgameReport";
+import { teamTopPerformer, gameScore, type GameEvent, type PlayerBox } from "./postgameReport";
 import type { ScheduleGame, SeasonStats } from "./matchups";
 
 // 요청 항목 1~7("직전 경기 활약 선수 주의/직전 경기 수비 약점/조합 시너지/최근 추세/오펜스
@@ -59,7 +59,27 @@ export type PreviewInsight =
   | { kind: "trend"; team: "home" | "away"; text: string; wins: number; losses: number; avgMargin: number }
   | { kind: "oreb_watch"; team: "home" | "away"; orebPct: number; leagueAvgOrebPct: number; reason: string }
   | { kind: "block_watch"; team: "home" | "away"; pcode: string; name: string; blkPg: number; reason: string }
+  | {
+      kind: "season_ace";
+      team: "home" | "away";
+      /** 국내 1위. 자격(15경기 또는 300분) 통과자가 없으면 null. */
+      domestic: AceEntry | null;
+      /** 외국선수 + 아시아쿼터 중 1위. 없으면 null. */
+      foreign: AceEntry | null;
+      /** 이 시즌 경기가 아직 없어 지난 시즌으로 물러섰으면 "25-26" 같은 라벨. 아니면 null. */
+      priorSeasonLabel: string | null;
+    }
   | { kind: "win_prob"; homeProb: number; awayProb: number };
+
+export type AceEntry = {
+  pcode: string;
+  name: string;
+  /** 게임스코어 경기당 평균. watch_player가 쓰는 gameScore()와 같은 식. */
+  gameScorePg: number;
+  gp: number;
+  minutes: number;
+  isAsianQuota: boolean;
+};
 
 // 직전 경기 한 판 전체(양 팀) - app/games/[gmkey]/page.tsx가 "이 경기" 자체를 위해 이미 쓰는
 // getPlayerStats(gmkey)/getEvents(gmkey) 결과를 그대로 재사용해(같은 매핑 규칙으로) 만들어
@@ -471,57 +491,226 @@ function buildOrebWatchInsight(team: "home" | "away", seasonStats: SeasonStats |
 // ---------------------------------------------------------------------------
 // Insight 5b: block_watch - 팀 season 블록 리더(최소 경기수/블록 기준 충족 시만).
 // ---------------------------------------------------------------------------
-async function getSeasonBlockLeader(
+/** 한 팀의 그 시즌 선수별 누적. block_watch와 season_ace가 **같은 조회를 나눠 쓴다.** */
+export type TeamSeasonPlayer = {
+  pcode: string;
+  name: string;
+  /** 실제로 뛴 경기 수(DNP 제외). */
+  gp: number;
+  minutes: number;
+  blkSum: number;
+  /** 게임스코어 합. 경기당 평균은 gameScoreSum / gp. */
+  gameScoreSum: number;
+  nationality: Nationality | null;
+};
+
+export type TeamSeasonAgg = {
+  players: TeamSeasonPlayer[];
+  /** 집계에 쓴 시즌. 지난 시즌으로 폴백했으면 요청한 시즌과 다르다. */
+  seasonUsed: string;
+};
+
+/**
+ * 팀-시즌 선수 누적 한 번.
+ *
+ * 왜 하나로 합쳤나: 예전에는 buildBlockWatchInsight만 쓰는 getSeasonBlockLeader였고, 여기에
+ * 에이스 조회를 따로 붙이면 팀당 2왕복 x 2팀 = 페이지당 4왕복이 더 늘어난다. select에 컬럼만
+ * 얹으면 왕복은 그대로다.
+ *
+ * fallbackSeason: 26-27처럼 아직 한 경기도 안 치른 시즌이면 그 시즌 집계가 0행이라 두 인사이트
+ * 모두 사라진다(실제로 지금 block_watch/oreb_watch가 그 상태다). 그때는 지난 시즌으로 물러서고,
+ * **어느 시즌을 썼는지 seasonUsed로 돌려줘서 화면 문구에 반드시 명시**한다 - 라벨 없이 폴백하면
+ * 지난 시즌 수치가 이번 시즌 성적처럼 읽힌다(buildTrendInsight가 이미 같은 함정을 처리한다).
+ */
+async function getTeamSeasonAgg(
   tcode: string,
   seasonName: string,
   beforeDate: string,
-  departed?: Set<string>
-): Promise<{ pcode: string; name: string; blkPg: number; gp: number } | null> {
-  const { data: games } = await supabase
-    .from("games")
-    .select("gmkey")
-    .eq("season_name", seasonName)
-    .eq("season_category", "정규시즌")
-    .lt("game_date", beforeDate)
-    .or(`home_tcode.eq.${tcode},away_tcode.eq.${tcode}`)
-    .not("home_score", "is", null);
-  if (!games || !games.length) return null;
-  const gmkeys = games.map((g) => g.gmkey);
+  fallbackSeason?: string | null
+): Promise<TeamSeasonAgg | null> {
+  const fetchFor = async (season: string, cutoff: string | null) => {
+    let q = supabase
+      .from("games")
+      .select("gmkey")
+      .eq("season_name", season)
+      .eq("season_category", "정규시즌")
+      .or(`home_tcode.eq.${tcode},away_tcode.eq.${tcode}`)
+      .not("home_score", "is", null);
+    // 리크프리: 이 경기 이전 경기만. 폴백(지난 시즌)은 이미 통째로 과거라 컷오프가 필요 없다.
+    if (cutoff) q = q.lt("game_date", cutoff);
+    const { data } = await q;
+    return (data ?? []).map((g) => g.gmkey);
+  };
 
-  const { data: stats } = await supabase
-    .from("game_player_stats")
-    .select("pcode, blk, player:players(name)")
-    .eq("tcode", tcode)
-    .in("gmkey", gmkeys);
+  let seasonUsed = seasonName;
+  let gmkeys = await fetchFor(seasonName, beforeDate);
+  if (!gmkeys.length && fallbackSeason) {
+    seasonUsed = fallbackSeason;
+    gmkeys = await fetchFor(fallbackSeason, null);
+  }
+  if (!gmkeys.length) return null;
+
+  const [statsRes, natRes] = await Promise.all([
+    supabase
+      .from("game_player_stats")
+      .select(
+        "pcode, blk, min_played, pts, reb, ast, stl, fgm, fga, tpm, tpa, ftm, fta, fouls, turnovers, player:players(name)"
+      )
+      .eq("tcode", tcode)
+      .in("gmkey", gmkeys),
+    supabase.from("player_nationality").select("pcode, nationality").eq("season_name", seasonUsed),
+  ]);
+  const stats = statsRes.data as unknown as SeasonStatRow[] | null;
   if (!stats || !stats.length) return null;
 
-  const agg = new Map<string, { blkSum: number; gp: number; name: string }>();
-  for (const r of stats as unknown as { pcode: string; blk: number | null; player: { name: string } | null }[]) {
-    const cur = agg.get(r.pcode) ?? { blkSum: 0, gp: 0, name: r.player?.name ?? r.pcode };
+  const natByPcode = new Map<string, Nationality>();
+  for (const r of (natRes.data ?? []) as { pcode: string; nationality: string }[]) {
+    if (r.nationality === "국내" || r.nationality === "외국" || r.nationality === "아시아쿼터") {
+      natByPcode.set(r.pcode, r.nationality);
+    }
+  }
+
+  const agg = new Map<string, TeamSeasonPlayer>();
+  for (const r of stats) {
+    const cur =
+      agg.get(r.pcode) ??
+      ({
+        pcode: r.pcode,
+        name: r.player?.name ?? r.pcode,
+        gp: 0,
+        minutes: 0,
+        blkSum: 0,
+        gameScoreSum: 0,
+        nationality: natByPcode.get(r.pcode) ?? null,
+      } as TeamSeasonPlayer);
+    const min = r.min_played ?? 0;
+    // DNP(0분) 행은 출전경기로 세지 않는다. 예전 getSeasonBlockLeader는 무조건 +1이라
+    // 화면에 인쇄되는 "N경기"가 실제 출전보다 컸다(25-26 정규시즌 DNP 612행).
+    if (min > 0) cur.gp += 1;
+    cur.minutes += min;
     cur.blkSum += r.blk ?? 0;
-    cur.gp += 1;
+    // game_player_stats.fgm/fga는 2점 전용이라 3점을 더해야 gameScore가 기대하는 값이 된다
+    // (이 파일 상단 PlayerBox 주석과 같은 규칙).
+    cur.gameScoreSum += gameScore({
+      pts: r.pts ?? 0,
+      fgm: (r.fgm ?? 0) + (r.tpm ?? 0),
+      fga: (r.fga ?? 0) + (r.tpa ?? 0),
+      ftm: r.ftm ?? 0,
+      fta: r.fta ?? 0,
+      reb: r.reb ?? 0,
+      ast: r.ast ?? 0,
+      stl: r.stl ?? 0,
+      blk: r.blk ?? 0,
+      fouls: r.fouls ?? 0,
+      turnovers: r.turnovers ?? 0,
+    });
     agg.set(r.pcode, cur);
   }
-  let best: { pcode: string; name: string; blkPg: number; gp: number } | null = null;
-  for (const [pcode, a] of agg) {
-    if (departed?.has(pcode)) continue;
-    const blkPg = a.blkSum / a.gp;
-    if (!best || blkPg > best.blkPg) best = { pcode, name: a.name, blkPg, gp: a.gp };
+  return { players: [...agg.values()], seasonUsed };
+}
+
+type SeasonStatRow = {
+  pcode: string;
+  blk: number | null;
+  min_played: number | null;
+  pts: number | null;
+  reb: number | null;
+  ast: number | null;
+  stl: number | null;
+  fgm: number | null;
+  fga: number | null;
+  tpm: number | null;
+  tpa: number | null;
+  ftm: number | null;
+  fta: number | null;
+  fouls: number | null;
+  turnovers: number | null;
+  player: { name: string } | null;
+};
+
+function buildBlockWatchInsight(
+  team: "home" | "away",
+  agg: TeamSeasonAgg | null,
+  departed?: Set<string>
+): PreviewInsight | null {
+  if (!agg) return null;
+  let best: TeamSeasonPlayer | null = null;
+  for (const p of agg.players) {
+    if (departed?.has(p.pcode) || p.gp <= 0) continue;
+    if (!best || p.blkSum / p.gp > best.blkSum / best.gp) best = p;
+  }
+  if (!best || best.gp < BLOCK_WATCH_MIN_GP) return null;
+  const blkPg = best.blkSum / best.gp;
+  if (blkPg < BLOCK_WATCH_MIN_BPG) return null;
+  const reason = `시즌 평균 ${blkPg.toFixed(1)}블록/경기로 팀 내 1위(${best.gp}경기 기준) - 골밑 시도 때 이 선수의 블록을 조심.`;
+  return { kind: "block_watch", team, pcode: best.pcode, name: best.name, blkPg, reason };
+}
+
+// ---------------------------------------------------------------------------
+// Insight 7: season_ace - "직전 경기 반짝"이 아니라 시즌 내내 팀을 끌고 간 선수. 국내/외국 분리.
+// ---------------------------------------------------------------------------
+//
+// 요청: "직전 경기 활약했던 선수말고도, 실질적인 에이스에 대해서도 (국내/해외 나눠서 진행하면
+// 좋을듯)". watch_player와 **같은 자(gameScore)** 를 시즌 창에 대는 것이라, 두 카드가 같은
+// 선수를 가리키면 그 자체가 "반짝이 아니다"라는 문장이 된다.
+//
+// ── 왜 게임스코어인가 (25-26 팀별 1위 실측 대조) ────────────────────────────────
+// 후보였던 시즌 지표들과의 일치율: PER과 9/10, WPA와 9/10. 득점(PPG)은 PER과 7/10에 그친다.
+// 갈리는 두 팀이 정확히 이 지표를 쓰는 이유다 - 가스공사는 득점 1위가 벨란겔(15.8)이지만
+// 게임스코어 1위는 라건아, 소노는 득점 1위가 이정현(18.6)이지만 게임스코어 1위는 네이던 나이트.
+// "득점만 많은 선수"를 에이스라고 부르지 않는 게 요청의 '실질적'에 해당한다.
+//
+// 탈락시킨 것들: player_win_impact / lineup_combo / player_onoff 는 **season 컬럼이 없는 통산
+// 집계**라 시즌 에이스로 쓰면 10팀 중 9팀이 통산 누적 베테랑으로 바뀐다. PER은 우리가 계산한
+// 값이 아니라 KBL 피드를 그대로 받은 것이고 경기별 범위가 -509.6~+498.3이라, 하한 없이 쓰면
+// 1경기 15분 뛴 선수가 팀 에이스가 된다. WPA는 시즌 총득점과 r=0.9909라 사실상 득점의 재탕이다.
+const ACE_MIN_GP = 15; // lib/seasonLeaders.ts의 LEADER_QUALIFY, playerDataScience.ts와 같은 값
+const ACE_MIN_MINUTES = 300; // OR 조건인 이유: 짧게 뛰고 떠난 외국선수 교체를 부당하게 자르지 않기 위해
+
+export type Nationality = "국내" | "외국" | "아시아쿼터";
+
+function pickAce(players: TeamSeasonPlayer[], want: (n: Nationality | null) => boolean, departed?: Set<string>) {
+  let best: TeamSeasonPlayer | null = null;
+  for (const p of players) {
+    if (departed?.has(p.pcode) || p.gp <= 0) continue;
+    if (!want(p.nationality)) continue;
+    if (p.gp < ACE_MIN_GP && p.minutes < ACE_MIN_MINUTES) continue;
+    if (!best || p.gameScoreSum / p.gp > best.gameScoreSum / best.gp) best = p;
   }
   return best;
 }
 
-async function buildBlockWatchInsight(
+function buildSeasonAceInsight(
   team: "home" | "away",
-  tcode: string,
+  agg: TeamSeasonAgg | null,
   seasonName: string,
-  beforeDate: string,
   departed?: Set<string>
-): Promise<PreviewInsight | null> {
-  const leader = await getSeasonBlockLeader(tcode, seasonName, beforeDate, departed);
-  if (!leader || leader.gp < BLOCK_WATCH_MIN_GP || leader.blkPg < BLOCK_WATCH_MIN_BPG) return null;
-  const reason = `시즌 평균 ${leader.blkPg.toFixed(1)}블록/경기로 팀 내 1위(${leader.gp}경기 기준) - 골밑 시도 때 이 선수의 블록을 조심.`;
-  return { kind: "block_watch", team, pcode: leader.pcode, name: leader.name, blkPg: leader.blkPg, reason };
+): PreviewInsight | null {
+  if (!agg) return null;
+  // 국내 / 비국내(외국 + 아시아쿼터)로 가른다. 아시아쿼터를 외국 쪽에 넣은 이유: 요청이
+  // "국내/해외"라는 2분법이고, 팀당 AQ가 0~1명뿐이라 따로 떼면 카드 하나가 자주 빈다.
+  // 다만 뽑힌 선수가 AQ면 문구에 그렇게 적는다(아래 aceLabel).
+  const domestic = pickAce(agg.players, (n) => n === "국내", departed);
+  const foreign = pickAce(agg.players, (n) => n === "외국" || n === "아시아쿼터", departed);
+  if (!domestic && !foreign) return null;
+
+  const toEntry = (p: TeamSeasonPlayer) => ({
+    pcode: p.pcode,
+    name: p.name,
+    gameScorePg: Math.round((p.gameScoreSum / p.gp) * 100) / 100,
+    gp: p.gp,
+    minutes: Math.round(p.minutes),
+    isAsianQuota: p.nationality === "아시아쿼터",
+  });
+
+  return {
+    kind: "season_ace",
+    team,
+    domestic: domestic ? toEntry(domestic) : null,
+    foreign: foreign ? toEntry(foreign) : null,
+    // 폴백했으면 반드시 드러낸다.
+    priorSeasonLabel: agg.seasonUsed !== seasonName ? shortSeasonLabel(agg.seasonUsed) : null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -540,6 +729,8 @@ export type BuildInsightsInput = {
   homeTcode: string;
   awayTcode: string;
   seasonName: string;
+  /** 개막 전이라 seasonName 경기가 0건일 때 물러설 시즌. 없으면 폴백하지 않는다. */
+  prevSeasonName?: string | null;
   gameDate: string; // 지금 보고 있는 이 경기의 날짜(시즌 폴백 슛 조회의 "이 시점까지" 컷오프)
   homeSchedule: ScheduleGame[];
   awaySchedule: ScheduleGame[];
@@ -557,12 +748,16 @@ export type BuildInsightsInput = {
 export async function buildMatchupInsights(input: BuildInsightsInput): Promise<PreviewInsight[]> {
   const insights: PreviewInsight[] = [];
 
-  const [homeWatch, awayWatch, homeBlock, awayBlock] = await Promise.all([
+  // 팀-시즌 집계는 팀당 한 번만 받는다 - block_watch와 season_ace가 같은 결과를 나눠 쓴다.
+  // 따로 조회하면 페이지당 4왕복이 더 늘어난다.
+  const [homeWatch, awayWatch, homeAgg, awayAgg] = await Promise.all([
     buildWatchPlayerInsight("home", input.homeTcode, input.homePriorGame, input.seasonName, input.gameDate, input.homeDeparted),
     buildWatchPlayerInsight("away", input.awayTcode, input.awayPriorGame, input.seasonName, input.gameDate, input.awayDeparted),
-    buildBlockWatchInsight("home", input.homeTcode, input.seasonName, input.gameDate, input.homeDeparted),
-    buildBlockWatchInsight("away", input.awayTcode, input.seasonName, input.gameDate, input.awayDeparted),
+    getTeamSeasonAgg(input.homeTcode, input.seasonName, input.gameDate, input.prevSeasonName),
+    getTeamSeasonAgg(input.awayTcode, input.seasonName, input.gameDate, input.prevSeasonName),
   ]);
+  const homeBlock = buildBlockWatchInsight("home", homeAgg, input.homeDeparted);
+  const awayBlock = buildBlockWatchInsight("away", awayAgg, input.awayDeparted);
   if (homeWatch) insights.push(homeWatch);
   if (awayWatch) insights.push(awayWatch);
 
@@ -587,6 +782,11 @@ export async function buildMatchupInsights(input: BuildInsightsInput): Promise<P
   if (awayOreb) insights.push(awayOreb);
   if (homeBlock) insights.push(homeBlock);
   if (awayBlock) insights.push(awayBlock);
+
+  const homeAce = buildSeasonAceInsight("home", homeAgg, input.seasonName, input.homeDeparted);
+  const awayAce = buildSeasonAceInsight("away", awayAgg, input.seasonName, input.awayDeparted);
+  if (homeAce) insights.push(homeAce);
+  if (awayAce) insights.push(awayAce);
 
   const winProb = buildWinProbInsight(input.homeWinProb);
   if (winProb) insights.push(winProb);
@@ -664,6 +864,17 @@ export function gradeMatchupInsights(insights: PreviewInsight[], ctx: GradingCon
         const p = boxByPcode.get(insight.pcode);
         if (!p) return "이번 경기 미출전.";
         return `이번 경기 실제 블록 ${p.blk}개.`;
+      }
+      case "season_ace": {
+        // 이 카드는 두 명(국내/외국)을 담으므로 채점도 둘 다 한다.
+        const line = (label: string, e: AceEntry | null) => {
+          if (!e) return null;
+          const p = boxByPcode.get(e.pcode);
+          if (!p) return `${label} ${e.name} 이번 경기 미출전.`;
+          return `${label} ${e.name} 실제 ${p.pts}점 (FG ${p.fgm}/${p.fga}) ${p.reb}REB ${p.ast}AST.`;
+        };
+        const parts = [line("국내", insight.domestic), line("외국", insight.foreign)].filter(Boolean);
+        return parts.length ? parts.join(" / ") : null;
       }
       case "trend":
         return null; // 스펙: 추세는 강하게 채점할 대상이 아님 - 참고 정보로만 표시
