@@ -2729,3 +2729,57 @@ footer.foot {
   color: var(--gold);
   font-weight: 600;
 }
+
+/* 일정 상황(lib/scheduleContext.ts) - 표시 전용 섹션. 승률에 반영하지 않는다는 캡션이
+   이 블록의 핵심이라, 캡션을 눈에 띄되 본문을 가리지 않는 톤으로 둔다. */
+.sched-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+.sched-col {
+  border-left: 3px solid var(--ink-faint);
+  padding: 4px 0 4px 10px;
+}
+.sched-team {
+  font-size: 12.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.sched-side {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+}
+.sched-bits {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  word-break: keep-all;
+}
+.sched-next {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.sched-venue {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+.sched-caveat {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px dashed rgba(var(--line-rgb), 0.15);
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+  word-break: keep-all;
+}

@@ -12,6 +12,7 @@ import { collectAllOnCourtLineups, subComboKeys, type PlayerStartInfo } from "@/
 import { getLineupRatings, getPlayerOnOffRatings, type LineupRating, type PlayerOnOff } from "@/lib/lineupNetRating";
 import { buildMatchupInsights, gradeMatchupInsights, type PreviewInsight, type PriorGameData } from "@/lib/matchupInsights";
 import { getDepartedByTeam, prevSeasonName } from "@/lib/preseason";
+import { getScheduleContext, scheduleSummary } from "@/lib/scheduleContext";
 import { TeamBadge } from "@/components/TeamBadge";
 import GameReplay from "@/components/GameReplay";
 import { InsightCard } from "@/components/InsightCard";
@@ -495,8 +496,9 @@ export default async function GamePage({
   let h2h: Awaited<ReturnType<typeof getHeadToHead>> | null = null;
   let standings: Awaited<ReturnType<typeof getStandingsAsOf>> = [];
   let allTeams: { tcode: string; name: string; abbr: string; color: string; logo_url: string | null }[] = [];
+  let sched: Awaited<ReturnType<typeof getScheduleContext>> = { home: null, away: null };
   if (game.home_team && game.away_team) {
-    [homeSeasonStats, awaySeasonStats, homeSchedule, awaySchedule, h2h, standings, allTeams] = await Promise.all([
+    [homeSeasonStats, awaySeasonStats, homeSchedule, awaySchedule, h2h, standings, allTeams, sched] = await Promise.all([
       getSeasonStatsAsOf(game.home_team.tcode, game.season_name, game.game_date),
       getSeasonStatsAsOf(game.away_team.tcode, game.season_name, game.game_date),
       getRecentSchedule(game.home_team.tcode, game.game_date),
@@ -504,6 +506,9 @@ export default async function GamePage({
       getHeadToHead(game.home_team.tcode, game.away_team.tcode, game.game_date),
       getStandingsAsOf(game.season_name, game.game_date),
       supabase.from("teams").select("tcode, name, abbr, color, logo_url").then((r) => r.data ?? []),
+      // 일정 상황(연전/휴식/공유 구장) - **표시 전용.** 승률에는 넣지 않는다(lib/scheduleContext.ts
+      // 상단에 15시즌 3,993경기 실측 근거 - 휴식일 차이의 설명력이 R2=0.0011이다).
+      getScheduleContext(game.gmkey, game.season_name, game.game_date, game.home_team.tcode, game.away_team.tcode),
     ]);
   }
   // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - allTeams는 teams 전체를 시즌
@@ -734,6 +739,8 @@ export default async function GamePage({
           homeSchedule.length > 0 ||
           awaySchedule.length > 0 ||
           h2h ||
+          sched.home ||
+          sched.away ||
           standings.length > 0) && (
           <details className="panel preview-details">
             <summary className="preview-details-summary">프리뷰 인사이트 자세히 보기</summary>
@@ -746,6 +753,47 @@ export default async function GamePage({
                       <li key={i} dangerouslySetInnerHTML={{ __html: line }} />
                     ))}
                   </ul>
+                </div>
+              )}
+
+
+              {(sched.home || sched.away) && (
+                <div className="preview-subsection">
+                  <div className="panel-title">일정 상황</div>
+                  <div className="sched-grid">
+                    {([["home", sched.home], ["away", sched.away]] as const).map(([side, c]) => {
+                      if (!c) return null;
+                      const team = side === "home" ? game.home_team : game.away_team;
+                      const bits = scheduleSummary(c);
+                      return (
+                        <div className="sched-col" key={side} style={{ borderLeftColor: side === "home" ? hColor : aColor }}>
+                          <div className="sched-team">
+                            {team?.name}
+                            <span className="sched-side">{c.isHome ? "홈" : "원정"}</span>
+                          </div>
+                          <div className="sched-bits">{bits.length ? bits.join(" · ") : "특별한 일정 부담 없음"}</div>
+                          {c.nextRestDays != null && (
+                            <div className="sched-next">
+                              다음 경기까지 {c.nextRestDays <= 0 ? "하루도 못 쉼" : `${c.nextRestDays}일`}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {sched.home?.stadium && (
+                    <div className="sched-venue">
+                      경기장 <b>{sched.home.stadium}</b>
+                      {sched.home.venueNote ? ` · ${sched.home.venueNote}` : ""}
+                    </div>
+                  )}
+                  {/* 이 캡션이 이 섹션의 핵심이다. 숫자를 보여주되 "그래서 유리하다"고 말하지 않는다. */}
+                  <div className="sched-caveat">
+                    일정은 <b>참고용 표시</b>입니다. 15시즌 정규시즌 3,993경기를 전수 확인한 결과, 휴식일과 경기 결과 사이에
+                    쓸 만한 관계가 나오지 않았습니다 — 홈 승률이 백투백 55.6%, 하루 쉼 55.7%, 5일 이상 쉼 53.7%로 단조 경향이
+                    없고, 휴식일 차이와 득실차의 설명력은 R<sup>2</sup>=0.001입니다. 그래서 위 숫자는 승률 계산에 반영하지
+                    않습니다. 이동 거리는 경기장 좌표 자체가 없어 표시하지 않습니다.
+                  </div>
                 </div>
               )}
 
