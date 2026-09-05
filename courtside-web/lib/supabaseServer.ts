@@ -137,5 +137,35 @@ export const supabaseServer = new Proxy(client, {
   },
 }) as typeof client;
 
-/** 지금 서버가 전용 키를 쓰고 있는가 - 배포 점검용. */
+/** 지금 서버가 전용 키를 쓰고 있는가 - 배포 점검용. **존재**만 본다(아래 serverKeyClaims 참고). */
 export const usingServerKey = !!serverKey;
+
+/** NEXT_PUBLIC_SUPABASE_URL의 프로젝트 ref(호스트 첫 조각). 키의 ref 클레임과 맞는지 대조용. */
+export const projectRef: string | null = (() => {
+  try {
+    return new URL(url).hostname.split(".")[0] ?? null;
+  } catch {
+    return null;
+  }
+})();
+
+/**
+ * 서버 키의 JWT 클레임(role / ref)만 읽는다 - **키 값은 이 모듈 밖으로 절대 내보내지 않는다.**
+ *
+ * 왜 필요한가(2026-09-05 사고 2차): usingServerKey가 true여도 값이 **다른 Supabase 프로젝트의 키**
+ * 이거나 손상된 값이면 모든 쿼리가 401이 되어 사이트 전체가 500이 된다. 존재 여부만으로는 이걸
+ * 못 잡았다. Supabase JWT 키는 payload에 role("anon"/"service_role")과 ref(프로젝트)를 담으므로
+ * 서명 검증 없이 payload만 디코드해도 "어느 프로젝트의 어떤 역할 키인가"는 알 수 있다.
+ * 새 형식(sb_secret_...)은 JWT가 아니라 format="other"로 답한다.
+ */
+export function serverKeyClaims(): { format: "missing" | "jwt" | "other"; role: string | null; ref: string | null } {
+  if (!serverKey) return { format: "missing", role: null, ref: null };
+  const parts = serverKey.split(".");
+  if (parts.length !== 3) return { format: "other", role: null, ref: null };
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as { role?: string; ref?: string };
+    return { format: "jwt", role: payload.role ?? null, ref: payload.ref ?? null };
+  } catch {
+    return { format: "other", role: null, ref: null };
+  }
+}

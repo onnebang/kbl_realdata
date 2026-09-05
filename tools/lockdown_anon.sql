@@ -6,8 +6,11 @@
 --   1) courtside-web 배포에 SUPABASE_SERVICE_ROLE_KEY 환경변수가 들어가 있어야 한다.
 --      없으면 lib/supabaseServer.ts가 공개 키로 폴백하고, 이 스크립트가 그 키를 막는 순간
 --      서버 렌더가 전부 빈 화면이 된다.
---   2) 확인 방법: 배포 로그에 "[supabaseServer] SUPABASE_SERVICE_ROLE_KEY가 없어 공개 키로
---      폴백합니다" 경고가 **없어야** 한다.
+--   2) 확인 방법: **프로덕션 도메인**의 /api/health 가 {"usingServerKey":true,"vercelEnv":"production"}
+--      을 답해야 한다. 로그의 문구로 판단하지 마라 - 2026-09-05에 로그의 긍정 문구를 믿고 이
+--      스크립트를 실행했다가 프로덕션 런타임은 여전히 공개 키여서(다른 배포/빌드의 로그였다)
+--      사이트가 500/404/빈화면이 됐고, 아래 롤백 블록으로 즉시 되돌렸다. Vercel 환경변수는
+--      추가 이후 만들어진 배포에만 들어가고 Production 스코프 체크가 따로 있다.
 --   3) 이 스크립트는 코트사이드(KBL) 자산만 건드린다. kbo/kleague/kovo/kbl540/profiles 계열은
 --      다른 앱의 것이라 손대지 않는다(아래 4절에 목록만 남겼다).
 --
@@ -48,7 +51,10 @@ declare
     'season_roster', 'roster_changes', 'roster_departure',
     'import_slot_season', 'import_rule_season',
     'departure_impact_team', 'departure_impact_player',
-    'strength_adjustment_team', 'strength_adjustment_player'
+    'strength_adjustment_team', 'strength_adjustment_player',
+    -- 2026-09-05 추가(시즌 에이스 국적). build_player_nationality.py가 만드는 공개 읽기 정책은
+    -- 다른 테이블들과 같은 초기 상태이고, 닫는 건 이 스크립트 한 곳이 맡는다.
+    'player_nationality'
   ];
 begin
   foreach t in array targets loop
@@ -105,7 +111,8 @@ begin
     'season_roster','roster_changes','roster_departure',
     'import_slot_season','import_rule_season',
     'departure_impact_team','departure_impact_player',
-    'strength_adjustment_team','strength_adjustment_player'
+    'strength_adjustment_team','strength_adjustment_player',
+    'player_nationality'
   ] loop
     if exists (select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
                 where n.nspname='public' and c.relname=t and c.relkind='r') then
