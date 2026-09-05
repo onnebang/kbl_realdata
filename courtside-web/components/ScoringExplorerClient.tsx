@@ -12,11 +12,11 @@ import styles from "@/app/leaderboards/scoring-explorer/scoring-explorer.module.
 // 시즌 격자를 한 번에 들고 있다가, 재생/이전/다음/슬라이더는 서버 왕복 없이 클라이언트
 // 메모리에서만" 동작 - 엔티티 자체를 바꾸는 순간만 fetchEntitySeasonGridsAction(Server Action)
 // 호출.
+// team/player는 뺐다 - 팀·선수 페이지의 히어로 밀도 지도가 같은 데이터를 더 잘 그린다.
+// 여기 남은 둘은 그 페이지들에 없는 것: 리그 전체의 시대 변화와, 감독별 성향.
 const DIM_LABELS: { value: Dimension; label: string }[] = [
-  { value: "team", label: "팀별" },
-  { value: "player", label: "선수별" },
-  { value: "coach", label: "감독별" },
   { value: "league", label: "리그 전체" },
+  { value: "coach", label: "감독별" },
 ];
 
 const VIEW_BOX = `${GRID.xMin} ${GRID.yMin} ${GRID.xMax - GRID.xMin} ${GRID.yMax - GRID.yMin}`;

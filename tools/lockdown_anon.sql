@@ -93,7 +93,8 @@ revoke execute on function public.season_zone_mix from anon, authenticated, publ
 revoke execute on function public.team_best_units from anon, authenticated, public;
 revoke execute on function public.team_season_four_factors from anon, authenticated, public;
 revoke execute on function public.team_season_roster from anon, authenticated, public;
-revoke execute on function public.form_index_season(text) from anon, authenticated, public;
+-- 2026-09-06: 창 인자가 붙어 시그니처가 (text, int)로 바뀌었다(tools/rpc_form_index_v2.sql).
+revoke execute on function public.form_index_season(text, int) from anon, authenticated, public;
 
 -- ---------------------------------------------------------------------------
 -- 5. 쓰기 권한 정리 - 지금도 RLS가 막고 있지만, grant 자체를 없애 이중으로
