@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cached, TTL, TAG } from "@/lib/cachePolicy";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
 
 // 시즌 브라우저 박스스코어 모달(components/SeasonBrowserModal.tsx)이 여는 시점에만 부르는
@@ -52,8 +53,18 @@ export async function GET(req: NextRequest) {
   if (!gmkey || !homeTcode || !awayTcode) {
     return NextResponse.json({ error: "gmkey, home, away 파라미터가 필요합니다" }, { status: 400 });
   }
+  // 감사 지적: 무검증·무캐시·무인증 JSON이라 gmkey 4,477개를 돌리면 박스스코어(per 포함)가 전량
+  // 수집됐다. 형식 검증으로 쓰레기 입력을 막고, **종료 경기는 불변**이므로 24시간 캐시 + CDN 헤더를
+  // 붙여 반복 호출이 DB에 닿지 않게 한다. 진행 중 경기는 매번 새로(no-store).
+  if (!/^[A-Z0-9]{6,16}$/.test(gmkey) || !/^\d{2}$/.test(homeTcode) || !/^\d{2}$/.test(awayTcode)) {
+    return NextResponse.json({ error: "bad request" }, { status: 400 });
+  }
+  const { data: game } = await supabase.from("games").select("is_ended").eq("gmkey", gmkey).maybeSingle();
+  if (!game) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const ended = !!game.is_ended;
 
-  const [{ data: events, error: evErr }, { data: teamStats }, { data: playerStats }] = await Promise.all([
+  const load = async () => {
+    const [{ data: events, error: evErr }, { data: teamStats }, { data: playerStats }] = await Promise.all([
     supabase
       .from("game_events")
       .select("quarter, event_order, home_score, away_score")
@@ -72,8 +83,14 @@ export async function GET(req: NextRequest) {
       )
       .eq("gmkey", gmkey)
       .returns<PlayerStatRow[]>(),
-  ]);
-  if (evErr) return NextResponse.json({ error: evErr.message }, { status: 500 });
+    ]);
+    if (evErr) throw new Error(evErr.message);
+    return { events: events ?? [], teamStats: teamStats ?? [], playerStats: playerStats ?? [] };
+  };
+  // 종료 경기만 캐시 - 키는 gmkey, 태그는 경기 단위(재수집 시 무효화 가능).
+  const { events, teamStats, playerStats } = ended
+    ? await cached(load, ["boxscore", gmkey], TTL.final, [TAG.game(gmkey)])
+    : await load();
 
   // 쿼터별 득점: 각 쿼터 "끝" 시점 누적 스코어 - 그 전 쿼터 누적 스코어. Q로 시작하면
   // 정규쿼터, X로 시작하면 연장(개수는 실제 데이터만큼 동적으로).
@@ -167,7 +184,8 @@ export async function GET(req: NextRequest) {
     };
   }
 
-  return NextResponse.json({
+  return NextResponse.json(
+    {
     quarters: {
       home: { q: homeQ, ot: homeOt },
       away: { q: awayQ, ot: awayOt },
@@ -180,5 +198,7 @@ export async function GET(req: NextRequest) {
       home: homePlayers,
       away: awayPlayers,
     },
-  });
+    },
+    { headers: { "Cache-Control": ended ? "public, s-maxage=86400, stale-while-revalidate=3600" : "no-store" } }
+  );
 }
