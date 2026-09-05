@@ -370,7 +370,10 @@ export type SeasonProjection = {
  * 라이브 경기 화면은 이 함수를 쓰지 않으므로 30초 갱신 요구와 충돌하지 않는다.
  */
 export const getSeasonProjection = cachedFn(computeSeasonProjection, {
-  name: "seasonProjection",
+  // 이름 뒤 날짜는 strength_adjustment 빌드 버전이다. tools/build_strength_adjustment.py를 다시
+  // 돌렸으면 **이 값을 올려야** 새 값이 바로 보인다 - unstable_cache(6h)는 Vercel Data Cache에
+  // 배포를 넘어 살아남아서, 안 올리면 최대 6시간 옛 표가 뜬다.
+  name: "seasonProjection-sa2026-09-06",
   ttl: TTL.manualBuild,
   tags: (season) => [TAG.season(season ?? PRESEASON_SEASON), TAG.batch, TAG.build],
 });

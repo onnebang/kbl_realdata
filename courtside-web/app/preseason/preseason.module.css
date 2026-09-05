@@ -979,3 +979,63 @@
     font-size: 12.5px;
   }
 }
+
+/* ── 스카우팅 근거(접이식) ────────────────────────────────────────────────── */
+.scoutDetails {
+  margin-top: 10px;
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 10px;
+  padding: 0 12px;
+  background: var(--surface);
+}
+.scoutSummary {
+  cursor: pointer;
+  padding: 10px 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  list-style: none;
+}
+.scoutSummary::-webkit-details-marker {
+  display: none;
+}
+.scoutSummary::before {
+  content: "▸ ";
+  color: var(--ink-faint);
+}
+.scoutDetails[open] .scoutSummary::before {
+  content: "▾ ";
+}
+.scoutList {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 6px;
+}
+.scoutItem {
+  padding: 8px 0 8px 10px;
+  border-left: 3px solid rgba(var(--line-rgb), 0.16);
+}
+.scoutHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.scoutTier {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.scoutEv {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+  word-break: keep-all;
+}
+@media (max-width: 430px) {
+  .scoutEv {
+    font-size: 12.5px;
+  }
+}

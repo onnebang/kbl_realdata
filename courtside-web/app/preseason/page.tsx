@@ -276,6 +276,38 @@ function AdjBreakdown({ proj, cur, prev }: { proj: SeasonProjection; cur: string
           25%) · 아시아쿼터 16.2(중앙값). <b>이 등급은 측정이 아니라 스카우팅 판단입니다.</b>
         </div>
       )}
+      {/* 스카우팅 근거 - 사용자가 준 리그 스탯·EASL·연습경기 기사를 등급의 근거로 보여준다.
+          "참고 정도로만"이라는 요청 그대로 접어 두고, 열면 선수별로 무엇을 보고 등급을 매겼는지 나온다.
+          strength_adjustment_player.evidence는 이전까지 저장만 되고 어디에도 렌더되지 않았다. */}
+      {priors && (
+        <details className={styles.scoutDetails}>
+          <summary className={styles.scoutSummary}>사전확률 {adj.priorSlots}자리의 스카우팅 근거 보기</summary>
+          <div className={styles.scoutList}>
+            {rows.flatMap((t) =>
+              (t.adj as NonNullable<typeof t.adj>).team.slots
+                .filter((sl) => sl.tier)
+                .map((sl) => (
+                  <div key={`${t.tcode}-${sl.slot}`} className={styles.scoutItem}>
+                    <div className={styles.scoutHead}>
+                      <TeamBadge team={badgeOf(t)} size={14} />
+                      <b>{sl.name}</b>
+                      <span className={styles.scoutTier}>
+                        {sl.tier} · 투영 PER {sl.per.toFixed(1)}
+                        {sl.prevName ? ` · 전임 ${sl.prevName}${sl.prevPer != null ? ` ${sl.prevPer.toFixed(1)}` : ""}` : ""}
+                      </span>
+                    </div>
+                    {sl.evidence ? <div className={styles.scoutEv}>{sl.evidence}</div> : null}
+                  </div>
+                ))
+            )}
+          </div>
+          <div className={styles.note}>
+            위 근거는 해외 리그 기록·국제대회(EASL)·8~9월 연습경기 기사에서 옮긴 <b>참고 자료</b>이지 KBL 실측이 아닙니다. 리그 간
+            수준 차이를 환산하는 검증된 계수가 없어 숫자를 그대로 쓰지 않고, <b>등급 하나</b>로만 반영했습니다. KBL 팀을 직접 상대한
+            기록(EASL·연습경기)이 있는 선수는 그만큼 등급의 근거가 단단합니다.
+          </div>
+        </details>
+      )}
       {/* 신인 드래프트 - 사용자: "11월 9일날 신인 드래프트가 있어서 그 이후로 신인이 들어오긴
           할건데 ... 작년에 신입들이 활약했던걸 생각하면 추가를 해야할것 같아".
           아직 누구인지 모르므로 넣을 수 없다. 대신 "빠져 있다"는 사실과, 들어왔을 때 얼마나
