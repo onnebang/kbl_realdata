@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
-import { getSeasonsWithFormData, getFormIndexLeaderboard, type FormSortKey, MIN_ATTEMPTS, MIN_RECENT_GAMES } from "@/lib/formIndex";
+import {
+  getSeasonsWithFormData,
+  getFormIndexLeaderboard,
+  type FormSortKey,
+  FORM_WINDOWS,
+  formWindowLabel,
+  MIN_ATTEMPTS,
+  MIN_RECENT_GAMES,
+} from "@/lib/formIndex";
 import styles from "./form-index.module.css";
 
 // web/form_index_template.html 리디자인 이식. 원본은 정적 스냅샷(2025-26 시즌 고정, JS로
@@ -13,6 +21,9 @@ const COLUMNS: { key: FormSortKey; label: string }[] = [
   { key: "actualPts", label: "실제" },
   { key: "expectedPts", label: "기대(xPts)" },
   { key: "delta", label: "델타" },
+  // 기본 정렬이 되는 열. 원시 합계(델타)는 많이 던진 선수를 구조적으로 불리하게 만든다 -
+  // 25-26에서 시도 1위(1,091개) 자밀 워니가 합계로는 113/119위, 100슛당으로는 74/119위다.
+  { key: "deltaPer100", label: "100슛당" },
 ];
 
 function fmtDelta(v: number) {
@@ -22,25 +33,28 @@ function fmtDelta(v: number) {
 export default async function FormIndexPage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string; sort?: string; dir?: string }>;
+  searchParams: Promise<{ season?: string; sort?: string; dir?: string; win?: string }>;
 }) {
-  const { season, sort, dir } = await searchParams;
+  const { season, sort, dir, win } = await searchParams;
   const seasons = await getSeasonsWithFormData();
   const activeSeason = season ?? seasons[0];
-  const sortKey = (COLUMNS.find((c) => c.key === sort)?.key ?? "delta") as FormSortKey;
+  const sortKey = (COLUMNS.find((c) => c.key === sort)?.key ?? "deltaPer100") as FormSortKey;
+  // 창(경기 수). 0 = 시즌 전체. 목록에 없는 값이 들어오면 기본 5경기.
+  const parsedWin = Number(win);
+  const activeWin = (FORM_WINDOWS as readonly number[]).includes(parsedWin) ? parsedWin : 5;
   const ascending = dir === "asc";
 
-  const rows = await getFormIndexLeaderboard(activeSeason, sortKey, ascending);
+  const rows = await getFormIndexLeaderboard(activeSeason, activeWin, sortKey, ascending);
 
   // 다이버징 HOT/COLD 리스트는 테이블 정렬 상태와 무관하게 항상 delta 내림차순 기준(템플릿의
   // renderDivergeLists()와 동일 - byDeltaDesc를 테이블 정렬과 별도로 계산).
-  const byDeltaDesc = rows.slice().sort((a, b) => b.delta - a.delta);
+  const byDeltaDesc = rows.slice().sort((a, b) => b.deltaPer100 - a.deltaPer100);
   const hot = byDeltaDesc.slice(0, 8);
   const cold = byDeltaDesc.slice(-8).reverse();
 
   const sortLink = (key: FormSortKey) => {
     const nextDir = sortKey === key && !ascending ? "asc" : "desc";
-    return `?season=${encodeURIComponent(activeSeason)}&sort=${key}&dir=${nextDir}`;
+    return `?season=${encodeURIComponent(activeSeason)}&win=${activeWin}&sort=${key}&dir=${nextDir}`;
   };
 
   const barRow = (r: (typeof rows)[number], i: number, tone: "hot" | "cold") => (
@@ -51,7 +65,7 @@ export default async function FormIndexPage({
         <div className={styles.barTeam}>{r.teamName}</div>
       </div>
       <div className={`${styles.barVal} ${tone === "hot" ? styles.lbDeltaHot : styles.lbDeltaCold}`}>
-        {fmtDelta(r.delta)}
+        {fmtDelta(r.deltaPer100)}
       </div>
     </div>
   );
@@ -67,6 +81,8 @@ export default async function FormIndexPage({
           기준(최소 {MIN_RECENT_GAMES}경기 데이터거나 시도 {MIN_ATTEMPTS}회 미만인 선수는 제외).
         </div>
 
+        {/* 창 선택을 같은 폼에 둔다 - 따로 두면 시즌을 바꿀 때 창이 초기화된다.
+            정렬(sort/dir)은 hidden으로 실어 보내 제출해도 정렬이 풀리지 않게 한다. */}
         <form className={styles.seasonForm}>
           <select name="season" defaultValue={activeSeason} className={styles.seasonSelect}>
             {seasons.map((s) => (
@@ -75,8 +91,17 @@ export default async function FormIndexPage({
               </option>
             ))}
           </select>
+          <select name="win" defaultValue={String(activeWin)} className={styles.seasonSelect}>
+            {FORM_WINDOWS.map((w) => (
+              <option key={w} value={w}>
+                {formWindowLabel(w)}
+              </option>
+            ))}
+          </select>
+          <input type="hidden" name="sort" value={sortKey} />
+          <input type="hidden" name="dir" value={ascending ? "asc" : "desc"} />
           <button type="submit" className={styles.seasonSubmit}>
-            시즌 보기
+            보기
           </button>
         </form>
 
@@ -139,6 +164,9 @@ export default async function FormIndexPage({
                     <td>{r.actualPts.toFixed(1)}</td>
                     <td>{r.expectedPts.toFixed(1)}</td>
                     <td className={r.delta >= 0 ? styles.lbDeltaHot : styles.lbDeltaCold}>{fmtDelta(r.delta)}</td>
+                    <td className={r.deltaPer100 >= 0 ? styles.lbDeltaHot : styles.lbDeltaCold}>
+                      <b>{fmtDelta(r.deltaPer100)}</b>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -147,6 +175,13 @@ export default async function FormIndexPage({
           {!rows.length && <div className={styles.emptyNote}>이 시즌은 표본 기준을 충족하는 선수가 없음</div>}
 
           <div className={styles.explainBox}>
+            <b>100슛당</b>으로 보는 이유 - 델타(합계)는 많이 던진 선수일수록 절댓값이 커져서, 슛을 많이 맡는
+            에이스가 구조적으로 불리해집니다. 실제로 25-26 시즌 시도 1위(1,091개) 자밀 워니는 합계로는 119명 중
+            113위지만 100슛당으로는 74위입니다. 그래서 기본 정렬을 100슛당으로 두었습니다 — 합계도 열로 같이 두니
+            둘을 나란히 비교해 보세요. 창(최근 N경기)을 바꿔 가며 보면 &quot;지금 반짝&quot;인지 &quot;원래 그런&quot;인지가
+            갈립니다.
+            <br />
+            <br />
             <b>xPts(기대득점)</b>란 - 15시즌 전체 리그 평균 기준, 그 슛이 던져진 코트 위치(구역)에서
             평균적으로 얼마나 성공하는지를 근거로 &ldquo;이 슛 하나가 평균적으로 몇 점짜리인가&rdquo;를
             계산한 값(<code>build_xpts_shot_quality.py</code>). 최근 5경기 동안 던진 모든 슛(성공+실패)의

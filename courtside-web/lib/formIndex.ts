@@ -59,13 +59,34 @@ export type FormIndexRow = {
   expectedPts: number;
   delta: number;
   deltaPerGame: number;
+  /**
+   * 100슛당 델타. 이 지표의 기본값이어야 하는 값이다 - 원시 합계(delta)는 많이 던진 선수를
+   * 구조적으로 불리하게 만든다(실측: 25-26 시도 1위 자밀 워니가 합계 113/119위, 100슛당 74/119위).
+   */
+  deltaPer100: number;
   lastGameDate: string;
 };
-export type FormSortKey = "delta" | "deltaPerGame" | "actualPts" | "expectedPts" | "attempts" | "games";
+export type FormSortKey = "delta" | "deltaPer100" | "deltaPerGame" | "actualPts" | "expectedPts" | "attempts" | "games";
+
+/** 창 선택지 - 0은 시즌 전체. RPC form_index_season(p_season, p_window)의 p_window로 그대로 간다. */
+export const FORM_WINDOWS = [1, 3, 5, 10, 0] as const;
+export type FormWindow = (typeof FORM_WINDOWS)[number];
+export function formWindowLabel(w: number): string {
+  return w <= 0 ? "시즌 전체" : `최근 ${w}경기`;
+}
 
 export async function getSeasonsWithFormData(): Promise<string[]> {
-  const { data } = await supabase.from("seasons").select("season_name").order("season_name", { ascending: false });
-  return (data ?? []).map((s) => s.season_name);
+  // seasons 테이블을 그대로 쓰면 아직 한 경기도 안 치른 시즌(개막 전 2026-2027)이 맨 앞에 와서
+  // 기본 진입이 빈 표가 된다(실측 버그). 슛 로그가 실제로 있는 시즌만 남긴다.
+  const { data } = await supabase
+    .from("games")
+    .select("season_name")
+    .eq("season_category", "정규시즌")
+    .not("home_score", "is", null)
+    .order("season_name", { ascending: false });
+  const seen = new Set<string>();
+  for (const r of data ?? []) seen.add(r.season_name as string);
+  return [...seen].sort((a, b) => b.localeCompare(a));
 }
 
 type GameStatRow = { pcode: string; gmkey: string; games: { game_date: string } | null };
@@ -95,14 +116,15 @@ type FormRpcRow = {
  */
 export async function getFormIndexLeaderboard(
   seasonName: string,
-  sortKey: FormSortKey = "delta",
+  windowGames: number = 5,
+  sortKey: FormSortKey = "deltaPer100",
   ascending = false
 ): Promise<FormIndexRow[]> {
   const [rpcRes, teamsRes] = await Promise.all([
-    supabase.rpc("form_index_season", { p_season: seasonName }),
+    supabase.rpc("form_index_season", { p_season: seasonName, p_window: windowGames }),
     supabase.from("teams").select("tcode, name, abbr, color, logo_url"),
   ]);
-  if (rpcRes.error) throw new Error(`form_index_season(${seasonName}): ${rpcRes.error.message}`);
+  if (rpcRes.error) throw new Error(`form_index_season(${seasonName}, ${windowGames}): ${rpcRes.error.message}`);
   const raw = (rpcRes.data ?? []) as FormRpcRow[];
   if (!raw.length) return [];
 
@@ -131,6 +153,7 @@ export async function getFormIndexLeaderboard(
       expectedPts: Math.round(expectedPts * 10) / 10,
       delta: Math.round(delta * 10) / 10,
       deltaPerGame: Math.round((delta / games) * 100) / 100,
+      deltaPer100: Math.round((delta / Math.max(1, Number(r.attempts))) * 100 * 100) / 100,
       lastGameDate: r.last_game_date ?? "",
     };
   });
