@@ -1,4 +1,5 @@
 import { supabaseServer as supabase } from "./supabaseServer";
+import { TAG, TTL, cached, cachedFn } from "./cachePolicy";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import type { TeamSeasonGame } from "./matchups";
 
@@ -6,6 +7,13 @@ import type { TeamSeasonGame } from "./matchups";
 // lib/playerDataScience.ts와 같은 구조: GROUP BY가 필요한 집계(4팩터/로스터/베스트 유닛/
 // 존 구성비)는 마이그레이션 team_profile_datasci_rpc의 RPC 4종을 호출하고, 행 수가 적은
 // 것(시즌 WPA, 프리게임 승률)은 PostgREST로 직접.
+//
+// 캐시(감사 2026-09-06: 팀 프로필이 요청마다 RPC 4종 + 슛 로그 수천 행을 다시 받았다):
+// 입력이 전부 daily_batch 산출물(박스스코어·슛로그·스틴트·로스터)이라 TTL.batchDaily로
+// 감싼다. 반환값은 전부 배열/객체/숫자뿐이라 unstable_cache의 JSON 직렬화가 안전하다
+// (Map을 돌려주는 getPregameProbs만 감싸지 않았다). RPC 오류는 null/[]로 삼키지 않고
+// throw 한다 - 삼키면 "오류로 빈 결과"가 1시간 캐시에 갇히고, 페이지의 soft 폴백이
+// 어차피 console.error로 남기고 그 패널만 비우기 때문이다.
 
 // ── 팀 시즌 슛 전체(히어로 별자리 + 슛 프로필 캡션이 공유) ─────────────────────────
 // 시즌 슛은 팀당 ~4천 건 - shot_log에 tcode 단독 인덱스가 없어서(스키마 실측) 시즌
@@ -13,8 +21,24 @@ import type { TeamSeasonGame } from "./matchups";
 // idx_shotlog_game_player(gmkey 선두)를 타게 함.
 export type TeamShot = { x: number; y: number; d: string; made: boolean };
 
-export async function getTeamSeasonShots(tcode: string, gmkeys: string[]): Promise<TeamShot[]> {
-  if (!gmkeys.length) return [];
+/**
+ * gmkey 목록이 배열이라 cachedFn 인자로 못 넣는다(스칼라만) - 정렬해 이어 붙인 문자열을
+ * 키로 쓴다(같은 집합이면 순서가 달라도 같은 키, lib/playerPageData.ts 관례). 시즌이
+ * 진행돼 치른 경기가 늘면 목록이 달라져 자연히 새 키가 된다. 호출부(팀 프로필)가 넘기는
+ * gmkey는 종료 경기뿐이라 라이브 슛이 캐시에 갇힐 일은 없다. seasonName은 태그용(선택).
+ */
+export function getTeamSeasonShots(tcode: string, gmkeys: string[], seasonName?: string): Promise<TeamShot[]> {
+  if (!gmkeys.length) return Promise.resolve([]);
+  const sorted = [...gmkeys].sort();
+  return cached(
+    () => computeTeamSeasonShots(tcode, sorted),
+    ["teamSeasonShots", tcode, sorted.join(",")],
+    TTL.batchDaily,
+    [TAG.batch, ...(seasonName ? [TAG.season(seasonName)] : [])]
+  );
+}
+
+async function computeTeamSeasonShots(tcode: string, gmkeys: string[]): Promise<TeamShot[]> {
   return fetchAllPagesBounded<TeamShot>(
     (from, to) =>
       supabase
@@ -93,17 +117,31 @@ const FACTOR_DEFS: {
   { key: "def_ftr", label: "FTr", side: "DEF", invert: true, fmt: (v) => v.toFixed(3) },
 ];
 
-export async function getTeamFourFactors(tcode: string, seasonName: string): Promise<TeamFourFactors | null> {
+/**
+ * RPC는 시즌 단위(p_season만 받아 10팀 전부)라 시즌 하나로 캐시하고 팀 행은 아래에서 고른다 -
+ * (tcode, season)으로 캐시하면 같은 RPC 결과를 팀 수만큼 저장하고 미스도 팀 수만큼 난다.
+ */
+const getFourFactorsRows = cachedFn(computeFourFactorsRows, {
+  name: "teamSeasonFourFactors",
+  ttl: TTL.batchDaily,
+  tags: (seasonName) => [TAG.batch, TAG.season(seasonName)],
+});
+
+async function computeFourFactorsRows(seasonName: string): Promise<FourFactorsRow[]> {
   const { data, error } = await supabase.rpc("team_season_four_factors", { p_season: seasonName });
-  if (error || !data) return null;
+  if (error) throw new Error(`team_season_four_factors(${seasonName}) 실패: ${error.message}`);
   // numeric 컬럼이 문자열로 오는 경우 대비해 숫자화하되, tcode(문자 코드 - "50" 등)는
   // 절대 Number()로 만들면 안 됨(=== 비교가 영영 실패하는 버그를 실제로 겪음).
-  const rows = (data as FourFactorsRow[]).map((r) => {
+  return ((data ?? []) as FourFactorsRow[]).map((r) => {
     const num = Object.fromEntries(
       Object.entries(r).map(([k, v]) => [k, k !== "tcode" && typeof v === "string" ? Number(v) : v])
     );
     return num as unknown as FourFactorsRow;
   });
+}
+
+export async function getTeamFourFactors(tcode: string, seasonName: string): Promise<TeamFourFactors | null> {
+  const rows = await getFourFactorsRows(seasonName);
   const me = rows.find((r) => r.tcode === tcode);
   if (!me || rows.length < 2) return null;
 
@@ -241,7 +279,14 @@ export type RosterRow = {
   totalWpa: number | null;
 };
 
-export async function getRosterContribution(tcode: string, seasonName: string): Promise<RosterRow[]> {
+/** 로스터 기여도 - RPC + WPA 조인. 둘 다 daily_batch 산출물이라 TTL.batchDaily. */
+export const getRosterContribution = cachedFn(computeRosterContribution, {
+  name: "teamRosterContribution",
+  ttl: TTL.batchDaily,
+  tags: (_tcode, seasonName) => [TAG.batch, TAG.season(seasonName)],
+});
+
+async function computeRosterContribution(tcode: string, seasonName: string): Promise<RosterRow[]> {
   type Raw = {
     pcode: string;
     name: string;
@@ -257,7 +302,9 @@ export async function getRosterContribution(tcode: string, seasonName: string): 
     supabase.rpc("team_season_roster", { p_tcode: tcode, p_season: seasonName }),
     supabase.from("player_season_wpa").select("pcode, total_wpa").eq("season_name", seasonName).eq("tcode", tcode),
   ]);
-  if (error || !data) return [];
+  // 오류를 []로 돌려주면 캐시에 "빈 로스터"가 1시간 갇힌다 - throw 해서 저장을 막는다.
+  if (error) throw new Error(`team_season_roster(${tcode}, ${seasonName}) 실패: ${error.message}`);
+  if (!data) return [];
   const wpaByPcode = new Map((wpaRows ?? []).map((r) => [r.pcode as string, Number(r.total_wpa)]));
   return (data as Raw[])
     .map((r) => {
@@ -287,9 +334,17 @@ export const UNIT_MIN_MINUTES_5MAN = 20;
 
 export type BestUnit = { n: number; pcodes: string[]; names: string[]; minutes: number; netRatingPer40: number };
 
-export async function getBestUnits(tcode: string, seasonName: string): Promise<BestUnit[]> {
+/** 베스트 유닛 - lineup_combo(수동 build) × 이 시즌 로스터(daily_batch). 더 자주 바뀌는 쪽에 맞춰 batchDaily, 태그는 둘 다. */
+export const getBestUnits = cachedFn(computeBestUnits, {
+  name: "teamBestUnits",
+  ttl: TTL.batchDaily,
+  tags: (_tcode, seasonName) => [TAG.batch, TAG.build, TAG.season(seasonName)],
+});
+
+async function computeBestUnits(tcode: string, seasonName: string): Promise<BestUnit[]> {
   const { data, error } = await supabase.rpc("team_best_units", { p_tcode: tcode, p_season: seasonName });
-  if (error || !data) return [];
+  if (error) throw new Error(`team_best_units(${tcode}, ${seasonName}) 실패: ${error.message}`);
+  if (!data) return [];
   type Raw = { n: number; pcodes: string[]; names: string[] | null; minutes: string | number; net_rating_per40: string | number };
   return (data as Raw[]).map((r) => ({
     n: Number(r.n),
@@ -325,11 +380,24 @@ export type ZoneProfileRow = {
 
 export type TeamZoneProfile = { rows: ZoneProfileRow[]; teamTotal: number; leagueTotal: number };
 
-export async function getTeamZoneProfile(tcode: string, seasonName: string): Promise<TeamZoneProfile | null> {
+type ZoneMixRow = { tcode: string; zone: string; att: number; made: number };
+
+/** 4팩터와 같은 이유로 시즌 단위 캐시(RPC가 p_season만 받아 전 팀 행을 돌려준다). */
+const getZoneMixRows = cachedFn(computeZoneMixRows, {
+  name: "seasonZoneMix",
+  ttl: TTL.batchDaily,
+  tags: (seasonName) => [TAG.batch, TAG.season(seasonName)],
+});
+
+async function computeZoneMixRows(seasonName: string): Promise<ZoneMixRow[]> {
   const { data, error } = await supabase.rpc("season_zone_mix", { p_season: seasonName });
-  if (error || !data || !(data as unknown[]).length) return null;
-  type Raw = { tcode: string; zone: string; att: number; made: number };
-  const rows = data as Raw[];
+  if (error) throw new Error(`season_zone_mix(${seasonName}) 실패: ${error.message}`);
+  return ((data ?? []) as ZoneMixRow[]).map((r) => ({ tcode: r.tcode, zone: r.zone, att: Number(r.att), made: Number(r.made) }));
+}
+
+export async function getTeamZoneProfile(tcode: string, seasonName: string): Promise<TeamZoneProfile | null> {
+  const rows = await getZoneMixRows(seasonName);
+  if (!rows.length) return null;
   const team: Record<ZoneKey, { att: number; made: number }> = {
     rim: { att: 0, made: 0 },
     close: { att: 0, made: 0 },

@@ -4,7 +4,8 @@ import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
 import { TeamBadge } from "@/components/TeamBadge";
-import { getStandingsAsOf, getTeamSeasonFixtures, getTeamPlayedRegCount, type TeamFixture, type StandingsRow } from "@/lib/matchups";
+import { getTeamPlayedRegCount, type TeamFixture, type StandingsRow } from "@/lib/matchups";
+import { getAllTeams } from "@/lib/playerProfile";
 import { displayTeamName } from "@/lib/teamNames";
 import { buildConstellationSvg } from "@/lib/playerDataScience";
 import {
@@ -50,6 +51,8 @@ import {
   getGameTags,
   getPregameFeatures,
   getTeamLastPlayedSeason,
+  getTeamSeasonFixturesCached,
+  getStandingsAsOfCached,
   splitFixtures,
   teamSideProb,
   fmtStart,
@@ -71,7 +74,24 @@ import { normalizePos } from "@/lib/playerStatus";
 //   estSeason(추정: 4팩터·존 구성비·로스터 기여도) = statSeason(정규 5경기 임계 전이면 25-26)
 // ?season=로 과거 시즌을 직접 고르면 두 시즌 모두 그 시즌이 된다(결과 중심 보기).
 
+// 캐시 미스가 겹치면(RPC 4종 + 시즌 기록표 1.1초 + 슛 수천 행) 기본 함수 시간 한도를 넘길 수
+// 있다. /preseason과 같은 값 - 캐시 히트에서는 훨씬 빨리 끝나고, 이 값은 상한일 뿐이다.
+export const maxDuration = 60;
+
 type TeamInfo = { tcode: string; name: string; abbr: string; color: string; logo_url: string | null };
+
+/**
+ * 2·3차 파도의 추정 패널(4팩터·존 구성비·로스터 기여도·베스트 유닛·기록표·리더·순위표·리본
+ * 재료)은 하나가 실패해도 페이지 본체(팀 존재·시즌 목록·일정)를 끌고 죽지 않는다 - 그 패널만
+ * 빈 상태("이 시즌 ... 없음")로 그린다. 단, 조용히 삼키지 않는다: 반드시 console.error로
+ * 남긴다(감사 2026-09-06: "soft 폴백은 선택적 패널에만, 본체는 그대로 throw").
+ */
+function soft<T>(tcode: string, what: string, p: Promise<T>, fallback: T): Promise<T> {
+  return p.catch((e: unknown) => {
+    console.error(`[teams/${tcode}] ${what} 조회 실패 - 해당 패널만 비움:`, e);
+    return fallback;
+  });
+}
 
 async function getTeam(tcode: string): Promise<TeamInfo | null> {
   const { data } = await supabase.from("teams").select("tcode, name, abbr, color, logo_url").eq("tcode", tcode).maybeSingle();
@@ -583,6 +603,8 @@ export default async function TeamPage({
   // 가져온다(개막 전 히어로 전적·별자리의 폴백 표본).
   // 팀 기록표(getTeamSeasonStats)는 리그 10팀 전체를 집계해야 순위가 나오므로 팀 하나가 아니라
   // 시즌 하나를 받는다(1.1초). 팀 행은 byTcode에서 꺼내 쓴다.
+  // 일정(fixtures/prevFixtures)은 페이지 본체라 그대로 throw. 나머지는 soft(패널만 비움 + console.error).
+  // 일정·순위표·RPC·슛은 캐시 판(lib/teamPageData.ts, lib/teamDataScience.ts - TTL.batchDaily).
   const [
     fixtures,
     prevFixtures,
@@ -597,18 +619,25 @@ export default async function TeamPage({
     seasonStats,
     teamLeaders,
   ] = await Promise.all([
-      getTeamSeasonFixtures(tcode, factSeason),
-      estSeason !== factSeason ? getTeamSeasonFixtures(tcode, estSeason) : Promise.resolve<TeamFixture[]>([]),
-      supabase.from("teams").select("tcode, name, abbr, color, logo_url").then((r) => r.data ?? []),
-      getTeamFourFactors(tcode, estSeason),
-      getRosterContribution(tcode, estSeason),
-      getBestUnits(tcode, estSeason),
-      getTeamZoneProfile(tcode, estSeason),
-      getStandingsAsOf(factSeason, "9999-12-31"),
-      estSeason !== factSeason ? getStandingsAsOf(estSeason, "9999-12-31") : Promise.resolve<StandingsRow[]>([]),
-      factSeason === PRESEASON_SEASON ? Promise.resolve(preseasonChanges) : getTeamRosterChanges(factSeason, tcode),
-      getTeamSeasonStats(estSeason),
-      getTeamLeaders(tcode, estSeason),
+      getTeamSeasonFixturesCached(tcode, factSeason),
+      estSeason !== factSeason ? getTeamSeasonFixturesCached(tcode, estSeason) : Promise.resolve<TeamFixture[]>([]),
+      // teams 13행은 준-상수 - 모든 페이지가 쓰는 getAllTeams(TTL.reference) 하나로 공유. 실패해도
+      // 일정 행이 oppName/oppTcode를 갖고 있어 이름·배지만 폴백된다.
+      soft(tcode, "teams", getAllTeams(), new Map()),
+      soft(tcode, "fourFactors", getTeamFourFactors(tcode, estSeason), null),
+      soft(tcode, "rosterContribution", getRosterContribution(tcode, estSeason), []),
+      soft(tcode, "bestUnits", getBestUnits(tcode, estSeason), []),
+      soft(tcode, "zoneProfile", getTeamZoneProfile(tcode, estSeason), null),
+      // 순위표가 비면 히어로 W-L/RANK는 일정에서 센 전적으로 폴백한다(아래 record 계산).
+      soft(tcode, "standings", getStandingsAsOfCached(factSeason, "9999-12-31"), []),
+      estSeason !== factSeason
+        ? soft(tcode, "standings(est)", getStandingsAsOfCached(estSeason, "9999-12-31"), [])
+        : Promise.resolve<StandingsRow[]>([]),
+      factSeason === PRESEASON_SEASON
+        ? Promise.resolve(preseasonChanges)
+        : soft(tcode, "rosterChanges", getTeamRosterChanges(factSeason, tcode), null),
+      soft(tcode, "seasonStats", getTeamSeasonStats(estSeason), null),
+      soft(tcode, "teamLeaders", getTeamLeaders(tcode, estSeason), null),
     ]);
   const statRow = seasonStats?.byTcode[tcode] ?? null;
 
@@ -618,19 +647,20 @@ export default async function TeamPage({
 
   // 3차: gmkey가 정해져야 하는 조회. 별자리 표본은 "사실"이므로 26-27 첫 경기부터 26-27로
   // 바뀌고, 아직 한 경기도 없으면 지난 시즌 슛으로 채운다(빈 히어로 방지).
+  // 전부 히어로 아트·리본·일정표의 장식 재료라 soft - 없으면 별자리 없음 / 승률 칸 "-".
   const shotFixtures = played.length ? played : prevFixtures.filter((f) => f.status === "final");
   const shotSeason = played.length ? factSeason : estSeason;
   const [shots, playedProbs, pregame, tags] = await Promise.all([
-    getTeamSeasonShots(tcode, shotFixtures.map((f) => f.gmkey)),
-    getPregameProbs(playedGmkeys),
-    getPregameFeatures(pendingGmkeys),
-    getGameTags(playedGmkeys),
+    soft(tcode, "shots", getTeamSeasonShots(tcode, shotFixtures.map((f) => f.gmkey), shotSeason), []),
+    soft(tcode, "pregameProbs", getPregameProbs(playedGmkeys), new Map()),
+    soft(tcode, "pregameFeatures", getPregameFeatures(pendingGmkeys), new Map()),
+    soft(tcode, "gameTags", getGameTags(playedGmkeys), new Map()),
   ]);
 
   // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - 보고 있는 factSeason 기준으로
   // 표시 이름만 덮어씀(기존 페이지 로직 유지).
   const oppByTcode = new Map(
-    opponents.map((t) => [t.tcode, { ...t, name: displayTeamName(t.tcode, t.name, factSeason) }])
+    [...opponents.values()].map((t) => [t.tcode, { ...t, name: displayTeamName(t.tcode, t.name, factSeason) }])
   );
   const teamName = displayTeamName(team.tcode, team.name, factSeason);
   // 저명도 팀 색(KT #1A1A1A 등)은 차트에서만 보조 액센트로 - 데이터 주장이 아닌 디자인 상수.
@@ -893,7 +923,7 @@ export default async function TeamPage({
                       </td>
                       <td className={styles.schedOppCell}>
                         {g.isHome ? "vs" : "@"}
-                        <TeamBadge team={opp ? { ...opp, logoUrl: opp.logo_url } : null} size={16} />
+                        <TeamBadge team={opp ?? null} size={16} />
                         {opp?.name ?? g.oppName}
                       </td>
                       <td className={styles.schedProb}>

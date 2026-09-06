@@ -145,9 +145,22 @@ export type PlayerCombos = {
   blocks: ComboSizeBlock[];
   /** 어느 크기든 한 행이라도 있는가. 패널을 통째로 접을지 판단용. */
   any: boolean;
-  /** 조회 실패. 빈 결과("조합 없음")와 절대 같은 화면이 되면 안 된다. */
+  /**
+   * 조회 실패. 빈 결과("조합 없음")와 절대 같은 화면이 되면 안 된다.
+   *
+   * 이 값은 **호출부**(app/players/[pcode]/page.tsx의 `.catch`)가 만든다. 이 파일의 compute
+   * 함수는 실패를 삼키지 않고 던진다 - 예전엔 compute 안에서 `{failed: true}`를 돌려줬는데,
+   * 그 반환값이 cachedFn(unstable_cache)을 그대로 통과해 일시 장애가 TTL(커리어 6시간 · 시즌
+   * 1시간) 동안 "불러오지 못함"으로 굳어 버렸다(감사 지적). 던지면 캐시엔 아무것도 안 남고
+   * 다음 요청이 다시 시도한다.
+   */
   failed: boolean;
 };
+
+/** 호출부 `.catch`용 실패 센티널. 매번 새 객체를 돌려준다(공유 객체를 어디선가 변형하지 않도록). */
+export function failedCombos(): PlayerCombos {
+  return { blocks: [], any: false, failed: true };
+}
 
 type ComboDbRow = { pcodes: string[]; minutes: number; stints: number; net_rating_per40: number };
 
@@ -180,15 +193,11 @@ export const getPlayerCombos = cachedFn(computePlayerCombos, {
 });
 
 async function computePlayerCombos(pcode: string): Promise<PlayerCombos> {
-  let bySize: ComboDbRow[][];
-  try {
-    bySize = await Promise.all(COMBO_SIZES.map((size) => fetchSizeRows(pcode, size)));
-  } catch {
-    // fetchAllPagesBounded는 재시도 후에도 실패하면 던진다(조용히 잘린 숫자를 화면에 올리지
-    // 않으려는 그 파일의 규칙). 프로필 페이지 전체를 500으로 만들 이유는 없으므로 여기서
-    // 삼키되, "조합 없음"이 아니라 "불러오지 못함"으로 구분해서 넘긴다.
-    return { blocks: [], any: false, failed: true };
-  }
+  // fetchAllPagesBounded는 재시도 후에도 실패하면 던진다(조용히 잘린 숫자를 화면에 올리지
+  // 않으려는 그 파일의 규칙). 여기서 받아 `{failed: true}`로 바꾸면 안 된다 - 이 함수는
+  // cachedFn 안이라 그 센티널이 6시간 캐시된다(PlayerCombos.failed 주석). 그대로 던지고,
+  // 프로필 페이지를 500으로 만들지 않는 일은 호출부의 `.catch(failedCombos)`가 맡는다.
+  const bySize: ComboDbRow[][] = await Promise.all(COMBO_SIZES.map((size) => fetchSizeRows(pcode, size)));
 
   // 1차 정렬·컷을 먼저 끝내고 이름을 붙인다(조회량을 12행 분량으로 줄이기 위해).
   const picked = COMBO_SIZES.map((size, i) => {
@@ -277,15 +286,12 @@ async function computeGetPlayerSeasonCombos(pcode: string, season: string): Prom
   const games = await getSeasonGames(season, { category: null });
   if (!games.length) return null; // 개막 전 등 - 그 시즌에 끝난 경기가 없음
 
-  let stints;
-  try {
-    stints = await fetchSubjectStints(
-      pcode,
-      games.map((g) => g.gmkey)
-    );
-  } catch {
-    return { blocks: [], any: false, failed: true };
-  }
+  // 실패는 던진다(위 computePlayerCombos와 같은 이유 - cachedFn 안에서 센티널을 돌려주면
+  // 일시 장애가 TTL.batchDaily 1시간 동안 캐시된다). 호출부가 `.catch(failedCombos)`로 받는다.
+  const stints = await fetchSubjectStints(
+    pcode,
+    games.map((g) => g.gmkey)
+  );
   if (!stints.length) return null; // 그 시즌 라인업 로그에 이 선수가 없음(출전 없음 등)
 
   // 스틴트마다 동료(최대 4명)의 부분집합을 세어 "함께"만 쌓는다 - lib/wowy.ts getWowy의

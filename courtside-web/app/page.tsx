@@ -17,6 +17,20 @@ function fmtDate(d: string) {
   return `${y.slice(2)}.${m}.${day}`;
 }
 
+// 보조 조회 전용 soft 폴백(감사 지적: MVP·태그·승률 중 하나만 실패해도 랜딩 전체가 error.tsx가
+// 되고, 라이브 중엔 HomeLiveRefresher가 30초마다 그 오류 화면을 다시 만든다). 카드 장식이
+// 빠진 채로라도 일정은 보여야 하므로 여기서만 삼키되, 조용히 삼키지는 않는다 - 반드시
+// console.error로 남긴다. 본체(getSeasons / getTeamsForSeason / getGames)는 이 헬퍼로 감싸지
+// 않는다: 그쪽 실패는 그대로 throw → app/error.tsx.
+// NoInfer: T는 조회 함수의 반환 타입에서만 정해진다 - `new Map()`(Map<any, any>)이 T를 넓혀
+// 아래 .get() 결과를 any로 만드는 일이 없게.
+function soft<T>(label: string, p: Promise<T>, fallback: NoInfer<T>): Promise<T> {
+  return p.catch((e: unknown) => {
+    console.error("[home]", label, e);
+    return fallback;
+  });
+}
+
 export default async function HomePage({
   searchParams,
 }: {
@@ -32,15 +46,17 @@ export default async function HomePage({
   // 진행중 경기는 "현재" 승률(최신 이벤트)을 따로 조회.
   const finalGames = games.filter((g) => deriveGameStatus(g) === "final");
   const liveGmkeys = games.filter((g) => deriveGameStatus(g) === "live").map((g) => g.gmkey);
+  // 다섯 조회 전부 선택적 장식이라 각각 soft 폴백(빈 Map) - 어느 하나가 죽어도 카드의 그 칸만
+  // 비고 일정은 그대로 그려진다. 폴백은 위 soft()가 console.error를 남긴 뒤에만 돌아온다.
   const [winProbs, liveProbs, mvps, tags, seasonWinPcts] = await Promise.all([
-    getPregameWinProbs(gmkeys),
-    getLiveWinProbs(liveGmkeys),
-    getGameMvps(finalGames),
+    soft("pregameWinProbs", getPregameWinProbs(gmkeys), new Map()),
+    soft("liveWinProbs", getLiveWinProbs(liveGmkeys), new Map()),
+    soft("gameMvps", getGameMvps(finalGames), new Map()),
     // 태그(짜릿한 역전승 등)는 game_summary_tags에 종료 경기만 들어있다 - 예정/진행중
     // gmkey까지 같이 넘기면 어차피 못 찾을 키로 IN 절만 불린다. 라이브 자동 갱신이
     // 30초마다 이 쿼리를 다시 때리므로 넘기는 키 수를 줄여둔다.
-    getGameTags(finalGames.map((g) => g.gmkey)),
-    getSeasonWinPcts(activeSeason),
+    soft("gameTags", getGameTags(finalGames.map((g) => g.gmkey)), new Map()),
+    soft("seasonWinPcts", getSeasonWinPcts(activeSeason), new Map()),
   ]);
 
   return (

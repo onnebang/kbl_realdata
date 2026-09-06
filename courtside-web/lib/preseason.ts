@@ -1,6 +1,7 @@
 import { supabaseServer as supabase } from "./supabaseServer";
+import { TAG, TTL, cached, cachedFn } from "./cachePolicy";
 import { displayTeamName } from "./teamNames";
-import { getPlayerCareerGames, type CareerGameRow } from "./playerProfile";
+import { getAllTeams, getPlayerCareerGames, type CareerGameRow } from "./playerProfile";
 
 // 개막 전 리포트(/preseason) 데이터 - 요청: "이적생들로 인해서 팀이 많이 변경이 되었을텐데 그
 // 부분에 대해서도 리포트가 필요... 시즌 시작전 리포트를 먼저 제공하고, 실제 시즌이 시작되면
@@ -54,7 +55,16 @@ export function daysUntilKst(dateStr: string): number {
  * 0건 → "개막까지 개막 7일째"라는 모순된 배너가 떴음). 개막 여부는 필터와 무관한 리그 전체
  * 기준이어야 하므로 그 판정을 이 함수 안으로 옮긴다.
  */
-export async function getSeasonOpener(season: string): Promise<{ firstGameDate: string; nGames: number } | null> {
+// 개막 여부 게이트는 첫 경기가 끝나는 순간(라이브 파이프라인이 home_score를 채울 때) 뒤집힌다 -
+// daily_batch가 아니라서 TTL.batchDaily(1h)가 아니라 예정 경기 규약인 TTL.scheduled(10분)를 쓴다.
+// 홈 배너가 개막 후 최대 10분 "D-DAY"로 남을 수 있는 것이 이 선택의 비용이다.
+export const getSeasonOpener = cachedFn(computeSeasonOpener, {
+  name: "seasonOpener",
+  ttl: TTL.scheduled,
+  tags: (season) => [TAG.batch, TAG.season(season)],
+});
+
+async function computeSeasonOpener(season: string): Promise<{ firstGameDate: string; nGames: number } | null> {
   const { data } = await supabase.from("games").select("gmkey, game_date, home_score").eq("season_name", season).order("game_date");
   const real = (data ?? []).filter((g) => isRealGmkey(g.gmkey as string));
   if (!real.length) return null;
@@ -64,18 +74,25 @@ export async function getSeasonOpener(season: string): Promise<{ firstGameDate: 
 
 export type TeamInfo = { tcode: string; name: string; abbr: string; color: string; logoUrl: string | null };
 
+/**
+ * teams 13행을 시즌 기준 표기로. 감사(2026-09-06): 개막 리포트 한 번에 이 조회가 5~6번 나갔다
+ * (outlook·roster·demos·departure·importRule·projection이 제각기 불렀다). 이제 DB는 모든
+ * 페이지가 공유하는 lib/playerProfile.ts getAllTeams(cachedMap, TTL.reference) 하나만 치고,
+ * 시즌별 개명(전주 KCC -> 부산 KCC)은 그 위에서 JS로 입힌다 - 13행이라 비용이 없다.
+ * 반환 계약(Map<tcode, TeamInfo>)은 그대로라 호출부는 손대지 않았다.
+ */
 export async function getTeams(season: string): Promise<Map<string, TeamInfo>> {
-  const { data } = await supabase.from("teams").select("tcode, name, abbr, color, logo_url");
+  const all = await getAllTeams();
   return new Map(
-    (data ?? []).map((t) => [
-      t.tcode as string,
+    [...all.values()].map((t) => [
+      t.tcode,
       {
-        tcode: t.tcode as string,
+        tcode: t.tcode,
         // 연고지 개명(전주 KCC -> 부산 KCC)은 이 시즌 기준 표기로.
-        name: displayTeamName(t.tcode as string, t.name as string, season),
-        abbr: t.abbr as string,
-        color: (t.color as string) ?? "#888888",
-        logoUrl: (t.logo_url as string | null) ?? null,
+        name: displayTeamName(t.tcode, t.name, season),
+        abbr: t.abbr,
+        color: t.color ?? "#888888",
+        logoUrl: t.logoUrl ?? null,
       },
     ])
   );
@@ -106,7 +123,19 @@ export type SeasonOutlook = {
   teams: TeamOutlook[];
 };
 
-export async function getSeasonOutlook(season = PRESEASON_SEASON): Promise<SeasonOutlook> {
+// 입력(games 일정·pregame_features·지난 시즌 결과)이 전부 daily_batch 산출물 - TTL.batchDaily.
+// 기본 인자는 cachedFn의 인자 추론을 잃게 하므로(lib/playerProfile.ts 관례) 바깥에서 채운다.
+export function getSeasonOutlook(season = PRESEASON_SEASON): Promise<SeasonOutlook> {
+  return cachedSeasonOutlook(season);
+}
+
+const cachedSeasonOutlook = cachedFn(computeSeasonOutlook, {
+  name: "seasonOutlook",
+  ttl: TTL.batchDaily,
+  tags: (season) => [TAG.batch, TAG.season(season)],
+});
+
+async function computeSeasonOutlook(season: string): Promise<SeasonOutlook> {
   const prevSeason = prevSeasonName(season);
   const [teams, schedRes, prevRes] = await Promise.all([
     getTeams(season),
@@ -250,7 +279,19 @@ function num(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export async function getRosterChangeReport(season = PRESEASON_SEASON): Promise<RosterChangeReport> {
+// roster_changes는 tools/build_roster_changes.py(수동 build)가 다시 만든다 - 태그에 build도 건다.
+// 팀 프로필(getTeamRosterChanges)과 /teams·/preseason이 같은 캐시 한 장을 나눠 쓴다.
+export function getRosterChangeReport(season = PRESEASON_SEASON): Promise<RosterChangeReport> {
+  return cachedRosterChangeReport(season);
+}
+
+const cachedRosterChangeReport = cachedFn(computeRosterChangeReport, {
+  name: "rosterChangeReport",
+  ttl: TTL.batchDaily,
+  tags: (season) => [TAG.batch, TAG.build, TAG.season(season)],
+});
+
+async function computeRosterChangeReport(season: string): Promise<RosterChangeReport> {
   const prevSeason = prevSeasonName(season);
   const [teams, res] = await Promise.all([
     getTeams(season),
@@ -364,7 +405,17 @@ export function roleFromNote(note: string | null): string | null {
   return head && (head.includes("외국인") || head.includes("아시아")) ? head : null;
 }
 
-export async function getSeasonDirectory(season = PRESEASON_SEASON): Promise<DirectoryTeam[]> {
+export function getSeasonDirectory(season = PRESEASON_SEASON): Promise<DirectoryTeam[]> {
+  return cachedSeasonDirectory(season);
+}
+
+const cachedSeasonDirectory = cachedFn(computeSeasonDirectory, {
+  name: "seasonDirectory",
+  ttl: TTL.batchDaily,
+  tags: (season) => [TAG.batch, TAG.build, TAG.season(season)],
+});
+
+async function computeSeasonDirectory(season: string): Promise<DirectoryTeam[]> {
   const [teams, rosterRes, changesRes, departureRes] = await Promise.all([
     getTeams(season),
     supabase.from("season_roster").select("tcode, pcode, player_name, back_num, pos, note").eq("season_name", season),
@@ -440,14 +491,25 @@ export async function getSeasonDirectory(season = PRESEASON_SEASON): Promise<Dir
 
 /** 프리뷰 인사이트 게이트용 - 팀별 "이미 떠난" 선수 pcode(직전 시즌 경기에서 뽑힌 선수를 걸러낼 때). */
 export async function getDepartedByTeam(season = PRESEASON_SEASON): Promise<Map<string, Set<string>>> {
-  const { data } = await supabase.from("roster_changes").select("tcode, pcode").eq("season_name", season).eq("change", "out").not("pcode", "is", null);
+  // Map<Set>은 JSON 직렬화가 안 된다(cachePolicy 주석) - 캐시에는 {tcode: pcode[]}로 넣고 여기서 되살린다.
+  // 호출부(경기 페이지) 계약은 그대로.
+  const rows = await cachedDepartedRows(season);
   const map = new Map<string, Set<string>>();
-  for (const r of data ?? []) {
-    const set = map.get(r.tcode as string) ?? new Set<string>();
-    set.add(r.pcode as string);
-    map.set(r.tcode as string, set);
-  }
+  for (const [tcode, pcodes] of Object.entries(rows)) map.set(tcode, new Set(pcodes));
   return map;
+}
+
+const cachedDepartedRows = cachedFn(computeDepartedRows, {
+  name: "departedByTeam",
+  ttl: TTL.batchDaily,
+  tags: (season) => [TAG.batch, TAG.build, TAG.season(season)],
+});
+
+async function computeDepartedRows(season: string): Promise<Record<string, string[]>> {
+  const { data } = await supabase.from("roster_changes").select("tcode, pcode").eq("season_name", season).eq("change", "out").not("pcode", "is", null);
+  const out: Record<string, string[]> = {};
+  for (const r of data ?? []) (out[r.tcode as string] ??= []).push(r.pcode as string);
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -481,7 +543,12 @@ export type DemoGame = {
   tag: { key: string; label: string } | null;
 };
 
-export async function getDemoGames(): Promise<DemoGame[]> {
+/** 지난 시즌 종료 경기 10개 - 사실상 불변이지만 태그 재생성(game_summary_tags)을 따라가도록 batchDaily. */
+export function getDemoGames(): Promise<DemoGame[]> {
+  return cached(computeDemoGames, ["demoGames"], TTL.batchDaily, [TAG.batch]);
+}
+
+async function computeDemoGames(): Promise<DemoGame[]> {
   const gmkeys = DEMO_GAMES.map((d) => d.gmkey);
   const [gamesRes, tagsRes] = await Promise.all([
     supabase.from("games").select("gmkey, game_date, season_name, season_category, home_tcode, away_tcode, home_score, away_score").in("gmkey", gmkeys),
@@ -662,7 +729,18 @@ async function fetchTeamRegMinutes(tcode: string, seasonName: string): Promise<R
   return rows;
 }
 
-export async function getRetainedMinutes(tcode: string, season = PRESEASON_SEASON): Promise<RetainedMinutes | null> {
+// 팀별 10페이지 병렬 조회(1~2초)라 캐시 효과가 가장 큰 함수. 반환값에 Map은 없다(league는 배열).
+export function getRetainedMinutes(tcode: string, season = PRESEASON_SEASON): Promise<RetainedMinutes | null> {
+  return cachedRetainedMinutes(tcode, season);
+}
+
+const cachedRetainedMinutes = cachedFn(computeRetainedMinutes, {
+  name: "retainedMinutes",
+  ttl: TTL.batchDaily,
+  tags: (_tcode, season) => [TAG.batch, TAG.build, TAG.season(season)],
+});
+
+async function computeRetainedMinutes(tcode: string, season: string): Promise<RetainedMinutes | null> {
   const prevSeason = prevSeasonName(season);
   const [changesRes, wpaRes] = await Promise.all([
     supabase.from("roster_changes").select("tcode, pcode, change, prev_tcode, prev_season_name").eq("season_name", season),
@@ -777,7 +855,14 @@ export async function getRetainedMinutes(tcode: string, season = PRESEASON_SEASO
  *  PREGAME_MODEL_CAPTION을 그대로 붙인다(로스터 변화 부분 반영 - 실측 continuity 0.891~1.0). */
 export const PREGAME_MODEL_CAPTION = "지난 시즌 지표 기반 프리시즌 모델 · 로스터 변화 부분 반영(연속성 입력 0.89~1.0) · 참고용";
 
-export async function getPregameProb(gmkey: string): Promise<number | null> {
+// pregame_features는 daily_batch에서만 바뀌지만 "예정 경기" 값이라 TTL 표의 scheduled(10분) 규약을 따른다.
+export const getPregameProb = cachedFn(computePregameProb, {
+  name: "pregameProb",
+  ttl: TTL.scheduled,
+  tags: (gmkey) => [TAG.batch, TAG.game(gmkey)],
+});
+
+async function computePregameProb(gmkey: string): Promise<number | null> {
   const { data } = await supabase.from("pregame_features").select("home_win_prob").eq("gmkey", gmkey).maybeSingle();
   return data?.home_win_prob == null ? null : Number(data.home_win_prob);
 }

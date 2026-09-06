@@ -31,7 +31,7 @@ import {
   type SeasonZoneMix,
   type PercentileProfile,
 } from "@/lib/playerDataScience";
-import { getPlayerCombos, getPlayerSeasonCombos } from "@/lib/lineupCombos";
+import { getPlayerCombos, getPlayerSeasonCombos, failedCombos } from "@/lib/lineupCombos";
 import { getPlayerOnOffRatings } from "@/lib/lineupNetRating";
 import { getPlayerRosterStatus } from "@/lib/playerStatus";
 import {
@@ -45,10 +45,10 @@ import {
   PRESEASON_SEASON,
 } from "@/lib/seasonFocus";
 import { aggregateCareer, getPlayerWpaBySeason } from "@/lib/playerPageData";
-import { getCareerGrain, type CareerNight } from "@/lib/careerGrain";
+import { getCareerGrain, type CareerGrain, type CareerNight } from "@/lib/careerGrain";
 import { buildCareerStripSvg, CELL_MAX_W, GAP_RESERVE } from "@/lib/careerStrip";
-import { getPlayerForm } from "@/lib/playerForm";
-import { getPlayerGlance } from "@/lib/playerGlance";
+import { getPlayerForm, type PlayerForm } from "@/lib/playerForm";
+import { getPlayerGlance, type PlayerGlance } from "@/lib/playerGlance";
 import { displayTeamName } from "@/lib/teamNames";
 import { TeamBadge } from "@/components/TeamBadge";
 import { PlayerGlanceCard } from "@/components/PlayerGlance";
@@ -64,6 +64,22 @@ import styles from "./player-profile.module.css";
 // 포스터형 히어로를 "선수 사진" 대신 "그 선수의 커리어 슛 전체를 별자리처럼 깐 배경
 // 아트"로 적응(players.photo_url이 773명 전원 null - 실측). 히어로 밴드만 테마와 무관한
 // 위임적 다크(모든 색을 직접 칠함)이고, 그 아래 본문은 기존 테마 토큰 그대로.
+
+// 세 파도 21개 조회가 콜드 캐시에서 겹치면(커리어 슛 전체 페이지네이션 + 팀 경기 페이지 +
+// RPC 셋) Vercel 기본 서버리스 제한을 넘길 수 있다 - app/page.tsx·leaderboards와 같은 안전장치.
+export const maxDuration = 60;
+
+// 선택적 패널 전용 soft 폴백(감사 지적: 세 파도 21개 조회가 하나의 실패 도메인이라 클러치 RPC
+// 하나가 타임아웃 나도 선수 페이지 전체가 error.tsx가 됐다). 여기서만 삼키되 조용히 삼키지는
+// 않는다 - 반드시 console.error로 남긴다. 본체는 이 헬퍼로 감싸지 않는다: 선수 존재(getPlayerInfo
+// → notFound), 커리어 경기·최근 경기·팀 목록·명단 상태(히어로 정체성)는 그대로 throw → app/error.tsx.
+// NoInfer: T는 조회 함수의 반환 타입에서만 정해진다(`new Map()`이 T를 any로 넓히지 않게).
+function soft<T>(label: string, p: Promise<T>, fallback: NoInfer<T>): Promise<T> {
+  return p.catch((e: unknown) => {
+    console.error("[player]", label, e);
+    return fallback;
+  });
+}
 
 function pct(v: number | null) {
   return v == null ? "-" : `${(v * 100).toFixed(1)}%`;
@@ -305,20 +321,26 @@ export default async function PlayerPage({
   // 1차: 시즌 선택과 무관한 조회(클러치/시너지/온오프/존 기대값 포함)를 전부 병렬로. 커리어 경기
   // 행(getPlayerCareerGames)은 로스터 상태 판정·히어로 타일·커리어 아크·시즌별 기록표가 모두
   // 공유하므로 한 번만 읽는다(기존 getPlayerCareerBySeason과 중복 조회하지 않기 위해 교체).
+  // 앞 셋(커리어 경기·최근 경기·팀)은 본체 - 실패하면 throw. 나머지는 선택적 패널이라 soft().
   const [careerRows, recentGames, teamByTcode, careerShots, clutch, combos, onOffMap, zoneExpectedPts, winImpact] =
     await Promise.all([
       getPlayerCareerGames(pcode),
       getPlayerRecentGames(pcode),
       getAllTeams(),
-      getCareerShots(pcode),
-      getClutchProfile(pcode),
+      // 히어로 밀도 지도·슈팅 DNA·슛 임팩트용. 빈 배열이면 세 빌더 모두 "슛 없음" 경로로 간다.
+      soft("careerShots", getCareerShots(pcode), []),
+      soft("clutchProfile", getClutchProfile(pcode), null),
       // 2인만 보던 시너지 카드를 2·3·4·5인 조합표로 교체(요청: "3인/4인/5인 조합도").
       // 크기별 임계값·정렬 근거는 lib/lineupCombos.ts 주석에 실측과 함께 있다.
-      getPlayerCombos(pcode),
-      getPlayerOnOffRatings([pcode]),
-      getZoneExpectedPts(),
+      // 실패 센티널(failed: true)은 여기서 만든다 - compute 안에서 돌려주면 cachedFn이 6시간
+      // 캐시해 버린다(lib/lineupCombos.ts PlayerCombos.failed 주석). 컴포넌트가 "조합 없음"과
+      // 다른 문장("불러오지 못했습니다")으로 그린다.
+      soft("playerCombos", getPlayerCombos(pcode), failedCombos()),
+      soft("onOffRatings", getPlayerOnOffRatings([pcode]), new Map()),
+      // 빈 Map이면 buildImpactDots가 기대값 0으로 잔차를 계산한다 - 점은 찍히되 색 판정만 평평해진다.
+      soft("zoneExpectedPts", getZoneExpectedPts(), new Map()),
       // 미리 구운 1행(tools/build_player_win_impact.py) - 실시간 집계는 콜드 1.1~2.1초라 못 얹는다.
-      getWinImpact(pcode),
+      soft("winImpact", getWinImpact(pcode), null),
     ]);
 
   // 2차: 확정 명단(season_roster) 대조 - 히어로 정체성(팀·등번호·포지션)의 유일한 출처다.
@@ -330,10 +352,13 @@ export default async function PlayerPage({
   // 다중 시즌 폼(75포제션당)도 같은 파도에 넣는다 - careerRows를 주입하므로 커리어 경기 재조회는
   // 0이고, 남는 비용은 팀-경기 한 갈래(4시즌 약 2,280행/3페이지, 15시즌 김선형도 병렬 9페이지)뿐이라
   // 로스터 상태·커리어 결과 나란히 돌면 벽시계 시간이 늘지 않는다. 한눈 카드가 이 form을 재사용한다.
+  // 명단 상태는 본체(팀·등번호·포지션·시즌 목록 = 히어로 정체성과 focus의 입력) - throw.
+  // 결 띠와 폼은 패널이라 soft(null). null이면 아래에서 그 패널만 "불러오지 못함"으로 그리고,
+  // 한눈 카드에는 undefined로 넘겨 카드가 스스로 재조회하게 둔다(그것도 실패하면 카드가 soft).
   const [status, grain, form] = await Promise.all([
     getPlayerRosterStatus(pcode, careerRows),
-    getCareerGrain(pcode, careerRows),
-    getPlayerForm(pcode, { careerRows, recentN: windowN }),
+    soft<CareerGrain | null>("careerGrain", getCareerGrain(pcode, careerRows), null),
+    soft<PlayerForm | null>("playerForm", getPlayerForm(pcode, { careerRows, recentN: windowN }), null),
   ]);
   // "이번 시즌"의 정의는 lib/seasonFocus.ts 한 곳에서만 - 추정 패널(평균·퍼센타일·슛)은 statSeason을
   // 받아 개막일 밤에 1경기 평균이 시즌 수치로 승격되는 일이 없게 한다(선수 임계 10GP).
@@ -371,32 +396,47 @@ export default async function PlayerPage({
   // 집계하는 시즌은 언제나 focus.statSeason이므로 ?season=으로 다른 시즌을 고른 순간 이 퍼센타일은
   // 카드와 다른 표본이 된다. 그때는 넘기지 않고(undefined) 카드가 자기 시즌 것을 따로 받게 둔다 -
   // 값과 퍼센타일의 기준이 어긋난 칸을 만들지 않기 위해서다.
-  const percentileP = shotSeason ? getPercentileProfile(pcode, shotSeason) : Promise.resolve(null);
+  // soft()는 정의 시점에 건다 - 아래 Promise.all 안에서만 걸면 glancePercentileP가 같은 프로미스를
+  // 공유하므로 퍼센타일 RPC 하나의 실패가 한눈 카드까지 함께 거부시킨다.
+  const percentileP = soft(
+    "percentileProfile",
+    shotSeason ? getPercentileProfile(pcode, shotSeason) : Promise.resolve(null),
+    null
+  );
   const glancePercentileP: Promise<PercentileProfile | null | undefined> =
     shotSeason === focus.statSeason ? percentileP : Promise.resolve(undefined);
   // Promise.all 배열 순서 == 구조분해 순서: boxTotals, percentile, wpaRank, wpaBySeason,
   // seasonCombos(방금 추가), glance(제일 마지막 - glancePercentileP.then(...)).
+  // 이 파도는 전부 선택적 패널이라 하나씩 soft() - null/빈 Map/failedCombos()는 각 패널이 이미
+  // "없음"과 구분해서 그리는 값이다(글랜스만 카드 자리에 "불러오지 못함"을 따로 세운다).
   const [boxTotals, percentile, wpaRank, wpaBySeason, seasonCombos, glance] = await Promise.all([
-    shotSeason ? getPlayerSeasonBoxTotals(pcode, shotSeason) : Promise.resolve(null),
+    soft("seasonBoxTotals", shotSeason ? getPlayerSeasonBoxTotals(pcode, shotSeason) : Promise.resolve(null), null),
     percentileP,
-    shotSeason ? getSeasonWpaRank(pcode, shotSeason) : Promise.resolve(null),
-    getPlayerWpaBySeason(pcode, seasonNames),
+    soft("seasonWpaRank", shotSeason ? getSeasonWpaRank(pcode, shotSeason) : Promise.resolve(null), null),
+    soft("wpaBySeason", getPlayerWpaBySeason(pcode, seasonNames), new Map()),
     // 요청: "최고의 조합에서, 커리어 통산과 함께 시즌별 최고의 조합도 제공". lineup_combo에는
     // 시즌 컬럼이 없어(파일 상단 주석) 이 조회만 lineup_stints에서 즉석 계산한다 - 다른 패널과
     // 같은 shotSeason을 쓰므로 ?season=을 바꾸면 조합표도 같이 따라간다.
-    shotSeason ? getPlayerSeasonCombos(pcode, shotSeason) : Promise.resolve(null),
+    // 실패 센티널은 커리어 조합과 같은 이유로 여기서 만든다(compute 안에서 돌려주면 1시간 캐시).
+    soft("seasonCombos", shotSeason ? getPlayerSeasonCombos(pcode, shotSeason) : Promise.resolve(null), failedCombos()),
     // 한눈 카드: 페이지가 이미 가진 것(커리어 경기·폼·커리어 슛·클러치·커리어 결)을 전부 주입해
     // 재조회를 없앤다. 남는 조회는 온/오프 + 시즌 WPA + 분 가중 고급지표 세 갈래뿐이고, 그것도
     // 이 파도의 나머지와 동시에 돈다(직렬 waterfall 추가 없음).
-    glancePercentileP.then((p) =>
-      getPlayerGlance(pcode, focus.statSeason, {
-        careerRows,
-        form,
-        careerShots,
-        percentile: p,
-        clutch,
-        grain,
-      })
+    // form/grain이 soft로 null이 됐으면 undefined로 넘긴다 - 옵션 계약이 "주면 재조회 안 함"이라
+    // null을 그대로 넘기면 카드가 그걸 값으로 받는다.
+    soft<PlayerGlance | null>(
+      "playerGlance",
+      glancePercentileP.then((p) =>
+        getPlayerGlance(pcode, focus.statSeason, {
+          careerRows,
+          form: form ?? undefined,
+          careerShots,
+          percentile: p,
+          clutch,
+          grain: grain ?? undefined,
+        })
+      ),
+      null
     ),
   ]);
 
@@ -459,22 +499,26 @@ export default async function PlayerPage({
   // 히어로 발치 밴드: 폭 800 · 높이 72는 --strip-h(72px)와 1:1로 맞춘 값이라 데스크톱(.wrap 900px)
   // 에서 뷰박스가 거의 등배로 그려진다. 밤이 0개면 빌더가 null을 돌려주고 밴드 자체를 안 그린다
   // (커리어 기록이 없는 선수 - 26-27 명단 중 pcode가 없는 15명이 여기에 해당).
-  const heroStrip = buildCareerStripSvg(grain, {
-    uid: `hero${pcode}`,
-    teamColors,
-    teamAbbrs,
-    width: 800,
-    height: 72,
-    tone: "hero",
-  });
+  // grain이 null(soft 폴백)이면 히어로 발치 밴드를 그리지 않는다 - "밤이 0개"와는 다른 상태지만
+  // 히어로에는 빈 밴드 대신 아무것도 안 그리는 게 맞고, 사실은 아래 확대판 패널이 문장으로 밝힌다.
+  const heroStrip = grain
+    ? buildCareerStripSvg(grain, {
+        uid: `hero${pcode}`,
+        teamColors,
+        teamAbbrs,
+        width: 800,
+        height: 72,
+        tone: "hero",
+      })
+    : null;
   // §9 확대판: 마지막 windowN "출전"까지 거슬러 올라간 구간. 뷰박스 폭을 칸 수에 딱 맞춰 요청해
   // (칸 상한 9 × 칸 수 + 좌우 여백) 오른쪽에 빈 공간이 남지 않게 한다. 커리어 끝에 공백 시즌
   // 표식이 붙는 선수(배스)는 빌더가 오른쪽에 GAP_RESERVE만큼 예약하므로 그만큼 더 요청한다
   // (숫자를 여기 베껴 두면 빌더 쪽이 바뀔 때 딱 맞는 폭이 조용히 어긋난다 - 그래서 상수를 가져온다).
-  const zoomCells = grain.nights.length ? nightsForRecentAppearances(grain.nights, windowN) : 0;
-  const lastNightYear = grain.nights.length ? Number(grain.nights[grain.nights.length - 1].seasonName.slice(0, 4)) : 0;
-  const zoomGapReserve = grain.gapSeasons.some((s) => Number(s.slice(0, 4)) > lastNightYear) ? GAP_RESERVE : 0;
-  const zoomStrip = zoomCells
+  const zoomCells = grain?.nights.length ? nightsForRecentAppearances(grain.nights, windowN) : 0;
+  const lastNightYear = grain?.nights.length ? Number(grain.nights[grain.nights.length - 1].seasonName.slice(0, 4)) : 0;
+  const zoomGapReserve = grain?.gapSeasons.some((s) => Number(s.slice(0, 4)) > lastNightYear) ? GAP_RESERVE : 0;
+  const zoomStrip = grain && zoomCells
     ? buildCareerStripSvg(grain, {
         uid: `zoom${pcode}`,
         teamColors,
@@ -591,7 +635,16 @@ export default async function PlayerPage({
           두 번째 칩(개막 후·임계 전 '26-27 진행 중 · N경기')을 스스로 지운다. 그 정보를 잃지 않으려고
           카드 칩은 건드리지 않고, 대신 기준이 갈리는 자리에 아래 한 줄을 세운다.
           카드가 자기 .card 래퍼를 들고 오므로 styles.panel로 한 겹 더 감싸지 않는다. */}
-      <PlayerGlanceCard glance={glance} focus={focus} teams={teamByTcode} />
+      {/* glance가 null이면 soft 폴백(위 console.error) - "기록 없음"이 아니라 "불러오지 못함"으로 적는다.
+          카드 자리를 비워 두지 않는 이유: 첫 화면이 조용히 짧아지면 사용자는 "원래 카드가 없는 선수"로 읽는다. */}
+      {glance ? (
+        <PlayerGlanceCard glance={glance} focus={focus} teams={teamByTcode} />
+      ) : (
+        <div className={styles.panel}>
+          <div className={styles.panelTitle}>한눈에 보기</div>
+          <div className="empty-note">한눈 카드를 불러오지 못했습니다. 아래 패널은 그대로 볼 수 있고, 잠시 후 새로고침하면 카드도 열립니다.</div>
+        </div>
+      )}
 
       {/* 카드(기준 시즌)와 아래 패널(선택 시즌)의 기준이 갈렸을 때만 뜨는 이음새 문장.
           카드를 선택 시즌으로 재집계하지 않는 이유까지 같이 밝힌다 - 퍼센타일은 그 시즌 리그 풀에서만
@@ -856,8 +909,12 @@ export default async function PlayerPage({
       <div className={styles.panel}>
         {/* 제목의 숫자는 "요청한 창"이 아니라 "실제로 그린 출전 수"다 - 커리어가 창보다 짧은
             선수(1경기 커리어)에게 '최근 15경기'라고 쓰면 없는 표본을 주장하게 된다. */}
-        <div className={styles.panelTitle}>최근 {Math.min(windowN, grain.playedCount)}경기 결 · 커리어 띠 확대</div>
-        {zoomStrip ? (
+        {/* grain이 없으면(soft 폴백) 출전 수를 모르므로 커리어 행 수로 상한을 잡는다 - 같은 "실제 표본" 규칙. */}
+        <div className={styles.panelTitle}>최근 {Math.min(windowN, grain ? grain.playedCount : careerGp)}경기 결 · 커리어 띠 확대</div>
+        {!grain ? (
+          // 조회 실패를 "경기 기록 없음"으로 적으면 거짓이 된다(이 저장소 규칙) - 실패는 실패라고 쓴다.
+          <div className="empty-note">커리어 띠를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>
+        ) : zoomStrip ? (
           <>
             <svg
               className={styles.stripZoomSvg}
@@ -905,18 +962,26 @@ export default async function PlayerPage({
           기준 칩(chip)은 넘기지 않는다 - 이 표는 한 시즌이 아니라 모든 시즌이라 단일 시즌 기준 칩을
           달면 거짓이 된다. 패널이 스스로 단위·시즌 수 칩을 만든다.
           ?season=은 검증을 통과한 값만 넘겨 단위 토글이 잘못된 시즌을 링크로 되살리지 않게 한다. */}
-      <PlayerFormPanel
-        form={form}
-        unit={formUnit}
-        query={{
-          w: w ? String(windowN) : undefined,
-          season: seasonQuery,
-          rate: rate ? formUnit : undefined,
-          [RECENT_RATE_PARAM]: rw ? recentRate : undefined,
-        }}
-        teamAbbrs={teamAbbrs}
-        id="form"
-      />
+      {form ? (
+        <PlayerFormPanel
+          form={form}
+          unit={formUnit}
+          query={{
+            w: w ? String(windowN) : undefined,
+            season: seasonQuery,
+            rate: rate ? formUnit : undefined,
+            [RECENT_RATE_PARAM]: rw ? recentRate : undefined,
+          }}
+          teamAbbrs={teamAbbrs}
+          id="form"
+        />
+      ) : (
+        // soft 폴백 - 패널 자체는 남겨 "원래 없는 표"가 아니라 "지금 못 불러온 표"로 읽히게 한다.
+        <div className={styles.panel} id="form">
+          <div className={styles.panelTitle}>시즌별 폼</div>
+          <div className="empty-note">시즌별 폼을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>
+        </div>
+      )}
 
       <div className={styles.panel}>
         <div className={styles.panelTitle}>게임 로그</div>

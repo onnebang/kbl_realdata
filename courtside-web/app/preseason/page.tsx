@@ -650,16 +650,29 @@ function DemoCard({ g }: { g: DemoGame }) {
   );
 }
 
+/**
+ * 선택 섹션(시즌 전망 시뮬레이션·확정 결장·외국인 규정)은 "없으면 섹션만 빠진다"가 약속인데,
+ * 지금까지는 null 반환만 그랬고 throw(네트워크·RPC 오류)는 페이지 전체를 죽였다(감사 2026-09-06).
+ * 조용히 삼키지는 않는다 - console.error로 남기고 그 섹션만 뺀다. 본체(outlook·roster·demos)는
+ * 그대로 throw.
+ */
+function optional<T>(what: string, p: Promise<T>): Promise<T | null> {
+  return p.catch((e: unknown) => {
+    console.error(`[preseason] ${what} 조회 실패 - 해당 섹션만 생략:`, e);
+    return null;
+  });
+}
+
 export default async function PreseasonPage() {
   const [outlook, roster, demos, proj, departures, importRule] = await Promise.all([
     getSeasonOutlook(PRESEASON_SEASON),
     getRosterChangeReport(PRESEASON_SEASON),
     getDemoGames(),
-    getSeasonProjection(PRESEASON_SEASON),
+    optional("seasonProjection", getSeasonProjection(PRESEASON_SEASON)),
     // 둘 다 없으면 해당 섹션만 빠지고 나머지 페이지는 그대로 - 확정 명단/슬롯 집계가 아직
     // 없는 시즌에도 개막 리포트는 열려야 한다.
-    getDepartureReport(PRESEASON_SEASON),
-    getImportRuleReport(PRESEASON_SEASON),
+    optional("departureReport", getDepartureReport(PRESEASON_SEASON)),
+    optional("importRuleReport", getImportRuleReport(PRESEASON_SEASON)),
   ]);
   // 섹션 번호는 실제로 그려지는 것만 세어 매긴다(빠진 섹션 때문에 번호가 건너뛰면 안 된다).
   let sectionNo = 1;

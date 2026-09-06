@@ -1,6 +1,7 @@
 import { supabaseServer as supabase } from "./supabaseServer";
+import { TAG, TTL, cachedFn } from "./cachePolicy";
 import { PRESEASON_SEASON, isRealGmkey, type RosterChange, type TeamRosterChanges } from "./preseason";
-import { getHeadToHead, type TeamFixture } from "./matchups";
+import { getHeadToHead, getStandingsAsOf, getTeamSeasonFixtures, type TeamFixture } from "./matchups";
 import { normalizePos, type PlayerPos } from "./playerStatus";
 import { UNIT_MIN_MINUTES_2MAN, UNIT_MIN_MINUTES_5MAN, ZONE_KEYS, type BestUnit, type RosterRow, type ZoneKey } from "./teamDataScience";
 
@@ -8,6 +9,26 @@ import { UNIT_MIN_MINUTES_2MAN, UNIT_MIN_MINUTES_5MAN, ZONE_KEYS, type BestUnit,
 // matchups/seasonFocus/teamDataScience)는 계약이 고정돼 있어 손대지 않고, 이 페이지만 쓰는
 // 조회·집계(프롤로그 사실, 로스터 월, 확정 명단 시드 베스트 유닛, 상대별 전적, 일정용 모델
 // 승률·태그)를 여기에 모은다. 전부 SELECT + JS 집계이고 RPC·마이그레이션은 없다(1단계 원칙).
+
+// ---------------------------------------------------------------------------
+// 일정·순위표의 캐시 판(감사 2026-09-06: 팀 프로필이 요청마다 games를 3~4번 다시 읽었다).
+// lib/matchups.ts 원본은 경기 프리뷰가 리크프리 날짜(beforeDate)로 부르는 공용 계약이라
+// 손대지 않고 여기서 감싼다. TeamFixture/StandingsRow는 문자열·숫자·불리언뿐이라 JSON
+// 직렬화(unstable_cache)가 안전하다. games는 daily_batch(일정 동기화·정산)에서 바뀌므로
+// TTL.batchDaily - 단, 경기가 끝난 직후 최대 1시간은 결과·순위가 옛 값일 수 있다는 뜻이다.
+// daily_batch가 revalidateTag(TAG.batch)를 치면 즉시 갱신된다.
+// ---------------------------------------------------------------------------
+export const getTeamSeasonFixturesCached = cachedFn(getTeamSeasonFixtures, {
+  name: "teamSeasonFixtures",
+  ttl: TTL.batchDaily,
+  tags: (_tcode, seasonName) => [TAG.batch, TAG.season(seasonName)],
+});
+
+export const getStandingsAsOfCached = cachedFn(getStandingsAsOf, {
+  name: "standingsAsOf",
+  ttl: TTL.batchDaily,
+  tags: (seasonName) => [TAG.batch, TAG.season(seasonName)],
+});
 
 // ---------------------------------------------------------------------------
 // 날짜·시각 표기(일정·상태 스트립·다음 장 공용)
