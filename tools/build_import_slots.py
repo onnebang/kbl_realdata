@@ -95,10 +95,16 @@ alter table import_rule_season enable row level security;
 
 
 def ensure_policy(cur, table):
-    """public read 정책 - 이미 있으면 넘어간다(create policy에 if not exists가 없다)."""
+    # 락다운(tools/lockdown_anon.sql) 이후로는 공개 읽기 정책을 만들지 않는다 - 서버는
+    # service_role로 읽으므로 정책이 없어도 동작한다. 예전엔 이 줄이 배치를 돌릴 때마다
+    # 락다운을 조용히 되돌려 테이블이 다시 anon 공개가 됐다(감사 실측).
+    # """public read 정책 - 이미 있으면 넘어간다(create policy에 if not exists가 없다)."""
     cur.execute("select 1 from pg_policies where tablename = %s and policyname = %s", (table, "public read " + table))
     if not cur.fetchone():
-        cur.execute('create policy "public read %s" on %s for select using (true)' % (table, table))
+        # 락다운(tools/lockdown_anon.sql) 이후로는 공개 읽기 정책을 만들지 않는다 - 서버는
+        # service_role로 읽으므로 정책이 없어도 동작한다. 예전엔 이 줄이 배치를 돌릴 때마다
+        # 락다운을 조용히 되돌려 테이블이 다시 anon 공개가 됐다(감사 실측).
+        # cur.execute('create policy "public read %s" on %s for select using (true)' % (table, table))
 
 
 def pearson(xs, ys):

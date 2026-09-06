@@ -77,16 +77,15 @@ export function formWindowLabel(w: number): string {
 
 export async function getSeasonsWithFormData(): Promise<string[]> {
   // seasons 테이블을 그대로 쓰면 아직 한 경기도 안 치른 시즌(개막 전 2026-2027)이 맨 앞에 와서
-  // 기본 진입이 빈 표가 된다(실측 버그). 슛 로그가 실제로 있는 시즌만 남긴다.
+  // 기본 진입이 빈 표가 된다. 그래서 "실제로 경기를 치른 시즌"만 남겨야 하는데, games를 직접
+  // 훑으면 **PostgREST 1,000행 상한에 잘린다** - 3,993행 중 앞 1,000행만 오니 distinct 결과가
+  // 15시즌이 아니라 4시즌이 됐다(프로덕션에서 실제로 드롭다운이 4개만 떴다).
+  // 같은 조건을 이미 담고 있는 뷰를 쓴다(15행). lib/seasonLeaders.ts도 같은 뷰를 쓴다.
   const { data } = await supabase
-    .from("games")
+    .from("seasons_with_regular_games")
     .select("season_name")
-    .eq("season_category", "정규시즌")
-    .not("home_score", "is", null)
     .order("season_name", { ascending: false });
-  const seen = new Set<string>();
-  for (const r of data ?? []) seen.add(r.season_name as string);
-  return [...seen].sort((a, b) => b.localeCompare(a));
+  return (data ?? []).map((r) => r.season_name as string);
 }
 
 type GameStatRow = { pcode: string; gmkey: string; games: { game_date: string } | null };

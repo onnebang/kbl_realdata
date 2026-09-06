@@ -68,7 +68,10 @@ alter table player_nationality enable row level security;
 
 POLICY = """
 drop policy if exists "public read player_nationality" on player_nationality;
-create policy "public read player_nationality" on player_nationality for select using (true);
+# 락다운(tools/lockdown_anon.sql) 이후로는 공개 읽기 정책을 만들지 않는다 - 서버는
+# service_role로 읽으므로 정책이 없어도 동작한다. 예전엔 이 줄이 배치를 돌릴 때마다
+# 락다운을 조용히 되돌려 테이블이 다시 anon 공개가 됐다(감사 실측).
+# create policy "public read player_nationality" on player_nationality for select using (true);
 """
 
 
