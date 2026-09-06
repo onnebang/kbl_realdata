@@ -77,6 +77,16 @@ function realtimeBlocked() {
 // 폴백 주기. 요구사항은 15~20초 - 라이브 수집기 자체가 그보다 자주 넣지 않으므로
 // 상한(18초)에 가깝게 둬서 불필요한 왕복을 줄인다.
 const POLL_MS = 18_000;
+/**
+ * "realtime이 아직 살아 있다"고 볼 수 있는 침묵 시간. **폴링 주기와 분리해야 한다.**
+ *
+ * 예전에는 이 판정에 POLL_MS(18초)를 그대로 썼다. 그런데 수집기(tools/live_collector.py)의 기본
+ * 주기가 60초라, realtime이 완벽히 살아 있어도 마지막 메시지로부터 18초가 지나는 순간이 매
+ * 주기마다 온다 - 결과적으로 18초 tick 3.3개 중 2~3개가 실제로 DB를 때렸다(감사 실측:
+ * realtime 정상인데도 폴링이 상시 중복 실행). 60초 주기에 여유를 둔 90초로 잡으면, realtime이
+ * 살아 있는 동안에는 폴링이 한 번도 나가지 않고 정말 끊겼을 때만 폴백이 뜬다.
+ */
+const REALTIME_FRESH_MS = 90_000;
 // 폴백 폴링이 몇 번에 한 번 전 구간을 다시 읽을지(18초 x 10 = 3분). 워터마크 방식만으로는
 // 이미 받은 행의 정정(재업서트)을 절대 못 보기 때문에 필요한 안전장치.
 const FULL_REFETCH_EVERY = 10;
@@ -213,7 +223,10 @@ export function useLiveGame({ gmkey, enabled, initialLastOrder }: UseLiveGameArg
 
     const tick = async () => {
       if (cancelled) return;
-      if (Date.now() - lastRealtimeAtRef.current < POLL_MS) {
+      // 탭이 안 보이면 폴링하지 않는다 - 시청자가 다른 탭에 가 있는 동안 DB를 때릴 이유가 없다
+      // (홈의 HomeLiveRefresher는 이미 같은 게이트를 갖고 있는데 여기만 없었다).
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      if (Date.now() - lastRealtimeAtRef.current < REALTIME_FRESH_MS) {
         stats.pollsSkipped += 1;
         return;
       }
@@ -230,7 +243,10 @@ export function useLiveGame({ gmkey, enabled, initialLastOrder }: UseLiveGameArg
 
       let q = supabase.from("game_events").select(LIVE_EVENT_COLUMNS).eq("gmkey", gmkey);
       if (!fullRefetch) q = q.gt("event_order", highOrderRef.current);
-      const { data } = await q.order("event_order", { ascending: true });
+      // 전 구간 재조회에 상한이 없으면 PostgREST 기본 행 상한에서 조용히 잘린다 - 한 경기가
+      // 600행 안팎이라 2,000이면 연장 포함해도 충분하고, 잘리면 관측되도록 경고를 남긴다.
+      const { data } = await q.order("event_order", { ascending: true }).range(0, 1999);
+      if (data && data.length === 2000) console.warn("[live] 이벤트 2000행 상한에 걸렸다 - 페이지네이션 필요", gmkey);
       if (cancelled) return;
       if (data && data.length) ingest(data as unknown as LiveEventRow[], "polling");
 
@@ -245,10 +261,19 @@ export function useLiveGame({ gmkey, enabled, initialLastOrder }: UseLiveGameArg
       if (g.is_ended) setEnded(true);
     };
 
+    // 마운트 직후 한 번 - realtime이 정상이면 위 REALTIME_FRESH_MS 가드에 걸려 스킵되고,
+    // 웹소켓이 막힌 환경(사내망 등)에서만 첫 18초의 공백을 메운다.
+    void tick();
     const id = setInterval(tick, POLL_MS);
+    // 탭이 다시 보이면 즉시 한 번 따라잡는다(가시성 게이트로 건너뛴 동안의 공백 메우기).
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
       clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [gmkey, enabled, ended, ingest]);
 
