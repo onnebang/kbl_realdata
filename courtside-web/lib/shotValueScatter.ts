@@ -1,4 +1,5 @@
 import { supabaseServer as supabase } from "./supabaseServer";
+import { cachedFn, TTL, TAG } from "./cachePolicy";
 import { classifyShot } from "./formIndex";
 import { computeTSA, computePSA, computeMoreyPct } from "./shotImpactChart";
 import { fetchAllPagesBounded, getSeasonsWithShots, MIN_SAMPLE } from "./scoringExplorer";
@@ -41,7 +42,7 @@ type BoxAgg = { pts: number; fga: number; fta: number };
 
 // game_player_stats.fga/fgm은 2점 시도만이고 3점은 tpa/tpm에 별도(shotImpactChart.ts에서
 // 실측 확정된 이 프로젝트 스키마 관례) - TSA/MOREY%가 요구하는 "총 FGA"는 fga+tpa.
-export async function getShotValueScatterData(seasonName: string): Promise<ShotValueScatterData> {
+async function computeShotValueScatterData(seasonName: string): Promise<ShotValueScatterData> {
   type BoxRow = { pcode: string; tcode: string; pts: number | null; fga: number | null; tpa: number | null; fta: number | null };
   const boxRows = await fetchAllPagesBounded<BoxRow>(
     (from, to) =>
@@ -307,3 +308,14 @@ export function buildShotValueScatterSvg(data: ShotValueScatterData): string {
 
   return svg;
 }
+
+/**
+ * 시즌 하나의 슛 가치 산점도. 시즌 전체 game_player_stats + shot_log를 통째로 받아 JS에서 뭉치는
+ * 함수라(약 4.3만 행, 왕복 44회) 요청마다 다시 하면 안 된다 - 종료된 시즌 값은 불변이다.
+ * 반환 ShotValueScatterData는 숫자·문자열·배열뿐이라 직렬화가 안전하다.
+ */
+export const getShotValueScatterData = cachedFn(computeShotValueScatterData, {
+  name: "shotValueScatter",
+  ttl: TTL.batchDaily,
+  tags: (season) => [TAG.batch, TAG.season(String(season))],
+});

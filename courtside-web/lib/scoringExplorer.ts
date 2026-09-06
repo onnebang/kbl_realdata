@@ -1,4 +1,5 @@
 import { GRID, buildHeatmapSvg, type Dimension, type EntityOption, type EntitySeasonGrids, type GridCell, type GridResult } from "./scoringExplorerShape";
+import { cachedFn, TTL, TAG } from "./cachePolicy";
 import { supabaseServer as supabase } from "./supabaseServer";
 
 // 클라이언트도 쓰는 모양은 ./scoringExplorerShape에 있다(그쪽은 Supabase를 import하지 않는다).
@@ -282,7 +283,7 @@ const LEAGUE_RECENT_SEASONS = 3;
 // 시즌"의 15x15 격자를 한 번에 계산해서 반환(리그는 최근 LEAGUE_RECENT_SEASONS개로 제한 -
 // 위 주석). lib/scoringExplorerActions.ts의 Server Action이 이 함수를 감싸서 클라이언트가
 // 엔티티를 바꿀 때마다 호출.
-export async function getEntitySeasonGrids(dim: Dimension, entityId: string): Promise<EntitySeasonGrids> {
+async function computeEntitySeasonGrids(dim: Dimension, entityId: string): Promise<EntitySeasonGrids> {
   if (dim === "league") {
     const allSeasons = await getSeasonsWithShots(); // 최신순
     const recent = allSeasons.slice(0, LEAGUE_RECENT_SEASONS);
@@ -333,3 +334,21 @@ export async function getEntitySeasonGrids(dim: Dimension, entityId: string): Pr
 // lib/zoneCompare.ts와 상수·공식이 완전히 동일해 재사용(출력이 바이트 단위로 같음 - 중복 구현
 // 아님). drawHoop만은 템플릿 로컬 버전이 zoneCompare.ts 버전(두 골대짜리 전체 코트용, 그물 표시
 // 있음)과 달라서 이 파일에 템플릿 그대로 복사.
+
+/**
+ * 엔티티 하나의 시즌별 15x15 격자. **캐시가 필수인 함수다.**
+ *
+ * 실측(2026-09-06 프로덕션 DB): shot_log 순차 스캔이 2,011회 · 회당 498,259행 · 누적 10억 행이고,
+ * game_events와 함께 이 DB의 디스크 읽기를 지배한다. 인스턴스 메모리는 933MB/약 2GB에 커밋
+ * 1.63GB(한도 초과)로 이미 스왑을 쓰고 있어서, 캐시 없는 전 테이블 스캔이 곧 메모리 압박이다.
+ * 이 함수는 Server Action이 감싸고 있어 **인증 없이 누구나 반복 호출**할 수 있다 - 캐시가
+ * 없으면 그 자체로 비용 폭탄 경로다(감사 지적).
+ *
+ * 반환 EntitySeasonGrids는 { seasons: string[]; grids: Record<string, GridResult> }로 순수 객체·
+ * 배열뿐이라 unstable_cache의 JSON 직렬화에서 깨지지 않는다(Map/Set/Date 없음 - 확인함).
+ */
+export const getEntitySeasonGrids = cachedFn(computeEntitySeasonGrids, {
+  name: "entitySeasonGrids",
+  ttl: TTL.batchDaily,
+  tags: () => [TAG.batch],
+});
