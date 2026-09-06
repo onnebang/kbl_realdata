@@ -408,6 +408,23 @@ function ActHeader({ num, title }: { num: number; title: string }) {
   );
 }
 
+/**
+ * 선택적 패널 전용 폴백. lib/supabaseServer.ts가 모든 쿼리 실패를 던지게 된 뒤(조용한 빈 화면을
+ * 없애려고), 이 페이지의 부수 패널 하나가 삐끗하면 경기 화면 전체가 오류가 됐다 - 라이브 중계
+ * 중이라면 더 나쁘다. 실패를 삼키지는 않는다: 반드시 서버 로그에 남기고, 화면에는 그 패널만 빈다.
+ *
+ * NoInfer는 new Map() 같은 폴백이 T를 any로 넓히지 못하게 막는다.
+ */
+function soft<T>(label: string, p: Promise<T>, fallback: NoInfer<T>): Promise<T> {
+  return p.catch((e: unknown) => {
+    console.error("[game]", label, e);
+    return fallback;
+  });
+}
+
+// 캐시 미스에서 40회 안팎의 DB 왕복이 겹칠 수 있다(감사 실측). 다른 무거운 페이지와 같은 안전장치.
+export const maxDuration = 60;
+
 export default async function GamePage({
   params,
 }: {
@@ -421,13 +438,15 @@ export default async function GamePage({
   // 게이팅은 전부 이 status만 봄(예전의 home_score != null 개별 체크 대신).
   const status = deriveGameStatus(game);
 
+  // 본체(팀스탯·박스스코어·이벤트·액션라벨)는 그대로 던진다 - 없으면 그릴 화면이 없다.
+  // 프리뷰 지표와 슛 로그는 패널 재료라 실패해도 그 패널만 빈다.
   const [teamStats, playerStats, events, pregameFeatures, actionLabels, shots] = await Promise.all([
     getTeamStats(gmkey),
     getPlayerStats(gmkey),
     getEvents(gmkey),
-    getPregameFeatures(gmkey),
+    soft("pregameFeatures", getPregameFeatures(gmkey), null),
     getActionLabels(),
-    getShots(gmkey),
+    soft("shots", getShots(gmkey), []),
   ]);
 
   const homeTeam = teamStats.find((t) => t.tcode === game.home_team?.tcode);
@@ -476,22 +495,39 @@ export default async function GamePage({
   let allTeams: { tcode: string; name: string; abbr: string; color: string; logo_url: string | null }[] = [];
   let sched: Awaited<ReturnType<typeof getScheduleContext>> = { home: null, away: null };
   if (game.home_team && game.away_team) {
+    // 여기부터는 전부 매치업 '패널'이다 - 하나가 없어도 경기 화면은 성립한다.
+    // 다만 allTeams는 순위표·역대 맞대결·최근 일정 배지가 공유하는 이름 맵이라, 실패하면
+    // 그 세 패널이 함께 약어로 떨어진다(빈 배열이어도 아래 teamMetaByTcode가 견딘다).
     [homeSeasonStats, awaySeasonStats, homeSchedule, awaySchedule, h2h, standings, allTeams, sched] = await Promise.all([
-      getSeasonStatsAsOf(game.home_team.tcode, game.season_name, game.game_date),
-      getSeasonStatsAsOf(game.away_team.tcode, game.season_name, game.game_date),
-      getRecentSchedule(game.home_team.tcode, game.game_date),
-      getRecentSchedule(game.away_team.tcode, game.game_date),
-      getHeadToHead(game.home_team.tcode, game.away_team.tcode, game.game_date),
-      getStandingsAsOf(game.season_name, game.game_date),
-      supabase.from("teams").select("tcode, name, abbr, color, logo_url").then((r) => r.data ?? []),
+      soft("homeSeasonStats", getSeasonStatsAsOf(game.home_team.tcode, game.season_name, game.game_date), null),
+      soft("awaySeasonStats", getSeasonStatsAsOf(game.away_team.tcode, game.season_name, game.game_date), null),
+      soft("homeSchedule", getRecentSchedule(game.home_team.tcode, game.game_date), []),
+      soft("awaySchedule", getRecentSchedule(game.away_team.tcode, game.game_date), []),
+      soft<Awaited<ReturnType<typeof getHeadToHead>> | null>(
+        "headToHead",
+        getHeadToHead(game.home_team.tcode, game.away_team.tcode, game.game_date),
+        null
+      ),
+      soft("standings", getStandingsAsOf(game.season_name, game.game_date), []),
+      soft(
+        "allTeams",
+        // PostgREST 빌더는 PromiseLike(then만 있고 catch가 없다) - Promise로 감싸야 폴백이 붙는다.
+        Promise.resolve(supabase.from("teams").select("tcode, name, abbr, color, logo_url").then((r) => r.data ?? [])),
+        []
+      ),
       // 일정 상황(연전/휴식/공유 구장) - **표시 전용.** 승률에는 넣지 않는다(lib/scheduleContext.ts
       // 상단에 15시즌 3,993경기 실측 근거 - 휴식일 차이의 설명력이 R2=0.0011이다).
-      getScheduleContext(game.gmkey, game.season_name, game.game_date, game.home_team.tcode, game.away_team.tcode),
+      soft(
+        "scheduleContext",
+        getScheduleContext(game.gmkey, game.season_name, game.game_date, game.home_team.tcode, game.away_team.tcode),
+        { home: null, away: null }
+      ),
     ]);
   }
   let reportSections: { title: string; html: string }[] = [];
   if (status === "final" && game.home_score != null && game.away_score != null && derivedEvents.length > 0 && game.home_team && game.away_team) {
-    const rarity = await getGameRarity(game.home_score, game.away_score);
+    // 희소성은 games 4,207행을 훑는 부수 지표다 - 없으면 리포트에서 그 문장만 빠진다.
+    const rarity = await soft("gameRarity", getGameRarity(game.home_score, game.away_score), null);
     reportSections = buildPostgameReport({
       events: derivedEvents,
       box,
@@ -549,7 +585,7 @@ export default async function GamePage({
     const awayLineups = collectAllOnCourtLineups(derivedEvents, replayPlayers, game.away_team.tcode);
     const keys = new Set<string>();
     for (const lineup of [...homeLineups, ...awayLineups]) for (const k of subComboKeys(lineup)) keys.add(k);
-    const ratingsMap = await getLineupRatings(Array.from(keys));
+    const ratingsMap = await soft("lineupRatings", getLineupRatings(Array.from(keys)), new Map());
     lineupRatings = Object.fromEntries(ratingsMap);
   }
 
@@ -557,7 +593,7 @@ export default async function GamePage({
   // 바로 조회(부분조합 전개 불필요). 스크럽 위치와 무관한 정적 값이라 서버에서 한 번만.
   let playerOnOff: Record<string, PlayerOnOff> = {};
   if (replayPlayers.length > 0) {
-    const onOffMap = await getPlayerOnOffRatings(replayPlayers.map((p) => p.pcode));
+    const onOffMap = await soft("playerOnOff", getPlayerOnOffRatings(replayPlayers.map((p) => p.pcode)), new Map());
     playerOnOff = Object.fromEntries(onOffMap);
   }
 
@@ -587,25 +623,35 @@ export default async function GamePage({
     const homeSched0 = homeSchedule[0] ?? null;
     const awaySched0 = awaySchedule[0] ?? null;
     // 개막 전 게이트(roster_changes 'out') - 이 시즌에 확정 로스터가 없으면 빈 맵이라 게이트 없음.
+    // 직전 경기 재구성은 이 페이지에서 가장 무거운 부수 작업이다(경기를 두 개 더 조립한다).
+    // 실패하면 프리뷰 인사이트 카드만 빠지고 본 경기 화면은 그대로 간다.
     const [homePriorGame, awayPriorGame, leagueAvgOrebPct, departedByTeam] = await Promise.all([
-      buildPriorGameData(
-        homeSched0?.gmkey ?? null,
-        homeSched0?.gameDate ?? null,
-        homeSched0 ? (homeSched0.isHome ? game.home_team.tcode : homeSched0.oppTcode) : null,
-        homeSched0 ? (homeSched0.isHome ? homeSched0.oppTcode : game.home_team.tcode) : null,
-        actionLabels,
-        homeSched0?.seasonName ?? null
+      soft(
+        "homePriorGame",
+        buildPriorGameData(
+          homeSched0?.gmkey ?? null,
+          homeSched0?.gameDate ?? null,
+          homeSched0 ? (homeSched0.isHome ? game.home_team.tcode : homeSched0.oppTcode) : null,
+          homeSched0 ? (homeSched0.isHome ? homeSched0.oppTcode : game.home_team.tcode) : null,
+          actionLabels,
+          homeSched0?.seasonName ?? null
+        ),
+        null
       ),
-      buildPriorGameData(
-        awaySched0?.gmkey ?? null,
-        awaySched0?.gameDate ?? null,
-        awaySched0 ? (awaySched0.isHome ? game.away_team.tcode : awaySched0.oppTcode) : null,
-        awaySched0 ? (awaySched0.isHome ? awaySched0.oppTcode : game.away_team.tcode) : null,
-        actionLabels,
-        awaySched0?.seasonName ?? null
+      soft(
+        "awayPriorGame",
+        buildPriorGameData(
+          awaySched0?.gmkey ?? null,
+          awaySched0?.gameDate ?? null,
+          awaySched0 ? (awaySched0.isHome ? game.away_team.tcode : awaySched0.oppTcode) : null,
+          awaySched0 ? (awaySched0.isHome ? awaySched0.oppTcode : game.away_team.tcode) : null,
+          actionLabels,
+          awaySched0?.seasonName ?? null
+        ),
+        null
       ),
-      getLeagueAvgOrebPct(game.season_name, game.game_date),
-      getDepartedByTeam(game.season_name),
+      soft("leagueAvgOrebPct", getLeagueAvgOrebPct(game.season_name, game.game_date), null),
+      soft("departedByTeam", getDepartedByTeam(game.season_name), new Map()),
     ]);
 
     previewInsights = await buildMatchupInsights({
