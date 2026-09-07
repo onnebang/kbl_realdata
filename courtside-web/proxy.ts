@@ -62,6 +62,10 @@ export function proxy(req: NextRequest): NextResponse {
   const { allowed, retryAfterSec } = rateLimit(`${bucket}:${ip}`, LIMITS[bucket]);
   if (allowed) {
     const res = NextResponse.next();
+    // 진단용: NextResponse.next()에 붙인 응답 헤더가 애초에 클라이언트까지 살아남는지부터
+    // 무조건 확인한다(Cache-Control/x-courtside-cdn이 배포 후 아예 안 보였음 - 원인이
+    // "Cache-Control만 특별 취급"인지 "next() 패스스루 헤더 자체가 전달 안 됨"인지 구분).
+    res.headers.set("x-proxy-probe", "1");
     // GET만(POST/서버액션 응답을 캐시하면 안 된다) + 화이트리스트 경로만. 여기서 세팅하면
     // 프레임워크가 나중에 쓰는 Cache-Control을 덮어쓴다 - 순서가 이래야 이긴다.
     if (req.method === "GET" && isCdnCacheable(req.nextUrl.pathname)) {
