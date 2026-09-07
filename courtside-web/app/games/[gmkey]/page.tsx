@@ -1007,7 +1007,14 @@ export default async function GamePage({
         <div className="game-act">
           <ActHeader num={2} title="경기중 인터랙티브 문자중계" />
           <GameReplay
-            events={derivedEvents}
+            /* 페이로드 감사(2026-09): 예전엔 derivedEvents를 그대로 넘겼는데, 그 배열의
+               action_label(14,060B) / player_name(12,855B) / elapsed·runHome·runAway·surge
+               (34,382B)는 전부 클라이언트가 이미 가진 재료로 복원 가능한 값이다. 그래서
+               원본 행(events)만 넘기고 GameReplay가 attachDerivedFields + 아래 두 맵으로
+               같은 배열을 다시 만든다(GameReplay.tsx의 serverEvents useMemo).
+               derivedEvents 자체는 그대로 남는다 - 아래 Act 3의 AI 리포트가 서버에서 그
+               파생값으로 계산하기 때문. 여기서 줄인 것은 "전송"뿐이다. */
+            events={events}
             players={replayPlayers}
             homeTeam={{
               tcode: game.home_team.tcode,
@@ -1029,7 +1036,13 @@ export default async function GamePage({
             lineupRatings={lineupRatings}
             playerOnOff={playerOnOff}
             live={status === "live"}
-            liveActionLabels={status === "live" ? Object.fromEntries(actionLabels) : undefined}
+            /* action_codes 33행 맵(약 800B). 예전엔 라이브 경기에만 보냈지만, 행마다 라벨
+               문자열을 박는 것(14,060B)보다 압도적으로 싸서 이제 항상 보낸다. 복원 규칙은
+               buildGameData와 같다(맵에 없으면 코드 자체를 라벨로). */
+            actionLabels={Object.fromEntries(actionLabels)}
+            /* 이름은 종료 경기라면 players prop(replayPlayers)이 이미 같은 값을 들고 있어서
+               따로 보낼 게 없다. 진행중 경기만 박스스코어가 없어 이 폴백이 필요하다
+               (getPlayerNames 주석) - 그래서 이 prop은 예전 그대로 라이브 전용. */
             liveNames={status === "live" ? Object.fromEntries(liveNames) : undefined}
           />
         </div>

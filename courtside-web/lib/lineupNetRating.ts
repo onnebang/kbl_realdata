@@ -4,7 +4,11 @@ import { TAG, TTL, cachedMap } from "./cachePolicy";
 // tools/build_synergy_matchup.py가 15시즌 전체 라인업 스틴트를 미리 집계해둔
 // lineup_combo/player_onoff 테이블 조회. 조회 범위는 lib/gameLineups.ts의 subComboKeys로
 // "이 경기에서 실제로 나온 조합"만 좁혀서 넘겨받음(전체 로스터 조합 폭발 방지).
-export type LineupRating = { pcodes: string[]; n: number; minutes: number; stints: number; netRatingPer40: number };
+// pcodes/n은 이 타입에서 뺐다: 소비자(GameReplay.tsx의 bestComboBySize/lineupLine)는
+// netRatingPer40/minutes/stints만 읽고, 표시용 pcode 목록은 자기가 만든 조합 배열을 쓴다.
+// 그런데도 조합 수백 개 × pcodes 배열이 RSC 페이로드에 실려 실측 17,966B(lineupRatings의
+// 35%)를 화면에 쓰이지도 않고 전송하고 있었다. select에서도 같이 빼서 DB→서버 구간도 줄인다.
+export type LineupRating = { minutes: number; stints: number; netRatingPer40: number };
 
 export async function getLineupRatings(comboKeys: string[]): Promise<Map<string, LineupRating>> {
   if (!comboKeys.length) return new Map();
@@ -15,10 +19,10 @@ export async function getLineupRatings(comboKeys: string[]): Promise<Map<string,
     const chunk = comboKeys.slice(i, i + 200);
     const { data } = await supabase
       .from("lineup_combo")
-      .select("combo_key, pcodes, n, minutes, stints, net_rating_per40")
+      .select("combo_key, minutes, stints, net_rating_per40")
       .in("combo_key", chunk);
     for (const r of data ?? []) {
-      map.set(r.combo_key, { pcodes: r.pcodes, n: r.n, minutes: r.minutes, stints: r.stints, netRatingPer40: r.net_rating_per40 });
+      map.set(r.combo_key, { minutes: r.minutes, stints: r.stints, netRatingPer40: r.net_rating_per40 });
     }
   }
   return map;

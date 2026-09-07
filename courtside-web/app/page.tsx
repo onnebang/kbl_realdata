@@ -1,15 +1,26 @@
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
 import { teamInkStyle } from "@/lib/teamAccent";
-import { getSeasons, getTeamsForSeason, getGames, getPregameWinProbs, getLiveWinProbs, getGameMvps, getGameTags, getSeasonWinPcts } from "@/lib/homeGames";
+import {
+  getSeasons,
+  getTeamsForSeason,
+  getGames,
+  getPregameWinProbs,
+  getLiveWinProbs,
+  getGameMvps,
+  getGameTags,
+  getSeasonWinPcts,
+  HOME_PAGE_SIZE,
+} from "@/lib/homeGames";
 import { deriveGameStatus } from "@/lib/gameStatus";
 import HomeLiveRefresher from "@/components/HomeLiveRefresher";
 import { PreseasonBanner } from "@/components/PreseasonBanner";
 
-// 실측(라이브 검증 중 발견) - 기본 진입(팀 필터 없음, 최근 시즌)이 최대 200경기 x
+// 실측(라이브 검증 중 발견) - 기본 진입(팀 필터 없음, 최근 시즌)이 예전엔 최대 200경기 x
 // 선수당 ~24행짜리 MVP 조회까지 겹쳐서 병렬화 전엔 20~30초 가까이 걸림(lib/homeGames.ts의
-// getGameMvps 청크 병렬화로 크게 줄였지만, Vercel 기본 서버리스 제한을 넘기지 않도록
-// leaderboards/scoring-explorer와 같은 안전장치를 여기도 둠).
+// getGameMvps 청크 병렬화로 크게 줄였고, 지금은 한 페이지 HOME_PAGE_SIZE(30)경기만 조회한다.
+// 그래도 Vercel 기본 서버리스 제한을 넘기지 않도록 leaderboards/scoring-explorer와 같은
+// 안전장치는 그대로 둠).
 export const maxDuration = 60;
 
 function fmtDate(d: string) {
@@ -34,17 +45,25 @@ function soft<T>(label: string, p: Promise<T>, fallback: NoInfer<T>): Promise<T>
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string; team?: string }>;
+  searchParams: Promise<{ season?: string; team?: string; page?: string }>;
 }) {
-  const { season, team } = await searchParams;
+  const { season, team, page: pageParam } = await searchParams;
   const seasons = await getSeasons();
   const activeSeason = season ?? seasons[0];
-  const [teamOptions, games] = await Promise.all([getTeamsForSeason(activeSeason), getGames(activeSeason, team)]);
+  // ?page=abc / ?page=-3 은 1페이지로. 범위를 넘긴 값은 getGames가 마지막 페이지로 클램프해
+  // 실제 페이지를 돌려준다(빈 화면 대신 마지막 장을 보여준다).
+  const requestedPage = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+  const [teamOptions, { games, page, pageCount, total, offset, counts }] = await Promise.all([
+    getTeamsForSeason(activeSeason),
+    getGames(activeSeason, team, requestedPage),
+  ]);
 
   const gmkeys = games.map((g) => g.gmkey);
   // MVP는 승패가 확정된 종료 경기만(진행중 경기는 스코어가 있어도 승자가 아직 없음),
   // 진행중 경기는 "현재" 승률(최신 이벤트)을 따로 조회.
   const finalGames = games.filter((g) => deriveGameStatus(g) === "final");
+  // **이 페이지에 실제로 그려지는** 라이브 경기만. 라이브는 목록 맨 앞 구간이라 사실상
+  // 1페이지에만 나오고, 2페이지 이후에서는 이 배열이 비어 자동 갱신 타이머가 아예 안 붙는다.
   const liveGmkeys = games.filter((g) => deriveGameStatus(g) === "live").map((g) => g.gmkey);
   // 다섯 조회 전부 선택적 장식이라 각각 soft 폴백(빈 Map) - 어느 하나가 죽어도 카드의 그 칸만
   // 비고 일정은 그대로 그려진다. 폴백은 위 soft()가 console.error를 남긴 뒤에만 돌아온다.
@@ -59,6 +78,20 @@ export default async function HomePage({
     soft("seasonWinPcts", getSeasonWinPcts(activeSeason), new Map()),
   ]);
 
+  // 페이지 이동 링크 - **클라이언트 JS 없이** 쿼리스트링만 바꾼다(이 사이트 관례).
+  // 사용자가 고른 필터(시즌·팀)는 그대로 유지하고, 고르지 않은 값은 URL에 넣지 않는다
+  // (기본 진입 URL을 더럽히지 않기 위해). 1페이지는 ?page를 아예 안 붙인다.
+  const pageHref = (p: number) => {
+    const qs = new URLSearchParams();
+    if (season) qs.set("season", season);
+    if (team) qs.set("team", team);
+    if (p > 1) qs.set("page", String(p));
+    const q = qs.toString();
+    return q ? `/?${q}` : "/";
+  };
+  const pagerLabel = { display: "inline-block", padding: "7px 6px", fontSize: "12px", color: "var(--ink-faint)" } as const;
+  const pagerDisabled = { opacity: 0.35 } as const;
+
   return (
     <div className="wrap">
       <div className="title">코트사이드</div>
@@ -68,8 +101,10 @@ export default async function HomePage({
         이동합니다.
       </div>
 
-      {/* 개막 전(이 시즌 종료 경기 0, 예정 경기 있음)에만 - 첫 경기가 끝나면 자동으로 사라짐. */}
-      {finalGames.length === 0 && games.length > 0 && <PreseasonBanner season={activeSeason} />}
+      {/* 개막 전(이 시즌 종료 경기 0, 예정 경기 있음)에만 - 첫 경기가 끝나면 자동으로 사라짐.
+          판정은 시즌 전체 개수(counts)로 한다 - finalGames는 이제 "이 페이지의" 종료 경기라,
+          예정 경기가 많은 시즌에서는 1페이지에 종료 경기가 한 건도 안 걸릴 수 있다. */}
+      {counts.final === 0 && total > 0 && <PreseasonBanner season={activeSeason} />}
 
       <form className="filter-form">
         <select name="season" defaultValue={activeSeason}>
@@ -87,6 +122,8 @@ export default async function HomePage({
             </option>
           ))}
         </select>
+        {/* GET 폼은 현재 쿼리스트링을 이 필드들로 통째로 갈아끼운다 - 필터를 바꾸면 page가
+            자동으로 떨어져 1페이지부터 다시 본다(원하는 동작). */}
         <button type="submit" className="btn-primary">
           보기
         </button>
@@ -228,13 +265,46 @@ export default async function HomePage({
         })}
       </div>
 
+      {/* 이전/다음 - 링크 두 개와 현재 위치뿐이다("더 보기"처럼 목록을 계속 이어 붙이면
+          라이브 갱신이 다시 그 전체를 내려받게 되므로 쓰지 않는다).
+          prefetch={false}: Next의 기본 프리페치는 다음 페이지 페이로드를 미리 당겨와서,
+          페이지네이션으로 아낀 바이트를 사용자가 누르지도 않은 채 도로 쓴다. */}
+      {pageCount > 1 && (
+        <nav className="filter-form" aria-label="경기 목록 페이지 이동">
+          {page > 1 ? (
+            <Link href={pageHref(page - 1)} className="btn-primary" rel="prev" prefetch={false}>
+              ← 이전 {HOME_PAGE_SIZE}경기
+            </Link>
+          ) : (
+            <span className="btn-primary" style={pagerDisabled} aria-disabled="true">
+              ← 이전 {HOME_PAGE_SIZE}경기
+            </span>
+          )}
+          <span style={pagerLabel} aria-current="page">
+            {page} / {pageCount} 페이지
+          </span>
+          {page < pageCount ? (
+            <Link href={pageHref(page + 1)} className="btn-primary" rel="next" prefetch={false}>
+              다음 {HOME_PAGE_SIZE}경기 →
+            </Link>
+          ) : (
+            <span className="btn-primary" style={pagerDisabled} aria-disabled="true">
+              다음 {HOME_PAGE_SIZE}경기 →
+            </span>
+          )}
+        </nav>
+      )}
+
       {/* D. 진행중 경기가 하나라도 있을 때만 자동 갱신 타이머를 붙인다 - 없으면 이
-          컴포넌트 자체가 렌더되지 않아 타이머도, 네트워크 요청도 0이다. */}
+          컴포넌트 자체가 렌더되지 않아 타이머도, 네트워크 요청도 0이다. liveGmkeys는
+          **지금 보고 있는 페이지**의 라이브 경기라, 라이브가 없는 2페이지 이후에서는
+          30초마다 아무것도 오가지 않는다. */}
       {liveGmkeys.length > 0 && <HomeLiveRefresher />}
 
       <footer className="foot">
-        {activeSeason} 시즌 · {games.length}경기 표시(최대 200경기) · Supabase 프로젝트
-        &quot;who are u_kbl&quot;에서 실시간 조회
+        {activeSeason} 시즌 · 전체 {total}경기 중{" "}
+        {games.length > 0 ? `${offset + 1}-${offset + games.length}번째` : "0번째"} 표시(
+        {page}/{pageCount} 페이지) · Supabase 프로젝트 &quot;who are u_kbl&quot;에서 실시간 조회
         {liveGmkeys.length > 0 && ` · 라이브 ${liveGmkeys.length}경기 진행중(30초마다 자동 갱신)`}
       </footer>
     </div>

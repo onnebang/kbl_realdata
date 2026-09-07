@@ -54,6 +54,10 @@ const MISS_CODES = new Set(["202", "206", "208"]);
 // 세 코드를 다 세고 있었고 이 파일만 어긋나 있었다.
 const FOUL_CODES = new Set(["215", "216", "224"]);
 
+// 모듈 레벨 상수여야 한다 - 기본값을 `= {}`로 쓰면 렌더마다 새 객체가 되어 아래
+// serverEvents/events useMemo가 매 렌더 재계산된다(600~800행 × attachDerivedFields).
+const EMPTY_MAP: Record<string, string> = {};
+
 function emptyBoxLine() {
   // oreb/dreb - Game Leaders 카드(REBOUNDS 항목의 "N DREB, M OREB" 서브라인)용으로 209/210을
   // 나눠 셈. reb는 그대로 둘의 합(기존 박스스코어 테이블 REB 컬럼이 이미 이 값을 씀).
@@ -269,12 +273,23 @@ type ShotWithQuarter = ShotWithMeta;
 // 보였다. 진행중일 때만 x축을 "경기 경과 시간"으로 바꾸고 남은 시간은 빈 칸으로 둔다
 // (Q3/Q4 격자선까지 미리 그려서 '아직 두 쿼터가 남았다'가 한눈에 보이게) + 곡선의 맨 앞에
 // 진행중 마커를 찍는다. 종료 경기는 live=false로 예전 경로를 그대로 타서 픽셀 단위로 동일.
-// 라이브로 들어온 raw game_events 행을 서버(app/games/[gmkey]/page.tsx의 buildGameData)와
-// 똑같은 모양의 GameEvent로. 파생 필드(elapsed/runHome/runAway/surge)는 호출부가 채운 뒤
-// attachDerivedFields가 배열 전체에 대해 다시 계산한다.
+// raw game_events 행(라이브 수신분 **그리고 서버 prop**)을 GameEvent 모양으로.
+// 파생 필드(elapsed/runHome/runAway/surge)는 호출부가 채운 뒤 attachDerivedFields가
+// 배열 전체에 대해 다시 계산한다.
+//
+// 왜 서버 prop까지 이 함수를 타는가(페이로드 감사, 2026-09): 서버가 events prop에
+// action_label(실측 14,060B)과 player_name(12,855B)을 행마다 문자열로 박아 보내고 있었다.
+// 둘 다 같은 페이로드 안에 이미 있는 것으로 복원 가능하다 - 라벨은 action_codes 33행 맵
+// (약 800B), 이름은 players prop(replayPlayers)이 그대로 들고 있다. 그래서 서버는 원본
+// 행만 보내고 복원은 여기서 한다. 이름 해석 순서(nameByPcode -> names -> lateNames -> null)는
+// page.tsx buildGameData의 (nameMap -> fallbackNames -> null)과 같은 순서다:
+//   - 종료 경기: nameByPcode = replayPlayers = nameMap, names(liveNames) = {}
+//   - 진행중 경기: playerStats가 아직 없어 replayPlayers/nameMap 둘 다 비고 names가 답을 준다
+// 즉 어느 경우에도 표시되는 이름은 이전과 글자 단위로 같다.
 function toGameEventShape(
   r: LiveEventRow,
   actionLabels: Record<string, string>,
+  nameByPcode: Map<string, string>,
   names: Record<string, string>,
   lateNames: Record<string, string>
 ): Omit<GameEvent, "elapsed" | "runHome" | "runAway" | "surge"> {
@@ -286,7 +301,7 @@ function toGameEventShape(
     action_code: r.action_code,
     action_label: r.action_code ? actionLabels[r.action_code] ?? r.action_code : null,
     pcode: r.pcode,
-    player_name: r.pcode ? names[r.pcode] ?? lateNames[r.pcode] ?? null : null,
+    player_name: r.pcode ? nameByPcode.get(r.pcode) ?? names[r.pcode] ?? lateNames[r.pcode] ?? null : null,
     tcode: r.tcode,
     home_score: r.home_score,
     away_score: r.away_score,
@@ -484,7 +499,7 @@ function WinProbLiveChart({ events, idx, homeColor, live }: { events: GameEvent[
 }
 
 export default function GameReplay({
-  events: serverEvents,
+  events: serverEventRows,
   players,
   homeTeam,
   awayTeam,
@@ -494,10 +509,14 @@ export default function GameReplay({
   lineupRatings,
   playerOnOff,
   live = false,
-  liveActionLabels,
+  actionLabels = EMPTY_MAP,
   liveNames,
 }: {
-  events: GameEvent[];
+  // 파생 필드(elapsed/runHome/runAway/surge = 실측 34,382B)와 action_label/player_name까지
+  // 뺀 **원본 game_events 행 그대로**. 전부 이 컴포넌트가 복원한다 - toGameEventShape 주석과
+  // 아래 serverEvents useMemo 참고. LiveEventRow가 곧 그 원본 모양이라 타입을 그대로 쓴다
+  // (page.tsx의 EventRow와 필드가 일치).
+  events: LiveEventRow[];
   players: PlayerMeta[];
   homeTeam: TeamMeta;
   awayTeam: TeamMeta;
@@ -515,11 +534,14 @@ export default function GameReplay({
   // Phase 2 - 진행중(deriveGameStatus === "live")일 때만 true. false면 이 컴포넌트는
   // 예전과 완전히 동일하게 동작한다(구독/폴링 없음, 라벨/차트도 그대로).
   live?: boolean;
-  // 라이브로 새로 들어온 game_events 행을 서버가 만든 GameEvent와 같은 모양으로 만들려면
-  // action_code -> 라벨, pcode -> 이름 맵이 필요하다. 서버가 이미 조회해 둔 것을 그대로
-  // 내려받는다(클라이언트에서 다시 조회하지 않음). 경기 도중 처음 투입되는 선수 이름만
-  // useLiveGame이 따로 채운다(lateNames).
-  liveActionLabels?: Record<string, string>;
+  // action_code -> 라벨 맵(action_codes 33행). 예전엔 라이브 경기에만 내려보내고 종료
+  // 경기는 행마다 action_label 문자열을 박아 보냈는데, 33행 맵(약 800B)이 14,060B보다
+  // 압도적으로 싸서 이제 **항상** 내려받는다. 없으면 코드 자체를 라벨로 쓰는 폴백은 그대로.
+  actionLabels?: Record<string, string>;
+  // 진행중 경기 전용 pcode -> 이름 폴백. 경기가 끝나기 전엔 game_player_stats가 없어서
+  // players prop(=박스스코어 기반)이 통째로 비고, 그때만 이 맵이 이름을 준다. 종료 경기는
+  // players prop이 같은 이름을 이미 들고 있어 서버가 아예 안 보낸다(undefined).
+  // 경기 도중 처음 투입되는 선수 이름만 useLiveGame이 따로 채운다(lateNames).
   liveNames?: Record<string, string>;
 }) {
   // ---- B-1. events = 서버 prop ∪ 라이브 수신 행 --------------------------------
@@ -531,13 +553,23 @@ export default function GameReplay({
   // 병합은 realtime/폴링과 완전히 같은 mergeEventRows 하나를 쓴다.
   const liveCtx = useLiveGameContext();
   const liveRows = liveCtx.rows;
+  // 아래 serverEvents 복원이 이름 맵을 필요로 해서 원래 있던 자리(박스스코어 섹션)에서
+  // 여기로 올렸다. 값/의존성은 그대로 - 위치만 이동.
+  const nameByPcode = useMemo(() => new Map(players.map((p) => [p.pcode, p.name])), [players]);
+  // 서버가 보낸 원본 행 -> 예전 events prop과 값이 동일한 GameEvent[]. attachDerivedFields는
+  // 라이브 병합 경로가 이미 쓰던 바로 그 함수라 클라이언트 번들이 커지지 않는다(이미 import됨).
+  // 서버는 AI 리포트를 위해 파생값을 그대로 계산한다 - 여기서 뺀 건 "전송"뿐이다.
+  const serverEvents = useMemo(
+    () => attachDerivedFields(serverEventRows.map((r) => toGameEventShape(r, actionLabels, nameByPcode, liveNames ?? EMPTY_MAP, liveCtx.lateNames))),
+    [serverEventRows, actionLabels, nameByPcode, liveNames, liveCtx.lateNames]
+  );
   const events = useMemo(() => {
     if (!live || liveRows.length === 0) return serverEvents;
     const byOrder = new Map(serverEvents.map((e) => [e.event_order, e]));
     const incoming: GameEvent[] = liveRows.map((r) => {
       const cur = byOrder.get(r.event_order);
       return {
-        ...toGameEventShape(r, liveActionLabels ?? {}, liveNames ?? {}, liveCtx.lateNames),
+        ...toGameEventShape(r, actionLabels, nameByPcode, liveNames ?? EMPTY_MAP, liveCtx.lateNames),
         // 파생 필드는 아래 attachDerivedFields가 어차피 전부 다시 계산한다. 다만 기존 행과
         // "값이 같은지" 비교할 때 이것들 때문에 매번 달라 보이면 무의미한 재계산이 나므로
         // 기존 값을 그대로 실어 보낸다(mergeEventRows가 참조 동일성을 유지할 수 있게).
@@ -549,7 +581,7 @@ export default function GameReplay({
     });
     const merged = mergeEventRows(serverEvents, incoming);
     return merged === serverEvents ? serverEvents : attachDerivedFields(merged);
-  }, [live, liveRows, serverEvents, liveActionLabels, liveNames, liveCtx.lateNames]);
+  }, [live, liveRows, serverEvents, actionLabels, nameByPcode, liveNames, liveCtx.lateNames]);
 
   // ---- B-2. 팔로우 라이브 / 이탈 ------------------------------------------------
   // pinnedIdx === null 이 곧 "최신 이벤트에 붙어 있음(팔로우 중)". 사용자가 뒤로 스크럽하면
@@ -831,7 +863,6 @@ export default function GameReplay({
   const RECENT_WINDOW_SEC = 180;
   const RUN_THRESHOLD = 6; // lib/postgameReport.ts의 checkOpponentRunAfterFoulTrouble과 같은 기준
   const DROUGHT_MIN_SEC = 90;
-  const nameByPcode = useMemo(() => new Map(players.map((p) => [p.pcode, p.name])), [players]);
   const eventsUpToIdx = useMemo(() => events.slice(0, idx + 1), [events, idx]);
   const liveStreaks = useMemo(
     () => findShootingStreaks(eventsUpToIdx).filter((s) => row.elapsed - s.row.elapsed <= RECENT_WINDOW_SEC),
