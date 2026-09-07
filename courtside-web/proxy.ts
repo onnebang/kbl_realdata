@@ -32,6 +32,26 @@ const LIMITS = {
   prefetch: 600,
 } as const;
 
+// CDN 캐시 헤더를 여기서 붙인다 - next.config.ts의 headers()가 안 먹혔다(배포 후 curl로 확인:
+// x-courtside-cdn:1은 붙는데 Cache-Control은 여전히 private,no-cache,no-store). 원인은
+// force-dynamic 라우트(예: /leaderboards/season, /preseason)가 렌더 파이프라인 막바지에
+// **프레임워크 자신이** Cache-Control을 강제로 써넣기 때문이다 - next.config.js의 headers()는
+// 그보다 먼저 적용되는 설정이라 이 시점에 덮여 사라진다. proxy(구 middleware)는 응답이 만들어진
+// **뒤에** 헤더를 다시 쓸 수 있는 유일한 지점이라 여기서 강제로 덮어쓴다.
+const CDN_CACHEABLE = "public, s-maxage=300, stale-while-revalidate=3600";
+// 정규식으로 판정한다(next.config.ts의 source 목록과 대상이 같다) - /games/:gmkey와 /(홈)은
+// 여기에 절대 없다(라이브 점수). PathnameRegExp가 아니라 손으로 정확히 맞춘다.
+const CDN_CACHEABLE_PATHS = [
+  /^\/players\/[^/]+$/,
+  /^\/teams\/[^/]+$/,
+  /^\/leaderboards(\/.*)?$/,
+  /^\/season-browser$/,
+  /^\/preseason$/,
+];
+function isCdnCacheable(pathname: string): boolean {
+  return CDN_CACHEABLE_PATHS.some((re) => re.test(pathname));
+}
+
 export function proxy(req: NextRequest): NextResponse {
   // Vercel 뒤에서는 x-forwarded-for의 첫 항목이 클라이언트 IP다. 없으면 제한하지 않는다 -
   // 키가 없다고 전원을 한 키로 묶으면 그 순간 사이트 전체가 429가 된다(대안이 더 나쁘다).
@@ -40,7 +60,16 @@ export function proxy(req: NextRequest): NextResponse {
 
   const bucket = classify(req);
   const { allowed, retryAfterSec } = rateLimit(`${bucket}:${ip}`, LIMITS[bucket]);
-  if (allowed) return NextResponse.next();
+  if (allowed) {
+    const res = NextResponse.next();
+    // GET만(POST/서버액션 응답을 캐시하면 안 된다) + 화이트리스트 경로만. 여기서 세팅하면
+    // 프레임워크가 나중에 쓰는 Cache-Control을 덮어쓴다 - 순서가 이래야 이긴다.
+    if (req.method === "GET" && isCdnCacheable(req.nextUrl.pathname)) {
+      res.headers.set("Cache-Control", CDN_CACHEABLE);
+      res.headers.set("x-courtside-cdn", "2"); // "2" = proxy가 덮어썼다(config만 붙은 "1"과 구분)
+    }
+    return res;
+  }
 
   return new NextResponse(`Too Many Requests - ${retryAfterSec}초 뒤에 다시 시도해 주세요.`, {
     status: 429,
