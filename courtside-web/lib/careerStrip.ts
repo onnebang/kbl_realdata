@@ -55,6 +55,23 @@ export type CareerStripOptions = {
   detail?: "auto" | "cell" | "season";
   /** 시즌 히트존을 링크로 만들지(기본 true - /players/{pcode}?season=은 페이지가 이미 받는 쿼리). */
   seasonLinks?: boolean;
+  /**
+   * 그릴 구간 [start, end) - grain.nights 인덱스. recentN보다 우선한다.
+   * 모바일에서 띠를 시즌별 행으로 접을 때(buildCareerStripRowsSvg) 쓴다.
+   */
+  range?: { start: number; end: number };
+  /**
+   * 글자 배율(1 = 9단위). 뷰박스가 화면 폭보다 넓게 그려지는 곳에서만 키운다 - 확대판(1.5),
+   * 모바일 행(2). 히어로 한 줄 띠는 1로 둔다(800단위를 900px에 그리므로 9단위 ≈ 10px).
+   */
+  fontScale?: number;
+  /**
+   * 칸 위에 그날 득점을, 이동평균선 끝에 창 평균을 적는다. 칸 폭 7단위 이상·칸 40개 이하일 때만
+   * 실제로 찍힌다(그보다 촘촘하면 숫자가 서로를 덮는다). 확대판(L5~L30) 전용.
+   */
+  valueLabels?: boolean;
+  /** 캡션 머리말 덮어쓰기 - 행 모드가 "21-22 시즌 54경기"처럼 시즌을 적는 데 쓴다. */
+  captionHead?: string;
 };
 
 export type CareerStripResult = {
@@ -172,6 +189,9 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
   const tone: CareerStripTone = opts.tone ?? "hero";
   const W0 = opts.width ?? STRIP_DEFAULT_WIDTH;
   const H = Math.max(48, opts.height ?? STRIP_DEFAULT_HEIGHT);
+  // 글자 배율. 라벨 줄(PAD_T)도 같이 키워야 커진 글자가 막대를 덮지 않는다.
+  const FS = Math.max(1, opts.fontScale ?? 1);
+  const f9 = n1(9 * FS);
 
   // 잉크(중립색)는 톤에 따라 다르다. 히어로는 라이트/다크 양쪽에서 딥다크라 테마 토큰
   // (--line-rgb는 라이트에서 '어두운 잉크')을 쓰면 검은 배경 위에서 사라진다 - 직접 칠한다.
@@ -186,10 +206,17 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
   const MONO = "IBM Plex Mono, monospace";
 
   // ── 잘라내기(§9 패널) ───────────────────────────────────────────────────────────────
-  const crop = opts.recentN != null && opts.recentN > 0 && opts.recentN < all.length ? all.length - opts.recentN : 0;
-  const nights = crop > 0 ? all.slice(crop) : all;
+  // range가 있으면 그 구간, 없으면 recentN(끝에서 자르기), 둘 다 없으면 전체.
+  const rangeStart = opts.range
+    ? Math.max(0, Math.min(all.length - 1, opts.range.start))
+    : opts.recentN != null && opts.recentN > 0 && opts.recentN < all.length
+      ? all.length - opts.recentN
+      : 0;
+  const rangeEnd = opts.range ? Math.max(rangeStart + 1, Math.min(all.length, opts.range.end)) : all.length;
+  const crop = rangeStart; // 이름 유지 - 아래 이동평균 slice·§10이 쓴다
+  const nights = all.slice(rangeStart, rangeEnd);
   const N = nights.length;
-  const cropped = crop > 0;
+  const cropped = rangeStart > 0 || rangeEnd < all.length;
 
   const blocks = blocksOf(nights);
   const played = nights.filter((n) => n.kind === "played");
@@ -203,7 +230,7 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
   // ── 축(칸 폭 → 모드) ───────────────────────────────────────────────────────────────
   // 공백 시즌 표식이 커리어 끝에 붙으면 오른쪽에 자리를 미리 뺀다(라벨이 잘리지 않게).
   const lastBlockYear = Number(blocks[blocks.length - 1].seasonName.slice(0, 4));
-  const reachesEnd = crop + N === all.length;
+  const reachesEnd = rangeEnd === all.length;
   const trailingGaps = reachesEnd ? grain.gapSeasons.filter((s) => Number(s.slice(0, 4)) > lastBlockYear) : [];
   const reserve = trailingGaps.length ? GAP_RESERVE : 0;
 
@@ -222,7 +249,7 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
 
   const W = Math.max(W0, PAD_L + N * cw + reserve + PAD_R);
   const BASE = H - PAD_B;
-  const TOP = PAD_T;
+  const TOP = Math.round(PAD_T * FS);
   const bandH = BASE - TOP;
   const x0 = (i: number) => PAD_L + i * cw;
   const xc = (i: number) => PAD_L + i * cw + cw / 2;
@@ -330,6 +357,22 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
     for (const [tcode, d] of byTeam) parts.push(`<path fill="${colorOf(tcode)}" d="${d.join("")}"/>`);
   }
 
+  // ── 4-1. 값 라벨(확대판) ─────────────────────────────────────────────────────────
+  // 제보: "L15·L30 가시성" - 막대 높이만으로는 그날 몇 점인지 읽히지 않는다. 칸이 충분히 넓을
+  // 때만(7단위+, 40칸 이하) 칸 위에 득점을 적는다. 0점은 적지 않는다(바닥 눈금이 이미 말한다).
+  const showValues = !!opts.valueLabels && mode === "cell" && cw >= 7 && N <= 40;
+  if (showValues) {
+    const fv = n1(8 * FS);
+    parts.push(`<g pointer-events="none" font-family="${MONO}" font-size="${fv}" font-weight="700" text-anchor="middle" fill="${ink(0.85)}">`);
+    for (let i = 0; i < N; i++) {
+      const n = nights[i];
+      if (n.kind !== "played" || n.pts <= 0) continue;
+      const y = Math.max(TOP + 7 * FS, yOf(n.pts) - 2.5);
+      parts.push(`<text x="${n1(xc(i))}" y="${n1(y)}">${n.pts}</text>`);
+    }
+    parts.push("</g>");
+  }
+
   // ── 5. 결장 레일(기준선 아래) ──────────────────────────────────────────────────────
   // 연속 결장은 한 rect로 합쳐 "구멍"이 길이로 읽히게 한다(실측 최장 45칸 - 김선형 17-18).
   // 방향(아래)과 색(회색)이 0점 출전(위·팀 색)과 달라서 두 사실이 절대 섞이지 않는다.
@@ -381,7 +424,7 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
   // 값은 자르기 전 전체 이력으로 계산한 뒤 같은 구간을 잘라 쓴다 - §9 패널도 첫 칸부터 선이 산다.
   const maWindow = shortWindow ? STRIP_COMPACT_MA_WINDOW : MOVING_AVERAGE_WINDOW;
   const maAll = careerMovingAverage(all, maWindow);
-  const ma = crop > 0 ? maAll.slice(crop) : maAll;
+  const ma = maAll.slice(rangeStart, rangeEnd);
   // 선은 '출전한 밤' 위에만 점을 찍는다. careerGrain은 결장 칸에서 직전 값을 이어 주지만(선이
   // 끊기지 않게), 그 값을 그대로 그리면 45칸짜리 결장 구간(김선형 17-18 실측)이 평평한 직선이
   // 되어 "그 기간에도 꾸준했다"로 읽힌다 - 뛰지 않은 밤에 대한 주장이라 그릴 수 없다.
@@ -439,20 +482,40 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
     parts.push(`<path d="${d}" fill="none" stroke="${haloColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.55" pointer-events="none"/>`);
     parts.push(`<path d="${d}" fill="none" stroke="${lineColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.92" pointer-events="none"/>`);
     maDrawn = maWindow;
+    // 확대판에서는 선의 끝에 창 평균을 적어 "지금 흐름이 몇 점인지"를 숫자로 닫는다.
+    if (showValues) {
+      let lastIdx = -1;
+      for (let i = N - 1; i >= 0; i--) if (nights[i].kind === "played" && ma[i] != null) { lastIdx = i; break; }
+      if (lastIdx >= 0) {
+        const v = ma[lastIdx] as number;
+        const px = xc(lastIdx);
+        const py = BASE - (v / denom) * bandH;
+        const fv = n1(8.5 * FS);
+        const label = `${maWindow}경기 평균 ${v.toFixed(1)}`;
+        const anchor = px > W * 0.6 ? "end" : "start";
+        const tx = anchor === "end" ? px - 6 : px + 6;
+        const ty = Math.max(TOP + 8 * FS, py - 6);
+        parts.push(
+          `<g pointer-events="none" font-family="${MONO}" font-size="${fv}" font-weight="700" text-anchor="${anchor}">` +
+            `<text x="${n1(tx)}" y="${n1(ty)}" fill="${haloColor}" stroke="${haloColor}" stroke-width="3" stroke-linejoin="round">${esc(label)}</text>` +
+            `<text x="${n1(tx)}" y="${n1(ty)}" fill="${lineColor}">${esc(label)}</text></g>`
+        );
+      }
+    }
   }
 
   // ── 9. 축 라벨(연도 또는 월) + 득점 축 상한 ────────────────────────────────────────
   const scaleLabel = `${maxPts}점`;
   const scaleX = Math.min(W - 2, PAD_L + N * cw + reserve);
-  parts.push(`<text x="${n1(scaleX)}" y="9" font-size="9" text-anchor="end" fill="${ink(0.55)}" font-family="${MONO}">${esc(scaleLabel)}</text>`);
+  parts.push(`<text x="${n1(scaleX)}" y="${n1(TOP - 4)}" font-size="${f9}" text-anchor="end" fill="${ink(0.55)}" font-family="${MONO}">${esc(scaleLabel)}</text>`);
   // 9px 모노 기준 대략폭(한글 글리프는 두 배 가까이 넓다) - 연도 라벨이 축 상한 라벨을 밟지 않게.
-  const textW = (s: string) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 127 ? 9 : 5.4), 0);
+  const textW = (s: string) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 127 ? 9 : 5.4) * FS, 0);
   const labelGuard = scaleX - textW(scaleLabel) - 8;
 
   let lastLabelX = -99;
   const pushLabel = (x: number, text: string, alpha: number) => {
-    if (x - lastLabelX < 22 || x > labelGuard) return;
-    parts.push(`<text x="${n1(x + 2)}" y="9" font-size="9" fill="${ink(alpha)}" font-family="${MONO}">${esc(text)}</text>`);
+    if (x - lastLabelX < 22 * FS || x > labelGuard) return;
+    parts.push(`<text x="${n1(x + 2)}" y="${n1(TOP - 4)}" font-size="${f9}" fill="${ink(alpha)}" font-family="${MONO}">${esc(text)}</text>`);
     lastLabelX = x;
   };
   if (compact) {
@@ -493,8 +556,8 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
     parts.push(
       `<g><title>${esc(`${list.join(" · ")} KBL 출전 기록 없음`)}</title>` +
         `<line x1="${n1(x)}" y1="${n1(TOP - 4)}" x2="${n1(x)}" y2="${n1(BASE + 8)}" stroke="${ink(0.34)}" stroke-width="1" stroke-dasharray="2 3"/>` +
-        `<text x="${n1(tx)}" y="${n1(TOP + 9)}" font-size="9" text-anchor="${anchor}" fill="${ink(0.6)}" font-family="${MONO}">${esc(label)}</text>` +
-        `<text x="${n1(tx)}" y="${n1(TOP + 20)}" font-size="9" text-anchor="${anchor}" fill="${ink(0.42)}" font-family="${MONO}">기록 없음</text></g>`
+        `<text x="${n1(tx)}" y="${n1(TOP + 9 * FS)}" font-size="${f9}" text-anchor="${anchor}" fill="${ink(0.6)}" font-family="${MONO}">${esc(label)}</text>` +
+        `<text x="${n1(tx)}" y="${n1(TOP + 20 * FS)}" font-size="${f9}" text-anchor="${anchor}" fill="${ink(0.42)}" font-family="${MONO}">기록 없음</text></g>`
     );
   }
 
@@ -541,7 +604,7 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
 
   // ── 캡션(고정 문형) ────────────────────────────────────────────────────────────────
   // 이동평균선을 못 그린 경우(표본 미달)에는 마지막 절을 뺀다 - 없는 선을 설명하면 거짓말이다.
-  const head = cropped ? `최근 ${playedCount}경기` : `커리어 ${playedCount}경기`;
+  const head = opts.captionHead ?? (cropped ? `최근 ${playedCount}경기` : `커리어 ${playedCount}경기`);
   const caption =
     `${head} (${firstDate} ~ ${lastDate}) · 칸 하나 = 한 경기 득점 · 색 = 그날의 소속팀 · ` +
     `빈칸 = 등록 기간 중 결장(미등록·이적 전후 기간은 그리지 않음)` +
@@ -568,4 +631,50 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
     compact,
     note,
   };
+}
+
+// ── 모바일: 시즌별 행 ───────────────────────────────────────────────────────────────
+//
+// 제보(2026-09-06 실기기): 히어로 발치 띠가 375px에서 "너무 작아서 안 보임". 실측으로 이유가 분명하다 -
+// 26-27 명단 198명의 커리어 총 경기 p50 122·max 739라, 한 줄 띠를 303px에 넣으면 칸 하나가
+// 2.5px(p50)·0.41px(max)이고 9단위 글자는 3px가 된다. 크기를 키워서 될 일이 아니다.
+//
+// 시즌별로 한 행씩 접으면 최장 시즌(64경기)도 칸이 4.7px 이상이고 시즌 라벨이 행마다 붙는다
+// (시즌 수 p50 4·p90 11·max 15). 각 행의 뷰박스 폭을 칸 수에 딱 맞춰(칸 상한 9 × 칸 수 + 여백)
+// 페이지가 행을 100% 폭으로 늘리면 칸이 화면 폭을 다 쓴다. 행은 시즌 히트존 모드로 고정한다 -
+// 5px짜리 칸은 손가락으로 집을 수 없다.
+export type CareerStripRow = { seasonName: string; result: CareerStripResult };
+export type CareerStripRowsResult = { rows: CareerStripRow[]; note: string };
+
+export function buildCareerStripRowsSvg(
+  grain: CareerGrain,
+  opts: Omit<CareerStripOptions, "range" | "recentN" | "width" | "detail"> & { rowHeight?: number }
+): CareerStripRowsResult | null {
+  const all = grain.nights;
+  if (!all.length) return null;
+  const blocks = blocksOf(all);
+  const lastYear = Number(blocks[blocks.length - 1].seasonName.slice(0, 4));
+  const trailingGap = grain.gapSeasons.some((s) => Number(s.slice(0, 4)) > lastYear);
+  const rows: CareerStripRow[] = [];
+  for (let k = 0; k < blocks.length; k++) {
+    const b = blocks[k];
+    const len = b.end - b.start + 1;
+    const isLast = k === blocks.length - 1;
+    const r = buildCareerStripSvg(grain, {
+      ...opts,
+      uid: `${opts.uid}r${b.seasonName.slice(0, 4)}`,
+      range: { start: b.start, end: b.end + 1 },
+      width: len * CELL_MAX_W + PAD_L + PAD_R + (isLast && trailingGap ? GAP_RESERVE : 0),
+      // 글자 배율 2면 라벨 줄(PAD_T)이 26단위가 된다 - 40으로 두면 막대 띠(bandH)가 2단위만 남아
+      // 아무것도 안 보인다(초안의 실수). 80 = 라벨 26 + 막대 42 + 레일 12.
+      height: opts.rowHeight ?? 80,
+      detail: "season",
+      fontScale: opts.fontScale ?? 2,
+      captionHead: `${shortSeason(b.seasonName)} 시즌 ${b.played}경기`,
+    });
+    if (r) rows.push({ seasonName: b.seasonName, result: r });
+  }
+  const gaps = grain.gapSeasons.length ? ` · 공백 시즌 ${grain.gapSeasons.map(shortSeason).join("·")}(기록 없음)` : "";
+  const note = `${rows.length}시즌을 행으로 나눠 그림 · 행 하나 = 한 시즌, 칸 하나 = 한 경기 · 행을 누르면 그 시즌 기록${gaps}`;
+  return { rows, note };
 }

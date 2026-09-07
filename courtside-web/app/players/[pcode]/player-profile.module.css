@@ -737,3 +737,116 @@
     gap: 8px;
   }
 }
+
+/* ── 모바일 시각화 재배치(2026-09-06 실기기 제보) ──────────────────────────────────
+   세 그림(커리어 띠·슈팅 DNA·최근 N경기)의 공통 원인은 "넓은 뷰박스를 303px로 축소"라 칸과
+   글자가 사라지는 것. 크기 조정이 아니라 모바일 전용 배치로 푼다:
+   - 커리어 띠: 한 줄(.heroFootSvg) 대신 시즌별 행(.heroFootRows) - 칸 ≥4.7px
+   - 슈팅 DNA: 존 레인×시즌 열(.dnaWide) 대신 시즌 행×존 열(.dnaTall)
+   - 확대판: 값 라벨·글자 배율은 빌더가, 여기서는 높이만 */
+.heroFootRows {
+  display: none;
+}
+/* 높이를 고정해야 한다: 행마다 뷰박스 폭이 칸 수만큼 다르므로 height:auto면 10경기 시즌이 54경기
+   시즌의 5배 높이로 그려진다. 고정 높이 + xMinYMid meet = 모든 행이 같은 배율(≈0.7, 칸 6px). */
+.heroFootRow {
+  display: block;
+  width: 100%;
+  height: 56px;
+  overflow: visible;
+  margin: 2px 0;
+}
+.heroFootRow a {
+  cursor: pointer;
+}
+.dnaWide {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.dnaTall {
+  display: none;
+}
+.dnaCaption {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+  margin-top: 8px;
+  word-break: keep-all;
+}
+.dnaCaption b {
+  color: var(--ink);
+}
+@media (max-width: 620px) {
+  .heroFootSvg {
+    display: none;
+  }
+  .heroFootRows {
+    display: block;
+  }
+  .heroFootCaption {
+    font-size: 11px;
+  }
+  .heroFootNote {
+    font-size: 10.5px;
+  }
+  .stripZoomSvg {
+    height: 176px;
+  }
+  .stripCaption {
+    font-size: 11.5px;
+  }
+  .dnaWide {
+    display: none;
+  }
+  .dnaTall {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .dnaLegend {
+    font-size: 12px;
+    gap: 8px 14px;
+  }
+}
+
+/* ── 슈팅 DNA 모바일 행(시즌 × 존 100% 바) ──────────────────────────────────────── */
+.dnaTallRow {
+  display: grid;
+  grid-template-columns: 40px 1fr 66px;
+  gap: 8px;
+  align-items: center;
+  margin: 5px 0;
+}
+.dnaTallSeason {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.dnaTallBar {
+  display: flex;
+  height: 22px;
+  border-radius: 6px;
+  overflow: hidden;
+  gap: 1px;
+}
+.dnaTallSeg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.dnaTallDelta {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: right;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}

@@ -46,7 +46,7 @@ import {
 } from "@/lib/seasonFocus";
 import { aggregateCareer, getPlayerWpaBySeason } from "@/lib/playerPageData";
 import { getCareerGrain, type CareerGrain, type CareerNight } from "@/lib/careerGrain";
-import { buildCareerStripSvg, CELL_MAX_W, GAP_RESERVE } from "@/lib/careerStrip";
+import { buildCareerStripSvg, buildCareerStripRowsSvg, CELL_MAX_W, GAP_RESERVE } from "@/lib/careerStrip";
 import { getPlayerForm, type PlayerForm } from "@/lib/playerForm";
 import { getPlayerGlance, type PlayerGlance } from "@/lib/playerGlance";
 import { displayTeamName } from "@/lib/teamNames";
@@ -246,8 +246,25 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
     if (labels[i].y - labels[i - 1].y < 12) labels[i].y = labels[i - 1].y + 12;
   }
 
+  // "DNA"라고 이름 붙였으면 변화가 읽혀야 한다(제보). 밴드는 모양으로만 말하니 숫자로 두 번 더 말한다:
+  // (1) 첫 시즌 → 최근 시즌 존별 비율(양쪽 레이아웃 공통 캡션, 5pp 이상은 굵게)
+  // (2) 모바일 행마다 전 시즌 대비 가장 크게 움직인 존(3pp 미만은 안 적는다 - 시즌당 슛 30개 컷에서
+  //     1~2pp는 슛 한두 개 차이라 방향을 말할 수 없다)
+  const pp = (v: number) => Math.round(v * 100);
+  const first = mix[0];
+  const latest = mix[n - 1];
+  const biggestShift = (i: number): { zone: (typeof DNA_ZONES)[number]; pp: number } | null => {
+    if (i === 0) return null;
+    let best: { zone: (typeof DNA_ZONES)[number]; pp: number } | null = null;
+    for (const z of DNA_ZONES) {
+      const d = pp(mix[i].shares[z]) - pp(mix[i - 1].shares[z]);
+      if (!best || Math.abs(d) > Math.abs(best.pp)) best = { zone: z, pp: d };
+    }
+    return best && Math.abs(best.pp) >= 3 ? best : null;
+  };
   return (
     <div>
+      <div className={styles.dnaWide}>
       <svg className={styles.dnaSvg} viewBox={`0 0 ${W} ${H}`}>
         {/* 밴드 사이에 패널색 실선을 얇게 둘러 인접 밴드가 서로 번지지 않게. */}
         {DNA_ZONES.map((z, zi) => (
@@ -283,6 +300,35 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
           0%
         </text>
       </svg>
+      <div className={styles.pctNote}>오른쪽 라벨 = {shortSeason(latest.season)} 비율</div>
+      </div>
+      {/* 모바일: 시즌 행 × 존 열. 640단위 뷰박스를 303px로 줄이면 밴드 라벨이 4px가 되어 안 읽힌다(제보).
+          행은 위가 오래된 시즌 - 데스크톱 밴드의 왼→오와 같은 시간 방향이라 변화를 같은 순서로 읽는다. */}
+      <div className={styles.dnaTall}>
+        {mix.map((m, i) => {
+          const shift = biggestShift(i);
+          return (
+            <div className={styles.dnaTallRow} key={m.season}>
+              <div className={styles.dnaTallSeason}>{shortSeason(m.season)}</div>
+              <div className={styles.dnaTallBar} title={`${m.season} 슛 ${m.total.toLocaleString()}개`}>
+                {DNA_ZONES.map((z) =>
+                  m.shares[z] > 0 ? (
+                    <div key={z} className={styles.dnaTallSeg} style={{ width: `${m.shares[z] * 100}%`, background: DNA_COLORS[z] }}>
+                      {m.shares[z] >= 0.12 ? pp(m.shares[z]) : ""}
+                    </div>
+                  ) : null
+                )}
+              </div>
+              <div className={styles.dnaTallDelta} style={shift ? { color: DNA_COLORS[shift.zone] } : undefined}>
+                {shift ? `${DNA_ZONE_LABELS[shift.zone]} ${shift.pp > 0 ? "▲" : "▼"}${Math.abs(shift.pp)}` : i === 0 ? "" : "·"}
+              </div>
+            </div>
+          );
+        })}
+        <div className={styles.pctNote}>
+          행 = 시즌(위가 오래된 시즌) · 칸 안 숫자 = 비율(%) · 오른쪽 = 전 시즌 대비 가장 크게 움직인 존(퍼센트포인트, 3 미만은 · )
+        </div>
+      </div>
       <div className={styles.dnaLegend}>
         {DNA_ZONES.map((z) => (
           <span key={z}>
@@ -290,7 +336,21 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
             {DNA_ZONE_LABELS[z]}
           </span>
         ))}
-        <span>오른쪽 라벨 = {shortSeason(mix[n - 1].season)} 비율</span>
+      </div>
+      <div className={styles.dnaCaption}>
+        {shortSeason(first.season)} → {shortSeason(latest.season)} 변화:{" "}
+        {DNA_ZONES.map((z, i) => {
+          const a = pp(first.shares[z]);
+          const b = pp(latest.shares[z]);
+          const big = Math.abs(b - a) >= 5;
+          return (
+            <span key={z}>
+              {i ? " · " : ""}
+              {DNA_ZONE_LABELS[z]} {big ? <b>{a}→{b}%</b> : `${a}→${b}%`}
+            </span>
+          );
+        })}
+        {" "}· 굵게 = 5pp 이상 · 시즌당 슛 30개 이상인 {n}시즌 기준
       </div>
     </div>
   );
@@ -511,6 +571,11 @@ export default async function PlayerPage({
         tone: "hero",
       })
     : null;
+  // 모바일(≤620px)용 시즌별 행. 실측: 26-27 명단 198명의 커리어 총 경기 p50 122·max 739라 한 줄 띠를
+  // 303px에 넣으면 칸이 2.5px·0.4px다 - 키워서 될 일이 아니라 시즌별로 접는다(최장 시즌 64경기도 칸
+  // ≥4.7px). 한 줄 띠와 행 둘 다 그려 보내고 CSS가 폭으로 하나만 보인다(.heroFootSvg / .heroFootRows).
+  // 행은 시즌 히트존 모드(칸당 ~26B)라 둘 다 보내는 비용은 작다.
+  const heroRows = grain ? buildCareerStripRowsSvg(grain, { uid: `herorow${pcode}`, teamColors, teamAbbrs, tone: "hero" }) : null;
   // §9 확대판: 마지막 windowN "출전"까지 거슬러 올라간 구간. 뷰박스 폭을 칸 수에 딱 맞춰 요청해
   // (칸 상한 9 × 칸 수 + 좌우 여백) 오른쪽에 빈 공간이 남지 않게 한다. 커리어 끝에 공백 시즌
   // 표식이 붙는 선수(배스)는 빌더가 오른쪽에 GAP_RESERVE만큼 예약하므로 그만큼 더 요청한다
@@ -529,6 +594,10 @@ export default async function PlayerPage({
         tone: "surface",
         // 확대판은 언제나 경기 단위(칸 = 클릭 가능한 한 경기). "띠는 질감, 패널은 개별 경기".
         detail: "cell",
+        // 제보 "L15·L30 가시성": 뷰박스(칸 9단위)가 화면 폭보다 넓게 그려지는 패널이라 글자를 1.5배로,
+        // 칸 위에 그날 득점과 이동평균 끝값을 적는다(칸 40개 이하일 때만 - 빌더가 판단).
+        fontScale: 1.5,
+        valueLabels: true,
       })
     : null;
 
@@ -618,6 +687,22 @@ export default async function PlayerPage({
               preserveAspectRatio="xMidYMid meet"
               dangerouslySetInnerHTML={{ __html: heroStrip.svg }}
             />
+            {/* 모바일: 시즌별 행(최신 시즌이 위 - 스크롤 없이 지금 시즌이 먼저). 행 높이는 CSS가 고정하고
+                xMinYMid meet이라 모든 행이 같은 배율로 그려진다(짧은 시즌은 짧게). */}
+            {heroRows && (
+              <div className={styles.heroFootRows}>
+                {[...heroRows.rows].reverse().map((r) => (
+                  <svg
+                    key={r.seasonName}
+                    className={styles.heroFootRow}
+                    viewBox={r.result.viewBox}
+                    preserveAspectRatio="xMinYMid meet"
+                    dangerouslySetInnerHTML={{ __html: r.result.svg }}
+                  />
+                ))}
+                <div className={styles.heroFootNote}>{heroRows.note} · 최신 시즌이 위</div>
+              </div>
+            )}
             <div className={styles.heroFootCaption}>{heroStrip.caption}</div>
             <div className={styles.heroFootNote}>{heroStrip.note}</div>
           </div>
