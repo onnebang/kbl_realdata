@@ -107,7 +107,7 @@ export default async function CoachesPage() {
                 </div>
               </div>
               <div className={dir.teamLinks}>
-                <span>{t.name}{t.confirmed ? "" : " (확인 필요)"} → 프로필</span>
+                <span>{t.name}{t.confirmed ? "" : " (확인 필요)"} · 프로필</span>
               </div>
             </Link>
           );

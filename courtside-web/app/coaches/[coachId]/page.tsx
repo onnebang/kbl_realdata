@@ -103,8 +103,9 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
               </div>
               <div className={styles.tileLabel}>승-패</div>
             </div>
+            {/* 이 카드의 주인공 숫자 하나 - 나머지 타일은 조용한 크기를 유지한다 */}
             <div className={styles.tile}>
-              <div className={styles.tileVal}>
+              <div className={`${styles.tileVal} ${styles.tileValLead}`}>
                 {fmtPct3(career.wpct)}
                 <span className={styles.tileSe}>±{fmtPct3(career.wpctSe)}</span>
               </div>
@@ -320,8 +321,9 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
           </p>
           {challenges.map((c) => (
             <div key={c.seasonName + c.tcode} className={styles.chGrid}>
+              {/* 이 카드의 주인공 숫자 하나 = 경기당 사용 */}
               <div className={styles.tile}>
-                <div className={styles.tileVal}>
+                <div className={`${styles.tileVal} ${styles.tileValLead}`}>
                   {c.perGame.toFixed(2)}
                   <span className={styles.tileSe}>±{c.sePoisson.toFixed(2)}</span>
                 </div>

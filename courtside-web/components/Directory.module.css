@@ -1,5 +1,6 @@
 /* 팀/선수 디렉터리(/teams, /players) 공용 스타일 - globals.css :root 토큰만 사용(라이트/다크는
-   토큰이 알아서 바뀜). 프로필 페이지의 시각 언어(Big Shoulders 숫자, IBM Plex Mono 라벨)와 맞춤. */
+   토큰이 알아서 바뀜). 프로필 페이지의 시각 언어와 맞춤: 숫자는 Big Shoulders, 글자는 Pretendard.
+   이 파일에는 모노가 없다 - 라벨·태그·보조 줄이 전부 한글이라(IBM Plex Mono에 한글 글리프가 없다). */
 .head {
   display: flex;
   flex-wrap: wrap;
@@ -7,17 +8,20 @@
   gap: 10px 16px;
   margin-top: 6px;
 }
+/* "25-26 확정 로스터 · 773명" - 한글이라 모노를 쓰지 않는다(숫자만 tabular-nums). */
 .kicker {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  letter-spacing: 0.2em;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
 }
+/* 산문 - 한 줄 길이는 지면 폭 토큰이 정한다(68ch 하드코딩 제거). */
 .lede {
   font-size: 13px;
-  line-height: 1.6;
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
-  max-width: 68ch;
+  max-width: var(--measure-read);
   margin: 6px 0 14px;
 }
 
@@ -27,21 +31,22 @@
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
 }
+/* 팀 색은 글자색이 아니라 모서리다 - 카드 왼쪽 테두리 하나가 팀 정체성을 맡고
+   글자는 전부 --ink 계열로 둔다(아래 .teamSection과 같은 규칙). 움직임은 라이브 점
+   하나뿐이라 hover 트랜지션·들어올림은 두지 않는다 - 테두리만 즉시 진해진다. */
 .teamCard {
   display: block;
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-top: 4px solid var(--team, var(--gold));
-  border-radius: 14px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-left: 4px solid var(--team, var(--gold));
+  border-radius: var(--r-card);
   padding: 14px 16px 12px;
   color: var(--ink);
   text-decoration: none;
-  transition: transform 0.12s ease, border-color 0.12s ease;
 }
 .teamCard:hover {
-  transform: translateY(-1px);
   border-color: rgba(var(--line-rgb), 0.28);
-  border-top-color: var(--team, var(--gold));
+  border-left-color: var(--team, var(--gold));
 }
 .teamName {
   display: flex;
@@ -50,12 +55,14 @@
   font-weight: 800;
   font-size: 16px;
 }
+/* 라틴 약어(LG/KCC)라 Big Shoulders는 안전하다. 카드에서 큰 숫자는 아래 승-패 하나뿐이므로
+   약어는 한 단 내리고 색도 뺀다(팀 색은 왼쪽 테두리가 이미 말한다). */
 .teamAbbr {
   margin-left: auto;
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 26px;
-  color: var(--team, var(--gold));
+  font-size: var(--fs-500);
+  color: var(--ink-faint);
   letter-spacing: 0.02em;
 }
 .teamStats {
@@ -66,17 +73,24 @@
   padding-top: 10px;
   border-top: 1px dashed rgba(var(--line-rgb), 0.12);
 }
+/* 카드 하나에 큰 숫자는 하나 - 첫 칸(지난 시즌 승-패)이 이 카드의 스코어보드 값이고
+   기대승·로스터 수는 그 아래 단으로 조용히 둔다. */
 .statVal {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 22px;
-  line-height: 1;
+  font-size: var(--fs-500);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
+.teamStats > div:first-child .statVal {
+  font-size: var(--fs-600);
+}
+/* "25-26 정규", "확정 로스터 · 영입 3" - 한글 라벨이라 Pretendard(숫자만 tabular-nums). */
 .statLabel {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
   margin-top: 3px;
 }
@@ -85,7 +99,7 @@
   flex-wrap: wrap;
   gap: 6px 12px;
   margin-top: 10px;
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--gold);
 }
@@ -113,9 +127,11 @@
   background: var(--surface);
   color: var(--ink);
 }
+/* 필터 칩 - 구단 약어(LG/KCC)와 한글("전체")이 같은 줄에 섞이므로 Pretendard.
+   누를 수 있는 컨트롤이라 배경 + 테두리를 함께 두는 유일한 예외다(패널 안 타일이 아니다). */
 .chip {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12.5px;
   font-weight: 700;
   padding: 5px 9px;
   border-radius: 999px;
@@ -133,8 +149,8 @@
 .teamSection {
   margin-top: 16px;
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 14px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
   padding: 12px 14px;
   border-left: 4px solid var(--team, var(--gold));
 }
@@ -148,10 +164,12 @@
   color: var(--ink);
   text-decoration: none;
 }
+/* "17명" - 한글 단위가 붙으므로 Pretendard(숫자는 tabular-nums). */
 .teamSectionCount {
   margin-left: auto;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
 }
 .playerGrid {
@@ -165,7 +183,7 @@
   align-items: center;
   gap: 8px;
   padding: 5px 6px;
-  border-radius: 8px;
+  border-radius: var(--r-inset);
   color: var(--ink);
   text-decoration: none;
 }
@@ -195,10 +213,12 @@ a.playerRow:hover {
   font-size: 13px;
   color: var(--ink-faint);
 }
+/* 등번호 - 목록 안의 스코어보드 숫자. */
 .num {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
   font-size: 18px;
+  letter-spacing: -0.01em;
   color: var(--ink-faint);
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -213,20 +233,24 @@ a.playerRow:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* "가드 · 외국인 · 25-26 54G 12.3P" - 한글이 섞인 보조 줄이라 Pretendard + tabular-nums. */
 .sub {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 태그 문구는 전부 한글(영입·복귀·신입·아시아쿼터…)이라 Pretendard. */
+/* 배지는 데이터 조각이므로 하드 엣지(--r-led). 위 .chip은 누를 수 있는 컨트롤이라 알약을 유지한다. */
 .tag {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12px;
   font-weight: 700;
   padding: 2px 6px;
-  border-radius: 6px;
+  border-radius: var(--r-led);
   white-space: nowrap;
 }
 .tagForeign {
@@ -247,10 +271,11 @@ a.playerRow:hover {
   color: var(--ink-soft);
 }
 .note {
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-faint);
   margin-top: 12px;
-  line-height: 1.5;
+  max-width: var(--measure-read);
+  line-height: var(--lh-prose);
 }
 /* 이 시즌에 안 뛰는 선수(군 입대·해외 진출·미계약) - 명부에는 있지만 전력이 아니다. */
 .tagOut {

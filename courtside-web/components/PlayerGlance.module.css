@@ -17,8 +17,8 @@
 .card {
   margin-top: 14px;
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 14px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
   padding: 16px 18px 18px;
 }
 
@@ -29,21 +29,23 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+/* 한글 표제 규칙 - Pretendard 800 + -0.02em(body 상속이라 서체는 지정하지 않는다). */
 .title {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--fs-300);
   font-weight: 800;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: var(--ink);
 }
 /* 선수/팀 페이지 .panelChip과 같은 모양 - 카드가 페이지 안에서 이물감 없이 앉도록. */
 .chip {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: var(--fs-100);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0;
   padding: 2px 8px;
-  border-radius: 999px;
+  /* 데이터 조각(기준 칩) - 하드 엣지. */
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   border: 1px solid rgba(var(--line-rgb), 0.14);
   color: var(--ink-soft);
@@ -83,10 +85,11 @@
   gap: 10px;
   margin: 12px 0 0;
 }
+/* 왼쪽 3px 색 바 + 하드 엣지 = 중계 하단 자막의 데이터 조각. */
 .hlCell {
   min-width: 0;
   padding: 11px 13px 12px;
-  border-radius: 11px;
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   border-left: 3px solid var(--tone);
   display: flex;
@@ -94,20 +97,23 @@
   gap: 6px;
 }
 .hlLabel {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--ink-soft);
 }
+/* 이 카드의 주인공 숫자 - 스코어보드 규칙(globals.css .scoreboard와 같은 다섯 선언).
+   아래 22칸 격자의 .cNum(23px)은 여기보다 한 단 작아서 큰 숫자는 카드에 하나뿐이다. */
 .hlValue {
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 34px;
+  font-size: var(--fs-700);
   font-weight: 800;
-  line-height: 0.94;
+  letter-spacing: -0.01em;
+  line-height: var(--lh-tight);
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 .hlRank {
-  font-size: 11.5px;
+  font-size: var(--fs-200);
   font-weight: 700;
   color: var(--tone-ink);
   line-height: 1.35;
@@ -116,10 +122,11 @@
   margin-top: 12px;
   padding: 12px 14px;
   border: 1px dashed rgba(var(--line-rgb), 0.18);
-  border-radius: 11px;
-  font-size: 11.5px;
-  line-height: 1.55;
+  border-radius: var(--r-inset);
+  font-size: var(--fs-200);
+  line-height: var(--lh-data);
   color: var(--ink-faint);
+  max-width: var(--measure-read);
 }
 
 /* ── 커리어 한 줄 ────────────────────────────────────────────────────────────────── */
@@ -131,9 +138,12 @@
   margin: 12px 0 0;
   padding: 11px 0 0;
   border-top: 1px solid rgba(var(--line-rgb), 0.08);
-  font-size: 12px;
+  font-size: var(--fs-100);
   color: var(--ink-soft);
   line-height: 1.5;
+  /* 조각이 이어 붙어 한 문장처럼 읽히는 줄이다 - 카드 폭(1180px 지면에서 1070px)을
+     다 쓰지 않고 62자에서 접는다. */
+  max-width: var(--measure-read);
 }
 /* 짧은 숫자 조각은 한 덩어리로 붙여 둔다. max-width/overflow는 안전장치 - flex 아이템은
    min-width:auto라서 nowrap 텍스트가 컨테이너보다 길면 페이지를 옆으로 밀어버린다. */
@@ -197,17 +207,19 @@
   gap: 4px 10px;
   margin-bottom: 6px;
 }
+/* 그룹 표제도 한글 표제 규칙(Pretendard 800 + -0.02em). 아래 .groupNote(12)보다 한 단 위. */
 .groupTitle {
-  font-size: 11px;
+  font-size: var(--fs-200);
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: -0.02em;
   color: var(--ink-soft);
 }
 /* '수비 블록이 얇은 것은 데이터의 한계다' - lib/playerGlance.ts notes의 문장을 그대로 건다. */
 .groupNote {
-  font-size: 10px;
-  line-height: 1.4;
+  font-size: var(--fs-100);
+  line-height: var(--lh-data);
   color: var(--ink-faint);
+  max-width: var(--measure-read);
 }
 .cells {
   display: grid;
@@ -215,12 +227,13 @@
   gap: 8px;
 }
 
+/* 22칸 격자의 한 칸 = 순위 셀급 데이터 조각 - 하드 엣지. */
 .cell {
   min-width: 0;
   overflow: hidden;
   background: var(--surface-soft);
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: var(--r-led);
   padding: 8px 9px 8px;
   display: flex;
   flex-direction: column;
@@ -229,7 +242,7 @@
 /* 라벨 두 줄분을 항상 비워 둔다 - 칸마다 값의 세로 위치가 어긋나지 않도록.
    한글은 keep-all로 어절 단위로만 끊고, 긴 라틴 토큰은 anywhere로 강제 줄바꿈. */
 .cLabel {
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.22;
   min-height: 2.44em;
   color: var(--ink-soft);
@@ -252,23 +265,24 @@
 }
 .cUnit {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 8.5px;
-  letter-spacing: 0.04em;
+  font-size: var(--fs-100);
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
 }
 
 /* 퍼센타일 바(0-100). 가운데 눈금 = 리그 중앙(50). */
+/* 미터는 데이터 조각 - 알약이 아니라 하드 엣지. */
 .meter {
   position: relative;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: rgba(var(--line-rgb), 0.1);
   overflow: hidden;
 }
 .meterFill {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--tone);
   opacity: 0.92;
 }
@@ -315,7 +329,7 @@
 }
 .cFootText {
   min-width: 0;
-  font-size: 9.5px;
+  font-size: var(--fs-100);
   line-height: 1.35;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
@@ -364,13 +378,13 @@
   margin-bottom: 6px;
 }
 .dietSample {
-  font-size: 10px;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
 }
 .dietBar {
   display: flex;
   height: 14px;
-  border-radius: 7px;
+  border-radius: var(--r-led);
   overflow: hidden;
   background: rgba(var(--line-rgb), 0.08);
 }
@@ -383,7 +397,7 @@
   flex-wrap: wrap;
   gap: 3px 14px;
   margin-top: 6px;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-soft);
 }
 .dietItem {
@@ -413,9 +427,10 @@
 /* ── 기준과 한계 ─────────────────────────────────────────────────────────────────── */
 .caption {
   margin-top: 12px;
-  font-size: 10.5px;
-  line-height: 1.55;
+  font-size: 12.5px;
+  line-height: var(--lh-data);
   color: var(--ink-faint);
+  max-width: var(--measure-read);
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
@@ -424,9 +439,10 @@
   padding-top: 9px;
   border-top: 1px solid rgba(var(--line-rgb), 0.08);
 }
+/* 접힌 블록의 표제 - 안쪽 산문(12.5)보다 한 단 위여야 여는 손잡이로 읽힌다. */
 .moreSummary {
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--fs-200);
   font-weight: 700;
   color: var(--ink-soft);
   list-style: none;
@@ -443,16 +459,18 @@
 }
 .moreLine {
   margin-top: 9px;
-  font-size: 10.5px;
-  line-height: 1.55;
+  font-size: 12.5px;
+  line-height: var(--lh-data);
   color: var(--ink-faint);
+  max-width: var(--measure-read);
 }
 .moreList {
   margin: 8px 0 0;
   padding-left: 16px;
-  font-size: 10.5px;
-  line-height: 1.65;
+  font-size: 12.5px;
+  line-height: var(--lh-prose);
   color: var(--ink-faint);
+  max-width: var(--measure-read);
 }
 .defs {
   margin: 12px 0 0;
@@ -464,17 +482,19 @@
   grid-template-columns: 112px minmax(0, 1fr);
   gap: 10px;
 }
+/* 용어가 설명과 같은 크기면 어느 쪽이 표제인지 사라진다 - 한 단 위로. */
 .defTerm {
-  font-size: 10.5px;
+  font-size: var(--fs-200);
   font-weight: 700;
   color: var(--ink-soft);
   word-break: keep-all;
 }
 .defDesc {
   margin: 0;
-  font-size: 10.5px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: var(--lh-data);
   color: var(--ink-faint);
+  max-width: var(--measure-read);
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
@@ -495,7 +515,7 @@
     grid-template-columns: repeat(auto-fill, minmax(min(120px, 100%), 1fr));
   }
   .hlValue {
-    font-size: 30px;
+    font-size: var(--fs-600);
   }
   .defRow {
     grid-template-columns: minmax(0, 1fr);

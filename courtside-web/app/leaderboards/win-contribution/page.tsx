@@ -144,7 +144,7 @@ export default async function WinContributionPage({
         </div>
 
         <footer className="foot">
-          {activeSeason} 시즌 · {rows.length}명 · Supabase player_season_wpa에서 실시간 조회
+          {activeSeason} 시즌 · {rows.length}명 · 시즌 WPA 집계에서 실시간 조회
         </footer>
       </div>
     </div>

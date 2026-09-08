@@ -1,13 +1,15 @@
 /* 개막 리포트(/preseason) - 팀/선수 프로필과 같은 디자인 언어(Big Shoulders Display 숫자,
-   IBM Plex Mono 라벨, Pretendard 본문)를 페이지 스코프 CSS Module로. 토큰을 .pageRoot에
-   다시 정의하는 이유도 team-profile.module.css와 동일(전역 :root를 건드리지 않기 위해). */
+   Pretendard 본문·라벨)를 페이지 스코프 CSS Module로. 토큰을 .pageRoot에 다시 정의하는
+   이유도 team-profile.module.css와 동일(전역 :root를 건드리지 않기 위해).
+   IBM Plex Mono는 한글 글리프가 없어 시스템 모노로 폴백하므로 한글이 섞이지 않는 곳
+   (화살표·부호 숫자·확률·라틴 코드)에만 남긴다. */
 .pageRoot {
   --bg: #f4f5f8;
   --surface: #ffffff;
   --surface-soft: #eceef3;
   --ink: #14161c;
-  --ink-soft: #5b5f6e;
-  --ink-faint: #9297a880;
+  --ink-soft: #4a4f5c;
+  --ink-faint: #676c7b;
   --gold: #9a6b00;
   --gold-soft: #9a6b0022;
   --positive: #1a7f37;
@@ -23,8 +25,8 @@
     --surface: #1a1d24;
     --surface-soft: #23272f;
     --ink: #f2f3f7;
-    --ink-soft: #9297a8;
-    --ink-faint: #6a6f7f90;
+    --ink-soft: #a8aebe;
+    --ink-faint: #8d93a3;
     --gold: #ffd166;
     --gold-soft: #ffd16626;
     --positive: #4ade80;
@@ -39,8 +41,8 @@
   --surface: #1a1d24;
   --surface-soft: #23272f;
   --ink: #f2f3f7;
-  --ink-soft: #9297a8;
-  --ink-faint: #6a6f7f90;
+  --ink-soft: #a8aebe;
+  --ink-faint: #8d93a3;
   --gold: #ffd166;
   --gold-soft: #ffd16626;
   --positive: #4ade80;
@@ -54,10 +56,10 @@
 .hero {
   --hero-ink: #f4f5f8;
   --hero-ink-soft: rgba(244, 245, 248, 0.72);
-  --hero-ink-faint: rgba(244, 245, 248, 0.42);
+  --hero-ink-faint: rgba(244, 245, 248, 0.62);
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: var(--r-card);
   margin-top: 18px;
   min-height: 300px;
   display: flex;
@@ -103,8 +105,8 @@
 }
 .heroKicker {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  letter-spacing: 0.22em;
+  font-size: var(--fs-100);
+  letter-spacing: 0.02em;
   color: var(--hero-ink-faint);
   margin-bottom: 8px;
 }
@@ -114,13 +116,14 @@
   font-size: clamp(30px, 6vw, 50px);
   line-height: 1.04;
   margin: 0 0 10px;
-  letter-spacing: -0.01em;
+  /* 한글 표제 = Pretendard 800 + -0.02em */
+  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 .heroLede {
-  max-width: 62ch;
-  font-size: 13.5px;
-  line-height: 1.6;
+  max-width: var(--measure-read);
+  font-size: var(--fs-300);
+  line-height: var(--lh-prose);
   color: var(--hero-ink-soft);
   margin: 0;
 }
@@ -132,17 +135,18 @@
   padding-top: 14px;
   border-top: 1px solid rgba(244, 245, 248, 0.14);
 }
+/* 스코어보드 목소리(globals.css .scoreboard와 같은 규칙) - 숫자·라틴만 들어온다. */
 .heroStatVal {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 34px;
+  font-size: var(--fs-700);
   line-height: 1;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
 .heroStatLabel {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
+  font-size: var(--fs-100);
+  line-height: var(--lh-data);
   color: var(--hero-ink-faint);
   margin-top: 4px;
 }
@@ -151,35 +155,40 @@
 .panel {
   margin-top: 14px;
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 14px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
   padding: 16px 18px;
 }
+/* 한글 표제 = Pretendard 800 + -0.02em (Big Shoulders는 한글 글리프가 없어 여기 걸면 안 된다) */
 .panelTitle {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--ink-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-bottom: 4px;
+  font-size: var(--fs-500);
+  font-weight: 800;
+  line-height: var(--lh-tight);
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
 }
 .panelLede {
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: var(--fs-300);
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
   margin: 0 0 12px;
-  max-width: 70ch;
+  max-width: var(--measure-read);
 }
 .note {
-  font-size: 10.5px;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
   margin-top: 10px;
-  line-height: 1.5;
+  line-height: var(--lh-prose);
+  max-width: var(--measure-read);
 }
+/* 섹션 번호는 표제 묶음의 일부지 그 패널의 주인공 숫자가 아니다 - 제목과 같은 단으로
+   내려 27px 자리를 데이터(예상 승수·점수)에 넘긴다. */
 .sectionNum {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 22px;
+  font-size: var(--fs-500);
+  letter-spacing: -0.01em;
   color: var(--gold);
   margin-right: 8px;
   vertical-align: -2px;
@@ -196,7 +205,8 @@
   align-items: center;
   gap: 10px;
   padding: 5px 8px;
-  border-radius: 8px;
+  /* 표 행은 데이터 조각이다 - 하드 엣지(--r-led). 둥근 카드처럼 보이면 안 된다. */
+  border-radius: var(--r-led);
   text-decoration: none;
   color: var(--ink);
 }
@@ -204,9 +214,9 @@
   background: var(--surface-soft);
 }
 .outlookHead {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
+  font-size: var(--fs-100);
+  font-weight: 600;
+  line-height: var(--lh-data);
   color: var(--ink-faint);
 }
 .outlookHead:hover {
@@ -230,17 +240,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 미터도 데이터 조각 - 알약(999px) 대신 하드 엣지 */
 .outlookTrack {
   position: relative;
   height: 12px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   overflow: hidden;
 }
 .outlookFill {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   opacity: 0.92;
 }
 .outlookMid {
@@ -252,8 +263,7 @@
   background: rgba(var(--line-rgb), 0.32);
 }
 .outlookVal {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -268,8 +278,7 @@
   color: var(--ink-faint);
 }
 .outlookPrev {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
   text-align: right;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
@@ -300,25 +309,25 @@
 }
 .headlineTile {
   background: var(--surface-soft);
-  border-radius: 12px;
+  border-radius: var(--r-inset);
   padding: 12px 14px;
 }
 .headlineLabel {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-faint);
+  font-size: var(--fs-100);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
 }
+/* 한글(팀·선수 이름)이 들어오는 자리 - Pretendard 800 + -0.02em. Big Shoulders 금지. */
 .headlineVal {
   font-weight: 800;
-  font-size: 16px;
+  font-size: var(--fs-400);
+  letter-spacing: -0.02em;
   margin-top: 4px;
   line-height: 1.25;
 }
 .headlineSub {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-soft);
   margin-top: 4px;
   font-variant-numeric: tabular-nums;
@@ -347,8 +356,8 @@
   gap: 10px;
 }
 .teamCard {
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 12px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-inset);
   padding: 12px 14px 10px;
   border-top-width: 3px;
 }
@@ -359,6 +368,7 @@
   gap: 4px 8px;
   font-weight: 800;
   font-size: 14px;
+  letter-spacing: -0.02em;
   margin-bottom: 8px;
   text-decoration: none;
   color: var(--ink);
@@ -369,15 +379,15 @@
 }
 .teamCardSum {
   margin-left: auto;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: var(--fs-100);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
   /* 요약은 줄어들 수 있어야 한다 - 이름 대신 이쪽이 접힌다. */
   min-width: 0;
 }
 .changeRow {
   display: grid;
-  grid-template-columns: 40px 1fr;
+  grid-template-columns: 56px 1fr;
   gap: 8px;
   align-items: start;
   padding: 5px 0;
@@ -388,12 +398,13 @@
 }
 .chip {
   display: inline-block;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-size: var(--fs-100);
   font-weight: 700;
-  letter-spacing: 0.04em;
+  line-height: var(--lh-data);
+  letter-spacing: 0.02em;
   padding: 2px 0;
-  border-radius: 6px;
+  /* 배지 = 데이터 조각 */
+  border-radius: var(--r-led);
   text-align: center;
   margin-top: 2px;
 }
@@ -430,8 +441,7 @@
 }
 .staySummary {
   cursor: pointer;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--ink-soft);
   padding: 7px 0 3px;
@@ -457,13 +467,12 @@
   text-decoration: underline;
 }
 .changeRole {
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-faint);
   margin-left: 5px;
 }
 .changeStat {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-soft);
   margin-top: 1px;
   font-variant-numeric: tabular-nums;
@@ -481,13 +490,15 @@
 }
 .actCard {
   background: var(--surface-soft);
-  border-radius: 12px;
+  border-radius: var(--r-inset);
   padding: 12px 14px;
 }
+/* 막 번호는 순서표지지 데이터가 아니다 - 이 패널의 주인공 숫자는 아래 .demoNum(점수)이다. */
 .actNum {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 26px;
+  font-size: var(--fs-500);
+  letter-spacing: -0.01em;
   color: var(--gold);
   line-height: 1;
 }
@@ -509,31 +520,31 @@
 }
 .demoCard {
   display: block;
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 12px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-inset);
   padding: 12px 14px;
   text-decoration: none;
   color: var(--ink);
-  transition: transform 0.12s ease, border-color 0.12s ease;
 }
+/* 움직임은 라이브 점(live-pulse) 하나뿐 - 카드 hover 트랜지션/들림은 두지 않는다.
+   테두리 색만 즉시 바뀐다(어포던스). */
 .demoCard:hover {
-  transform: translateY(-1px);
   border-color: rgba(var(--line-rgb), 0.28);
 }
 .demoTop {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: var(--fs-100);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
 }
 .demoTag {
   margin-left: auto;
-  font-size: 9.5px;
+  font-size: var(--fs-100);
   font-weight: 700;
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--gold-soft);
   color: var(--gold);
   white-space: nowrap;
@@ -561,11 +572,13 @@
 .demoTeamAway {
   justify-content: flex-end;
 }
+/* 경기 카드의 주인공은 점수다(globals.css .game-card-score와 같은 크기). */
 .demoNum {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 26px;
+  font-size: var(--fs-600);
   line-height: 1;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -578,7 +591,7 @@
   color: var(--ink-soft);
 }
 .demoCta {
-  font-size: 11.5px;
+  font-size: var(--fs-200);
   font-weight: 700;
   color: var(--gold);
   margin-top: 6px;
@@ -606,11 +619,12 @@
   /* 순위(+변동) / 팀 / 예상 승수 / 승수 범위 / 순위 가능성 / 정규 1위 / 6강 / 지난 시즌.
      전반기 열은 뺐다 - 실측상 전체 기대승수의 0.4928~0.5040배(최대 오차 0.15승)라
      다른 열의 절반을 반복하고 있었다. 기본/조정 두 열은 "30.8 → 31.0" 한 칸으로 합쳤다. */
-  grid-template-columns: 48px minmax(78px, 1fr) 128px minmax(104px, 1.3fr) 104px 48px 44px 54px;
+  /* 승수 칸은 150px - 주인공 숫자(.projWinsFinal)가 --fs-600으로 커지면서 넓혔다. */
+  grid-template-columns: 48px minmax(78px, 1fr) 150px minmax(104px, 1.3fr) 104px 48px 44px 54px;
   align-items: center;
   gap: 8px;
   padding: 5px 8px;
-  border-radius: 8px;
+  border-radius: var(--r-led);
   text-decoration: none;
   color: var(--ink);
 }
@@ -637,7 +651,7 @@
 }
 .projMove {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-size: var(--fs-100);
   font-weight: 700;
   letter-spacing: -0.03em;
   white-space: nowrap;
@@ -658,14 +672,17 @@
   font-variant-numeric: tabular-nums;
 }
 .projWinsArrow {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-faint);
 }
+/* 이 패널의 주인공 숫자 - 스코어보드 목소리로 --fs-600. 같은 행의 나머지(기본 승수 15px ·
+   화살표 · 변동)는 조용히 남는다. 패널 하나에 큰 숫자는 이것 하나다. */
 .projWinsFinal {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 19px;
+  font-size: var(--fs-600);
   line-height: 1;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -676,10 +693,10 @@
   gap: 8px 16px;
   padding: 10px 12px;
   margin-bottom: 10px;
-  border-radius: 10px;
+  border-radius: var(--r-inset);
   background: var(--surface-soft);
-  font-size: 11.5px;
-  line-height: 1.5;
+  font-size: var(--fs-200);
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
   word-break: keep-all;
 }
@@ -693,9 +710,8 @@
   align-items: baseline;
   gap: 3px;
   padding: 3px 7px;
-  border-radius: 6px;
+  border-radius: var(--r-led);
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
   flex-shrink: 0;
 }
 .readMeBar {
@@ -703,7 +719,7 @@
   display: block;
   width: 62px;
   height: 12px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: rgba(var(--line-rgb), 0.12);
   align-self: center;
 }
@@ -713,7 +729,7 @@
   width: 46%;
   top: 2px;
   bottom: 2px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--ink-soft);
   opacity: 0.75;
 }
@@ -753,7 +769,7 @@
 .projDelta {
   display: block;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-size: var(--fs-100);
   font-weight: 600;
   margin-top: 2px;
   letter-spacing: -0.02em;
@@ -761,7 +777,7 @@
 /* 조정 순위가 기본과 다를 때만 붙는 꼬리표 */
 .projBaseRank {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
+  font-size: var(--fs-100);
   color: var(--ink-soft);
   white-space: nowrap;
 }
@@ -770,12 +786,14 @@
 .adjWarn {
   border: 1px solid rgba(214, 154, 46, 0.45);
   background: rgba(214, 154, 46, 0.09);
-  border-radius: 10px;
+  border-radius: var(--r-inset);
   padding: 10px 12px;
   margin-bottom: 12px;
-  font-size: 11.5px;
-  line-height: 1.55;
+  font-size: var(--fs-200);
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
+  /* 산문이다 - 한 줄 62자에서 끊는다 */
+  max-width: var(--measure-read);
   word-break: keep-all;
 }
 .adjWarn b {
@@ -793,16 +811,15 @@
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
-  border-radius: 7px;
+  border-radius: var(--r-led);
 }
 .adjRow:hover {
   background: var(--surface-soft);
 }
 .adjHead {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: var(--fs-100);
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
 }
 .adjHead:hover {
@@ -820,19 +837,24 @@
 .adjNum {
   text-align: right;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
+/* 이 표의 결론 칸(상대) - 앞 네 칸(모노 12.5px)보다 한 단계 위로 올려 스코어보드 목소리를 준다.
+   같은 요소에 .adjNum이 함께 걸리는데 이 규칙이 뒤에 있어 서체·크기를 덮어쓴다.
+   --fs-600은 위 예상 승수 표가 이미 쓰고 있다 - 한 패널에 큰 숫자는 하나. */
 .adjTotal {
+  font-family: "Big Shoulders Display", sans-serif;
   color: var(--ink);
-  font-weight: 700;
-  font-size: 12px;
+  font-weight: 800;
+  font-size: var(--fs-300);
+  letter-spacing: -0.01em;
 }
 .adjTrack {
   position: relative;
   height: 14px;
-  border-radius: 4px;
+  border-radius: var(--r-led);
   background: rgba(var(--line-rgb), 0.07);
   overflow: hidden;
 }
@@ -857,18 +879,19 @@
   background: #d64545;
 }
 
-/* 승수 80% 구간 - 트랙 전체가 리그의 승수 범위, 막대가 그 팀의 80% 구간, 흰 점이 기대승수 */
+/* 승수 80% 구간 - 트랙 전체가 리그의 승수 범위, 막대가 그 팀의 80% 구간, 흰 점이 기대승수.
+   미터는 데이터 조각이라 하드 엣지(--r-led). */
 .projTrack {
   position: relative;
   height: 12px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--surface-soft);
 }
 .projBand {
   position: absolute;
   top: 2px;
   bottom: 2px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: color-mix(in srgb, var(--tc, var(--ink-soft)) 74%, var(--ink) 26%);
   opacity: 0.8;
   min-width: 4px;
@@ -911,7 +934,7 @@
 }
 .projOdds {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11.5px;
+  font-size: var(--fs-200);
   font-weight: 600;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -919,7 +942,7 @@
 
 @media (max-width: 900px) {
   .projRow {
-    grid-template-columns: 44px minmax(66px, 1fr) 118px minmax(80px, 1fr) 84px 44px 40px;
+    grid-template-columns: 44px minmax(66px, 1fr) 140px minmax(80px, 1fr) 84px 44px 40px;
   }
   /* 지난 시즌 성적부터 접는다 */
   .projRow > :last-child {
@@ -928,7 +951,7 @@
 }
 @media (max-width: 640px) {
   .projRow {
-    grid-template-columns: 40px minmax(62px, 1fr) 116px minmax(70px, 1fr) 40px;
+    grid-template-columns: 40px minmax(62px, 1fr) 138px minmax(70px, 1fr) 40px;
   }
   /* 순위 가능성 스트립(5)과 정규 1위(6)를 접는다 - 좁은 화면에선 승수와 6강 확률이 요점. */
   .projRow > :nth-child(5),
@@ -945,12 +968,16 @@
      승수 범위(4번째)까지 접는다 - 범위는 바로 아래 각주가 말로 설명하고 있고, 이 화면에서
      사람들이 먼저 보는 건 승수와 6강 확률이다. */
   .projRow {
-    grid-template-columns: 26px minmax(0, 1fr) 100px 42px;
+    grid-template-columns: 26px minmax(0, 1fr) 112px 42px;
     gap: 6px;
     font-size: 12px;
   }
   .projRow > :nth-child(4) {
     display: none;
+  }
+  /* 이 폭에서 27px은 승수 칸을 넘긴다 - 화면의 주인공 자리는 유지하되 한 단 내린다. */
+  .projWinsFinal {
+    font-size: var(--fs-500);
   }
   .outlookTeam {
     white-space: normal;
@@ -969,12 +996,6 @@
     min-width: 520px;
   }
 
-  /* 작은 글자 상향 - 9~10.5px는 한글에서 읽히지 않는다. */
-  .panelLede,
-  .note {
-    font-size: 12px;
-    line-height: 1.75;
-  }
   .actBody {
     font-size: 12.5px;
   }
@@ -983,10 +1004,9 @@
 /* ── 스카우팅 근거(접이식) ────────────────────────────────────────────────── */
 .scoutDetails {
   margin-top: 10px;
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 10px;
+  border-radius: var(--r-inset);
   padding: 0 12px;
-  background: var(--surface);
+  background: var(--surface-soft);
 }
 .scoutSummary {
   cursor: pointer;
@@ -1023,15 +1043,16 @@
   font-size: 13px;
 }
 .scoutTier {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-soft);
 }
 .scoutEv {
   margin-top: 4px;
   font-size: 12px;
-  line-height: 1.65;
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
+  /* 산문(스카우팅 근거 문단) - 62자에서 끊는다 */
+  max-width: var(--measure-read);
   word-break: keep-all;
 }
 @media (max-width: 430px) {

@@ -14,17 +14,19 @@
   gap: 10px 16px;
   margin-top: 6px;
 }
+/* "WOWY · 25-26" 뒤에 "커리어"(한글)가 붙는 자리라 Pretendard + 숫자만 tabular. */
 .kicker {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  letter-spacing: 0.2em;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-100);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
 }
 .lede {
-  font-size: 13px;
-  line-height: 1.7;
+  font-size: var(--fs-300);
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
-  max-width: 68ch;
+  max-width: var(--measure-read);
   margin: 6px 0 14px;
 }
 
@@ -48,12 +50,14 @@
   align-items: center;
   margin: 10px 0 0;
 }
+/* 칩에 한글이 들어온다("커리어", "3인") - Pretendard + 숫자만 tabular. */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   padding: 4px 9px;
   border-radius: 999px;
@@ -77,9 +81,9 @@
 }
 .chipLabel {
   font-family: "Pretendard", system-ui, sans-serif;
-  font-size: 10px;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.02em;
   margin-right: 2px;
 }
 
@@ -87,8 +91,8 @@
 .picker {
   margin-top: 14px;
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 14px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
   padding: 12px 14px;
 }
 .pickerSummary {
@@ -107,15 +111,17 @@
 .pickerSummary::before {
   content: "▸";
   color: var(--gold);
-  font-size: 11px;
+  font-size: 12.5px;
 }
 details[open] > .pickerSummary::before {
   content: "▾";
 }
+/* "출전 21명" 같은 한글 캡션. */
 .pickerCount {
   margin-left: auto;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-100);
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   color: var(--ink-faint);
 }
@@ -131,7 +137,7 @@ details[open] > .pickerSummary::before {
   align-items: center;
   gap: 8px;
   padding: 5px 6px;
-  border-radius: 9px;
+  border-radius: var(--r-inset);
   border: 1px solid transparent;
   color: var(--ink);
   text-decoration: none;
@@ -163,10 +169,13 @@ details[open] > .pickerSummary::before {
   font-size: 13px;
   color: var(--ink-faint);
 }
+/* 등번호 = 스코어보드 목소리. */
 .tileNum {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
   font-size: 18px;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
   color: var(--ink-faint);
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -181,9 +190,11 @@ details[open] > .pickerSummary::before {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* "가드 · 30G · 850분" - 한글 단위가 섞인다. */
 .tileSub {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-100);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
   white-space: nowrap;
   overflow: hidden;
@@ -194,9 +205,9 @@ details[open] > .pickerSummary::before {
 .subject {
   margin-top: 16px;
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border: 1px solid rgba(var(--line-rgb), 0.14);
   border-left: 4px solid var(--team, var(--gold));
-  border-radius: 14px;
+  border-radius: var(--r-card);
   padding: 14px 16px;
 }
 .subjectHead {
@@ -205,9 +216,11 @@ details[open] > .pickerSummary::before {
   align-items: center;
   gap: 10px;
 }
+/* 한글 이름 = Pretendard 800 + -0.02em. */
 .subjectName {
   font-size: 18px;
   font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--ink);
   text-decoration: none;
 }
@@ -231,17 +244,21 @@ details[open] > .pickerSummary::before {
   padding-top: 10px;
   border-top: 1px dashed rgba(var(--line-rgb), 0.14);
 }
+/* 이 패널의 주인공 값이라 스코어보드 크기(--fs-600)로 올린다 - 박스스코어의 한 줄처럼
+   다섯 칸이 같은 무게고, 라벨(.tileLabel, --fs-100)은 그 아래에서 조용히 있는다.
+   숫자만 들어오는 자리다: fmtMin()·toLocaleString()·fmtNet() 전부 부호+숫자만 만든다. */
 .tileVal {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 24px;
-  line-height: 1;
+  font-size: var(--fs-600);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
+/* 타일 라벨이 한글("경기", "온코트 분", "스틴트", "마진")이라 Pretendard. */
 .tileLabel {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
   margin-top: 4px;
 }
@@ -257,7 +274,7 @@ details[open] > .pickerSummary::before {
   font-size: 12.5px;
 }
 .table th {
-  font-size: 9.5px;
+  font-size: var(--fs-100);
   padding: 7px 8px;
 }
 .table td {
@@ -299,9 +316,15 @@ details[open] > .pickerSummary::before {
   background: var(--team, transparent);
   opacity: 0.14;
 }
+/* 여기만 모노를 유지한다 - 등번호가 없는 선수는 이름 첫 글자(한글)가 대신 들어오는 자리라
+   (page.tsx의 `m.backNum ?? m.initial`) 스코어보드 서체를 걸면 그 경우에만 조용히 폴백한다.
+   등번호가 항상 숫자인 .tileNum과 다른 이유. */
 .avatarNum {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  /* IBM Plex Mono에도 한글 글리프는 없다 - 이름 첫 글자가 들어오면 시스템 monospace로
+     튀므로 globals.css의 시계(.replay-scoreboard-clock)와 같이 폴백을 이름 짓는다.
+     글리프 단위 폴백이라 등번호(숫자)는 계속 모노로 그려진다. */
+  font-family: "IBM Plex Mono", "Pretendard", monospace;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
@@ -340,9 +363,10 @@ details[open] > .pickerSummary::before {
   align-items: center;
   margin-bottom: 10px;
 }
+/* opacity 0.65를 걷어냈다 - 알파 잉크는 칩 배경 위에서 대비가 무너진다. 불투명 --ink-faint로. */
 .sizeCount {
-  font-size: 9.5px;
-  opacity: 0.65;
+  font-size: var(--fs-100);
+  color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
 
@@ -351,9 +375,10 @@ details[open] > .pickerSummary::before {
   text-align: right;
   line-height: 1.2;
 }
+/* "±2.7" - 표 안에서 값 아래 붙는 숫자라 모노 유지. */
 .seVal {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
   margin-top: 1px;
@@ -379,9 +404,11 @@ details[open] > .pickerSummary::before {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
+/* "128스틴트" - 한글 단위가 붙으므로 Pretendard + tabular. */
 .minSub {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-100);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
 }
 .netVal {
@@ -402,12 +429,13 @@ details[open] > .pickerSummary::before {
   width: 168px;
   min-width: 168px;
 }
+/* 발산 막대는 데이터 조각이라 하드 엣지(--r-led). */
 .diffBar {
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
   height: 12px;
-  border-radius: 3px;
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   overflow: hidden;
 }
@@ -429,19 +457,20 @@ details[open] > .pickerSummary::before {
 }
 .diffFillPos {
   background: var(--positive);
-  border-radius: 0 3px 3px 0;
+  border-radius: 0 var(--r-led) var(--r-led) 0;
 }
 .diffFillNeg {
   background: var(--negative);
-  border-radius: 3px 0 0 3px;
+  border-radius: var(--r-led) 0 0 var(--r-led);
 }
+/* 축 라벨이 한글 구절("따로일 때 ←")이라 Pretendard. */
 .diffAxis {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 8.5px;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   margin-top: 3px;
 }
 .diffAxisLeft {
@@ -458,7 +487,8 @@ details[open] > .pickerSummary::before {
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid rgba(var(--line-rgb), 0.1);
-  font-size: 11.5px;
+  max-width: var(--measure-read);
+  font-size: var(--fs-200);
   line-height: 1.85;
   color: var(--ink-soft);
 }
@@ -475,10 +505,11 @@ details[open] > .pickerSummary::before {
 .warn {
   margin-top: 12px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--r-inset);
   border: 1px solid color-mix(in srgb, var(--gold) 34%, transparent);
   background: var(--gold-soft);
-  font-size: 11.5px;
+  max-width: var(--measure-read);
+  font-size: var(--fs-200);
   line-height: 1.7;
   color: var(--ink-soft);
 }
@@ -486,16 +517,18 @@ details[open] > .pickerSummary::before {
   color: var(--ink);
 }
 .note {
-  font-size: 10.5px;
+  max-width: var(--measure-read);
+  font-size: 12.5px;
   color: var(--ink-faint);
   margin-top: 12px;
-  line-height: 1.6;
+  line-height: var(--lh-prose);
 }
+/* "표본 미달 동료 12명 보기" - 한글 문장. */
 .belowSummary {
   cursor: pointer;
   list-style: none;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--ink-faint);
   margin-top: 14px;
@@ -518,12 +551,14 @@ details[open] > .belowSummary::before {
   .playerGrid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   }
-  .table {
-    font-size: 11px;
-  }
   .table th,
   .table td {
     padding: 6px 5px;
+  }
+  /* 표 행은 손가락으로 짚는 자리다(동료 이름이 링크) - 셀 height는 표 레이아웃에서 최소
+     높이로 동작하므로 이 한 줄이 행 전체를 44px로 올린다. */
+  .table td {
+    height: 44px;
   }
   .diffCell {
     width: 110px;

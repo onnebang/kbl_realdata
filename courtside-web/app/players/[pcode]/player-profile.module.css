@@ -9,8 +9,11 @@
   --surface: #ffffff;
   --surface-soft: #eceef3;
   --ink: #14161c;
-  --ink-soft: #5b5f6e;
-  --ink-faint: #9297a880;
+  --ink-soft: #4a4f5c;
+  /* 전역 :root의 --ink-faint와 같은 값이어야 한다(이 블록은 문서 :root를 건드리지 않으려는
+     의도적 복제다). #6c7180은 --surface-soft에서 4.20, --bg에서 4.47로 미달이라 전역이
+     #676c7b로 올라갔는데, 이 복제본만 옛 값에 남아 선수 페이지가 전역과 갈렸다. */
+  --ink-faint: #676c7b;
   --home: #d9640a;
   --home-soft: #d9640a1a;
   --away: #1f6fd6;
@@ -27,9 +30,11 @@
   --dna-long: #2f9e44;
   --dna-three: #3b5bdb;
   --line-rgb: 20, 22, 28;
-  /* 히어로 발치 커리어 결 띠의 밴드 높이. 빌더에 넘기는 height(72 뷰박스 단위)와 같은 값이라
-     데스크톱(.wrap 900px - 좌우 패딩 = 864px)에서 뷰박스가 거의 등배로 그려진다. */
-  --strip-h: 72px;
+  /* 히어로 발치 커리어 결 띠의 밴드 높이. 빌더가 잡는 뷰박스 높이(79 = 라벨 줄 20 + 막대 47 +
+     레일 12)와 같은 값이라 데스크톱에서 뷰박스가 등배로 그려진다(막대 47px 그대로).
+     72였을 때는 라벨 줄이 13단위뿐이라 글자가 9px에 묶였다 - page.tsx가 fit.cssHeight로 이
+     값을 빌더에 알려주므로 **여기만 바꾸면 글자가 12px 아래로 내려간다**(둘은 짝이다). */
+  --strip-h: 79px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .pageRoot {
@@ -37,8 +42,8 @@
     --surface: #1a1d24;
     --surface-soft: #23272f;
     --ink: #f2f3f7;
-    --ink-soft: #9297a8;
-    --ink-faint: #6a6f7f90;
+    --ink-soft: #a8aebe;
+    --ink-faint: #8d93a3;
     --home: #ff8a3d;
     --home-soft: #ff8a3d26;
     --away: #3ea6ff;
@@ -59,8 +64,8 @@
   --surface: #1a1d24;
   --surface-soft: #23272f;
   --ink: #f2f3f7;
-  --ink-soft: #9297a8;
-  --ink-faint: #6a6f7f90;
+  --ink-soft: #a8aebe;
+  --ink-faint: #8d93a3;
   --home: #ff8a3d;
   --home-soft: #ff8a3d26;
   --away: #3ea6ff;
@@ -84,7 +89,9 @@
   --hero-team: #d9640a;
   --hero-ink: #f4f5f8;
   --hero-ink-soft: rgba(244, 245, 248, 0.72);
-  --hero-ink-faint: rgba(244, 245, 248, 0.42);
+  /* 0.42는 히어로 바닥(#0b0d12) 위에서 2.4:1이라 캡션이 읽히지 않았다. 0.62 = 3.82:1
+     (프리시즌 히어로 실측값) - 세 히어로가 같은 값을 쓴다. */
+  --hero-ink-faint: rgba(244, 245, 248, 0.62);
   /* 별자리 점 색 - color-mix 미지원 브라우저 폴백을 먼저 선언(성공=팀색+흰색, 실패=팀색). */
   --hero-dot: #d9640a;
   --hero-dot: color-mix(in srgb, var(--hero-team) 80%, #ffffff);
@@ -92,7 +99,7 @@
   --hero-dot-made: color-mix(in srgb, var(--hero-team) 45%, #ffffff);
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: var(--r-card);
   margin-top: 18px;
   min-height: 320px;
   /* 세로 스택 - 타이포 콘텐츠 아래에 커리어 결 띠가 한 줄 더 쌓인다(둘 다 밴드 바닥에 붙는다).
@@ -148,8 +155,8 @@
 }
 .heroKicker {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  letter-spacing: 0.22em;
+  font-size: var(--fs-100);
+  letter-spacing: 0.02em;
   color: var(--hero-ink-faint);
   margin-bottom: 8px;
 }
@@ -189,25 +196,28 @@
   gap: 2px;
   white-space: nowrap;
 }
+/* 화면의 주인공 숫자 - 스코어보드 규칙(globals.css .scoreboard와 같은 다섯 선언). */
 .heroStatVal {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 34px;
-  line-height: 1;
+  font-size: var(--fs-700);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
 .heroStatLabel {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
+  font-size: var(--fs-100);
+  letter-spacing: 0.02em;
   color: var(--hero-ink-faint);
   margin-top: 4px;
 }
 /* 표본 줄 - 값 · 기준 시즌 아래 세 번째 줄("정규+PO 53경기" / "정규 50경기 · 리그 2위/177").
    히어로는 두 테마 모두 다크라 색을 직접 칠한다(--hero-* 토큰). */
 .heroStatSample {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-100);
+  font-variant-numeric: tabular-nums;
   color: var(--hero-ink-soft);
   margin-top: 3px;
   letter-spacing: -0.01em;
@@ -216,10 +226,12 @@
 .heroBasis {
   display: inline-block;
   margin-top: 12px;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-100);
+  font-variant-numeric: tabular-nums;
   padding: 3px 9px;
-  border-radius: 999px;
+  /* 데이터 조각(기준 칩) - 하드 엣지. */
+  border-radius: var(--r-led);
   border: 1px solid rgba(244, 245, 248, 0.2);
   color: var(--hero-ink-soft);
 }
@@ -244,18 +256,22 @@
   cursor: pointer;
 }
 .heroFootCaption {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  line-height: 1.5;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-200);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-data);
   color: var(--hero-ink-soft);
   margin-top: 6px;
+  max-width: var(--measure-read);
 }
 .heroFootNote {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
-  line-height: 1.5;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-100);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-data);
   color: var(--hero-ink-faint);
   margin-top: 2px;
+  max-width: var(--measure-read);
 }
 
 /* 윈도우 토글 */
@@ -267,7 +283,7 @@
 .wtoggle {
   font-family: "IBM Plex Mono", monospace;
   font-weight: 700;
-  font-size: 12px;
+  font-size: var(--fs-100);
   padding: 6px 14px;
   border-radius: 999px;
   border: 1px solid rgba(var(--line-rgb), 0.16);
@@ -289,16 +305,17 @@
 .panel {
   margin-top: 14px;
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 14px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
   padding: 16px 18px;
 }
+/* 패널 표제 - 한글이 들어오므로 Pretendard 800 + -0.02em(중계 화면의 표제 규칙).
+   12.5px 회색 눈썹이던 것을 표제 크기로 되돌린다: 아래 값(27~34px)과 순서가 생긴다. */
 .panelTitle {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--ink-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  font-size: var(--fs-300);
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.02em;
   margin-bottom: 10px;
   display: flex;
   align-items: center;
@@ -308,13 +325,14 @@
 /* 기준 시즌 칩 - lib/seasonFocus.ts basisChip()이 만든 다섯 어휘만 들어온다(패널 제목이 원문
    시즌 문자열을 직접 쓰지 않도록). 대문자 변환은 한글에 무의미하므로 해제. */
 .panelChip {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-100);
   font-weight: 600;
-  text-transform: none;
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0;
   padding: 2px 8px;
-  border-radius: 999px;
+  /* 데이터 조각(기준 시즌 칩) - 하드 엣지. */
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   border: 1px solid rgba(var(--line-rgb), 0.14);
   color: var(--ink-soft);
@@ -330,21 +348,23 @@
   margin: 10px 0 0;
   padding: 9px 12px 9px 11px;
   border-left: 3px solid rgba(var(--line-rgb), 0.32);
-  border-radius: 0 10px 10px 0;
+  border-radius: 0 var(--r-inset) var(--r-inset) 0;
   background: var(--surface-soft);
-  font-size: 11.5px;
-  line-height: 1.65;
+  font-size: var(--fs-200);
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
+  max-width: var(--measure-read);
 }
 /* 문장 머리의 기준 칩 - 위 카드/아래 패널이 쓰는 칩과 같은 모양이라 "이 칩이 저 칩과 다르다"를
    같은 어휘로 비교하게 된다. 한글이 들어오므로 Big Shoulders 계열은 쓰지 않는다. */
 .glanceSeasonNoteChip {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-100);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--surface);
   border: 1px solid rgba(var(--line-rgb), 0.14);
   color: var(--ink);
@@ -366,11 +386,13 @@
   cursor: pointer;
 }
 .stripCaption {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
-  line-height: 1.55;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-data);
   color: var(--ink-soft);
   margin-top: 8px;
+  max-width: var(--measure-read);
 }
 /* 최근 구간 패널 안의 두 번째 소제목 - 옛 '최근 N경기 평균' 패널을 이 패널로 접으면서 생겼다.
    같은 창(L5~L30)을 두 문법으로 읽는다는 걸 선 하나로 구분해 준다: 위는 밤별 결(띠), 아래는
@@ -381,10 +403,11 @@
   padding-top: 12px;
   border-top: 1px solid rgba(var(--line-rgb), 0.1);
   margin-bottom: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--ink-faint);
-  letter-spacing: 0.02em;
+  /* 패널 표제(--fs-300) 한 단 아래의 소제목 - 같은 한글 표제 규칙, 크기만 낮춘다. */
+  font-size: var(--fs-200);
+  font-weight: 800;
+  color: var(--ink-soft);
+  letter-spacing: -0.02em;
 }
 .sw {
   width: 9px;
@@ -399,23 +422,26 @@
   grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
   gap: 10px;
 }
+/* 스탯 타일은 담는 것이 아니라 데이터 조각이다 - 하드 엣지. */
 .statTile {
   background: var(--surface-soft);
-  border-radius: 10px;
+  border-radius: var(--r-led);
   padding: 10px 8px;
   text-align: center;
 }
+/* 이 패널의 주인공 숫자 - 스코어보드 규칙. 19px에 갇혀 있어 라벨과 거의 같은 무게였다. */
 .sv {
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 19px;
-  font-weight: 700;
+  font-size: var(--fs-600);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: var(--lh-tight);
   font-variant-numeric: tabular-nums;
 }
 .sl {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   margin-top: 2px;
 }
 
@@ -448,12 +474,12 @@
   flex-wrap: wrap;
 }
 .heatRow label {
-  font-size: 12px;
+  font-size: var(--fs-100);
   color: var(--ink-soft);
 }
 .heatSelect {
   font-family: "Pretendard", sans-serif;
-  font-size: 12px;
+  font-size: var(--fs-200);
   font-weight: 600;
   padding: 6px 9px;
   border-radius: 8px;
@@ -479,9 +505,9 @@
 }
 .heatStat {
   text-align: center;
-  font-size: 12px;
+  font-size: var(--fs-100);
   color: var(--ink-soft);
-  font-family: "IBM Plex Mono", monospace;
+  font-variant-numeric: tabular-nums;
   margin-top: 8px;
 }
 
@@ -502,34 +528,37 @@
 }
 .miniStatCard {
   background: var(--surface-soft);
-  border-radius: 10px;
+  border-radius: var(--r-inset);
   padding: 12px 14px;
 }
 .miniStatLabel {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--ink-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   margin-bottom: 6px;
 }
+/* 카드의 주인공 숫자 - 스코어보드 규칙(아래 .miniStatSub/.miniStatNote는 조용히 남는다). */
 .miniStatMain {
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 22px;
-  font-weight: 700;
+  font-size: var(--fs-600);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: var(--lh-tight);
   font-variant-numeric: tabular-nums;
 }
 .miniStatSub {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-soft);
   margin-top: 3px;
 }
 .miniStatNote {
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-faint);
   margin-top: 8px;
-  line-height: 1.4;
+  line-height: var(--lh-data);
+  max-width: var(--measure-read);
 }
 
 /* ── 리그 퍼센타일 프로필(NBA.com식 가로 바) ─────────────────────────────────────── */
@@ -543,23 +572,26 @@
   align-items: center;
   gap: 10px;
 }
+/* 축 라벨(PTS/REB…)은 라틴 코드라 모노를 유지한다. 값(.pctValue 13)·퍼센타일(.pctNum 17)보다
+   한 단 아래여야 한다 - 셋이 전부 12.5px이라 축 라벨이 값과 동급으로 읽혔다. */
 .pctLabel {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-size: var(--fs-100);
   font-weight: 600;
   color: var(--ink-soft);
 }
+/* 미터는 데이터 조각 - 알약이 아니라 하드 엣지. */
 .pctTrack {
   position: relative;
   height: 10px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   overflow: hidden;
 }
 .pctFill {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   opacity: 0.9;
 }
 /* 리그 중앙값(50) 눈금 - 바가 어디쯤인지 즉시 읽히게. */
@@ -573,23 +605,27 @@
 }
 .pctValue {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: var(--fs-200);
   text-align: right;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
+/* 이 행의 주인공 - 퍼센타일. 스코어보드 규칙(숫자 전용이라 Big Shoulders 안전). */
 .pctNum {
   font-family: "Big Shoulders Display", sans-serif;
   font-size: 17px;
   font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: var(--lh-tight);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 .pctNote {
-  font-size: 10.5px;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
   margin-top: 10px;
-  line-height: 1.5;
+  line-height: var(--lh-data);
+  max-width: var(--measure-read);
 }
 
 /* ── 슈팅 DNA ─────────────────────────────────────────────────────────────────── */
@@ -601,7 +637,7 @@
 .dnaSingleBar {
   display: flex;
   height: 30px;
-  border-radius: 8px;
+  border-radius: var(--r-led);
   overflow: hidden;
   gap: 1px;
 }
@@ -611,7 +647,7 @@
   align-items: center;
   justify-content: center;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: var(--fs-100);
   font-weight: 700;
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -622,7 +658,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-soft);
   margin-top: 8px;
 }
@@ -654,7 +690,7 @@
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-inset);
   background: var(--surface-soft);
   text-decoration: none;
   color: var(--ink);
@@ -663,10 +699,13 @@
 .momentCard:hover {
   border-color: rgba(var(--line-rgb), 0.2);
 }
+/* 카드의 주인공 - WPA. 스코어보드 규칙(부호와 숫자만 들어온다). */
 .momentWpa {
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 22px;
+  font-size: var(--fs-600);
   font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: var(--lh-tight);
   flex-shrink: 0;
   min-width: 74px;
   font-variant-numeric: tabular-nums;
@@ -677,8 +716,7 @@
   line-height: 1.45;
 }
 .momentGo {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-faint);
   flex-shrink: 0;
 }
@@ -708,9 +746,9 @@
     padding: 4px 18px 16px;
     margin-top: 14px;
   }
-  .stripZoomSvg {
-    height: 140px;
-  }
+  /* .stripZoomSvg의 140px가 여기 있었는데 아래 같은 620 블록이 176px로 덮고 있었다(같은 명세도 =
+     나중 규칙 승). 죽은 규칙이라 지운다 - 남겨 두면 "모바일 확대판 높이 = 140"으로 읽혀서
+     page.tsx가 빌더에 넘기는 fit.cssHeight를 틀리게 잡는다(실제로 그렇게 잘못 쟀다). */
   .pctRow {
     grid-template-columns: 40px 1fr 52px 26px;
     gap: 7px;
@@ -723,16 +761,13 @@
    숫자·레이아웃은 건드리지 않고 **라벨과 캡션만** 키운다. */
 @media (max-width: 430px) {
   .sl,
-  .pctNote,
   .panelNote,
   .heroStatLabel {
-    font-size: 11.5px;
+    font-size: var(--fs-200);
     line-height: 1.7;
   }
-  .pctLabel,
-  .pctValue {
-    font-size: 11px;
-  }
+  /* .pctLabel/.pctValue/.pctNote는 여기서 손대지 않는다 - 셋 다 이미 바닥(12px) 위에 있고,
+     모바일에서만 크기를 올리면 라벨·주석이 다시 값(.pctValue 13)과 같아진다. */
   .statGrid {
     gap: 8px;
   }
@@ -768,10 +803,11 @@
   display: none;
 }
 .dnaCaption {
-  font-size: 12px;
-  line-height: 1.65;
+  font-size: var(--fs-100);
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
   margin-top: 8px;
+  max-width: var(--measure-read);
   word-break: keep-all;
 }
 .dnaCaption b {
@@ -785,17 +821,30 @@
     display: block;
   }
   .heroFootCaption {
-    font-size: 11px;
+    font-size: 12.5px;
   }
   .heroFootNote {
-    font-size: 10.5px;
+    font-size: var(--fs-100);
   }
   .stripZoomSvg {
     height: 176px;
   }
   .stripCaption {
-    font-size: 11.5px;
+    font-size: var(--fs-200);
   }
+  .dnaLegend {
+    font-size: 12px;
+    gap: 8px 14px;
+  }
+}
+
+/* ── 슈팅 DNA만 713px에서 행으로 넘어간다 ────────────────────────────────────────────
+   DNA SVG는 뷰박스 640이고 지면은 뷰포트 − 74라, 배율 1.0(= 글자가 뷰박스 단위 그대로)에
+   필요한 뷰포트가 714px다. 621~713px에서는 8단위 라벨이 10.26px까지 내려간다 - 크기를 키우면
+   좁은 쪽에서 다시 겹치므로, 이미 검증된 .dnaTall(HTML 행)이 그 구간까지 받게 한다.
+   나머지 모바일 규칙(커리어 띠·확대판·캡션·범례)은 620 그대로다 - 커리어 띠 행은 621px에서
+   한 줄 띠가 12px을 넘기므로 옮길 이유가 없다. */
+@media (max-width: 713px) {
   .dnaWide {
     display: none;
   }
@@ -803,10 +852,6 @@
     display: block;
     width: 100%;
     height: auto;
-  }
-  .dnaLegend {
-    font-size: 12px;
-    gap: 8px 14px;
   }
 }
 
@@ -818,15 +863,16 @@
   align-items: center;
   margin: 5px 0;
 }
+/* 행 라벨(시즌)은 같은 행의 값(.dnaTallSeg / .dnaTallDelta 12.5)보다 한 단 아래로. */
 .dnaTallSeason {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: var(--fs-100);
   color: var(--ink-soft);
 }
 .dnaTallBar {
   display: flex;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--r-led);
   overflow: hidden;
   gap: 1px;
 }
@@ -835,16 +881,19 @@
   align-items: center;
   justify-content: center;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 700;
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   overflow: hidden;
   white-space: nowrap;
 }
+/* page.tsx가 `${존 이름} ▲N`을 넣는다 - 다섯 존 중 넷이 한글(림·근거리·중거리·롱2·3점)이라
+   IBM Plex Mono 혼자면 그 글자만 이름 없는 시스템 모노로 떨어져 옆 숫자와 얼굴이 어긋난다.
+   폴백은 글리프 단위라 숫자·▲는 계속 Plex Mono다(careerStrip.ts가 쓰는 규칙과 같다). */
 .dnaTallDelta {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-family: "IBM Plex Mono", "Pretendard", monospace;
+  font-size: 12.5px;
   font-weight: 700;
   text-align: right;
   color: var(--ink-faint);

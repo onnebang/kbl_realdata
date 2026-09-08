@@ -6,8 +6,13 @@
   --surface: #ffffff;
   --surface-soft: #eceef3;
   --ink: #14161c;
-  --ink-soft: #5b5f6e;
-  --ink-faint: #9297a880;
+  /* 본문 잉크는 불투명 값만 쓴다 - 알파 잉크(#9297a880)는 --surface 위에서 본문 대비가
+     2.4:1까지 떨어졌다. globals.css :root와 같은 값. */
+  --ink-soft: #4a4f5c;
+  /* globals.css :root와 같은 값(#6c7180은 --surface-soft 4.20 / --bg 4.47로 미달이었다.
+     #676c7b는 #ffffff 5.24 / #eceef3 4.51 / #f4f5f8 4.81로 세 배경 모두 통과). 이 파일은
+     그 토큰을 페이지 래퍼에 복제할 뿐이므로 값이 갈라지면 안 된다. */
+  --ink-faint: #676c7b;
   --home: #d9640a;
   --home-soft: #d9640a1a;
   --away: #1f6fd6;
@@ -24,8 +29,8 @@
     --surface: #1a1d24;
     --surface-soft: #23272f;
     --ink: #f2f3f7;
-    --ink-soft: #9297a8;
-    --ink-faint: #6a6f7f90;
+    --ink-soft: #a8aebe;
+    --ink-faint: #8d93a3;
     --home: #ff8a3d;
     --home-soft: #ff8a3d26;
     --away: #3ea6ff;
@@ -42,8 +47,8 @@
   --surface: #1a1d24;
   --surface-soft: #23272f;
   --ink: #f2f3f7;
-  --ink-soft: #9297a8;
-  --ink-faint: #6a6f7f90;
+  --ink-soft: #a8aebe;
+  --ink-faint: #8d93a3;
   --home: #ff8a3d;
   --home-soft: #ff8a3d26;
   --away: #3ea6ff;
@@ -62,7 +67,9 @@
   --hero-team: #d9640a;
   --hero-ink: #f4f5f8;
   --hero-ink-soft: rgba(244, 245, 248, 0.72);
-  --hero-ink-faint: rgba(244, 245, 248, 0.42);
+  /* 0.42는 히어로 바닥(#0b0d12 계열) 위에서 본문 대비 3:1 아래로 떨어졌다 - 킥커·라벨·
+     구분점이 전부 이 잉크다. 0.62로 올린다(색은 그대로, 알파만). */
+  --hero-ink-faint: rgba(244, 245, 248, 0.62);
   --hero-dot: #d9640a;
   --hero-dot: color-mix(in srgb, var(--hero-team) 80%, #ffffff);
   --hero-dot-made: #ffc9a3;
@@ -116,10 +123,11 @@
   padding: 30px 28px 24px;
   width: 100%;
 }
+/* 라틴 코드 문자열("COURTSIDE TEAM PROFILE") 하나뿐이라 모노를 유지한다. */
 .heroKicker {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  letter-spacing: 0.22em;
+  font-size: 12px;
+  letter-spacing: 0.02em;
   color: var(--hero-ink-faint);
   margin-bottom: 8px;
 }
@@ -150,17 +158,24 @@
   padding-top: 14px;
   border-top: 1px solid rgba(244, 245, 248, 0.14);
 }
+/* 히어로 스탯 다섯(W-L · RANK · PPG · OPP · NET)은 전부 스코어보드 숫자다. 다만 화면에서
+   큰 숫자는 하나여야 한다 - 첫 칸(W-L, 이 팀의 전적)만 --fs-800으로 두고 나머지 넷은
+   --fs-600으로 내린다. 라틴/숫자만 들어오는 자리라 Big Shoulders가 안전하다. */
 .heroStatVal {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 34px;
-  line-height: 1;
+  font-size: var(--fs-600);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
+.heroStatRow > div:first-child .heroStatVal {
+  font-size: var(--fs-800);
+}
+/* "W-L · 25-26 정규시즌" - 한글이 섞이므로 모노(한글 글리프 없음)를 쓰지 않는다. */
 .heroStatLabel {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12px;
   color: var(--hero-ink-faint);
   margin-top: 4px;
 }
@@ -182,11 +197,12 @@
   color: var(--ink);
 }
 
+/* 독립 패널: 배경 + 얇은 테두리 + --r-card. 패널 안의 타일·웰은 --surface-soft 배경만 쓴다. */
 .panel {
   margin-top: 14px;
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 14px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
   padding: 16px 18px;
 }
 .panelTitle {
@@ -194,34 +210,38 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  /* globals.css .panel-title과 같은 단(--fs-200). 패널 안의 값(13px)·라벨(12~12.5px)보다
+     작아지지 않게. */
+  font-size: var(--fs-200);
   font-weight: 700;
-  color: var(--ink-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+  letter-spacing: 0.02em;
   margin-bottom: 10px;
 }
 /* 기준 시즌 칩 - 문구는 lib/seasonFocus.ts basisChip/statSeasonChip만이 만든다(다섯 어휘).
-   "이 숫자가 어느 시즌 것인가"를 제목 옆에서 즉시 읽히게 하는 게 목적이라 값 타일과 같은
-   모노 폰트를 쓰고 대문자 변환은 끈다(한글 칩). */
+   "이 숫자가 어느 시즌 것인가"를 제목 옆에서 즉시 읽히게 하는 게 목적. 한글 칩이라 모노는
+   쓰지 않고(IBM Plex Mono에 한글 글리프가 없어 시스템 모노로 폴백한다) 시즌 숫자 정렬은
+   tabular-nums로 지킨다. 패널 안의 칩이므로 배경만 쓰고 테두리는 두지 않는다. */
 .basisChip {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
-  text-transform: none;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-soft);
   background: var(--surface-soft);
-  border: 1px solid rgba(var(--line-rgb), 0.16);
-  border-radius: 999px;
+  /* 데이터 조각(어느 시즌 기준인가)이므로 하드 엣지. */
+  border-radius: var(--r-led);
   padding: 2px 8px;
   white-space: nowrap;
 }
+/* 패널마다 붙는 기준·정직성 캡션. 산문이므로 한 줄 길이를 지면 폭에서 끊는다. */
 .pctNote {
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-faint);
   margin-top: 10px;
-  line-height: 1.5;
+  max-width: var(--measure-read);
+  line-height: var(--lh-prose);
 }
 .sw {
   width: 9px;
@@ -232,11 +252,13 @@
 
 /* ── 4팩터 vs 리그 - 선수 퍼센타일 바와 같은 시각 언어(가로 바 + 리그 평균 눈금).
    값 컬럼이 "값 (리그평균)"까지 담느라 선수판보다 넓음. */
+/* "OFFENSE - 우리 공격" - 한글이 섞이므로 Pretendard. 아래 축 라벨(12.5px)보다 한 단 커야
+   소제목으로 읽힌다. */
 .ffSideTitle {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.02em;
   color: var(--ink-soft);
   margin: 12px 0 6px;
 }
@@ -247,29 +269,34 @@
   display: grid;
   gap: 8px;
 }
+/* 순위 칸은 40px - .pctNum이 --fs-500(21px)로 올라가면서 "10위"(숫자 두 자 + 12.5px 접미)가
+   34px을 넘는다. 늘린 폭은 가변 트랙(1fr)에서 가져오므로 값 칸은 그대로다. */
 .pctRow {
   display: grid;
-  grid-template-columns: 48px 1fr 108px 34px;
+  grid-template-columns: 48px 1fr 108px 40px;
   align-items: center;
   gap: 10px;
 }
+/* 4팩터 축 라벨은 라틴 코드(eFG%/TOV%/OREB%/FTr)뿐이라 모노를 유지한다. */
 .pctLabel {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--ink-soft);
 }
+/* 미터는 데이터 조각이다 - 알약(999px)이 아니라 하드 엣지(--r-led). 스코어보드의 게이지처럼
+   보이게 하는 것이 목적이고, 담는 것(패널·카드)만 --r-card로 둥글다. */
 .pctTrack {
   position: relative;
   height: 10px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   overflow: hidden;
 }
 .pctFill {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   opacity: 0.9;
 }
 .pctMid {
@@ -280,9 +307,11 @@
   width: 1px;
   background: rgba(var(--line-rgb), 0.28);
 }
+/* 값은 라벨(.pctLabel 12.5px)·캡션(.pctNote 12.5px)보다 한 단 위여야 한다 - 같은 크기면
+   행에서 무엇이 데이터인지 사라진다. */
 .pctValue {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: var(--fs-200);
   text-align: right;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -293,7 +322,8 @@
 }
 .pctNum {
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 17px;
+  font-size: var(--fs-500);
+  letter-spacing: -0.01em;
   font-weight: 800;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -308,7 +338,7 @@
    같은 클래스를 쓴다 - 크기는 숫자보다 한 단계 작게 둬서 단위로 읽히게. */
 .rankSuffix {
   font-family: "Pretendard", sans-serif;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0;
   margin-left: 1.5px;
@@ -356,7 +386,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-soft);
   margin-top: 6px;
 }
@@ -377,21 +407,26 @@
   align-items: center;
   gap: 10px;
   padding: 5px 8px;
-  border-radius: 8px;
+  border-radius: var(--r-inset);
   text-decoration: none;
   color: var(--ink);
 }
 .rosterRow:hover {
   background: var(--surface-soft);
 }
+/* 표 머리는 한글(선수·기여도·…)이라 Pretendard. 아래 값 셀(12.5px)보다 크지 않게 12px. */
 .rosterHead {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12px;
   color: var(--ink-faint);
 }
 .rosterHead:hover {
   background: none;
+}
+/* 표 머리의 값 칸(GP·PPG·승리기여)은 머리 크기를 따른다 - .rosterCell(값 크기)이 그대로 걸리면
+   머리가 아래 값과 같은 단이 되어 무엇이 데이터인지 사라진다. */
+.rosterHead .rosterCell {
+  font-size: inherit;
 }
 .rosterName {
   display: flex;
@@ -406,30 +441,35 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* "#12 G" - 등번호와 정규화된 라틴 포지션 코드뿐이라 모노 유지. */
 .rosterPos {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-size: 12px;
   color: var(--ink-faint);
   flex-shrink: 0;
 }
 .rosterBarTrack {
   position: relative;
   height: 9px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   overflow: hidden;
 }
 .rosterBarFill {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   /* 팀 색(대비 보정 쌍). page.tsx가 --ti-l/--ti-d를 인라인으로 내려준다. */
   background: var(--ti-l, var(--home));
   opacity: 0.85;
 }
+/* 값은 숫자라 모노가 맞지만, 이 클래스는 표 머리도 함께 쓴다(위 .rosterHead .rosterCell) - 그리고
+   머리 한 칸이 한글이다: page.tsx가 `{hasWpa ? "승리기여" : ""}`를 넣는다. IBM Plex Mono에는 한글
+   글리프가 없어서 옆칸 'GP'·'PPG'는 Plex Mono로, '승리기여'만 이름 없는 시스템 모노로 떨어져
+   한 행에서 얼굴이 갈렸다. 스택에 Pretendard를 이름 지어 두면 글리프 단위로 갈라져 숫자는 그대로다. */
 .rosterCell {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-family: "IBM Plex Mono", "Pretendard", monospace;
+  font-size: 12.5px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -450,15 +490,14 @@
 }
 .unitCard {
   background: var(--surface-soft);
-  border-radius: 10px;
+  border-radius: var(--r-inset);
   padding: 12px 14px;
 }
 .unitLabel {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--ink-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   margin-bottom: 6px;
 }
 .unitNames {
@@ -466,9 +505,11 @@
   font-size: 13.5px;
   line-height: 1.45;
 }
+/* "40분당 득실 · 함께 123분" - 한글 설명이라 Pretendard, 숫자는 tabular-nums로 정렬만 지킨다. */
 .unitSub {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-soft);
   margin-top: 5px;
 }
@@ -496,27 +537,27 @@
 .zoneBarTrack {
   position: relative;
   height: 9px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   overflow: hidden;
 }
 .zoneBarTeam {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--home);
   opacity: 0.9;
 }
 .zoneBarLeague {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--ink-faint);
   opacity: 0.55;
 }
 .zoneValue {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -532,23 +573,23 @@
   gap: 6px;
 }
 /* 예정 행: 시각·구장·모델 승률은 결과 행의 점수와 같은 무게로 읽히면 안 되므로 한 단 낮춘다. */
+/* 시각(19:00)은 기계가 읽는 숫자라 모노 유지. */
 .schedStart {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-faint);
 }
 .schedPending {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--ink-soft);
 }
 .schedTag {
   margin-left: 6px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--ink-faint);
   background: var(--surface-soft);
-  border: 1px solid rgba(var(--line-rgb), 0.16);
-  border-radius: 999px;
+  border-radius: var(--r-led);
   padding: 1px 6px;
   white-space: nowrap;
 }
@@ -557,12 +598,24 @@
   .heroStatRow {
     gap: 18px;
   }
+  /* 좁은 화면에서도 W-L만 크게, 나머지 넷은 조용히. */
+  .heroStatRow > div:first-child .heroStatVal {
+    font-size: var(--fs-700);
+  }
   .heroContent {
     padding: 24px 18px 18px;
   }
+  /* 값 칸은 104px - "54.2% (52.8%)"(13자 모노 13px ≈ 101px)가 잘리지 않는 최소치다.
+     값을 줄이는 대신 칸을 넓힌다(라벨 12 < 값 13 < 순위 17 순서를 좁은 화면에서도 유지). */
   .pctRow {
-    grid-template-columns: 42px 1fr 92px 30px;
+    grid-template-columns: 42px 1fr 104px 34px;
     gap: 7px;
+  }
+  .pctLabel {
+    font-size: var(--fs-100);
+  }
+  .pctNum {
+    font-size: var(--fs-400);
   }
   .rosterRow {
     grid-template-columns: minmax(80px, 120px) 1fr 40px 52px;
@@ -591,7 +644,7 @@
   gap: 9px;
   background: var(--surface-soft);
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: var(--r-inset);
   padding: 13px 14px 12px;
   text-decoration: none;
   color: var(--ink);
@@ -600,12 +653,12 @@
 .leaderCard:focus-visible {
   border-color: rgba(var(--line-rgb), 0.2);
 }
+/* 카테고리는 한글(득점·리바운드·…)이라 Pretendard. */
 .leaderCat {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
 }
 .leaderWho {
@@ -648,9 +701,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* posLabel은 정규화된 한글(가드/포워드/센터)이라 모노를 쓰지 않는다 - .rosterPos(G/F/C)와 다르다. */
 .leaderPos {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
   margin-top: 2px;
 }
@@ -666,28 +721,33 @@
   font-weight: 800;
   font-size: 38px;
   line-height: 0.92;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
+/* 단위는 라틴 코드(PPG/RPG/APG/SPG/BPG)뿐이라 모노 유지. */
 .leaderUnit {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-faint);
 }
+/* "54경기 · 합계 1,234" - 한글 설명이라 Pretendard + tabular-nums. */
 .leaderSub {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
-  line-height: 1.5;
+  line-height: var(--lh-data);
 }
 
 /* ── 팀 전체 기록 · 리그 순위 ────────────────────────────────────────────────────
    4팩터 패널(.pctRow)과 같은 시각 언어 - 라벨 / 방향 보정 바 / 값 / 리그 평균 / 순위.
    순위가 이 패널의 주장이라 .pctNum과 같은 Big Shoulders로 가장 크게 둔다. */
+/* 그룹 제목은 한글(종합·슈팅·리바운드·…) - Pretendard, 아래 지표 라벨(12.5px)보다 한 단 위. */
 .rankGroupTitle {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.02em;
   color: var(--ink-soft);
   margin: 14px 0 6px;
 }
@@ -701,20 +761,21 @@
   align-items: center;
   gap: 10px;
 }
+/* 표 머리는 한글(지표·값·리그 평균·순위) - Pretendard, 값(13px)보다 작게. */
 .rankHead {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
   white-space: nowrap;
 }
 .rankHeadRight {
   text-align: right;
 }
+/* 지표 이름은 한글과 라틴 코드가 섞인다(득점·자유투 유도율·eFG%·ORtg) - 한글 쪽을 살려 Pretendard. */
 .rankLabel {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--ink-soft);
   white-space: nowrap;
@@ -724,14 +785,14 @@
 .rankTrack {
   position: relative;
   height: 10px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   overflow: hidden;
 }
 .rankFill {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   opacity: 0.9;
 }
 .rankMid {
@@ -744,7 +805,7 @@
 }
 .rankValue {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 600;
   text-align: right;
   color: var(--ink);
@@ -753,16 +814,18 @@
 }
 .rankAvg {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   text-align: right;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 /* 한글 "위"는 .rankSuffix(Pretendard)로 분리한다 - 위 .rankSuffix 주석 참고. */
+/* 순위가 이 패널의 주장이라 스코어보드 서체로 가장 크게(--fs-500). 4팩터 .pctNum과 같은 단. */
 .rankNum {
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 19px;
+  font-size: var(--fs-500);
+  letter-spacing: -0.01em;
   font-weight: 800;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -773,7 +836,7 @@
 .panelLink {
   display: inline-block;
   margin-top: 8px;
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--away);
   text-decoration: none;
@@ -793,14 +856,14 @@
     gap: 6px;
   }
   .rankLabel {
-    font-size: 10px;
+    font-size: 12px;
   }
   .rankValue,
   .rankAvg {
-    font-size: 10.5px;
+    font-size: 12.5px;
   }
   .rankNum {
-    font-size: 16px;
+    font-size: 19px;
   }
   .leaderGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -839,9 +902,10 @@
 }
 .unitNet {
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 26px;
+  font-size: var(--fs-600);
   font-weight: 800;
-  line-height: 1;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -856,27 +920,43 @@
 .schedCat {
   margin-left: 6px;
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   color: var(--ink-soft);
-  font-size: 9.5px;
+  font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
 }
 
 /* ── 모바일(≤430px) ──────────────────────────────────────────────────────────
-   제보: "전체적으로 작음". 이 페이지는 9~10.5px 라벨이 많아 폰에서 읽히지 않는다.
-   숫자는 그대로 두고 **라벨과 캡션만** 키운다(레이아웃이 흔들리지 않는 선에서). */
+   제보: "전체적으로 작음". 라벨과 캡션은 데스크톱보다 한 단 더 키운다(바닥은 12px). */
 @media (max-width: 430px) {
   .pctNote,
   .rankGroupTitle,
   .ffSideTitle {
-    font-size: 11.5px;
+    font-size: 13px;
     line-height: 1.7;
   }
   .rosterHead,
   .rankHead {
-    font-size: 10.5px;
+    font-size: 12.5px;
+  }
+  /* 라벨·캡션을 12.5~13px로 올렸으니 값도 같이 올린다 - 안 그러면 표 머리(12.5)와 캡션(13)이
+     값(12.5)과 같거나 커져서 무엇이 데이터인지 화면에서 사라진다(앞 패스가 빠뜨린 검산).
+     칸 폭은 위 ≤620 그리드가 이미 감당한다: 값 5자 모노 13.5px ≈ 41px < 52px. */
+  .pctValue,
+  .rankValue {
+    font-size: 13.5px;
+  }
+  .pctRow {
+    grid-template-columns: 42px 1fr 112px 34px;
+  }
+  /* 리그 평균·존 비율·경기 시각은 비교용 보조 수치라 값보다 한 단 아래(캡션과 같은 단)에 둔다. */
+  .rankAvg,
+  .rosterCell,
+  .zoneValue,
+  .schedStart {
+    font-size: 13px;
   }
   .rosterNameMain {
     font-size: 13px;
@@ -885,27 +965,25 @@
   .leaderCat,
   .leaderPos,
   .leaderSub {
-    font-size: 10.5px;
+    font-size: 12.5px;
   }
   .unitLabel {
-    font-size: 10.5px;
+    font-size: 12.5px;
   }
   .unitNames {
     font-size: 13px;
     word-break: keep-all;
   }
   .unitSub {
-    font-size: 11px;
+    font-size: 12.5px;
   }
-  .unitNet {
-    font-size: 24px;
-  }
+  /* .unitNet은 이 카드의 주인공이라 모바일에서도 --fs-600을 유지한다(예전 24px 축소 제거). */
   .journeyLegend,
   .sw,
   .swGhost {
-    font-size: 11px;
+    font-size: 12.5px;
   }
   .schedCat {
-    font-size: 10px;
+    font-size: 12px;
   }
 }

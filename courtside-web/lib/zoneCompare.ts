@@ -1,6 +1,6 @@
-// courtside_template.html의 teamZoneStats()/renderZoneCompare()/drawCourtMarkings()/
-// drawHoop() 포팅 - 구역별(림/근거리/중거리/롱2/3점) 슛 시도·성공 비교를 나무색 코트 위에
-// 좌우 막대로. shot_log(이미 마이그레이션됨: gmkey/pcode/tcode/quarter/shot_order/x/y/d/
+// courtside_template.html의 teamZoneStats()/drawCourtMarkings()/drawHoop() 포팅 - 구역별
+// (림/근거리/중거리/롱2/3점) 슛 시도·성공 집계와 나무색 코트 그리기. shot_log(이미
+// 마이그레이션됨: gmkey/pcode/tcode/quarter/shot_order/x/y/d/
 // made)에서 직접 계산 - 원본처럼 미리 구운 GAME.shotChart가 아니라 매 요청마다 이 경기의
 // 슛 로그(보통 100~200건)를 훑는 정도라 가벼움.
 //
@@ -121,44 +121,6 @@ export function teamZoneStats(shots: ShotRow[], tcode: string): ZoneStats {
     if (s.made) stats[zoneKey].made++;
   }
   return stats;
-}
-
-export function buildZoneCompareSvg(home: ZoneStats, away: ZoneStats): string {
-  const zones = ZONE_BOUNDS_M.map(([key]) => key);
-  const zoneLabels = Object.fromEntries(ZONE_BOUNDS_M.map(([key, , , label]) => [key, label]));
-  const zoneMidM: Record<string, number> = { rim: 0.6, close: 2.1, midShort: 4.0, midLong: 5.875, three: 7.6 };
-  const maxAtt = Math.max(1, ...zones.map((z) => Math.max(home[z].att, away[z].att)));
-
-  const HX = HOOP_RIGHT[0],
-    HY = HOOP_RIGHT[1];
-  let svg = `<rect x="${COURT_X[0]}" y="${COURT_Y[0]}" width="${COURT_X[1] - COURT_X[0]}" height="${COURT_Y[1] - COURT_Y[0]}" fill="#d9b98a" stroke="var(--ink-faint)" stroke-width="2"/>`;
-  svg += drawCourtMarkings(HX, COURT_X[1], -1, "#fff", 1.6);
-  svg += drawHoop(HOOP_RIGHT[0], HOOP_RIGHT[1], false);
-
-  const BAR_W = 6,
-    GAP = 3,
-    BAR_MAX = 58;
-  zones.forEach((z) => {
-    const x = HX - zoneMidM[z] / SCALE_M_PER_UNIT;
-    const hLen = maxAtt ? (home[z].att / maxAtt) * BAR_MAX : 0;
-    const aLen = maxAtt ? (away[z].att / maxAtt) * BAR_MAX : 0;
-    const hPct = home[z].att ? Math.round((home[z].made / home[z].att) * 100) : 0;
-    const aPct = away[z].att ? Math.round((away[z].made / away[z].att) * 100) : 0;
-    const hx0 = x - GAP / 2 - BAR_W,
-      ax0 = x + GAP / 2;
-    svg += `<rect x="${hx0}" y="${HY - hLen}" width="${BAR_W}" height="${hLen}" fill="var(--home)" rx="1.5"/>`;
-    svg += `<rect x="${ax0}" y="${HY - aLen}" width="${BAR_W}" height="${aLen}" fill="var(--away)" rx="1.5"/>`;
-    const labelY = HY - Math.max(hLen, aLen, 14) - 38;
-    svg += `<text x="${x}" y="${labelY}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)" font-family="Pretendard, sans-serif">${zoneLabels[z]}</text>`;
-    const hvx = hx0 + BAR_W / 2,
-      hvy = HY - hLen - 4;
-    const avx = ax0 + BAR_W / 2,
-      avy = HY - aLen - 4;
-    svg += `<text x="${hvx}" y="${hvy}" text-anchor="start" font-size="10" font-weight="700" fill="var(--home)" font-family="IBM Plex Mono, monospace" transform="rotate(-90 ${hvx} ${hvy})">${hPct}%</text>`;
-    svg += `<text x="${avx}" y="${avy}" text-anchor="start" font-size="10" font-weight="700" fill="var(--away)" font-family="IBM Plex Mono, monospace" transform="rotate(-90 ${avx} ${avy})">${aPct}%</text>`;
-  });
-
-  return svg;
 }
 
 // 실제 슛 위치 점 차트 - perthirtysix.com(NBA 데이터 저널리즘 사이트) 레퍼런스로 사용자가

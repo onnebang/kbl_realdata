@@ -31,6 +31,10 @@ import { careerMovingAverage, MOVING_AVERAGE_WINDOW, type CareerGrain, type Care
 // (4) 이적 지점에는 색 변화 위에 작은 ◆를 얹는다. 실측(해먼즈 291698: 수원 KT → 울산 현대모비스)
 //     처럼 이적이 시즌 경계와 같은 픽셀에 떨어질 수 있어서, 시즌 헤어라인만으로는 "색이 바뀌었다"가
 //     경계선에 묻힌다.
+// (5) 글자 크기는 상수가 아니라 **뷰포트 구간마다 다른 값**이다(CareerStripFit / fitBands).
+//     같은 9단위가 히어로 띠에서 621px에 5.95px·1180px에 9px로 그려진다 - 배율이 3배 가까이
+//     달라지므로 한 값으로는 "어디서나 12px 이상"을 만족시킬 수 없다. lib/seasonRibbon.ts가
+//     먼저 쓴 수법(SVG 안 <style> + 미디어쿼리)을 그대로 쓴다.
 //
 // 정직성: 빈칸은 '등록 기간 안에서 그의 팀이 뛴 날, 그가 뛰지 않았다'까지만 뜻한다. 원인은 이 DB에
 // 없으므로 화면 문구는 '결장'까지만 - '부상'은 어디에도 쓰지 않는다.
@@ -61,10 +65,11 @@ export type CareerStripOptions = {
    */
   range?: { start: number; end: number };
   /**
-   * 글자 배율(1 = 9단위). 뷰박스가 화면 폭보다 넓게 그려지는 곳에서만 키운다 - 확대판(1.5),
-   * 모바일 행(2). 히어로 한 줄 띠는 1로 둔다(800단위를 900px에 그리므로 9단위 ≈ 10px).
+   * 이 SVG가 화면에서 실제로 어떻게 그려지는지(CSS 높이·가로 크롬·보이는 뷰포트 범위).
+   * 빌더는 W와 뷰박스 높이를 알지만 배율의 나머지 절반(CSS 상자)은 호출부만 안다 - 받아서
+   * 뷰포트 구간마다 정확한 font-size를 계산해 SVG 안 <style>에 박는다.
    */
-  fontScale?: number;
+  fit: CareerStripFit;
   /**
    * 칸 위에 그날 득점을, 이동평균선 끝에 창 평균을 적는다. 칸 폭 7단위 이상·칸 40개 이하일 때만
    * 실제로 찍힌다(그보다 촘촘하면 숫자가 서로를 덮는다). 확대판(L5~L30) 전용.
@@ -72,6 +77,13 @@ export type CareerStripOptions = {
   valueLabels?: boolean;
   /** 캡션 머리말 덮어쓰기 - 행 모드가 "21-22 시즌 54경기"처럼 시즌을 적는 데 쓴다. */
   captionHead?: string;
+  /**
+   * §10 공백 시즌 표식(두 줄: 시즌 · '기록 없음')을 띠 안에 그릴지. 기본 true.
+   * 행 모드는 false다 - 12px을 지키면 그 두 줄이 56px 행의 절반을 덮는데(320px 실측),
+   * 같은 사실을 행 묶음 바로 아래 note가 이미 문장으로 인쇄한다("공백 시즌 24-25·25-26(기록 없음)").
+   * 사실을 지우는 게 아니라 같은 사실의 중복을 지우는 것이다.
+   */
+  gapMarkers?: boolean;
 };
 
 export type CareerStripResult = {
@@ -118,6 +130,62 @@ const PAD_B = 12; // 기준선 아래(결장 레일 + 플레이오프 레일)
  * 빼는지 알아야 한다. 숫자를 호출부에 복사해 두면 여기만 바뀌었을 때 조용히 어긋난다.
  */
 export const GAP_RESERVE = 68;
+
+// ── 뷰포트 구간별 글자(lib/seasonRibbon.ts RB_STYLE과 같은 수법) ─────────────────────
+// 렌더 픽셀 = font-size(뷰박스 단위) × 배율, 배율 = min(렌더폭/W, CSS높이/뷰박스높이)(meet).
+// 이 배율이 뷰포트마다 3배 가까이 달라지므로(히어로 띠 621px 0.66 → 1180px 1.0) 크기 상수
+// 하나로는 "어디서나 12px 이상"을 만족시킬 수 없다. 그래서 SVG 안 <style>의 미디어쿼리로
+// 구간마다 font-size를 갈아끼운다 - SVG에서 CSS px = 사용자 단위이고, 인라인 DOM이라
+// 미디어쿼리는 문서 뷰포트로 평가된다.
+export type CareerStripFit = {
+  /** 이 SVG가 보이는 구간에서 가장 작은 CSS 높이(px). 작게 잡으면 글자가 커지는 쪽으로만 틀린다. */
+  cssHeight: number;
+  /** 뷰포트에서 빼는 가로 크롬(px) - .wrap 좌우 패딩 + 컨테이너 좌우 패딩·테두리. */
+  chrome: number;
+  /** 이 SVG가 보이는 가장 좁은 뷰포트(기본 320) / 가장 넓은 뷰포트(기본 제한 없음). */
+  minVp?: number;
+  maxVp?: number;
+};
+
+/** 저장소 계약: SVG 글자는 어느 뷰포트에서도 12px 이상. 반올림 여유를 두고 12.2를 겨냥한다. */
+const FIT_MIN_PX = 12;
+const FIT_TARGET_PX = 12.2;
+/** .wrap의 max-width(globals.css --measure-wide). 이보다 넓은 화면에서 지면은 더 안 넓어진다. */
+const FIT_MEASURE_WIDE = 1180;
+/** 구간 경계 후보(내림차순). 앞 구간 글자로도 12px가 나오면 아래에서 솎아낸다. */
+const FIT_BPS = [1000, 714, 620, 430, 375, 360];
+
+/** bp=null이 미디어쿼리 없는 기본 규칙. 목록은 내림차순이라 좁은 구간이 뒤에서 이긴다. */
+type FitBand = { bp: number | null; fs: number };
+
+/**
+ * 구간마다 "그 구간에서 가장 불리한 뷰포트"를 잡아 12.2px이 나오는 font-size를 계산한다.
+ * 어떤 구간이 이기는 범위의 **아래쪽 끝**이 그 구간의 최악이다(위로 갈수록 배율이 커진다).
+ */
+function fitBands(W: number, H: number, fit: CareerStripFit): FitBand[] {
+  const minVp = fit.minVp ?? 320;
+  const maxVp = fit.maxVp ?? Infinity;
+  const hRatio = fit.cssHeight / H;
+  const scaleAt = (vp: number) => Math.min((Math.min(vp, FIT_MEASURE_WIDE) - fit.chrome) / W, hRatio);
+  const fsAt = (vp: number) => Math.ceil((FIT_TARGET_PX / scaleAt(vp)) * 10) / 10;
+  const bps = FIT_BPS.filter((b) => b >= minVp && b < maxVp);
+  const out: FitBand[] = [{ bp: null, fs: fsAt(bps.length ? bps[0] + 1 : minVp) }];
+  for (let i = 0; i < bps.length; i++) {
+    const worst = i + 1 < bps.length ? bps[i + 1] + 1 : minVp;
+    // 앞 구간 글자로도 이 구간 바닥에서 12px를 넘으면 규칙을 더 두지 않는다(바이트·복잡도).
+    if (out[out.length - 1].fs * scaleAt(worst) >= FIT_MIN_PX) continue;
+    out.push({ bp: bps[i], fs: fsAt(worst) });
+  }
+  return out;
+}
+
+/**
+ * 라벨 줄 높이. 라벨 베이스라인이 TOP−4에 있고 글자 위끝이 대략 0.82em이므로 그만큼은 있어야
+ * 글자가 클립 rect(뷰박스) 위로 잘리지 않는다. PAD_T가 하한 - 작은 글자에서는 예전 그대로다.
+ */
+const fitLabelRow = (fs: number) => Math.max(PAD_T, Math.ceil(0.82 * fs + 4));
+/** 같은 식을 높이 계산 중에도 써야 해서 이름만 따로 둔다(TOP은 fsMax가 정해진 뒤에야 상수가 된다). */
+const TOP_AT = fitLabelRow;
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -188,10 +256,7 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
   const uid = safeId(opts.uid);
   const tone: CareerStripTone = opts.tone ?? "hero";
   const W0 = opts.width ?? STRIP_DEFAULT_WIDTH;
-  const H = Math.max(48, opts.height ?? STRIP_DEFAULT_HEIGHT);
-  // 글자 배율. 라벨 줄(PAD_T)도 같이 키워야 커진 글자가 막대를 덮지 않는다.
-  const FS = Math.max(1, opts.fontScale ?? 1);
-  const f9 = n1(9 * FS);
+  const H0 = Math.max(48, opts.height ?? STRIP_DEFAULT_HEIGHT);
 
   // 잉크(중립색)는 톤에 따라 다르다. 히어로는 라이트/다크 양쪽에서 딥다크라 테마 토큰
   // (--line-rgb는 라이트에서 '어두운 잉크')을 쓰면 검은 배경 위에서 사라진다 - 직접 칠한다.
@@ -203,7 +268,12 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
   // - 높이 2.2단위짜리 레일에서는 사실상 안 보인다. 히어로에는 다크 쪽 금색을 직접 칠하고,
   // 테마 토큰은 표면 패널(§9)에서만 쓴다(잉크·팀 색이 이미 따르는 규칙 그대로).
   const goldColor = tone === "hero" ? "#ffd166" : "var(--gold)";
-  const MONO = "IBM Plex Mono, monospace";
+  // IBM Plex Mono에는 한글 글리프가 없다. 이 띠가 찍는 글자 중 셋이 한글이다 -
+  // 득점 축 상한 `${maxPts}점`, 짧은 커리어의 월 라벨 `${N}월`, 공백 시즌의 '기록 없음'.
+  // 스택에 Pretendard를 이름 지어 두지 않으면 그 글자만 이름 없는 시스템 모노로 떨어져서
+  // 바로 옆 라틴 시즌 라벨("21-22")과 얼굴이 어긋난다(저장소가 세 번 쫓은 그 버그).
+  // 글리프 단위 폴백이라 숫자·라틴은 계속 Plex Mono로 남는다.
+  const MONO = '"IBM Plex Mono", "Pretendard", monospace';
 
   // ── 잘라내기(§9 패널) ───────────────────────────────────────────────────────────────
   // range가 있으면 그 구간, 없으면 recentN(끝에서 자르기), 둘 다 없으면 전체.
@@ -248,11 +318,86 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
   const mode: "cell" | "season" = opts.detail === "cell" ? "cell" : opts.detail === "season" ? "season" : cw >= DETAIL_MIN_CELL_W ? "cell" : "season";
 
   const W = Math.max(W0, PAD_L + N * cw + reserve + PAD_R);
+
+  // ── 공백 시즌 묶음(§10) - 높이 계산이 이 결과를 쓴다 ────────────────────────────────
+  // 실측: 패리스 배스(291671)는 23-24만 뛰고 26-27 명단에 있다 - 24-25·25-26이 공백이다.
+  // 두 줄(시즌 · '기록 없음')이 차지할 세로 자리를 뷰박스 높이에 미리 반영해야 하므로
+  // 그리기 직전이 아니라 여기서 묶는다.
+  const gapGroups = new Map<number, string[]>();
+  for (const sName of opts.gapMarkers === false ? [] : grain.gapSeasons) {
+    const y = Number(sName.slice(0, 4));
+    const at = blocks.findIndex((b) => Number(b.seasonName.slice(0, 4)) > y);
+    if (at < 0) {
+      if (!reachesEnd) continue; // 잘린 구간 뒤의 공백은 이 화면의 사실이 아니다
+      const arr = gapGroups.get(N) ?? [];
+      arr.push(sName);
+      gapGroups.set(N, arr);
+      continue;
+    }
+    if (blocks[at].start === 0) continue; // 자른 구간보다 앞 - 화면 밖
+    const arr = gapGroups.get(blocks[at].start) ?? [];
+    arr.push(sName);
+    gapGroups.set(blocks[at].start, arr);
+  }
+  // §4-1의 조건과 같아야 한다(그쪽은 fsMax가 정해진 뒤라 다시 쓰지 않고 이 값을 쓴다).
+  const showValues = !!opts.valueLabels && mode === "cell" && cw >= 8 && N <= 40;
+  /** 공백 두 줄의 윗줄 y. 축 라벨 줄(TOP-4)과 값 라벨 줄(valTop) **아래**로 내려 둔다. */
+  const gapTopAt = (fs: number) => Math.max(TOP_AT(fs) + 0.9 * fs, showValues ? TOP_AT(fs) + 1.93 * fs : 0);
+  /** 두 줄 + 아랫줄 디센더까지 담는 데 필요한 높이. */
+  const gapNeedAt = (fs: number) => gapTopAt(fs) + 1.5 * fs;
+
+  // ── 글자 구간 → 라벨 줄 → 뷰박스 높이 ───────────────────────────────────────────
+  // 가장 좁은 구간의 글자(fsMax)가 라벨 줄에 들어가야 하고, 막대 띠(bandH)는 얇아지면 안 된다.
+  // 그래서 라벨 줄이 커진 만큼 **뷰박스 높이를 키운다**(예전에는 라벨 줄이 막대를 먹었다).
+  // 높이가 커지면 높이 배율(CSS높이/H)이 작아져 글자가 다시 커지므로 두어 번 되돌린다 -
+  // 라벨 줄은 글자의 0.82배라 계수가 1보다 작고, 실측 두 번이면 멈춘다.
+  const bandH0 = H0 - PAD_T - PAD_B;
+  let H = H0;
+  let bands = fitBands(W, H, opts.fit);
+  // 공백 시즌 두 줄도 같은 이유로 높이를 요구한다 - 예전에는 이 줄들을 H 안으로 '클램프'해서
+  // 위로 밀었고, 그 결과 축 라벨·값 라벨 줄을 밟았다(검증자 실측 29쌍). 라벨을 미는 대신 키운다.
+  for (let i = 0; i < 6; i++) {
+    const fs = Math.max(...bands.map((b) => b.fs));
+    const need = Math.max(fitLabelRow(fs) + bandH0 + PAD_B, gapGroups.size ? Math.ceil(gapNeedAt(fs)) : 0);
+    if (need <= H) break;
+    H = need;
+    bands = fitBands(W, H, opts.fit);
+  }
+  // 겹침 검사는 언제나 가장 큰 구간 글자로 돈다(구간마다 다른 라벨 집합을 만들 수 없다).
+  // 다만 넓은 구간 글자(fsWide)로만 자리가 나는 라벨은 지우지 않고 .cgn-uid를 달아
+  // 좁은 구간에서만 숨긴다 - seasonRibbon의 .rbbWide와 같은 두 단 솎기.
+  // (이름 주의: .cgw-uid는 이미 §12 와이프 애니메이션의 클립 rect다. 거기에 display:none을
+  //  걸면 클립 모양이 사라져 띠가 통째로 안 보인다 - 실제로 한 번 그렇게 짰다가 하네스에서 잡았다.)
+  const fsMax = Math.max(...bands.map((b) => b.fs));
+  const fsWide = bands[0].fs;
+  const wideOnlyBp = bands.find((b) => b.fs > fsWide + 0.05)?.bp ?? null;
   const BASE = H - PAD_B;
-  const TOP = Math.round(PAD_T * FS);
+  const TOP = fitLabelRow(fsMax);
   const bandH = BASE - TOP;
   const x0 = (i: number) => PAD_L + i * cw;
   const xc = (i: number) => PAD_L + i * cw + cw / 2;
+
+  // 대략폭(한글 글리프 1em · 라틴 0.62em). §9 축 라벨 가드가 쓰지만 §4-1 값 라벨의 공백 구간
+  // 가드가 더 먼저 부르므로 여기서 선언한다(아래에 두면 TDZ로 런타임에 터진다 - 하네스가 잡았다).
+  const textW = (s: string, fs: number) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 127 ? 1 : 0.6) * fs, 0);
+
+  // 공백 시즌 두 줄의 최종 자리(위에서 H가 이미 이만큼을 담도록 커졌다).
+  const gapY1 = gapTopAt(fsMax);
+  const gapY2 = gapY1 + 1.25 * fsMax;
+  const gapLabelOf = (list: string[]) =>
+    list.length <= 2 ? list.map(shortSeason).join("·") : `${shortSeason(list[0])}~${shortSeason(list[list.length - 1])}`;
+  /** 그 라벨이 실제로 덮는 x 구간(값 라벨이 피해야 하는 자리). 앵커까지 반영한다. */
+  const gapSpanOf = (idx: number, label: string): [number, number] => {
+    const trailing = idx === N;
+    const gx = trailing ? PAD_L + N * cw + 9 : PAD_L + idx * cw;
+    const gw = Math.max(textW(label, fsMax), textW("기록 없음", fsMax));
+    if (!trailing) return [gx - gw / 2, gx + gw / 2];
+    // 커리어 끝 표식은 GAP_RESERVE(68단위)만큼만 예약돼 있다. 좁은 구간에서 글자가 커져 넘치면
+    // 오른쪽 끝에 붙여 문장을 온전히 남긴다 - 사실이 반쯤 잘리느니 막대 몇 개를 덮는 쪽이 낫다.
+    const wide = gx + 4 + gw > W - 2;
+    return wide ? [W - 2 - 0.06 * fsMax - gw, W - 2 - 0.06 * fsMax] : [gx + 4, gx + 4 + gw];
+  };
+  const gapSpans: Array<[number, number]> = [...gapGroups].map(([idx, list]) => gapSpanOf(idx, gapLabelOf(list)));
 
   const gap = cw >= 6 ? 1.2 : cw >= 3.5 ? 0.7 : cw >= 2.2 ? 0.35 : 0;
   const barW = Math.max(0.9, cw - gap);
@@ -362,22 +507,36 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
   // 때만(7단위+, 40칸 이하) 칸 위에 득점을 적는다. 0점은 적지 않는다(바닥 눈금이 이미 말한다).
   // 칸 폭 하한 8: 6.5단위 모노 두 자리가 7.8단위라 그보다 좁은 칸에서는 이웃을 밟는다
   // (실측 - 8단위로 찍었더니 9단위 칸에서 9.6단위가 되어 겹쳤다).
-  const showValues = !!opts.valueLabels && mode === "cell" && cw >= 8 && N <= 40;
   if (showValues) {
-    const fv = n1(6.5 * FS);
-    parts.push(`<g pointer-events="none" font-family="${MONO}" font-size="${fv}" font-weight="700" text-anchor="middle" fill="${ink(0.85)}">`);
+    // 글자 크기는 .cg-uid가 준다(구간마다 다르다) - 여기서 font-size를 박으면 상속을 덮는다.
+    parts.push(`<g pointer-events="none" font-weight="700" text-anchor="middle" fill="${ink(0.85)}">`);
     // 이웃과 겹칠 것 같으면 건너뛴다. 두 자리 숫자가 붙은 칸에 연달아 오면 "14"와 "16"이 "1416"으로
     // 읽힌다(375px 실측). 막대 높이가 이미 값을 말하므로, 겹치느니 몇 개를 안 적는 쪽이 낫다.
-    let lastValEnd = -Infinity;
+    // 좁은 구간 글자로 자리가 나면 늘 그리고, 넓은 구간 글자로만 나면 좁은 구간에서 숨긴다
+    // (한 값으로 솎으면 12px을 맞추는 대가로 넓은 화면의 라벨 절반을 잃는다).
+    let valNarrowEnd = -Infinity;
+    let valWideEnd = -Infinity;
+    const valTop = TOP + 0.78 * fsMax; // 라벨 위끝이 라벨 줄을 넘지 않는 가장 높은 자리
     for (let i = 0; i < N; i++) {
       const n = nights[i];
       if (n.kind !== "played" || n.pts <= 0) continue;
-      const w = String(n.pts).length * 6.5 * 0.62 * FS;
-      const x = xc(i);
-      if (x - w / 2 < lastValEnd) continue;
-      const y = Math.max(TOP + 7 * FS, yOf(n.pts) - 2.5);
-      parts.push(`<text x="${n1(x)}" y="${n1(y)}">${n.pts}</text>`);
-      lastValEnd = x + w / 2 + 1.6 * FS;
+      const digits = String(n.pts).length;
+      const halfN = digits * 0.31 * fsMax; // 0.62em/2
+      const halfW = digits * 0.31 * fsWide;
+      // 첫·마지막 칸의 라벨은 칸 중앙에 두면 절반이 뷰박스 밖이라 클립 rect가 자른다
+      // (320px 실측: 첫 칸 "30"의 왼쪽 획이 −1.5단위). 가장자리 여백은 겹침 검사(0.62em =
+      // Plex Mono 실폭)보다 넉넉히 잡는다 - 웹폰트가 오기 전 시스템 모노는 0.73em까지 넓다.
+      const edge = digits * 0.38 * fsMax;
+      const x = Math.min(Math.max(xc(i), edge), W - edge);
+      // 짧은 막대의 값 라벨은 y가 아래로 내려가 공백 시즌 두 줄과 같은 높이에 올 수 있다.
+      // 세로로 피할 방법이 없으므로 그 x 구간에서는 안 적는다(막대 높이가 이미 값을 말한다).
+      if (gapSpans.some(([ga, gb]) => x + halfN >= ga && x - halfN <= gb)) continue;
+      if (x - halfW < valWideEnd) continue; // 넓은 구간에서도 자리가 없으면 안 그린다
+      const narrowOk = x - halfN >= valNarrowEnd;
+      valWideEnd = x + halfW + 0.18 * fsWide;
+      if (narrowOk) valNarrowEnd = x + halfN + 0.18 * fsMax;
+      const y = Math.max(valTop, yOf(n.pts) - 2.5);
+      parts.push(`<text ${narrowOk ? "" : `class="cgn-${uid}" `}x="${n1(x)}" y="${n1(y)}">${n.pts}</text>`);
     }
     parts.push("</g>");
   }
@@ -498,19 +657,21 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
   // ── 9. 축 라벨(연도 또는 월) + 득점 축 상한 ────────────────────────────────────────
   const scaleLabel = `${maxPts}점`;
   const scaleX = Math.min(W - 2, PAD_L + N * cw + reserve);
-  parts.push(`<text x="${n1(scaleX)}" y="${n1(TOP - 4)}" font-size="${f9}" text-anchor="end" fill="${ink(0.55)}" font-family="${MONO}">${esc(scaleLabel)}</text>`);
-  // 9px 모노 기준 대략폭(한글 글리프는 두 배 가까이 넓다) - 연도 라벨이 축 상한 라벨을 밟지 않게.
-  const textW = (s: string) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 127 ? 9 : 5.4) * FS, 0);
-  const labelGuard = scaleX - textW(scaleLabel) - 8;
+  parts.push(`<text x="${n1(scaleX)}" y="${n1(TOP - 4)}" text-anchor="end" fill="${ink(0.55)}">${esc(scaleLabel)}</text>`);
+  const labelGuard = (fs: number) => scaleX - textW(scaleLabel, fs) - 8;
 
-  // 가드는 라벨의 '끝'까지 본다. 시작 x만 보면 글자가 커진 곳(행 모드 FS 2.6)에서 라벨 꼬리가
-  // 오른쪽 득점 축 라벨을 밟는다 - 실측으로 "23-2411월"·"4월25점"이 나왔다.
-  let lastLabelEnd = -99;
+  // 가드는 라벨의 '끝'까지 본다. 시작 x만 보면 글자가 커진 구간에서 라벨 꼬리가 오른쪽 득점 축
+  // 라벨을 밟는다 - 실측으로 "23-2411월"·"4월25점"이 나왔다. 값 라벨과 같은 두 단 솎기.
+  let labelNarrowEnd = -99;
+  let labelWideEnd = -99;
   const pushLabel = (x: number, text: string, alpha: number) => {
-    const w = textW(text);
-    if (x < lastLabelEnd + 6 * FS || x + 2 + w > labelGuard) return;
-    parts.push(`<text x="${n1(x + 2)}" y="${n1(TOP - 4)}" font-size="${f9}" fill="${ink(alpha)}" font-family="${MONO}">${esc(text)}</text>`);
-    lastLabelEnd = x + 2 + w;
+    const wW = textW(text, fsWide);
+    if (x < labelWideEnd + 0.67 * fsWide || x + 2 + wW > labelGuard(fsWide)) return;
+    const wN = textW(text, fsMax);
+    const narrowOk = x >= labelNarrowEnd + 0.67 * fsMax && x + 2 + wN <= labelGuard(fsMax);
+    labelWideEnd = x + 2 + wW;
+    if (narrowOk) labelNarrowEnd = x + 2 + wN;
+    parts.push(`<text ${narrowOk ? "" : `class="cgn-${uid}" `}x="${n1(x + 2)}" y="${n1(TOP - 4)}" fill="${ink(alpha)}">${esc(text)}</text>`);
   };
   if (compact) {
     for (let i = 0; i < N; i++) {
@@ -524,34 +685,22 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
   }
 
   // ── 10. 공백 시즌(칸이 없는 시즌) - 조용히 빼먹지 않고 끊김으로 그린다 ─────────────
-  // 실측: 패리스 배스(291671)는 23-24만 뛰고 26-27 명단에 있다 - 24-25·25-26이 공백이다.
-  const gapGroups = new Map<number, string[]>();
-  for (const s of grain.gapSeasons) {
-    const y = Number(s.slice(0, 4));
-    const at = blocks.findIndex((b) => Number(b.seasonName.slice(0, 4)) > y);
-    if (at < 0) {
-      if (!reachesEnd) continue; // 잘린 구간 뒤의 공백은 이 화면의 사실이 아니다
-      const arr = gapGroups.get(N) ?? [];
-      arr.push(s);
-      gapGroups.set(N, arr);
-      continue;
-    }
-    if (blocks[at].start === 0) continue; // 자른 구간보다 앞 - 화면 밖
-    const arr = gapGroups.get(blocks[at].start) ?? [];
-    arr.push(s);
-    gapGroups.set(blocks[at].start, arr);
-  }
+  // 묶기(gapGroups)와 자리(gapY1/gapY2/gapSpanOf)는 위에서 이미 정했다 - 높이 계산이 그 값을
+  // 써야 두 줄이 축·값 라벨 줄로 밀려 올라가지 않는다.
+  // 이 두 줄은 막대 위에 얹히므로 후광을 두른다(seasonRibbon의 RB_HALO와 같은 이유).
+  const gapHalo = `paint-order="stroke" stroke="${haloColor}" stroke-width="${n1(0.12 * fsMax)}" stroke-linejoin="round"`;
   for (const [idx, list] of gapGroups) {
     const trailing = idx === N;
     const x = trailing ? PAD_L + N * cw + 9 : x0(idx);
-    const label = list.length <= 2 ? list.map(shortSeason).join("·") : `${shortSeason(list[0])}~${shortSeason(list[list.length - 1])}`;
-    const anchor = trailing ? "start" : "middle";
-    const tx = trailing ? x + 4 : x;
+    const label = gapLabelOf(list);
+    const [spanA, spanB] = gapSpanOf(idx, label);
+    const anchor = !trailing ? "middle" : spanB < W - 2.5 ? "start" : "end";
+    const tx = !trailing ? x : anchor === "end" ? spanB : spanA;
     parts.push(
       `<g><title>${esc(`${list.join(" · ")} KBL 출전 기록 없음`)}</title>` +
         `<line x1="${n1(x)}" y1="${n1(TOP - 4)}" x2="${n1(x)}" y2="${n1(BASE + 8)}" stroke="${ink(0.34)}" stroke-width="1" stroke-dasharray="2 3"/>` +
-        `<text x="${n1(tx)}" y="${n1(TOP + 9 * FS)}" font-size="${f9}" text-anchor="${anchor}" fill="${ink(0.6)}" font-family="${MONO}">${esc(label)}</text>` +
-        `<text x="${n1(tx)}" y="${n1(TOP + 20 * FS)}" font-size="${f9}" text-anchor="${anchor}" fill="${ink(0.42)}" font-family="${MONO}">기록 없음</text></g>`
+        `<text x="${n1(tx)}" y="${n1(gapY1)}" text-anchor="${anchor}" fill="${ink(0.6)}" ${gapHalo}>${esc(label)}</text>` +
+        `<text x="${n1(tx)}" y="${n1(gapY2)}" text-anchor="${anchor}" fill="${ink(0.42)}" ${gapHalo}>기록 없음</text></g>`
     );
   }
 
@@ -580,6 +729,15 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
   // 이 rect 하나뿐이다(app/globals.css의 live-pulse와 같은 정책, 더 엄격한 쪽으로).
   const style =
     `<style>` +
+    // 글자는 뿌리 <g>에 한 번만 걸고 모든 <text>가 상속받는다(라벨마다 font-family를 적으면
+    // 라벨당 45B가 그대로 늘어난다 - 칸이 800개인 띠에서는 그게 곧 응답 크기다).
+    // 구간 규칙은 내림차순이라 좁은 구간이 뒤에서 이긴다(같은 명세도 = 나중 규칙 승).
+    `.cg-${uid}{font-family:${MONO};font-size:${n1(fsWide)}px}` +
+    bands
+      .slice(1)
+      .map((b) => `@media(max-width:${b.bp}px){.cg-${uid}{font-size:${n1(b.fs)}px}}`)
+      .join("") +
+    (wideOnlyBp ? `@media(max-width:${wideOnlyBp}px){.cgn-${uid}{display:none}}` : "") +
     `.cgz-${uid} a:hover rect,.cgz-${uid} a:focus-visible rect{fill:${ink(0.09)}}` +
     `.cgc-${uid} a:hover rect,.cgc-${uid} a:focus-visible rect{fill:${tone === "hero" ? "#ffffff" : "var(--ink)"}}` +
     // 히트존은 하얗게 칠하지 않는다 - 칸 하나가 통째로 흰 기둥이 되면 막대의 높이가 사라진다.
@@ -659,12 +817,14 @@ export function buildCareerStripRowsSvg(
       uid: `${opts.uid}r${b.seasonName.slice(0, 4)}`,
       range: { start: b.start, end: b.end + 1 },
       width: len * CELL_MAX_W + PAD_L + PAD_R + (isLast && trailingGap ? GAP_RESERVE : 0),
-      // 배율 2.6이면 라벨 줄(TOP)이 34단위다. 92 = 라벨 34 + 막대 46 + 레일 12.
-      // (초안의 40은 막대 띠가 2단위만 남아 아무것도 안 보였고, 80·배율 2는 375px에서 글자가
-      //  9.5~11.1px로 여전히 작았다 - 하네스 실측 후 92·2.6으로 올려 12.4~14.2px.)
-      height: opts.rowHeight ?? 92,
+      // 75 = 라벨 줄 13 + 막대 50 + 레일 12. 여기서 정하는 건 **막대 띠 50**뿐이다(라벨 줄과
+      // 최종 뷰박스 높이는 빌더가 구간별 글자에서 거꾸로 잡는다 - 행은 W가 시즌마다 달라
+      // 320px에서 필요한 글자가 27~32단위로 갈린다). 예전 고정값(높이 100·글자 2.9배)은
+      // 320px에서 최장 시즌+공백 표식이 9.96px로 바닥을 못 넘었다(검증자 실측).
+      height: opts.rowHeight ?? 75,
       detail: "season",
-      fontScale: opts.fontScale ?? 2.6,
+      // 공백 시즌 표식은 행 안에 그리지 않는다 - 아래 note가 같은 사실을 문장으로 진다.
+      gapMarkers: false,
       captionHead: `${shortSeason(b.seasonName)} 시즌 ${b.played}경기`,
     });
     if (r) rows.push({ seasonName: b.seasonName, result: r });

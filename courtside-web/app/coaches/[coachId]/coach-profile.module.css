@@ -1,6 +1,8 @@
-/* 감독 프로필 - globals.css :root 토큰만 사용(라이트/다크는 토큰이 바뀐다). 팀/선수 프로필의 시각 언어
-   (Big Shoulders 숫자, IBM Plex Mono 라벨)와 맞추되 히어로 아트는 없다 - 이 페이지의 데이터는 전부
-   '팀 성적을 감독 재임기로 자른 것'이라 감독 개인을 크게 그리지 않는다. 모든 글자 ≥ 11px(375px 기준). */
+/* 감독 프로필 - globals.css :root 토큰만 사용(라이트/다크는 토큰이 바뀐다). 중계 화면 문법:
+   숫자는 스코어보드 서체(globals.css .scoreboard와 같은 선언), 한글은 전부 Pretendard,
+   IBM Plex Mono는 라틴·정렬 숫자에만 남긴다(한글 글리프가 없어 조용히 폴백한다).
+   히어로 아트는 없다 - 이 페이지의 데이터는 전부 '팀 성적을 감독 재임기로 자른 것'이라
+   감독 개인을 크게 그리지 않는다. 모든 글자 ≥ 12px(375px 기준). */
 .head {
   display: flex;
   flex-wrap: wrap;
@@ -8,10 +10,11 @@
   gap: 8px 14px;
   margin-top: 6px;
 }
+/* "감독 · 정규시즌 기준" - 한글이라 모노를 쓰지 않는다. 자간도 넓히지 않는다(한글은 벌어지면 읽기 어렵다). */
 .kicker {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
-  letter-spacing: 0.18em;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
 }
 .sub {
@@ -31,8 +34,7 @@
   color: var(--ink);
 }
 .unconfirmed {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-faint);
 }
 
@@ -41,7 +43,7 @@
   margin-top: 18px;
   background: var(--surface);
   border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 14px;
+  border-radius: var(--r-card);
   padding: 14px 16px 12px;
 }
 .cardHead {
@@ -51,13 +53,19 @@
   gap: 6px 12px;
   margin-bottom: 8px;
 }
+/* 한글 표제 = Pretendard 800 + -0.02em(globals .title과 같은 규칙).
+   크기는 --fs-400 - 이 카드의 주인공은 제목이 아니라 숫자다. --fs-500으로 두면 아래
+   .tileVal(같은 단)과 같은 크기가 돼서 '통산 기록'이 '82'만큼 크게 읽혔다.
+   위계: 제목 17 < 타일 값 21 < 주인공 값 34(.tileValLead). */
 .cardTitle {
   font-weight: 800;
-  font-size: 16px;
+  font-size: var(--fs-400);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.02em;
 }
 .cardKicker {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
 }
 
@@ -67,31 +75,41 @@
   grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
   gap: 10px;
 }
+/* 패널 안의 웰이라 --r-inset(카드는 --r-card, 데이터 조각은 --r-led). */
 .tile {
   background: var(--surface);
   border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 12px;
+  border-radius: var(--r-inset);
   padding: 10px 12px 8px;
   min-width: 0;
 }
+/* 숫자만 들어가는 자리(경기 수·승-패·승률·득실·넷마진) - 스코어보드 서체를 그대로 얹는다.
+   한글이 섞이는 값은 아래 .tileText(Pretendard)를 쓴다. */
 .tileVal {
+  /* globals.css .scoreboard와 같은 선언 - 이 저장소에 composes 선례가 없어 모듈 안에 그대로 둔다. */
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 26px;
-  line-height: 1;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: var(--lh-tight);
+  font-size: var(--fs-500);
   white-space: nowrap;
+}
+/* 패널 하나에 큰 숫자는 하나. 통산 카드는 승률, 챌린지 카드는 경기당 사용이 주인공이다. */
+.tileValLead {
+  font-size: var(--fs-700);
 }
 .tileSe {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--ink-soft);
   margin-left: 4px;
 }
+/* "승률 · 이항 SE", "Q4·연장 비율(경향)" - 한글 라벨이라 Pretendard(숫자만 tabular-nums). */
 .tileLabel {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
   margin-top: 4px;
 }
@@ -103,7 +121,8 @@
 .captions {
   margin: 12px 0 0;
   padding: 0 0 0 16px;
-  font-size: 11.5px;
+  max-width: var(--measure-read);
+  font-size: 13px;
   line-height: 1.55;
   color: var(--ink-soft);
 }
@@ -111,7 +130,8 @@
   margin-top: 2px;
 }
 .note {
-  font-size: 11px;
+  max-width: var(--measure-read);
+  font-size: 12.5px;
   color: var(--ink-faint);
   margin-top: 10px;
   line-height: 1.5;
@@ -124,13 +144,13 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12.5px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* 머리글은 값보다 작고 조용하게 - 전부 한글("시즌·승-패·홈 · 원정")이라 Pretendard. */
 .table th {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--ink-faint);
   text-align: right;
@@ -152,23 +172,25 @@
   color: var(--ink);
   font-weight: 700;
 }
+/* 표 안 정렬 숫자(홈 12-15 · 원정 8-19, ±.045) - 한글이 없어 모노를 유지한다. */
 .small {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-faint);
 }
 .dim {
   color: var(--ink-faint);
 }
-/* 진행 중인 시즌 배지(표 행·레이더 칩) - 표본이 작다는 것을 값 옆에서 바로 알리는 용도. */
+/* 진행 중인 시즌 배지(표 행·레이더 칩) - 표본이 작다는 것을 값 옆에서 바로 알리는 용도.
+   데이터 조각이므로 모서리는 --r-led(하드 엣지). */
 .partial {
   display: inline-block;
   margin-left: 5px;
   padding: 1px 5px;
   border: 1px solid rgba(var(--line-rgb), 0.24);
-  border-radius: 999px;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  border-radius: var(--r-led);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   color: var(--ink-faint);
   white-space: nowrap;
@@ -198,7 +220,7 @@
     grid-template-columns: 1fr;
   }
 }
-/* min-width = 뷰박스 폭. 이보다 좁아지면 축 라벨(12 유닛)이 11px 아래로 내려가므로 줄이는 대신
+/* min-width = 뷰박스 폭(320). 이보다 좁아지면 축 라벨(12 유닛)이 12px 아래로 내려가므로 줄이는 대신
    래퍼(.tableWrap)가 가로로 스크롤한다 - 360px 기기의 실렌더 폭은 290px다. */
 .radarSvg {
   width: 100%;
@@ -211,7 +233,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px 14px;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-faint);
   margin-top: 6px;
 }
@@ -243,7 +265,8 @@
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px dashed rgba(var(--line-rgb), 0.12);
-  font-size: 12px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-soft);
 }
 .aux b {
@@ -252,7 +275,9 @@
 
 /* ── 챌린지 ── */
 .leagueLine {
+  max-width: var(--measure-read);
   font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   line-height: 1.55;
   color: var(--ink);
 }
@@ -264,7 +289,7 @@
 }
 .measuring {
   margin-top: 18px;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  max-width: var(--measure-read);
+  font-size: 12.5px;
   color: var(--ink-faint);
 }

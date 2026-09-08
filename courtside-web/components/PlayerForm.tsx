@@ -192,9 +192,16 @@ function subLabel(def: FormMetricDef): string | null {
 // 스파크라인(raw SVG 문자열)
 // ---------------------------------------------------------------------------
 //
-// 눈금 없는 스파크라인은 인코딩인 척하는 장식이다. 그래서 위/아래 두 줄에 도메인 양 끝을
-// 숫자로 찍고, 그 숫자가 곧 실제 도메인이 되도록 눈금 단위로 내림/올림해서 잡는다
-// (라벨을 반올림해 인쇄하면 그림과 숫자가 미세하게 어긋난다).
+// 눈금 없는 스파크라인은 인코딩인 척하는 장식이다. 그래서 도메인 양 끝을 눈금 단위로
+// 내림/올림해서 잡고(라벨을 반올림해 인쇄하면 그림과 숫자가 미세하게 어긋난다), 그 두 숫자를
+// 그림 밖 캡션(.tAxis "눈금 4.5 ~ 6.2")에, 가로축 양 끝 시즌을 그림 밑 한 줄(.tSpan)에 찍는다.
+//
+// 왜 글자가 SVG 안에 없는가: <text>의 font-size는 뷰박스 단위라 렌더 배율을 그대로 탄다.
+// 이 카드의 그림은 뷰박스 300 폭인데 렌더 폭이 모바일 375px 화면에서 130.5px다(패널 12 +
+// 카드 11 패딩을 걷어낸 2열 격자) - 배율 0.435. 예전의 font-size 8.5(눈금)와 8(x축)은 화면에서
+// 3.7px · 3.5px로 찍혔다. 배율을 이기려면 font-size 27이 필요한데, 렌더 높이가 38~56px뿐인
+// 그림에 12px 글자 두 줄을 얹으면 글자가 그림을 덮는다. 그래서 글자는 전부 HTML로 내렸다
+// (숫자는 한 개도 사라지지 않았다 - 자리만 옮겼다).
 //
 // 도메인은 '선수 값'만으로 잡는다. 리그 기준선까지 넣으면 워니의 득점(27.8~30.0)이 리그
 // 평균 16.3까지 늘어난 축 위에서 일직선이 되어 정작 보여야 할 추세가 사라진다. 대신
@@ -203,10 +210,13 @@ function subLabel(def: FormMetricDef): string | null {
 
 const SPARK_W = 300;
 const SPARK_H = 88;
-const SPARK_PAD = { l: 34, r: 10, t: 11, b: 17 };
+// 글자가 나갔으니 왼쪽 34(눈금 숫자 자리)와 아래 17(x축 라벨 자리)도 함께 나간다. 남는 여백은
+// 마지막 점의 후광 반지름(3.6 + 1.9 = 5.5)만 넘기면 된다 - 와이프 clip이 0..300/0..88이라
+// 여기를 넘긴 점은 잘린다.
+const SPARK_PAD = { l: 6, r: 8, t: 8, b: 8 };
 
 type SparkPoint = {
-  /** x축 라벨("19-20"). 라틴/숫자만 - SVG 안에 한글을 넣지 않는다. */
+  /** 시즌 라벨("19-20"). 툴팁 문장과 그림 밑 .tSpan 한 줄에 쓰인다. */
   label: string;
   value: number | null;
   league: number | null;
@@ -283,17 +293,13 @@ function buildSparkSvg(points: SparkPoint[], opts: { uid: string; digits: number
   const uid = safeId(opts.uid);
   const parts: string[] = [];
 
-  // ── 눈금 두 줄 + 숫자 ──────────────────────────────────────────────────────────────
+  // ── 눈금 두 줄(숫자는 캡션이 진다 - 위 주석) ───────────────────────────────────────
   if (!single) {
     for (const y of [PT, PT + plotH]) {
       parts.push(
         `<line x1="${PL}" y1="${n1(y)}" x2="${SPARK_W - PR}" y2="${n1(y)}" stroke="var(--ink-faint)" stroke-width="0.7" stroke-dasharray="2 3"/>`
       );
     }
-    const axisText = (y: number, t: string) =>
-      `<text x="${PL - 5}" y="${n1(y)}" font-size="8.5" text-anchor="end" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${esc(t)}</text>`;
-    parts.push(axisText(PT + 3, axis(hi)));
-    parts.push(axisText(PT + plotH + 3, axis(lo)));
   }
 
   // ── 리그 기준선(시즌마다 값이 다르므로 직선이 아니라 꺾은선) ────────────────────────
@@ -333,14 +339,10 @@ function buildSparkSvg(points: SparkPoint[], opts: { uid: string; digits: number
     parts.push(`<g><title>${esc(p.title)}</title>${halo}${dot}<circle cx="${cx}" cy="${cy}" r="9" fill="transparent"/></g>`);
   });
 
-  // ── x축 라벨. 시즌이 많으면 처음과 끝만(글자가 겹치면 읽히지 않는다). ────────────────
-  const labelIdx = n <= 5 ? points.map((_, i) => i) : [0, n - 1];
-  for (const i of labelIdx) {
-    const anchor = i === 0 && n > 1 ? "start" : i === n - 1 && n > 1 ? "end" : "middle";
-    parts.push(
-      `<text x="${n1(xOf(i))}" y="${SPARK_H - 5}" font-size="8" text-anchor="${anchor}" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${esc(points[i].label)}</text>`
-    );
-  }
+  // x축 라벨은 여기서 그리지 않는다 - 그림 밑 .tSpan 한 줄이 양 끝 시즌을 12px로 인쇄한다.
+  // (예전에는 시즌이 5개 이하면 다섯 개를 전부 SVG 안에 찍었는데, 12px로 키우면 "25-1226점"
+  //  처럼 통째로 겹친다. 겹치는 라벨을 솎느니 두 끝만 남기고 밖으로 내보내는 쪽이 정직하다 -
+  //  가운데 시즌 값은 점의 <title>과 아래 표에 그대로 있다.)
 
   // ── 그리기 애니메이션(왼→오 와이프 1회) ────────────────────────────────────────────
   // 정지 상태의 선언이 곧 완성된 그림이다(clip rect가 처음부터 전체 폭). 움직이는 요소는
@@ -711,8 +713,17 @@ export function PlayerFormPanel({
                       aria-label={`${def.label} 시즌 추이 ${points.map((p) => `${p.label} ${formatRate(key, p.value)}`).join(", ")}`}
                       dangerouslySetInnerHTML={{ __html: spark.svg }}
                     />
+                    {/* 가로축. SVG 안 <text>는 뷰박스 배율을 타서 모바일에서 3.5px이 됐다 -
+                        여기 HTML 12px 한 줄이면 배율과 무관하다. 그림 안 시즌은 점의 <title>과
+                        svg의 aria-label이 이미 다 부르므로 화면 낭독기에는 감춘다. */}
+                    {seasons.length > 1 && (
+                      <div className={styles.tSpan} aria-hidden="true">
+                        <span>{seasons[0].label}</span>
+                        <span>{seasons[seasons.length - 1].label}</span>
+                      </div>
+                    )}
                     {/* '눈금'은 한글이라 캡션 전체가 본문 폰트다(.tAxis). 숫자만 모노로 되돌려
-                        그림 안의 축 숫자와 같은 얼굴로 읽히게 한다(.tAxisNum). */}
+                        가로축 줄(.tSpan)과 같은 얼굴로 읽히게 한다(.tAxisNum). */}
                     <div className={styles.tAxis}>
                       {spark.single ? (
                         "그릴 수 있는 시즌이 하나라 추세선은 없다"

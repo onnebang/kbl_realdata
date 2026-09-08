@@ -2,10 +2,12 @@
    선수 프로필 안에 들어가므로 색은 페이지가 이미 정의한 토큰만 소비한다(자체 정의 없음).
    숫자에만 Big Shoulders Display를 쓴다 - 그 폰트에는 한글 글리프가 없다. */
 
+/* 산문 - 한 줄 길이는 지면 폭 토큰이 정한다. */
 .lede {
   font-size: 12.5px;
-  line-height: 1.6;
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
+  max-width: var(--measure-read);
   margin-bottom: 12px;
 }
 .lede b {
@@ -13,20 +15,23 @@
 }
 
 /* 클러치 안 / 밖 두 덩이. 이 패널의 헤드라인은 합계가 아니라 이 '어디서 나왔나'다. */
+/* 미터·스와치는 데이터 조각이므로 하드 엣지(--r-led). 담는 것(.card·.callout)만 --r-inset. */
 .splitBar {
   display: flex;
   height: 26px;
-  border-radius: 8px;
+  border-radius: var(--r-led);
   overflow: hidden;
   gap: 1px;
   margin-bottom: 6px;
 }
+/* "클러치 밖 62%" - 막대 안에 한글이 들어가므로 모노를 쓰지 않는다(퍼센트만 tabular-nums). */
 .splitSeg {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   color: #fff;
   white-space: nowrap;
@@ -43,7 +48,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-soft);
   margin-bottom: 14px;
 }
@@ -55,7 +60,7 @@
 .swatch {
   width: 10px;
   height: 10px;
-  border-radius: 3px;
+  border-radius: var(--r-led);
   flex: none;
 }
 
@@ -74,7 +79,7 @@
 }
 .typeTrack {
   height: 9px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   overflow: hidden;
 }
@@ -86,13 +91,15 @@
 .typeFill {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--away);
   opacity: 0.85;
 }
+/* "+23.9 · 821점 (47%)" - 한글 단위가 섞인 값 칸이라 Pretendard + tabular-nums로
+   정렬만 지킨다(모노로 두면 '점'만 시스템 모노로 폴백한다). */
 .typeVal {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12.5px;
   text-align: right;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
@@ -103,11 +110,14 @@
   font-weight: 700;
 }
 
+/* 한글 소제목 - Pretendard. 크기는 자기가 소개하는 값(.typeVal 12.5 / .wpa 21)보다 작게 두고
+   제목 역할은 굵기·자간·--ink-faint가 맡는다. 13px이면 바로 아래 .typeVal(12.5)보다 커져서
+   섹션 제목이 그 섹션의 숫자보다 크게 읽혔다. */
 .momentsHead {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-100);
+  font-weight: 700;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
   margin: 16px 0 7px;
 }
@@ -119,22 +129,25 @@
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: 9px;
-  border: 1px solid rgba(var(--line-rgb), 0.1);
-  background: var(--surface);
+  border-radius: var(--r-inset);
+  /* 패널 안의 타일이라 배경만으로 층을 만든다(테두리는 호버 때만 - 팀 프로필 .leaderCard와 같은 규칙). */
+  border: 1px solid transparent;
+  background: var(--surface-soft);
   color: var(--ink);
   text-decoration: none;
   margin-bottom: 5px;
 }
 .card:hover {
-  border-color: rgba(var(--line-rgb), 0.28);
-  background: var(--surface-soft);
+  border-color: rgba(var(--line-rgb), 0.2);
 }
+/* 이 카드의 주인공 = 승률 변화 폭. 더 키우지 않는 이유는 칸 폭이다 - 값이 "+12.3%p"(7자)까지
+   가고 칸은 58px이라 --fs-500(21px)이 넘치지 않는 최대치다. 서체 역할은 스코어보드 그대로. */
 .wpa {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 21px;
-  line-height: 1;
+  font-size: var(--fs-500);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
   text-align: right;
   font-variant-numeric: tabular-nums;
   color: var(--positive);
@@ -144,21 +157,24 @@
   font-size: 12px;
   line-height: 1.45;
 }
+/* "2025-11-02 vs 서울 SK" - 상대 팀 이름(한글)이 붙으므로 모노를 쓰지 않는다(날짜만 tabular-nums). */
 .when {
   color: var(--ink-faint);
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
 }
 .more {
   cursor: pointer;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--ink-soft);
   padding: 4px 0;
 }
 .note {
-  font-size: 10.5px;
-  line-height: 1.6;
+  font-size: 12.5px;
+  line-height: var(--lh-prose);
   color: var(--ink-faint);
+  max-width: var(--measure-read);
   margin-top: 12px;
 }
 .note b {
@@ -179,14 +195,16 @@
   gap: 14px;
   margin-top: 4px;
 }
+/* 산문 - 2단일 때 칸이 524px, 720px 아래에서는 1단 전폭이다. 62자에서 끊는다. */
 .callout {
   margin-top: 10px;
   padding: 9px 11px;
-  border-radius: 9px;
+  border-radius: var(--r-inset);
   background: var(--gold-soft);
   font-size: 12px;
-  line-height: 1.6;
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
+  max-width: var(--measure-read);
 }
 .callout b {
   color: var(--ink);
@@ -208,11 +226,12 @@
     font-size: 12px;
   }
   .typeVal {
-    font-size: 11.5px;
+    font-size: 13px;
     white-space: nowrap;
   }
+  /* 값(.typeVal)이 13으로 올라가는 폭이라 소제목도 함께 올리되 값보다는 낮게 둔다. */
   .momentsHead {
-    font-size: 11px;
+    font-size: 12.5px;
   }
   .callout {
     font-size: 12.5px;
@@ -221,13 +240,13 @@
 }
 
 /* ── 모바일(≤430px) 글자 크기 ────────────────────────────────────────────────
-   제보: "전체적으로 작음". 9~11px 라벨은 폰에서 읽히지 않는다. */
+   제보: "전체적으로 작음". 라벨 바닥은 12px, 소제목은 그보다 한 단 위. */
 @media (max-width: 430px) {
   .typeLabel {
-    font-size: 12px;
+    font-size: 12.5px;
   }
-  .momentsHead,
+  /* .momentsHead는 위 430px 블록이 이미 정한다(같은 값을 두 번 쓰면 한쪽만 고치게 된다). */
   .splitLegend {
-    font-size: 11.5px;
+    font-size: 12.5px;
   }
 }

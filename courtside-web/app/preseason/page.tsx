@@ -82,8 +82,11 @@ function OutlookRow({ t, rank }: { t: TeamOutlook; rank: number }) {
         <div className={styles.outlookMid} />
       </div>
       <div className={styles.outlookVal}>
-        <span className={styles.outlookValBig}>{t.expWins.toFixed(1)}승</span>
-        <span className={styles.outlookValSub}>/ {t.gp}경기 · {pct(t.expPct)}</span>
+        {/* Big Shoulders Display에는 한글 글리프가 없다 - '승'을 숫자 span 안에 두면 숫자만
+            콘덴스드로 그려지고 '승'만 sans-serif로 튄다(team-profile .rankSuffix와 같은 함정).
+            단위는 본문 서체로 도는 옆 span에 붙인다. */}
+        <span className={styles.outlookValBig}>{t.expWins.toFixed(1)}</span>
+        <span className={styles.outlookValSub}>승 / {t.gp}경기 · {pct(t.expPct)}</span>
       </div>
       <div className={styles.outlookPrev}>
         {t.prevW}-{t.prevL}

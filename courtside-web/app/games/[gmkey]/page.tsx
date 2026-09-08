@@ -1116,7 +1116,7 @@ export default async function GamePage({
       </div>
       )}
 
-      <footer className="foot">Supabase에서 실시간 조회 · {gmkey}</footer>
+      <footer className="foot">실시간 조회 · {gmkey}</footer>
     </div>
     </LiveGameProvider>
   );

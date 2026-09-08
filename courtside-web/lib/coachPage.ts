@@ -424,8 +424,14 @@ export type RadarInput = {
 
 /**
  * 6축 레이더. 축 범위 −2~+2 클립, 중심 = −2, 회색 기준 육각형 = 리그 평균(0), 바깥 테두리 = +2.
- * |z| < 시즌 SE인 축은 꼭짓점·라벨을 회색으로(리그 평균 수준). 글자는 전부 ≥ 12 유닛 - 뷰박스 320이
- * 그대로 픽셀이 되도록 CSS가 .radarSvg에 min-width: 320px(넘치면 래퍼가 가로 스크롤)를 걸어 둔다.
+ * |z| < 시즌 SE인 축은 꼭짓점·라벨을 회색으로(리그 평균 수준).
+ * 글자 크기는 .radarSvg{min-width:320px;max-width:340px}에 **의존한다**: 뷰박스 320 대비 배율이
+ * 1.0~1.0625로 고정되므로 13 유닛 = 13.0~13.8px(목표 12px보다 여유 1px). 12 유닛이던 동안은
+ * 정확히 12.0px로 바닥에 걸쳐 있었다. min-width가 사라지면 320px 화면의 지면은 246px = 배율
+ * 0.77이라 10px로 즉시 미달이니, 그때는 lib/seasonRibbon.ts처럼 SVG 안 <style> 미디어쿼리로
+ * 구간별 font-size를 갈아끼워야 한다(크기를 되돌리지 말 것).
+ * 축 라벨은 한글이 섞여(속공·페이스·볼관리) Pretendard, z 값(숫자)만 IBM Plex Mono - 라벨 전부를
+ * Plex Mono로 두면 한글 셋만 이름 없는 시스템 폴백으로 떨어져 한 육각형 위에서 얼굴이 갈렸다.
  */
 export function buildCoachRadarSvg({ season, seasonLabel, career }: RadarInput): string {
   const parts: string[] = [];
@@ -467,8 +473,8 @@ export function buildCoachRadarSvg({ season, seasonLabel, career }: RadarInput):
     parts.push(
       `<g><title>${esc(title)}</title>` +
         `<circle cx="${vx.toFixed(1)}" cy="${vy.toFixed(1)}" r="3.6" fill="${dot}" stroke="var(--surface)" stroke-width="1"/>` +
-        `<text x="${lx.toFixed(1)}" y="${(ly + dy).toFixed(1)}" text-anchor="${anchor}" font-size="12" font-weight="700" fill="${ink}" font-family="IBM Plex Mono, monospace">` +
-        `<tspan>${esc(a.short)}</tspan><tspan x="${lx.toFixed(1)}" dy="13" font-size="12" font-weight="600" fill="${sig ? "var(--gold)" : line(0.45)}">${esc(signed(z, 1))}</tspan></text>` +
+        `<text x="${lx.toFixed(1)}" y="${(ly + dy).toFixed(1)}" text-anchor="${anchor}" font-size="13" font-weight="700" fill="${ink}" font-family="Pretendard, sans-serif">` +
+        `<tspan>${esc(a.short)}</tspan><tspan x="${lx.toFixed(1)}" dy="14" font-size="13" font-weight="600" fill="${sig ? "var(--gold)" : line(0.45)}" font-family="IBM Plex Mono, monospace">${esc(signed(z, 1))}</tspan></text>` +
         `<rect x="${(vx - 9).toFixed(1)}" y="${(vy - 9).toFixed(1)}" width="18" height="18" fill="transparent"/></g>`
     );
   });

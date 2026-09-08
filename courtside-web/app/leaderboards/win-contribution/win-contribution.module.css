@@ -29,10 +29,10 @@
   flex-wrap: wrap;
 }
 .titleSize {
-  font-size: 30px;
+  font-size: var(--fs-700);
 }
 .subtitleWidth {
-  max-width: 480px;
+  max-width: var(--measure-read);
 }
 .seasonForm {
   display: flex;
@@ -40,13 +40,13 @@
   flex-shrink: 0;
 }
 
-/* 템플릿 .panel-title은 IBM Plex Mono 소문자 라벨 스타일 - globals.css의 .panel-title
-   (Pretendard sans, 글자간격 다름)과 달라서 오버라이드. */
+/* 패널 제목이 한글 문장("...시즌 승리 기여도 TOP 10")이라 모노를 쓰지 않는다 - globals.css
+   .panel-title과 같은 서체·크기로 맞추고 여백만 이 페이지 값으로 유지. */
 .panelTitle {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-200);
+  font-weight: 800;
+  letter-spacing: -0.02em;
   margin-bottom: 14px;
 }
 
@@ -58,10 +58,14 @@
   gap: 10px;
   padding: 7px 0;
 }
+/* 순위 숫자 = 스코어보드 목소리(tabular-nums · -0.01em). 숫자만 들어오는 자리다. */
 .barRank {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 15px;
+  font-size: var(--fs-300);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
   text-align: center;
 }
@@ -76,25 +80,30 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 팀 이름은 한글이라 Pretendard. */
 .barTeam {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
 }
+/* 미터는 데이터 조각이라 하드 엣지(--r-led). */
 .barTrack {
   height: 20px;
-  border-radius: 5px;
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   overflow: hidden;
 }
 .barFill {
   height: 100%;
-  border-radius: 5px;
+  border-radius: var(--r-led);
 }
+/* 값도 스코어보드 목소리로 - fmtWpa()는 부호+숫자만 만든다(한글 폴백 없음). */
 .barVal {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 12.5px;
-  font-weight: 700;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: var(--fs-300);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  font-weight: 800;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -117,15 +126,21 @@
 .table {
   font-size: 12.5px;
 }
+/* 열 제목은 라벨이라 값(td 12.5px)보다 한 단계 아래로 - 라벨이 값과 같은 크기면 위계가 없다. */
 .table th {
-  font-size: 10.5px;
+  font-size: var(--fs-100);
   padding: 8px 6px;
 }
 .table td {
   padding: 8px 6px;
 }
+/* 표 안 순위 셀도 스코어보드 목소리. 나머지 숫자 칸은 .data-table의 tabular-nums 그대로 둔다. */
 .rankCell {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: var(--fs-300);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
   width: 30px;
 }
@@ -138,10 +153,10 @@
 .activeHeader {
   color: var(--ink);
 }
+/* 정렬 화살표 - opacity를 걷어냈다(알파를 씌우면 --ink-faint의 대비가 다시 무너진다). */
 .arrow {
-  font-size: 8px;
+  font-size: var(--fs-100);
   margin-left: 2px;
-  opacity: 0.6;
 }
 .totalPos {
   color: var(--pos);
@@ -154,7 +169,8 @@
 
 .explainBox {
   margin-top: 14px;
-  font-size: 12px;
+  max-width: var(--measure-read);
+  font-size: var(--fs-100);
   line-height: 1.8;
   color: var(--ink-soft);
 }
@@ -167,20 +183,19 @@
 
 @media (max-width: 560px) {
   .titleSize {
-    font-size: 24px;
+    font-size: var(--fs-600);
   }
   .barRow {
-    grid-template-columns: 20px 84px 1fr 50px;
+    grid-template-columns: 20px 84px 1fr 54px;
     gap: 6px;
-  }
-  .barName {
-    font-size: 11px;
-  }
-  .table {
-    font-size: 11px;
   }
   .table th,
   .table td {
     padding: 6px 4px;
+  }
+  /* 표 행은 손가락으로 짚는 자리다(선수 칸이 링크) - 셀 height는 표 레이아웃에서 최소
+     높이로 동작하므로 이 한 줄이 행 전체를 44px로 올린다. */
+  .table td {
+    height: 44px;
   }
 }

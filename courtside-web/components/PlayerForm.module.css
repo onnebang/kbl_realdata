@@ -10,8 +10,8 @@
 .panel {
   margin-top: 14px;
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 14px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
   padding: 16px 18px 14px;
   /* 표가 자기 컨테이너 안에서만 가로 스크롤하도록 - 패널이 페이지를 옆으로 밀지 않는다. */
   min-width: 0;
@@ -25,20 +25,22 @@
   margin-bottom: 6px;
 }
 
+/* 한글 표제 규칙 - Pretendard 800 + -0.02em(body 상속이라 서체는 지정하지 않는다). */
 .title {
-  font-size: 13px;
+  font-size: var(--fs-300);
   font-weight: 800;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: var(--ink);
   margin: 0;
 }
 
 .chip {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: var(--fs-100);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   padding: 2px 8px;
-  border-radius: 999px;
+  /* 데이터 조각(기준 칩) - 하드 엣지. */
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   border: 1px solid rgba(var(--line-rgb), 0.14);
   color: var(--ink-soft);
@@ -46,10 +48,11 @@
 }
 
 .lede {
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: var(--fs-200);
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
   margin: 0 0 10px;
+  max-width: var(--measure-read);
 }
 .lede b {
   color: var(--ink);
@@ -65,7 +68,7 @@
   margin-bottom: 12px;
 }
 .toggle {
-  font-size: 11.5px;
+  font-size: var(--fs-200);
   font-weight: 700;
   padding: 5px 12px;
   border-radius: 999px;
@@ -86,24 +89,23 @@
   color: #fff;
 }
 .toggleNote {
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: var(--lh-data);
   color: var(--ink-faint);
   flex: 1 1 260px;
   min-width: 200px;
+  max-width: var(--measure-read);
 }
 
 /* ── 커리어 폭의 변화(가장 많이 오른/내린 항목) ───────────────────────────────────── */
 .spanBox {
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 12px;
+  border-radius: var(--r-inset);
   background: var(--surface-soft);
   padding: 10px 12px;
   margin-bottom: 10px;
 }
 .spanHead {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: var(--fs-100);
   font-weight: 600;
   color: var(--ink-faint);
   margin-bottom: 6px;
@@ -114,18 +116,20 @@
 }
 .spanWarn {
   font-family: "Pretendard", system-ui, sans-serif;
-  font-size: 10px;
+  font-size: var(--fs-100);
   color: var(--gold);
   border: 1px solid var(--gold-soft);
-  border-radius: 999px;
+  /* 배지 - 하드 엣지. */
+  border-radius: var(--r-led);
   padding: 1px 7px;
 }
 /* 요약을 만들지 않은 이유를 적는 자리. 문장이라 줄바꿈이 필요하다(칩과 달리 nowrap 금지). */
 .spanWhy {
   margin: 0;
-  font-size: 11.5px;
-  line-height: 1.65;
+  font-size: var(--fs-200);
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
+  max-width: var(--measure-read);
 }
 .spanGrid {
   display: grid;
@@ -136,8 +140,10 @@
 .spanItem {
   min-width: 0;
 }
+/* '가장 많이 오른/내린' 눈썹. 아래 지표 이름(.spanName)과 같은 12.5px이라 어느 쪽이 제목인지
+   사라져 있었다 - 눈썹은 바닥(12), 이름은 표제 크기(15)로 벌린다. */
 .spanKicker {
-  font-size: 10.5px;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
   margin-bottom: 1px;
 }
@@ -148,13 +154,14 @@
   gap: 8px;
 }
 .spanName {
-  font-size: 12.5px;
-  font-weight: 700;
+  font-size: var(--fs-300);
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--ink);
 }
 .spanNums {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 13px;
+  font-size: var(--fs-200);
   font-weight: 600;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -163,9 +170,12 @@
   color: var(--ink-faint);
   padding: 0 1px;
 }
+/* 눈썹(.spanKicker)과 같은 12px이라 '가장 많이 오른 항목'이라는 라벨과 '+1.5'라는 데이터가
+   같은 목소리로 서 있었다. 한 줄에 선 두 숫자 뭉치(.spanNums "4.5 → 6.0" / .spanDelta "+1.5")를
+   같은 13px로 묶고, 눈썹만 바닥 12px에 남긴다 - 라벨이 데이터보다 작다. */
 .spanDelta {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
+  font-size: var(--fs-200);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -179,17 +189,18 @@
   margin-bottom: 12px;
 }
 .deltaHead {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: var(--fs-100);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
   margin-right: 2px;
 }
 .deltaChip {
-  font-size: 11.5px;
+  font-size: var(--fs-200);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   padding: 3px 9px;
-  border-radius: 999px;
+  /* 데이터 조각(Δ 칩) - 하드 엣지. */
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   border: 1px solid rgba(var(--line-rgb), 0.12);
   white-space: nowrap;
@@ -220,11 +231,10 @@
   margin-bottom: 14px;
 }
 .trendCard {
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 12px;
+  border-radius: var(--r-inset);
   padding: 9px 11px 10px;
   margin: 0;
-  background: var(--surface);
+  background: var(--surface-soft);
   min-width: 0;
 }
 .tHead {
@@ -243,7 +253,7 @@
   color: var(--ink-soft);
 }
 .tLabel {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-faint);
 }
 .tTop {
@@ -252,12 +262,14 @@
   gap: 6px;
   flex-wrap: wrap;
 }
-/* 숫자와 %만 - Big Shoulders 안전. */
+/* 숫자와 %만 - Big Shoulders 안전. 이 카드의 주인공 숫자라 스코어보드 규칙을 그대로 건다
+   (30px = --fs-600과 --fs-700 사이. 카드가 206px 격자라 34px은 두 자리 소수에서 넘친다). */
 .tBig {
   font-family: "Big Shoulders Display", sans-serif;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 30px;
-  line-height: 1.05;
+  letter-spacing: -0.01em;
+  line-height: var(--lh-tight);
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
@@ -266,7 +278,7 @@
 }
 .tUnit {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-faint);
 }
 .tSpark {
@@ -276,16 +288,37 @@
   margin-top: 4px;
   overflow: visible;
 }
+/* 가로축(양 끝 시즌). 예전에는 SVG 안 <text font-size="8">이었다 - <text>의 font-size는
+   뷰박스 단위라, 뷰박스 300짜리 그림이 모바일 카드에서 130.5px로 그려지면(배율 0.435) 화면에
+   3.5px로 찍힌다. 바닥 12px의 4분의 1이다. 배율을 이기려면 font-size를 27로 올려야 하는데
+   렌더 높이가 38~56px뿐인 그림이 글자에 덮인다 - 그래서 HTML로 내렸다. 여기서는 12px가
+   그냥 12px다. 좌우 2%는 그림 안 플롯 영역(x 6~292 / 300)에 눈으로 맞춘 값. */
+.tSpan {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2%;
+  margin-top: 1px;
+  /* 시즌 라벨은 "19-20"이라 라틴/숫자뿐이지만, 모노에 없는 글리프가 섞일 때 시스템 폴백으로
+     떨어지지 않도록 다음 얼굴을 이름 짓는다(저장소 공통 규칙). */
+  font-family: "IBM Plex Mono", "Pretendard", monospace;
+  font-size: var(--fs-100);
+  line-height: var(--lh-data);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
 /* 축 캡션도 한글이 섞인다('눈금 …', '그릴 수 있는 시즌이 하나라 추세선은 없다',
    '이 지표를 그릴 표본이 없다'). .tFoot과 같은 이유로 본문 폰트로 그린다 - 모노에 한글
    글리프가 없어 폴백 페이스로 떨어지면 같은 줄의 숫자와 글자 폭·베이스라인이 어긋난다.
-   눈금 숫자만 .tAxisNum으로 모노를 되돌려 그림 안의 축 숫자(SVG도 모노)와 짝을 맞춘다. */
+   눈금 숫자만 .tAxisNum으로 모노를 되돌려 가로축 줄(.tSpan)과 짝을 맞춘다. */
 .tAxis {
   font-family: "Pretendard", system-ui, -apple-system, sans-serif;
-  font-size: 10px;
-  line-height: 1.5;
+  font-size: var(--fs-100);
+  line-height: var(--lh-data);
   color: var(--ink-faint);
   margin-top: 2px;
+  max-width: var(--measure-read);
 }
 .tAxisNum {
   font-family: "IBM Plex Mono", monospace;
@@ -294,10 +327,11 @@
 .tFoot {
   /* '리그 평균'이라는 한글이 섞이므로 본문 폰트로 되돌린다(모노에는 한글이 없다). */
   font-family: "Pretendard", system-ui, -apple-system, sans-serif;
-  font-size: 10.5px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: var(--lh-data);
   margin-top: 3px;
   color: var(--ink-soft);
+  max-width: var(--measure-read);
 }
 
 /* ── 표 ───────────────────────────────────────────────────────────────────────────── */
@@ -307,8 +341,7 @@
   overflow-x: auto;
   max-width: 100%;
   border: 1px solid rgba(var(--line-rgb), 0.1);
-  border-radius: 12px;
-  background: var(--surface);
+  border-radius: var(--r-inset);
 }
 .tableWrap:focus-visible {
   outline: 2px solid var(--home);
@@ -319,16 +352,17 @@
   width: max-content;
   min-width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--fs-100);
   white-space: nowrap;
 }
 
 /* 표 범례. 스크롤 컨테이너 밖에 있으므로 표를 옆으로 밀어도 제자리에 남는다. */
 .tableNote {
   margin: 0 0 5px;
-  font-size: 10.5px;
-  line-height: 1.55;
+  font-size: 12.5px;
+  line-height: var(--lh-data);
   color: var(--ink-faint);
+  max-width: var(--measure-read);
 }
 .tableNote b {
   color: var(--ink-soft);
@@ -336,7 +370,7 @@
 }
 
 .groupHead {
-  font-size: 10px;
+  font-size: var(--fs-100);
   font-weight: 700;
   color: var(--ink-faint);
   text-align: center;
@@ -364,14 +398,14 @@
   display: block;
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-200);
   line-height: 1.05;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   color: var(--ink-soft);
 }
 .hLabel {
   display: block;
-  font-size: 9.5px;
+  font-size: var(--fs-100);
   font-weight: 500;
   line-height: 1.3;
   color: var(--ink-faint);
@@ -399,14 +433,19 @@
 }
 .rowLabel {
   display: block;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
+/* 한글이 확실히 들어온다 - '정규시즌 6시즌'(커리어 행) · '25-26 정규시즌'(리그 행) 같은 한글
+   리터럴. (팀 약칭 때문이 아니다 - DB 확인 결과 teams.abbr 13개는 CRT DB EL GAS GOY KCC KGC
+   KT LG MOB SAM SK SONO로 전부 라틴이라 이 자리에 한글로 들어올 일이 없다.)
+   IBM Plex Mono에는 한글 글리프가 없어서 스택이 모노 하나뿐이면 그 글자만
+   이름 없는 시스템 폰트로 떨어져 같은 열의 다른 행과 얼굴이 달라진다. 다음 얼굴을 이름 짓는다. */
 .rowSub {
   display: block;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-family: "IBM Plex Mono", "Pretendard", monospace;
+  font-size: var(--fs-100);
   font-weight: 500;
   color: var(--ink-faint);
 }
@@ -415,7 +454,7 @@
 .rowFlag {
   margin-left: 4px;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-size: var(--fs-100);
   font-weight: 600;
   color: var(--gold);
 }
@@ -429,7 +468,7 @@
 }
 .numCell {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-soft);
 }
 .cellV {
@@ -443,7 +482,7 @@
 .cellD {
   display: block;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: var(--fs-100);
   font-weight: 500;
   line-height: 1.3;
 }
@@ -501,11 +540,12 @@
   gap: 3px;
 }
 .noteList li {
-  font-size: 11px;
-  line-height: 1.55;
+  font-size: 12.5px;
+  line-height: var(--lh-data);
   color: var(--ink-faint);
   padding-left: 12px;
   position: relative;
+  max-width: var(--measure-read);
 }
 .noteList li::before {
   content: "!";
@@ -527,7 +567,7 @@
   padding-top: 8px;
 }
 .summary {
-  font-size: 11.5px;
+  font-size: var(--fs-200);
   font-weight: 600;
   color: var(--ink-soft);
   cursor: pointer;
@@ -538,7 +578,7 @@
 .summary:focus-visible {
   outline: 2px solid var(--home);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--r-led);
 }
 
 .methodList {
@@ -547,16 +587,17 @@
   gap: 6px;
 }
 .methodList dt {
-  font-size: 10.5px;
+  font-size: var(--fs-200);
   font-weight: 700;
   color: var(--ink-soft);
-  letter-spacing: 0.02em;
+  letter-spacing: -0.02em;
 }
 .methodList dd {
   margin: 1px 0 0;
-  font-size: 11px;
-  line-height: 1.6;
+  font-size: 12.5px;
+  line-height: var(--lh-prose);
   color: var(--ink-faint);
+  max-width: var(--measure-read);
 }
 .methodList b {
   color: var(--ink-soft);
@@ -571,7 +612,7 @@
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
   .tBig {
-    font-size: 26px;
+    font-size: var(--fs-600);
   }
   .rowHead {
     min-width: 92px;

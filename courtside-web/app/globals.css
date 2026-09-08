@@ -8,8 +8,11 @@
   --surface: #ffffff;
   --surface-soft: #eceef3;
   --ink: #14161c;
-  --ink-soft: #5b5f6e;
-  --ink-faint: #9297a880;
+  --ink-soft: #4a4f5c;
+  /* 실측(WCAG 2.x, 이 파일의 세 배경 전부): #6c7180은 --surface-soft에서 4.20,
+     --bg에서 4.47로 미달이었다. #676c7b는 #ffffff 5.24 / #eceef3 4.51 / #f4f5f8 4.81로
+     세 배경 모두 통과한다. 다크(#8d93a3)는 5.49/4.87/6.15로 이미 통과라 그대로 둔다. */
+  --ink-faint: #676c7b;
   --home: #d9640a;
   --home-soft: #d9640a1a;
   --away: #1f6fd6;
@@ -19,6 +22,33 @@
   --positive: #1a8633;
   --negative: #cd2054;
   --line-rgb: 20, 22, 28;
+
+  /* 타이포 스케일 - 바닥 12px(--fs-100). 이보다 작은 font-size는 이 파일에 없다.
+     크기·줄간격·지면폭·반지름은 테마에 무관해서 :root에만 선언한다(다크 블록은
+     불투명 잉크 두 개만 덮어쓴다). */
+  --fs-100: 12px; /* 캡션·기준 문구·표 보조 */
+  --fs-200: 13px; /* 라벨·칩·내비 */
+  --fs-300: 15px; /* 본문 */
+  --fs-400: 17px; /* 리드 문단 */
+  --fs-500: 21px; /* 패널 제목 */
+  --fs-600: 27px; /* 섹션 제목 */
+  --fs-700: 34px; /* 페이지 제목 */
+  --fs-800: 54px; /* 히어로 */
+  --lh-prose: 1.65;
+  --lh-tight: 1.15;
+  --lh-data: 1.4;
+
+  /* 지면 폭 두 종류 - 표·차트·목록은 넓게, 산문은 한 줄 62자에서 끊는다. */
+  --measure-wide: 1180px;
+  --measure-read: 62ch;
+
+  /* 카드 위계 - 독립 패널 / 패널 안의 타일·웰. */
+  --r-card: 14px;
+  --r-inset: 10px;
+  /* 모서리는 두 종류다. 담는 것(패널·카드)은 --r-card, 데이터 조각(점수 칩·시계·순위 셀·
+     미터·배지)은 --r-led. 이 대비가 "스코어보드가 카드 위에 얹혀 있다"를 만든다 -
+     전부 14px이면 데이터와 컨테이너가 같은 물성이 된다. */
+  --r-led: 4px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -27,8 +57,8 @@
     --surface: #1a1d24;
     --surface-soft: #23272f;
     --ink: #f2f3f7;
-    --ink-soft: #9297a8;
-    --ink-faint: #6a6f7f90;
+    --ink-soft: #a8aebe;
+    --ink-faint: #8d93a3;
     --home: #ff8a3d;
     --home-soft: #ff8a3d26;
     --away: #3ea6ff;
@@ -57,6 +87,8 @@ body {
   color: var(--ink);
   background: var(--bg);
   font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-300);
+  line-height: var(--lh-prose);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -65,21 +97,31 @@ a {
   text-decoration: none;
 }
 
+/* ── 내비 ──────────────────────────────────────────────────────────────────────
+   실측: 12개 링크가 한 줄 overflow-x라 375px에서 3.5개만 닿고 스크롤 단서가 없었다.
+   링크를 두 무리로 나눈다 - 주요 5개(경기 목록~감독)는 항상 탭, 분석 7개(리더보드류)는
+   좁은 화면에서 <details> 접이식으로 내린다. 아래는 모바일 우선(=접힌 상태)이고
+   >=900px에서 details를 강제로 펼친다. 클라이언트 JS 0.
+
+   details 강제 펼침 주의: 최신 크로뮴은 닫힌 details를 자식의 display가 아니라
+   ::details-content { content-visibility: hidden }으로 감춘다. 그래서 두 규칙을 다
+   쓴다 - 구형은 display 트릭으로, 신형은 ::details-content로 열린다(모르는 의사요소가
+   든 규칙은 그 규칙만 버려지므로 서로 안전하다). */
 .nav-bar {
   border-bottom: 1px solid rgba(var(--line-rgb), 0.1);
   background: var(--surface);
 }
 .nav-bar-inner {
-  max-width: 900px;
+  max-width: var(--measure-wide);
   margin: 0 auto;
   padding: 0 18px;
   display: flex;
-  gap: 4px;
-  overflow-x: auto;
+  flex-direction: column;
 }
 .nav-link {
-  font-size: 12.5px;
+  font-size: var(--fs-200);
   font-weight: 600;
+  line-height: var(--lh-data);
   color: var(--ink-soft);
   padding: 12px 10px;
   white-space: nowrap;
@@ -89,25 +131,151 @@ a {
   color: var(--ink);
   border-bottom-color: var(--home);
 }
+/* 주요 탭. 좁은 화면에서 그래도 넘치면 오른쪽 끝 마스크가 "더 있다"를 보여준다
+   (스크롤바를 숨긴 대신 잘림을 페이드로 알린다). */
+.nav-main {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+}
+.nav-main::-webkit-scrollbar {
+  display: none;
+}
+.nav-more {
+  border-top: 1px solid rgba(var(--line-rgb), 0.08);
+}
+.nav-more-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 2px;
+  font-size: var(--fs-200);
+  font-weight: 700;
+  line-height: var(--lh-data);
+  color: var(--ink-soft);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.nav-more-summary::-webkit-details-marker {
+  display: none;
+}
+.nav-more-summary::after {
+  content: "▾";
+  color: var(--home);
+}
+.nav-more[open] > .nav-more-summary::after {
+  transform: rotate(180deg);
+}
+.nav-more-summary:hover {
+  color: var(--ink);
+}
+.nav-analysis {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 8px;
+}
+.nav-analysis .nav-link {
+  padding: 9px 2px;
+  font-weight: 500;
+  border-bottom: none;
+}
+.nav-analysis .nav-link:hover {
+  color: var(--ink);
+}
+
+@media (min-width: 900px) {
+  .nav-bar-inner {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 4px 20px;
+  }
+  .nav-main {
+    flex: none;
+    overflow-x: visible;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .nav-more {
+    flex: 1;
+    min-width: 0;
+    border-top: none;
+  }
+  .nav-more-summary {
+    display: none;
+  }
+  /* 넓은 화면에선 접이식이 아니라 그냥 오른쪽에 흘려 놓는다(넘치면 둘째 줄). */
+  .nav-more::details-content {
+    content-visibility: visible;
+    block-size: auto;
+  }
+  .nav-more:not([open]) > .nav-analysis,
+  .nav-analysis {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0 2px;
+    padding-bottom: 0;
+  }
+  .nav-analysis .nav-link {
+    padding: 12px 8px;
+    color: var(--ink-faint);
+    border-bottom: 2px solid transparent;
+  }
+  .nav-analysis .nav-link:hover {
+    border-bottom-color: var(--home);
+  }
+}
 
 .wrap {
-  max-width: 900px;
+  max-width: var(--measure-wide);
   margin: 0 auto;
   padding: 28px 18px 80px;
 }
 
-.title {
+/* ── 스코어보드 유틸리티 ──────────────────────────────────────────────────────
+   중계 화면의 목소리. 점수·등번호·큰 스탯값·승-패·순위 숫자에만 건다.
+   **한글 금지** - Big Shoulders Display에는 한글 글리프가 없어서 한글이 섞이면
+   경고 없이 sans-serif로 폴백한다(아래 .title이 지금까지 그 상태였다).
+   한글 표제는 Pretendard 800 + letter-spacing:-0.02em(=.title)을 쓴다.
+   크기는 거는 쪽에서 정한다 - 패널의 주인공이면 --fs-600 이상, 화면의 주인공이면
+   --fs-700 이상. 패널 하나에 큰 숫자는 하나. */
+.scoreboard,
+.game-card-score,
+.matchup-banner-score,
+.replay-sticky-score,
+.replay-team-score,
+.replay-sb-sep,
+.replay-prob-pct,
+.replay-leaders-val,
+.replay-feed-score {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 28px;
-  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: var(--lh-tight);
+}
+
+/* 페이지 제목. app/page.tsx("코트사이드")·리더보드 3곳·감독/선수/팀 페이지가 전부
+   한글을 넣는 자리라 Big Shoulders Display(한글 글리프 없음)를 걸면 안 된다 -
+   실측으로 조용히 sans-serif 폴백 중이었다. 한글 표제 = Pretendard 800. */
+.title {
+  font-family: "Pretendard", sans-serif;
+  font-weight: 800;
+  font-size: var(--fs-700);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
-  font-size: 13px;
+  max-width: var(--measure-read);
+  font-size: var(--fs-300);
   color: var(--ink-soft);
   margin-top: 6px;
-  line-height: 1.6;
+  line-height: var(--lh-prose);
 }
 
 select {
@@ -177,10 +345,11 @@ select {
 .game-card {
   display: block;
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 12px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
   padding: 12px 16px;
-  transition: border-color 0.15s;
+  /* 트랜지션 없음 - 이 제품에서 움직이는 건 라이브 점(live-pulse) 하나뿐이다.
+     hover 상태 자체는 남기되 즉시 바뀐다. */
 }
 
 .game-card:hover {
@@ -193,9 +362,13 @@ select {
    정중앙 고정. 요청: "간격이 너무 멀어, 더 작게 가운데 정렬로 붙여줘" - 이름 칸을 1fr(카드
    전체 너비까지 늘어남)에서 고정폭으로 바꾸고 justify-content:center로 카드 안에서 행
    자체를 가운데로 - 대칭 트릭(양쪽 칸 폭이 항상 같아야 스코어가 중앙 고정)은 그대로 유지. */
+/* 스코어 칸을 72->92px로, 이름 칸을 104->112px로 넓혔다 - 점수가 카드에서 가장 큰 것이
+   되도록 .game-card-score를 스코어보드 서체 27px로 키웠고(세 자리 점수 "108-102" 7글자),
+   이름 칸은 팀 색 바(3px)+여백(7px)이 새로 들어간 만큼을 돌려준 것이다. 양쪽 이름 칸 폭이
+   같아야 스코어가 정중앙에 고정되는 대칭 트릭은 그대로. */
 .game-card-row {
   display: grid;
-  grid-template-columns: 48px 22px minmax(0, 104px) 28px 72px 28px minmax(0, 104px) 22px 58px;
+  grid-template-columns: 48px 22px minmax(0, 112px) 28px 92px 28px minmax(0, 112px) 22px 58px;
   align-items: center;
   justify-content: center;
   gap: 4px;
@@ -203,34 +376,56 @@ select {
 
 .game-card-date {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-faint);
 }
 
+/* 팀 색은 글자색이 아니라 모서리다. 실측: teams.color를 글자색으로 쓰면 13개 팀 전부
+   한쪽 테마에서 WCAG 미달이다(다크 KCC 1.05 · 오리온스 1.03 · KT 1.16 = 사실상 안 보임).
+   중계 화면에서 팀 정체성은 색깔 글씨가 아니라 이름 옆의 색 띠다 - 글자는 --ink 계열로
+   두고, 팀 색은 3px 세로 바로 내보낸다. page.tsx가 이미 teamInkStyle()로 내려보내는
+   --ti-l/--ti-d(배경 대비를 맞춘 팀 색 한 쌍)를 그대로 바 색으로 쓴다 - 새 인라인 변수를
+   요구하지 않는다. 바는 배지가 있는 바깥쪽(홈=왼쪽, 원정=오른쪽)에 붙여 대칭을 지킨다.
+   opacity 0.55(패배팀)도 걷어냈다 - 알파 잉크는 대비를 무너뜨린다(#14161c 55% ≈ 3.5:1).
+   패배 = --ink-soft(라이트 7.06~8.19 / 다크 6.75~8.52), 승리 = --ink + 800. */
 .team-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  opacity: 0.55;
-  font-size: 13.5px;
+  font-size: var(--fs-200);
   font-weight: 700;
-  /* 팀컬러(teams.color)는 JSX에서 style={{color}}로 인라인 지정 - 팀마다 실제
-     브랜드 색이 달라서 CSS 클래스로는 표현이 안 됨(예전엔 홈=주황/원정=파랑
-     고정 2색이었는데, 사용자 요청으로 팀별 실제 색상으로 교체). */
+  letter-spacing: -0.02em;
+  line-height: var(--lh-data);
+  color: var(--ink-soft);
 }
 /* 요청: "승리 표시를 팀에 조금 더 가깝게, 너무 멀리있어서 가시성 떨어짐" - 이전엔
    팀이름 칸(minmax(0,1fr))이 로고 쪽(칸 안쪽)으로 정렬돼서, 실제 텍스트와 그 왼쪽의
    승/패 배지 사이에 칸 여유폭만큼 빈 공간이 생겨 배지-팀이름이 시각적으로 멀어 보였음.
    정렬 방향을 배지 쪽(칸 바깥쪽)으로 뒤집어서 배지+팀이름이 붙어 보이게 함(스코어를
    정중앙 고정시키는 1fr 트릭 자체는 유지 - 위 .game-card-row 주석 참고).*/
+/* 바 색은 --tb-l/--tb-d(page.tsx의 teamBarStyle). 서버는 테마를 모르므로 두 색을 같이 받고
+   여기서 고른다 - --ti-*와 같은 규약이지만 기준이 다르다: 막대는 글자가 아니라 표식이라
+   3:1(WCAG 1.4.11)이면 되고, 그만큼 팀 원색에 가깝게 남는다. */
 .team-name.home {
   text-align: left;
+  border-left: 3px solid var(--tb-l, var(--ink-faint));
+  padding-left: 7px;
 }
 .team-name.away {
   text-align: right;
+  border-right: 3px solid var(--tb-l, var(--ink-faint));
+  padding-right: 7px;
+}
+@media (prefers-color-scheme: dark) {
+  .team-name.home {
+    border-left-color: var(--tb-d, var(--ink-faint));
+  }
+  .team-name.away {
+    border-right-color: var(--tb-d, var(--ink-faint));
+  }
 }
 .team-name.win {
-  opacity: 1;
+  color: var(--ink);
   font-weight: 800;
 }
 
@@ -244,9 +439,9 @@ select {
   justify-content: center;
   width: 20px;
   height: 20px;
-  border-radius: 5px;
+  border-radius: var(--r-led);
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
 }
 .result-badge.win {
@@ -257,20 +452,25 @@ select {
   border: 1px solid rgba(var(--line-rgb), 0.14);
 }
 
+/* 경기 카드의 주인공은 점수다. 서체 규칙은 위 .scoreboard와 한 선언에 묶여 있고
+   (Big Shoulders Display 800 · tabular-nums · -0.01em), 여기서는 크기·배치만 정한다.
+   숫자와 "-"만 들어가는 자리라 한글 폴백 위험이 없다 - "예정" 같은 한글이 들어오는
+   자식(.status-chip)은 아래에서 Pretendard로 되돌린다. */
 .game-card-score {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: "IBM Plex Mono", monospace;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-size: var(--fs-600);
+  color: var(--ink);
   white-space: nowrap;
 }
+/* 진 쪽은 알파(0.45)로 흐리게 하지 않는다 - 큰 숫자일수록 알파 잉크의 대비 손실이
+   그대로 보인다. 불투명 --ink-faint로 한 단계만 물린다. */
 .game-card-score .lose {
-  opacity: 0.45;
+  color: var(--ink-faint);
 }
 .game-card-score .score-sep {
-  margin: 0 2px;
+  margin: 0 3px;
   color: var(--ink-faint);
 }
 
@@ -281,8 +481,8 @@ select {
   gap: 2px;
 }
 .game-card-category {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-family: "Pretendard", sans-serif;
+  font-size: 12px;
   color: var(--ink-faint);
   text-align: right;
 }
@@ -292,10 +492,10 @@ select {
    조회만. 태그 종류별로 톤을 다르게(역전승=골드, 압도적=주황, 접전=파랑) - 시맨틱
    컬러라 팀컬러(teams.color)와는 별개 팔레트. */
 .ai-tag {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--r-led);
   white-space: nowrap;
 }
 .ai-tag-comeback {
@@ -322,9 +522,10 @@ select {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid rgba(var(--line-rgb), 0.06);
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-faint);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Pretendard", sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 
 /* MVP/분전/식스맨 3인 - 승리팀=강조, 패배팀=톤 낮춤, 식스맨=골드(다른 AI 분석 배지와
@@ -371,14 +572,18 @@ select {
   display: block;
 }
 
-/* 예정 배지 - 스코어 자리에 들어감(0-0이나 빈칸처럼 보이는 것 방지). */
+/* 예정 배지 - 스코어 자리에 들어감(0-0이나 빈칸처럼 보이는 것 방지).
+   font-family를 반드시 명시한다: 부모 .game-card-score가 스코어보드 서체(Big Shoulders
+   Display, 한글 글리프 없음)라 상속시키면 app/page.tsx의 "예정"이 조용히 폴백한다.
+   데이터 조각이므로 모서리는 --r-led(하드 엣지). */
 .status-chip {
   display: inline-block;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 10.5px;
+  font-family: "Pretendard", sans-serif;
+  padding: 3px 10px;
+  border-radius: var(--r-led);
+  font-size: var(--fs-200);
   font-weight: 800;
-  letter-spacing: 0.06em;
+  line-height: var(--lh-data);
 }
 .status-chip.status-scheduled {
   background: var(--surface-soft);
@@ -393,9 +598,9 @@ select {
   align-items: center;
   gap: 4px;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.02em;
   color: var(--negative);
 }
 .live-dot {
@@ -414,19 +619,38 @@ select {
     opacity: 0.25;
   }
 }
+/* 남은 움직임은 넷뿐이다 - 라이브 점(live-pulse), 상/하단 고정 바의 등장·퇴장,
+   승률 막대의 폭 보간, 푸시 토스트. 앞의 하나만 장식이 아니라 '살아 있음'의 신호이고
+   나머지는 상태 전환이다. 모션을 줄여 달라고 하면 전부 즉시 전환으로 바꾼다
+   (토스트는 opacity:0에서 시작하므로 애니메이션을 끄는 대신 지속시간을 0으로 만든다 -
+   끄면 영영 안 보인다). */
 @media (prefers-reduced-motion: reduce) {
   .live-dot {
     animation: none;
+  }
+  .replay-sticky-bar,
+  .replay-sticky-probfill,
+  .replay-split-home,
+  .replay-split-away,
+  .replay-transport {
+    transition: none;
+  }
+  .replay-push-toast {
+    animation-duration: 0.01ms;
+    animation-delay: 0s, 4.2s;
   }
 }
 
 /* 아직 열리지 않은 막(경기 페이지) - 예정 경기의 Act 2/3, 진행중 경기의 Act 3 자리에
    헤더 대신 들어가는 작은 안내. */
 .act-locked-note {
+  max-width: var(--measure-read);
   margin-top: 28px;
+  margin-left: auto;
+  margin-right: auto;
   padding: 14px 16px;
   border: 1px dashed rgba(var(--line-rgb), 0.18);
-  border-radius: 10px;
+  border-radius: var(--r-inset);
   font-size: 12px;
   color: var(--ink-soft);
   text-align: center;
@@ -438,7 +662,7 @@ select {
   display: flex;
   align-items: stretch;
   height: 64px;
-  border-radius: 12px;
+  border-radius: var(--r-card);
   overflow: hidden;
   margin-bottom: 20px;
 }
@@ -478,7 +702,7 @@ select {
   align-items: center;
   gap: 16px;
   padding: 20px 22px;
-  border-radius: 14px;
+  border-radius: var(--r-card);
   margin-top: 18px;
   color: #fff;
 }
@@ -487,12 +711,13 @@ select {
      리디자인 때 겪은 것과 같은 함정) 대신 Pretendard 굵은 웨이트로. */
   font-family: "Pretendard", sans-serif;
   font-weight: 800;
-  font-size: 26px;
-  line-height: 1.1;
+  font-size: var(--fs-600);
+  line-height: var(--lh-tight);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 .team-page-record {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Pretendard", sans-serif;
+  font-variant-numeric: tabular-nums;
   font-size: 12.5px;
   opacity: 0.85;
   margin-top: 4px;
@@ -500,7 +725,7 @@ select {
 
 .matchup-banner-score {
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 24px;
+  font-size: var(--fs-600);
   font-weight: 800;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
@@ -527,17 +752,17 @@ select {
 .panel {
   margin-top: 16px;
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 14px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
   padding: 16px 18px;
 }
 
 .panel-title {
-  font-size: 11px;
+  font-size: var(--fs-200);
   font-weight: 700;
-  color: var(--ink-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  line-height: var(--lh-data);
+  color: var(--ink-soft);
+  letter-spacing: 0.02em;
   margin-bottom: 10px;
 }
 
@@ -559,7 +784,7 @@ select {
 }
 .game-act-num {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--surface);
   background: var(--home);
@@ -573,7 +798,8 @@ select {
 }
 .game-act-title {
   font-weight: 800;
-  font-size: 16.5px;
+  font-size: var(--fs-500);
+  line-height: var(--lh-tight);
   color: var(--ink);
   white-space: nowrap;
 }
@@ -603,8 +829,7 @@ select {
 .preview-details-summary::before {
   content: "▸";
   color: var(--home);
-  font-size: 11px;
-  transition: transform 0.15s;
+  font-size: 12.5px;
 }
 details[open] > .preview-details-summary::before {
   transform: rotate(90deg);
@@ -626,7 +851,7 @@ details[open] > .preview-details-summary::before {
 .ts-header {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 700;
   margin-bottom: 10px;
 }
@@ -638,15 +863,14 @@ details[open] > .preview-details-summary::before {
 table.data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
   white-space: nowrap;
 }
 
 table.data-table th {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-family: "Pretendard", sans-serif;
+  font-size: 12px;
   color: var(--ink-faint);
-  text-transform: uppercase;
   font-weight: 600;
   text-align: right;
   padding: 6px 8px;
@@ -697,16 +921,16 @@ table.data-table td:nth-child(2) {
   margin-bottom: 0;
 }
 .report-section-title {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-family: "Pretendard", sans-serif;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
   margin-bottom: 6px;
 }
 .report-text {
-  font-size: 13px;
-  line-height: 1.9;
+  max-width: var(--measure-read);
+  font-size: var(--fs-300);
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
   margin: 0 0 4px;
 }
@@ -734,15 +958,16 @@ table.data-table td:nth-child(2) {
 }
 .report-list {
   margin: 0;
+  max-width: var(--measure-read);
   padding-left: 20px;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.8;
   color: var(--ink-soft);
 }
 .report-list li::marker {
   color: var(--ink-faint);
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
 }
 .report-list b {
   color: var(--ink);
@@ -782,13 +1007,13 @@ table.data-table td:nth-child(2) {
 .report-team-abbr {
   display: inline-block;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   line-height: 1.5;
   padding: 0 4px;
   margin-right: 4px;
-  border-radius: 3px;
+  border-radius: var(--r-led);
   border-left: 2px solid currentColor;
   background: var(--surface-soft);
   color: inherit;
@@ -816,7 +1041,7 @@ table.data-table td:nth-child(2) {
   display: flex;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--r-inset);
   background: var(--surface-soft);
   border-left: 3px solid var(--ink-faint);
   margin-bottom: 8px;
@@ -834,14 +1059,15 @@ table.data-table td:nth-child(2) {
   min-width: 0;
 }
 .insight-card-title {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink);
   margin-bottom: 3px;
 }
 .insight-card-text {
-  font-size: 12px;
-  line-height: 1.65;
+  max-width: var(--measure-read);
+  font-size: 13px;
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
 }
 .insight-card-text b {
@@ -853,7 +1079,7 @@ table.data-table td:nth-child(2) {
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px dashed rgba(var(--line-rgb), 0.15);
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--gold);
   font-weight: 600;
 }
@@ -873,35 +1099,36 @@ table.data-table td:nth-child(2) {
 .ace-tag {
   flex: none;
   min-width: 30px;
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--ink-faint);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
 .ace-name {
   font-size: 13px;
 }
 .ace-aq {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--r-led);
   background: var(--gold-soft);
   color: var(--gold);
 }
 .ace-num {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .ace-sub {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
 .ace-note {
   margin-top: 6px;
-  font-size: 11px;
+  max-width: var(--measure-read);
+  font-size: 12.5px;
   line-height: 1.6;
   color: var(--ink-soft);
   word-break: keep-all;
@@ -914,7 +1141,7 @@ table.data-table td:nth-child(2) {
   gap: 16px;
 }
 .sched-col-title {
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 700;
   margin-bottom: 8px;
 }
@@ -922,7 +1149,7 @@ table.data-table td:nth-child(2) {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
   padding: 5px 0;
   border-bottom: 1px solid rgba(var(--line-rgb), 0.07);
 }
@@ -931,8 +1158,8 @@ table.data-table td:nth-child(2) {
   font-weight: 700;
   width: 16px;
   text-align: center;
-  border-radius: 4px;
-  font-size: 10.5px;
+  border-radius: var(--r-led);
+  font-size: 12.5px;
   padding: 1px 0;
 }
 .sched-result.win {
@@ -984,8 +1211,9 @@ table.data-table td:nth-child(2) {
   display: flex;
   justify-content: space-between;
   margin-top: 10px;
-  font-size: 11px;
-  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  font-family: "Pretendard", sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 .zone-compare-legend .zcl-home {
   color: var(--home);
@@ -1078,10 +1306,9 @@ table.data-table td:nth-child(2) {
 
 .player-hero-eyebrow {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
   margin-bottom: 6px;
 }
@@ -1112,8 +1339,7 @@ table.data-table td:nth-child(2) {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 700;
   font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: var(--ink-soft);
   padding: 3px 8px;
   border: 1px solid rgba(var(--line-rgb), 0.16);
@@ -1147,7 +1373,7 @@ table.data-table td:nth-child(2) {
   font-family: "IBM Plex Mono", monospace;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
   line-height: 1.5;
   color: var(--ink-faint);
 }
@@ -1165,7 +1391,7 @@ table.data-table td:nth-child(2) {
 }
 .stat-companion-label {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--ink-faint);
 }
@@ -1214,9 +1440,12 @@ table.data-table td:nth-child(2) {
   display: flex;
   gap: 4px;
 }
+/* 모노 금지: components/CustomMetricBuilder.tsx가 이 버튼에 "초기화"(한글)를 넣는다.
+   L5/L10 같은 라틴 라벨도 같이 쓰므로 tabular-nums를 남겨 폭을 고정한다. */
 .window-btn {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-family: "Pretendard", sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
   font-weight: 700;
   padding: 4px 9px;
   border-radius: 6px;
@@ -1241,7 +1470,7 @@ table.data-table td:nth-child(2) {
   gap: 3px;
   padding: 10px 4px;
   background: var(--surface-soft);
-  border-radius: 10px;
+  border-radius: var(--r-inset);
 }
 .stat-tile-val {
   font-family: "Big Shoulders Display", sans-serif;
@@ -1252,7 +1481,7 @@ table.data-table td:nth-child(2) {
 }
 .stat-tile-label {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-size: 12px;
   color: var(--ink-faint);
 }
 
@@ -1278,12 +1507,12 @@ table.data-table td:nth-child(2) {
   flex: 1;
   height: 14px;
   background: var(--surface-soft);
-  border-radius: 4px;
+  border-radius: var(--r-led);
   overflow: hidden;
 }
 .wpa-bar-fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--r-led);
 }
 .wpa-bar-fill.pos {
   background: #2e9e5b;
@@ -1319,14 +1548,14 @@ table.data-table td:nth-child(2) {
   align-items: center;
   gap: 8px;
   margin-top: 10px;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-faint);
 }
 .explorer-legend-gradient {
   flex: 1;
   max-width: 160px;
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--r-led);
   background: linear-gradient(to right, transparent, var(--home));
 }
 
@@ -1363,13 +1592,15 @@ table.data-table td:nth-child(2) {
   z-index: 40;
   display: grid;
   gap: 5px;
-  max-width: 900px;
+  max-width: var(--measure-wide);
   margin: 0 auto;
   background: var(--surface);
   border-bottom: 1px solid rgba(var(--line-rgb), 0.12);
   box-shadow: 0 3px 16px rgba(0, 0, 0, 0.16);
   padding: 9px 18px 10px;
-  font-family: "IBM Plex Mono", monospace;
+  /* 자식 .replay-sticky-clock이 clockStr()를 그린다 - 아래 시계 주석과 같은 이유로
+     한글 폴백을 명시한다. */
+  font-family: "IBM Plex Mono", "Pretendard", monospace;
   font-weight: 700;
   transform: translateY(-100%);
   transition: transform 0.15s ease-out;
@@ -1397,7 +1628,7 @@ table.data-table td:nth-child(2) {
 .replay-sticky-probbar {
   display: flex;
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   overflow: hidden;
   background: var(--surface-soft);
 }
@@ -1464,7 +1695,7 @@ table.data-table td:nth-child(2) {
 .replay-sticky-score {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 34px;
+  font-size: var(--fs-700);
   line-height: 0.92;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
@@ -1511,9 +1742,13 @@ table.data-table td:nth-child(2) {
   max-width: 420px;
   margin: 0 auto 14px;
 }
+/* 시계는 기계 판독 서체(모노)가 맞다 - 다만 GameReplay.tsx의 clockStr()가 경기 전에는
+   "경기 시작 전"(한글)을 돌려준다. IBM Plex Mono에는 한글 글리프가 없어서 그때 브라우저
+   기본 monospace로 조용히 튄다. 폴백을 지어내지 말고 이름을 적어 준다 - 숫자는 계속
+   IBM Plex Mono, 한글만 Pretendard로 간다(글리프 단위 폴백). */
 .replay-scoreboard-clock {
   text-align: center;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "IBM Plex Mono", "Pretendard", monospace;
   font-size: 12px;
   font-weight: 700;
   color: var(--ink-faint);
@@ -1547,7 +1782,7 @@ table.data-table td:nth-child(2) {
 }
 .replay-sb-sep {
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 26px;
+  font-size: var(--fs-600);
   font-weight: 700;
   color: var(--ink-faint);
 }
@@ -1561,18 +1796,18 @@ table.data-table td:nth-child(2) {
 .replay-prob-pct {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 700;
-  font-size: 26px;
+  font-size: var(--fs-600);
   margin-right: 6px;
 }
 .replay-prob-label {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  letter-spacing: 0.03em;
+  font-family: "Pretendard", sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
 }
 .replay-split-bar {
   height: 12px;
-  border-radius: 6px;
+  border-radius: var(--r-led);
   overflow: hidden;
   display: flex;
   background: var(--surface-soft);
@@ -1587,7 +1822,7 @@ table.data-table td:nth-child(2) {
 .replay-quarter-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
 }
 .replay-quarter-table th,
 .replay-quarter-table td {
@@ -1595,9 +1830,10 @@ table.data-table td:nth-child(2) {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+/* 모노 금지: 마지막 헤더가 "계"(한글)다. 표 헤더는 .data-table th와 같은 Pretendard로. */
 .replay-quarter-table th {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-family: "Pretendard", sans-serif;
+  font-size: 12px;
   color: var(--ink-faint);
   font-weight: 600;
 }
@@ -1631,10 +1867,10 @@ table.data-table td:nth-child(2) {
   margin-bottom: 12px;
 }
 .replay-flow-chip {
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 700;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: var(--gold-soft);
   color: var(--gold);
   white-space: nowrap;
@@ -1678,7 +1914,7 @@ table.data-table td:nth-child(2) {
 }
 .replay-leaders-cat {
   text-align: center;
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--ink-soft);
   letter-spacing: 0.02em;
@@ -1705,13 +1941,16 @@ table.data-table td:nth-child(2) {
   background: var(--surface-soft);
   border: 1px solid rgba(var(--line-rgb), 0.1);
 }
+/* 모노 금지: GameReplay.tsx의 playerPhoto()가 사진이 없으면 "#등번호" 또는 한글 이름
+   첫 글자를 이 자리에 찍는다(`(p.name || "?").slice(0, 1)`). 등번호 폭은 tabular-nums로. */
 .replay-leaders-photo-fallback {
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--surface-soft);
   color: var(--ink-faint);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Pretendard", sans-serif;
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 12px;
   border: 1px solid rgba(var(--line-rgb), 0.1);
@@ -1722,11 +1961,11 @@ table.data-table td:nth-child(2) {
 .replay-leaders-val {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 20px;
+  font-size: var(--fs-500);
   line-height: 1;
 }
 .replay-leaders-name {
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 700;
   margin-top: 3px;
   white-space: nowrap;
@@ -1734,7 +1973,7 @@ table.data-table td:nth-child(2) {
   text-overflow: ellipsis;
 }
 .replay-leaders-sub {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-faint);
   font-family: "IBM Plex Mono", monospace;
   margin-top: 1px;
@@ -1759,7 +1998,7 @@ table.data-table td:nth-child(2) {
 .replay-push-toast {
   background: var(--surface);
   border: 1px solid rgba(var(--line-rgb), 0.14);
-  border-radius: 16px;
+  border-radius: var(--r-card);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
   padding: 11px 13px;
   display: grid;
@@ -1807,16 +2046,16 @@ table.data-table td:nth-child(2) {
   align-items: baseline;
   gap: 6px;
 }
+/* 모노 금지(같은 감사에서 추가로 잡힘): GameReplay.tsx가 여기에 "코트사이드"를 넣는다. */
 .replay-push-app {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-family: "Pretendard", sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
 }
 .replay-push-time {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-family: "Pretendard", sans-serif;
+  font-size: 12px;
   color: var(--ink-faint);
   flex-shrink: 0;
 }
@@ -1826,7 +2065,7 @@ table.data-table td:nth-child(2) {
   margin-top: 2px;
 }
 .replay-push-msg {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-soft);
   margin-top: 1px;
   line-height: 1.4;
@@ -1856,20 +2095,20 @@ table.data-table td:nth-child(2) {
 }
 .replay-explain-label {
   flex: 0 0 92px;
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-faint);
 }
 .replay-explain-track {
   flex: 1;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   background: rgba(var(--line-rgb), 0.1);
   overflow: hidden;
 }
 .replay-explain-fill {
   height: 100%;
   background: var(--ink-faint);
-  border-radius: 999px;
+  border-radius: var(--r-led);
 }
 .replay-explain-fill.actual {
   background: var(--gold);
@@ -1878,11 +2117,11 @@ table.data-table td:nth-child(2) {
   flex: 0 0 36px;
   text-align: right;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
 }
 .replay-explain-text {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-soft);
   margin-top: 8px;
 }
@@ -1898,12 +2137,12 @@ table.data-table td:nth-child(2) {
   padding-top: 10px;
 }
 .replay-lineup-team {
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 800;
   margin-bottom: 4px;
 }
 .replay-lineup-line {
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-soft);
   line-height: 1.6;
 }
@@ -1934,7 +2173,7 @@ table.data-table td:nth-child(2) {
   gap: 20px;
 }
 .replay-court-col-label {
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 800;
   margin-bottom: 6px;
 }
@@ -1973,7 +2212,7 @@ table.data-table td:nth-child(2) {
 }
 .replay-court-streak,
 .replay-court-mvp {
-  font-size: 10px;
+  font-size: 12px;
   flex-shrink: 0;
 }
 /* 온/오프 넷레이팅(요청, player_onoff) - +/- 박스스코어 컬럼과 같은 --positive/--negative
@@ -2025,7 +2264,7 @@ table.data-table td:nth-child(2) {
   align-items: center;
   gap: 6px;
   padding: 5px 12px;
-  border-radius: 999px;
+  border-radius: var(--r-led);
   border: 1px solid var(--negative);
   background: var(--negative);
   color: #fff;
@@ -2061,13 +2300,13 @@ table.data-table td:nth-child(2) {
   pointer-events: auto;
 }
 .replay-transport-inner {
-  max-width: 900px;
+  max-width: var(--measure-wide);
   margin: 0 auto;
   background: var(--surface);
   border-top: 1px solid rgba(var(--line-rgb), 0.12);
   box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.18);
   padding: 10px 16px calc(11px + env(safe-area-inset-bottom, 0px));
-  border-radius: 14px 14px 0 0;
+  border-radius: var(--r-card) var(--r-card) 0 0;
 }
 
 /* ── 스크러버 = 승률 트랙 ──────────────────────────────────────────────────────
@@ -2078,7 +2317,8 @@ table.data-table td:nth-child(2) {
 .replay-scrub {
   position: relative;
   height: 44px;
-  border-radius: 8px;
+  /* 이건 담는 것이 아니라 미터다(승률 트랙) - 하드 엣지. */
+  border-radius: var(--r-led);
   overflow: hidden;
   margin-bottom: 9px;
   background: var(--surface-soft);
@@ -2131,14 +2371,14 @@ table.data-table td:nth-child(2) {
   top: 3px;
   transform: translateX(4px);
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   color: var(--ink);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   /* 팀 색 채움 위에 얹히므로 글자색만으론 대비를 보장할 수 없다 - 표면색 칩을 깔아
      어떤 팀 색·어떤 테마에서도 같은 대비가 나오게 한다. */
   background: color-mix(in srgb, var(--surface) 82%, transparent);
-  border-radius: 3px;
+  border-radius: var(--r-led);
   padding: 1px 3px;
 }
 /* 입력 자체는 투명하게 깔고 손잡이만 보인다 - 트랙 그림이 그대로 비쳐 보이게. */
@@ -2197,7 +2437,7 @@ table.data-table td:nth-child(2) {
   display: grid;
   justify-items: end;
   gap: 1px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "IBM Plex Mono", "Pretendard", monospace;
   font-variant-numeric: tabular-nums;
   min-width: 86px;
   text-align: right;
@@ -2208,7 +2448,7 @@ table.data-table td:nth-child(2) {
   color: var(--ink);
 }
 .replay-transport-pos {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-faint);
 }
 /* 하단 바가 커진 만큼 여백도 같이 - 패널 마지막 내용이 바 뒤로 숨지 않게. */
@@ -2239,7 +2479,7 @@ table.data-table td:nth-child(2) {
     font-size: 13px;
   }
   .replay-sticky-flow {
-    font-size: 11px;
+    font-size: 12.5px;
   }
 }
 
@@ -2252,8 +2492,8 @@ table.data-table td:nth-child(2) {
   margin: 2px 0 10px;
 }
 .replay-boxtab {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11.5px;
+  font-family: "Pretendard", sans-serif;
+  font-size: 13px;
   font-weight: 700;
   padding: 5px 12px;
   border-radius: 7px;
@@ -2261,7 +2501,6 @@ table.data-table td:nth-child(2) {
   border: 1px solid rgba(var(--line-rgb), 0.2);
   background: rgba(var(--line-rgb), 0.04);
   cursor: pointer;
-  transition: border-color 0.12s, background 0.12s, color 0.12s;
 }
 .replay-boxtab:hover {
   border-color: var(--home);
@@ -2273,11 +2512,12 @@ table.data-table td:nth-child(2) {
   border-color: var(--home);
 }
 .replay-boxtab-hint {
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-faint);
 }
 .replay-box-note {
-  font-size: 10.5px;
+  max-width: var(--measure-read);
+  font-size: 12.5px;
   line-height: 1.55;
   color: var(--ink-faint);
   margin-top: 10px;
@@ -2316,7 +2556,7 @@ table.data-table td:nth-child(2) {
 }
 .replay-speed {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 5px 6px;
   border-radius: 7px;
   border: 1px solid rgba(var(--line-rgb), 0.16);
@@ -2347,7 +2587,6 @@ table.data-table td:nth-child(2) {
   border: 1px solid rgba(var(--line-rgb), 0.22);
   background: rgba(var(--line-rgb), 0.04);
   cursor: pointer;
-  transition: border-color 0.12s, background 0.12s, color 0.12s;
 }
 .replay-quarter-btn:hover {
   border-color: var(--home);
@@ -2365,7 +2604,7 @@ table.data-table td:nth-child(2) {
 }
 /* 요청: "박스스코어와 플레이바이플레이가 절반씩 squeeze되지 않고 각각 전체 폭을 쓰도록" -
    기존 2열 그리드(박스스코어 1.1fr / 플레이바이플레이 0.9fr)를 세로 스택으로 전환. .wrap
-   자체의 max-width:900px 컨테이너 폭은 그대로 - 그 안에서 두 섹션이 나란히 반씩 나눠 쓰던
+   자체의 max-width(--measure-wide) 컨테이너 폭은 그대로 - 그 안에서 두 섹션이 나란히 반씩 나눠 쓰던
    걸 위아래로 쌓아 각자 전체 폭을 쓰게 함(DOM 순서 그대로 - 박스스코어가 여전히 위). */
 .replay-cols {
   display: flex;
@@ -2390,7 +2629,7 @@ table.data-table td:nth-child(2) {
   padding-right: 2px;
 }
 .replay-poss-group {
-  border-radius: 10px;
+  border-radius: var(--r-inset);
   margin-bottom: 8px;
   overflow: hidden;
   border: 1px solid rgba(var(--line-rgb), 0.08);
@@ -2403,18 +2642,19 @@ table.data-table td:nth-child(2) {
   background: color-mix(in srgb, var(--pg-color, var(--ink-faint)) 12%, var(--surface));
 }
 .replay-poss-team-name {
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 700;
 }
 .replay-poss-vs-tag {
-  font-size: 9.5px;
+  font-size: 12px;
   color: var(--ink-faint);
   font-family: "IBM Plex Mono", monospace;
 }
 .replay-poss-result {
   margin-left: auto;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-family: "Pretendard", sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
   color: var(--ink-soft);
 }
 .replay-poss-body {
@@ -2426,7 +2666,7 @@ table.data-table td:nth-child(2) {
   justify-content: space-between;
   gap: 8px;
   padding: 3px 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-soft);
 }
 .replay-poss-line b {
@@ -2434,8 +2674,8 @@ table.data-table td:nth-child(2) {
   font-weight: 600;
 }
 .replay-pl-clock {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-family: "IBM Plex Mono", "Pretendard", monospace;
+  font-size: 12.5px;
   color: var(--ink-faint);
   white-space: nowrap;
   flex-shrink: 0;
@@ -2447,7 +2687,7 @@ table.data-table td:nth-child(2) {
 .replay-pl-wpa {
   font-family: "IBM Plex Mono", monospace;
   font-weight: 700;
-  font-size: 10.5px;
+  font-size: 12.5px;
 }
 .replay-pl-wpa.up {
   color: var(--positive);
@@ -2488,7 +2728,7 @@ table.data-table td:nth-child(2) {
   align-items: center;
   gap: 8px;
   background: var(--surface-soft);
-  border-radius: 8px;
+  border-radius: var(--r-inset);
   padding: 7px 9px;
 }
 .replay-psc-photo {
@@ -2510,13 +2750,16 @@ table.data-table td:nth-child(2) {
   justify-content: center;
   background: var(--surface);
   color: var(--ink-faint);
-  font-family: "IBM Plex Mono", monospace;
+  /* 위 .replay-leaders-photo-fallback과 같은 헬퍼(playerPhoto)가 채우는 자리 - 한글
+     이름 첫 글자가 들어오므로 모노를 걸 수 없다. */
+  font-family: "Pretendard", sans-serif;
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
-  font-size: 10px;
+  font-size: 12px;
   border: 1px solid rgba(var(--line-rgb), 0.1);
 }
 .replay-psc-name {
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -2526,9 +2769,9 @@ table.data-table td:nth-child(2) {
   margin-right: 2px;
 }
 .replay-psc-tag {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-faint);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Pretendard", sans-serif;
 }
 .replay-poss-scoreline {
   display: flex;
@@ -2541,12 +2784,14 @@ table.data-table td:nth-child(2) {
 .replay-feed-score {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 700;
-  font-size: 15px;
+  font-size: var(--fs-300);
   font-variant-numeric: tabular-nums;
 }
+/* 모노 금지: components/GameReplay.tsx가 "{scoringTeam.name} 62%"처럼 한글 팀명을
+   앞에 붙인다. 뒤의 퍼센트가 줄마다 흔들리지 않게 tabular-nums는 유지. */
 .replay-poss-winpct {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-family: "Pretendard", sans-serif;
+  font-size: 12.5px;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
@@ -2562,8 +2807,9 @@ table.data-table td:nth-child(2) {
 }
 .replay-poss-divider {
   text-align: center;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-family: "Pretendard", sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
   color: var(--ink-faint);
   padding: 6px 0;
 }
@@ -2584,8 +2830,9 @@ table.data-table td:nth-child(2) {
 .metric-slider-label {
   display: flex;
   justify-content: space-between;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11.5px;
+  font-family: "Pretendard", sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
   font-weight: 700;
   color: var(--ink-soft);
 }
@@ -2610,7 +2857,7 @@ table.data-table td:nth-child(2) {
 .ts-nums {
   display: flex;
   justify-content: space-between;
-  font-size: 12.5px;
+  font-size: 13.5px;
   margin-bottom: 5px;
 }
 .ts-nums .ts-home {
@@ -2628,14 +2875,14 @@ table.data-table td:nth-child(2) {
 .ts-nums .ts-raw {
   color: var(--ink-faint);
   font-weight: 400;
-  font-size: 10.5px;
+  font-size: 12.5px;
   margin-left: 4px;
   margin-right: 4px;
 }
 .ts-bar {
   display: flex;
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--r-led);
   overflow: hidden;
   background: var(--surface-soft);
   gap: 2px;
@@ -2669,18 +2916,17 @@ table.data-table td:nth-child(2) {
 tr.bench-divider-row td {
   padding-top: 10px;
   padding-bottom: 4px;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
+  font-family: "Pretendard", sans-serif;
+  font-size: 12px;
   color: var(--ink-faint);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   border-bottom: none;
 }
 
 /* 박스스코어 등번호(요청 4-1) - 이름 옆 작은 회색 숫자. */
 .replay-jersey-num {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-faint);
 }
 
@@ -2708,10 +2954,12 @@ footer.foot {
   margin-top: 30px;
   padding-top: 14px;
   border-top: 1px solid rgba(var(--line-rgb), 0.1);
+  max-width: var(--measure-read);
   color: var(--ink-faint);
-  font-size: 11px;
-  font-family: "IBM Plex Mono", monospace;
-  line-height: 1.7;
+  font-size: 12.5px;
+  font-family: "Pretendard", sans-serif;
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-prose);
 }
 
 /* 스카우팅 인사이트 하단 단서 - 개막 전에 "이 카드는 지난 시즌 기록이고, 이적 제외 판정은
@@ -2721,8 +2969,9 @@ footer.foot {
   margin-top: 10px;
   padding-top: 9px;
   border-top: 1px dashed rgba(var(--line-rgb), 0.14);
+  max-width: var(--measure-read);
   color: var(--ink-faint);
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.55;
 }
 .insight-caveat a {
@@ -2743,42 +2992,43 @@ footer.foot {
   padding: 4px 0 4px 10px;
 }
 .sched-team {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 700;
   display: flex;
   align-items: baseline;
   gap: 6px;
 }
 .sched-side {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   color: var(--ink-soft);
 }
 .sched-bits {
   margin-top: 3px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
   word-break: keep-all;
 }
 .sched-next {
   margin-top: 2px;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-soft);
 }
 .sched-venue {
   margin-top: 8px;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--ink-soft);
 }
 .sched-caveat {
   margin-top: 8px;
   padding-top: 7px;
   border-top: 1px dashed rgba(var(--line-rgb), 0.15);
-  font-size: 11px;
+  max-width: var(--measure-read);
+  font-size: 12.5px;
   line-height: 1.65;
   color: var(--ink-soft);
   word-break: keep-all;
@@ -2788,8 +3038,9 @@ footer.foot {
    한 단계 작고 흐리게. 프록시/추정을 사실처럼 읽히지 않게 하는 장치라 절대 숨기지 않는다. */
 .report-caveat {
   margin: 4px 0 0;
-  font-size: 11px;
-  line-height: 1.6;
+  max-width: var(--measure-read);
+  font-size: 12.5px;
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
   word-break: keep-all;
 }
@@ -2810,9 +3061,10 @@ footer.foot {
     padding: 12px;
   }
   .game-card-row {
-    /* 배지16 + 이름1fr + 로고28 + 스코어58 + 로고28 + 이름1fr + 배지16, gap 3px x 6
-       = 고정 164px. 360px 화면에서 이름 칸이 각 68px가 된다(기존 6px). */
-    grid-template-columns: 16px minmax(0, 1fr) 28px 58px 28px minmax(0, 1fr) 16px;
+    /* 배지16 + 이름1fr + 로고28 + 스코어66 + 로고28 + 이름1fr + 배지16, gap 3px x 6
+       = 고정 172px. 360px 화면에서 이름 칸이 각 64px가 된다(예전 68px - 스코어 칸을
+       58->66px로 넓힌 만큼). 좁은 화면에서 가장 먼저 커야 하는 건 점수다. */
+    grid-template-columns: 16px minmax(0, 1fr) 28px 66px 28px minmax(0, 1fr) 16px;
     column-gap: 3px;
     row-gap: 7px;
   }
@@ -2841,8 +3093,16 @@ footer.foot {
     line-height: 1.22;
     font-size: 12px;
   }
+  /* 팀 색 바는 좁은 화면에서도 남긴다(팀 정체성 단서가 여기밖에 없다) - 대신 여백만
+     7px -> 4px로 줄여 글자 폭을 돌려준다. */
+  .team-name.home {
+    padding-left: 4px;
+  }
+  .team-name.away {
+    padding-right: 4px;
+  }
   .game-card-score {
-    font-size: 15px;
+    font-size: var(--fs-500);
   }
   .result-badge,
   .result-badge-placeholder {
@@ -2850,10 +3110,10 @@ footer.foot {
   }
   .result-badge {
     height: 16px;
-    font-size: 9px;
+    font-size: 12px;
   }
   .game-card-meta {
-    font-size: 11.5px;
+    font-size: 13px;
   }
 }
 
@@ -2861,13 +3121,15 @@ footer.foot {
    원색을 color에 그대로 넣으면 한쪽 테마에서 안 보인다(실기기 제보: 다크 모드에서
    부산 KCC #0C2340 남색 팀명이 배경에 묻혀 사라졌다). lib/teamAccent.ts의
    teamInkStyle()이 배경 대비를 맞춘 두 색을 --ti-l/--ti-d로 내려보내고 여기서 고른다.
-   (리포트 문장의 .report-team이 쓰던 규약과 같다.) */
-.team-name,
+   (리포트 문장의 .report-team이 쓰던 규약과 같다.)
+
+   .team-name(경기 카드)은 이 목록에서 뺐다 - 거기서는 같은 --ti-l/--ti-d를 글자색이
+   아니라 이름 옆 3px 세로 바로 쓴다(위 .team-name.home/.away 참고). 색이 꼭 글자에
+   있어야 하는 자리(리플레이 스코어보드 팀명·라인업 헤더 등)만 .team-ink로 남는다. */
 .team-ink {
   color: var(--ti-l, inherit);
 }
 @media (prefers-color-scheme: dark) {
-  .team-name,
   .team-ink {
     color: var(--ti-d, inherit);
   }

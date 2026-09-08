@@ -209,7 +209,9 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
 
   const W = 640,
     H = 230,
-    PAD_L = 30,
+    // 왼쪽 축 라벨('100%')을 9 -> 12단위로 키우면 x=2에서 폭 29단위를 먹는다 - 30이면 밴드
+    // 왼쪽 끝에 물려서 34로 넓힌다(밴드는 그만큼 오른쪽에서 시작).
+    PAD_L = 34,
     // 오른쪽에 밴드 이름·최신 비율을 직접 적는다(범례와 스와치를 눈으로 맞추지 않게).
     PAD_R = 78,
     PAD_T = 10,
@@ -230,7 +232,18 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
     return `M ${top.join(" L ")} L ${bottom.join(" L ")} Z`;
   };
 
+  // 시즌 축 눈금. 라벨을 9 -> 12단위로 키우면 "21-22"가 37단위라, 시즌이 많을 때 맨 끝 눈금과
+  // 그 앞 눈금이 부딪힌다(n=20·tickEvery=3이면 마지막 두 눈금 간격이 28단위). 크기를 되돌리는
+  // 대신 부딪히는 **앞** 라벨을 솎아낸다 - 마지막 시즌 라벨은 언제나 남는다(lib/careerStrip.ts의
+  // lastLabelEnd/lastValEnd와 같은 방식).
   const tickEvery = Math.max(1, Math.ceil(n / 8));
+  const TICK_LABEL_W = 37;
+  const tickIdx: number[] = [];
+  for (let i = 0; i < n; i++) if (i % tickEvery === 0) tickIdx.push(i);
+  if (tickIdx[tickIdx.length - 1] !== n - 1) tickIdx.push(n - 1);
+  for (let i = tickIdx.length - 1; i > 0; i--) {
+    if (xAt(tickIdx[i]) - xAt(tickIdx[i - 1]) < TICK_LABEL_W) tickIdx.splice(i - 1, 1);
+  }
 
   // 오른쪽 끝 라벨 - 마지막 시즌 기준 밴드의 세로 중앙에 존 이름과 비율. 3% 미만 밴드는
   // 적을 자리가 없어 생략하고(범례가 대신 든다), 남은 라벨끼리 겹치면 아래로 밀어 뗀다.
@@ -242,8 +255,17 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
   })
     .filter((l) => l.share >= 0.03)
     .sort((a, b) => a.y - b.y);
+  // 최소 간격은 라벨 크기를 따라간다(12단위 × 1.25) - 12로 두면 키운 글자끼리 겹친다.
+  const LABEL_GAP = 15;
   for (let i = 1; i < labels.length; i++) {
-    if (labels[i].y - labels[i - 1].y < 12) labels[i].y = labels[i - 1].y + 12;
+    if (labels[i].y - labels[i - 1].y < LABEL_GAP) labels[i].y = labels[i - 1].y + LABEL_GAP;
+  }
+  // 아래로만 밀면 바닥 밴드가 전부 얇을 때(3점 88% + 나머지 3%씩) 마지막 라벨이 뷰박스(230)
+  // 밖으로 나간다. 넘치면 바닥(210 - 시즌 눈금 222 위)에 붙이고 위로 되민다. 라벨 다섯 개가
+  // 60단위라 위로 밀려도 210-60 = 150이라 위쪽으로는 절대 안 넘친다.
+  for (let i = labels.length - 1; i >= 0; i--) {
+    const maxY = i === labels.length - 1 ? 210 : labels[i + 1].y - LABEL_GAP;
+    if (labels[i].y > maxY) labels[i].y = maxY;
   }
 
   // "DNA"라고 이름 붙였으면 변화가 읽혀야 한다(제보). 밴드는 모양으로만 말하니 숫자로 두 번 더 말한다:
@@ -270,14 +292,17 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
         {DNA_ZONES.map((z, zi) => (
           <path key={z} d={bandPath(zi)} fill={DNA_COLORS[z]} opacity={0.9} stroke="var(--surface)" strokeWidth={0.7} />
         ))}
+        {/* 존 이름(한글) + 비율. IBM Plex Mono에는 한글 글리프가 없어 '근거리'가 이름 없는
+            시스템 폴백으로 떨어졌다 - 숫자는 모노로 두되 폴백을 Pretendard로 이름 짓는다.
+            폭: 최악의 라벨 '근거리 100%'가 12단위에서 약 66단위, 라벨 자리는 PAD_R-6 = 72단위. */}
         {labels.map((l) => (
           <text
             key={l.z}
             x={W - PAD_R + 6}
-            y={l.y + 3.5}
-            fontSize={10}
+            y={l.y + 4}
+            fontSize={12}
             fill={DNA_COLORS[l.z]}
-            fontFamily="IBM Plex Mono, monospace"
+            fontFamily='"IBM Plex Mono", "Pretendard", monospace'
             fontWeight={700}
           >
             {DNA_ZONE_LABELS[l.z]} {Math.round(l.share * 100)}%
@@ -286,17 +311,15 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
         {[0.25, 0.5, 0.75].map((g) => (
           <line key={g} x1={PAD_L} y1={yAt(g)} x2={W - PAD_R} y2={yAt(g)} stroke="var(--surface)" strokeWidth={0.6} opacity={0.5} />
         ))}
-        {mix.map((m, i) =>
-          i % tickEvery === 0 || i === n - 1 ? (
-            <text key={m.season} x={xAt(i)} y={H - 8} fontSize={9} textAnchor="middle" fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
-              {shortSeason(m.season)}
-            </text>
-          ) : null
-        )}
-        <text x={2} y={yAt(1) + 8} fontSize={9} fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
+        {tickIdx.map((i) => (
+          <text key={mix[i].season} x={xAt(i)} y={H - 8} fontSize={12} textAnchor="middle" fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
+            {shortSeason(mix[i].season)}
+          </text>
+        ))}
+        <text x={2} y={yAt(1) + 9} fontSize={12} fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
           100%
         </text>
-        <text x={2} y={yAt(0)} fontSize={9} fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
+        <text x={2} y={yAt(0)} fontSize={12} fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
           0%
         </text>
       </svg>
@@ -556,8 +579,13 @@ export default async function PlayerPage({
     teamColors.set(tc, t.color);
     teamAbbrs.set(tc, t.abbr);
   }
-  // 히어로 발치 밴드: 폭 800 · 높이 72는 --strip-h(72px)와 1:1로 맞춘 값이라 데스크톱(.wrap 900px)
-  // 에서 뷰박스가 거의 등배로 그려진다. 밤이 0개면 빌더가 null을 돌려주고 밴드 자체를 안 그린다
+  // 히어로 발치 밴드: 폭 800 · 높이 72(= 라벨 줄 13 + 막대 47 + 레일 12)를 요청하면 빌더가
+  // 구간별 글자에 맞춰 라벨 줄과 최종 뷰박스 높이를 잡는다(막대 47은 그대로 남는다).
+  // fit은 이 SVG가 화면에서 그려지는 방식이다 - CSS 높이 --strip-h(79px)·가로 크롬 92px
+  // (.wrap 18+18 + .heroFoot 28+28)·≤620px에서는 행으로 바뀌므로 보이는 최소 뷰포트 621px.
+  // 이 세 숫자는 player-profile.module.css의 --strip-h/.heroFoot과 짝이다 - 한쪽만 바꾸면
+  // 글자가 조용히 12px 아래로 내려간다.
+  // 밤이 0개면 빌더가 null을 돌려주고 밴드 자체를 안 그린다
   // (커리어 기록이 없는 선수 - 26-27 명단 중 pcode가 없는 15명이 여기에 해당).
   // grain이 null(soft 폴백)이면 히어로 발치 밴드를 그리지 않는다 - "밤이 0개"와는 다른 상태지만
   // 히어로에는 빈 밴드 대신 아무것도 안 그리는 게 맞고, 사실은 아래 확대판 패널이 문장으로 밝힌다.
@@ -569,13 +597,24 @@ export default async function PlayerPage({
         width: 800,
         height: 72,
         tone: "hero",
+        fit: { cssHeight: 79, chrome: 92, minVp: 621 },
       })
     : null;
   // 모바일(≤620px)용 시즌별 행. 실측: 26-27 명단 198명의 커리어 총 경기 p50 122·max 739라 한 줄 띠를
   // 303px에 넣으면 칸이 2.5px·0.4px다 - 키워서 될 일이 아니라 시즌별로 접는다(최장 시즌 64경기도 칸
   // ≥4.7px). 한 줄 띠와 행 둘 다 그려 보내고 CSS가 폭으로 하나만 보인다(.heroFootSvg / .heroFootRows).
   // 행은 시즌 히트존 모드(칸당 ~26B)라 둘 다 보내는 비용은 작다.
-  const heroRows = grain ? buildCareerStripRowsSvg(grain, { uid: `herorow${pcode}`, teamColors, teamAbbrs, tone: "hero" }) : null;
+  // 행의 fit: 행 높이는 .heroFootRow가 56px로 고정하고, ≤620px에서만 보이며(그 위는 한 줄 띠),
+  // 그 폭에서 .heroFoot 패딩이 18+18이라 가로 크롬은 72px(.wrap 36 + 36)다.
+  const heroRows = grain
+    ? buildCareerStripRowsSvg(grain, {
+        uid: `herorow${pcode}`,
+        teamColors,
+        teamAbbrs,
+        tone: "hero",
+        fit: { cssHeight: 56, chrome: 72, maxVp: 620 },
+      })
+    : null;
   // §9 확대판: 마지막 windowN "출전"까지 거슬러 올라간 구간. 뷰박스 폭을 칸 수에 딱 맞춰 요청해
   // (칸 상한 9 × 칸 수 + 좌우 여백) 오른쪽에 빈 공간이 남지 않게 한다. 커리어 끝에 공백 시즌
   // 표식이 붙는 선수(배스)는 빌더가 오른쪽에 GAP_RESERVE만큼 예약하므로 그만큼 더 요청한다
@@ -595,8 +634,12 @@ export default async function PlayerPage({
         // 확대판은 언제나 경기 단위(칸 = 클릭 가능한 한 경기). "띠는 질감, 패널은 개별 경기".
         detail: "cell",
         // 제보 "L15·L30 가시성": 칸 위에 그날 득점을 적는다(칸 8단위 이상·40칸 이하일 때만 - 빌더가 판단).
-        // fontScale은 주지 않는다: 이 패널은 CSS 높이(모바일 140px)가 뷰박스 높이(92)보다 커서 배율이
-        // 이미 1.52다(데스크톱 1.83). 여기에 1.5를 더 곱했더니 375px에서 라벨이 통째로 겹쳤다(실측).
+        // 이 패널은 CSS 높이가 뷰박스 높이보다 커서 배율이 1을 넘지만(168/92 = 1.83) 그게 곧 상한이다 -
+        // 폭이 아무리 넓어도 6.5단위 값 라벨은 11.87px에서 멈췄다. 그래서 크기 상수를 곱하는 대신
+        // fit을 넘겨 구간마다 정확한 font-size를 빌더가 계산하게 한다.
+        // cssHeight는 보이는 구간의 **최솟값**(데스크톱 168 / ≤620px 176 중 168) - 작게 잡으면
+        // 실제 글자가 계산보다 커지는 쪽으로만 틀린다. 크롬 74 = .wrap 36 + .panel 36 + 테두리 2.
+        fit: { cssHeight: 168, chrome: 74 },
         valueLabels: true,
       })
     : null;
@@ -1196,7 +1239,7 @@ export default async function PlayerPage({
       </div>
 
       <footer className="foot">
-        2011-12~2025-26 시즌 전체 경기 기준 · 게임로그는 최근 30경기까지만 보관 · Supabase에서 실시간 조회
+        2011-12~2025-26 시즌 전체 경기 기준 · 게임로그는 최근 30경기까지만 보관 · 실시간 조회
       </footer>
     </div>
   );

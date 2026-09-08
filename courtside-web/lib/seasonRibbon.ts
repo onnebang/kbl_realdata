@@ -55,7 +55,42 @@ export type RibbonStats = {
   remainingPriced: number;
 };
 
-export const RIBBON_VIEWBOX = { w: 760, h: 236 };
+// 높이 252 → 262 → 272: 좁은 화면에서 글자가 38단위까지 커지면 위쪽 띠(월 라벨 · '다음 경기' ·
+// PO 라벨)가 플롯을 침범해서 PAD_T를 34 → 44 → 54로 넓혔다(플롯 높이 188은 그대로).
+// 38단위 기준 위쪽 띠 검산: 월 라벨 베이스라인 36 → 글자 위끝 5.6(캔버스 안) · 아래끝 43.6,
+// 플롯 위쪽 띠 시작이 plotTop-6 = 48이라 안 닿는다. '다음 경기' 라벨은 plotTop-12 = 42.
+export const RIBBON_VIEWBOX = { w: 760, h: 272 };
+
+// ── 글자: 뷰박스 단위가 아니라 '렌더 픽셀'을 맞춘다 ────────────────────────────────
+// .ribbonSvg는 width:100%이고 지면 폭 = 뷰포트 − 74(.wrap 좌우 36 + .panel 테두리·패딩 38)라
+// 렌더 배율 = (뷰포트 − 74)/760이다. 데스크톱(1108px)은 1.46, 375px 모바일은 0.40 - 3.6배
+// 차이라 font-size 한 값으로 양쪽을 만족시킬 수 없다(예전 9단위 = 데스크톱 13px·모바일 3.6px).
+// 그래서 SVG 안에 <style>을 넣어 뷰포트 폭 구간마다 글자를 갈아끼운다(SVG에서 CSS px = 사용자
+// 단위). 각 구간 하단에서의 렌더 픽셀: 1000px→12.2 / 800px→12.4 / 620px→12.2 / 480px→12.3 /
+// 401px→13.8 / 320px→12.3. 마지막 ≤400px 구간(38단위)이 iPhone SE 1세대(320px)를 위한 것 -
+// 32단위로는 (246/760)×32 = 10.4px밖에 안 나온다. 38단위는 (246/760)×38 = 12.3px.
+// 한글이 섞이는 라벨(N월·N승·기대·다음 경기·플레이오프)이 많아 스택에 Pretendard를 넣는다 -
+// IBM Plex Mono에는 한글 글리프가 없어 지금까지 조용히 sans-serif로 폴백하고 있었다.
+// 글자가 3.2배가 되면 라벨은 반드시 부딪히므로(careerStrip.ts에서 이미 밟은 함정) 크기를
+// 되돌리는 대신 라벨 수를 줄인다: 여백 안에 사는 축 눈금·상대 약어·PO 라벨은 .rbbWide로
+// 넓은 화면 전용이 되고(툴팁과 호출부 캡션이 같은 사실을 진다), 월 라벨은 32단위 기준 겹침
+// 검사로 솎는다. 좁은 화면에서도 남는 글자: 월 라벨(솎은 뒤) · 다음 경기 · LIVE · 기대/승수.
+const RB_FS_MAX = 38; // 가장 좁은 구간의 글자. 겹침 검사는 언제나 이 최댓값으로 한다.
+const RB_STYLE =
+  `<style>.rbb{font-family:"IBM Plex Mono","Pretendard",monospace;font-size:10px}` +
+  `@media(max-width:999px){.rbb{font-size:13px}.rbbWide{display:none}}` +
+  `@media(max-width:799px){.rbb{font-size:17px}}` +
+  `@media(max-width:619px){.rbb{font-size:23px}}` +
+  `@media(max-width:479px){.rbb{font-size:32px}}` +
+  `@media(max-width:400px){.rbb{font-size:38px}}</style>`;
+
+/** 대략 폭(기본은 가장 좁은 구간의 32단위) - 한글 글리프 1em, 라틴·숫자 0.62em(careerStrip.ts와 같은 근사). */
+function rbTextW(s: string, fs: number = RB_FS_MAX): number {
+  return [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 127 ? 1 : 0.62) * fs, 0);
+}
+
+/** 플롯 위에 떠서 데이터와 겹칠 수 있는 라벨용 배경 후광(scatter의 선수 이름표와 같은 수법). */
+const RB_HALO = `paint-order="stroke" stroke="var(--surface)" stroke-width="3" stroke-linejoin="round"`;
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -78,7 +113,7 @@ export function buildSeasonRibbonSvg(input: RibbonInput): { svg: string; stats: 
     H = RIBBON_VIEWBOX.h,
     PAD_L = 26,
     PAD_R = 40,
-    PAD_T = 34,
+    PAD_T = 54,
     PAD_B = 30;
   const plotTop = PAD_T,
     plotBot = H - PAD_B,
@@ -111,7 +146,7 @@ export function buildSeasonRibbonSvg(input: RibbonInput): { svg: string; stats: 
     remainingPriced: 0,
   };
 
-  const parts: string[] = [];
+  const parts: string[] = [RB_STYLE];
   parts.push(
     `<defs><pattern id="rbHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="rgba(var(--line-rgb),0.14)" stroke-width="2"/></pattern></defs>`
   );
@@ -125,8 +160,10 @@ export function buildSeasonRibbonSvg(input: RibbonInput): { svg: string; stats: 
       const x0 = PAD_L + poStart * bw,
         x1 = PAD_L + i * bw;
       parts.push(`<rect x="${x0.toFixed(1)}" y="${plotTop - 6}" width="${(x1 - x0).toFixed(1)}" height="${plotH + 6}" fill="url(#rbHatch)"/>`);
+      // PO 라벨은 좁은 화면(32단위 = 5글자 160단위)에서 띠보다 길어져 캔버스를 넘으므로 넓은
+      // 화면 전용. 빗금 띠와 칸 툴팁("· 플레이오프")이 좁은 화면에서 같은 사실을 진다.
       parts.push(
-        `<text x="${(x0 + 3).toFixed(1)}" y="${plotTop - 10}" font-size="9" font-weight="700" fill="rgba(var(--line-rgb),0.6)" font-family="IBM Plex Mono, monospace">${esc(
+        `<text x="${(x0 + 3).toFixed(1)}" y="${plotTop - 10}" class="rbb rbbWide" font-weight="700" fill="rgba(var(--line-rgb),0.6)">${esc(
           slots[poStart].seasonCategory
         )}</text>`
       );
@@ -134,29 +171,64 @@ export function buildSeasonRibbonSvg(input: RibbonInput): { svg: string; stats: 
     }
   }
 
-  // 월 구분선 + 월 라벨(첫 칸 포함)
+  // '다음 경기'(D-N) 라벨이 차지할 x 띠 - 월 라벨과 같은 줄이라 미리 잡아 두고 겹치는 월
+  // 라벨을 넓은 화면 전용으로 내린다.
+  const nextIdx = input.nextGmkey ? slots.findIndex((s) => s.gmkey === input.nextGmkey) : -1;
+  const nextLabel =
+    nextIdx < 0
+      ? ""
+      : input.openerDday != null
+        ? input.openerDday > 0
+          ? `D-${input.openerDday}`
+          : "D-DAY"
+        : slots[nextIdx].status === "live"
+          ? "진행 중"
+          : "다음 경기";
+  const nextHalf = nextLabel ? rbTextW(nextLabel) / 2 + 4 : 0;
+  const nextL = nextLabel ? cx(nextIdx) - nextHalf : Infinity;
+  const nextR = nextLabel ? cx(nextIdx) + nextHalf : -Infinity;
+
+  // 월 구분선 + 월 라벨(첫 칸 포함). 구분선은 전부 남기고 라벨만 솎는다 - 좁은 화면 글자
+  // (32단위)에서 이웃 라벨이나 '다음 경기' 라벨과 부딪히면 그 라벨만 rbbWide(넓은 화면 전용),
+  // 넓은 화면 글자(10단위)에서도 부딪히면(한 달에 한 경기 같은 경우) 아예 안 그린다.
+  let mEndWide = -1e9;
+  let mEndNarrow = -1e9;
   for (let i = 0; i < n; i++) {
     const m = slots[i].gameDate.slice(5, 7);
     const prevM = i > 0 ? slots[i - 1].gameDate.slice(5, 7) : null;
     if (prevM === m) continue;
     const x = PAD_L + i * bw;
     if (i > 0) parts.push(`<line x1="${x.toFixed(1)}" y1="${plotTop - 6}" x2="${x.toFixed(1)}" y2="${plotBot}" stroke="rgba(var(--line-rgb),0.22)" stroke-width="1" stroke-dasharray="2 3"/>`);
-    parts.push(`<text x="${(x + 3).toFixed(1)}" y="10" font-size="9" fill="rgba(var(--line-rgb),0.55)" font-family="IBM Plex Mono, monospace">${parseInt(m, 10)}월</text>`);
+    const label = `${parseInt(m, 10)}월`;
+    const lx = x + 3;
+    if (lx < mEndWide) continue;
+    mEndWide = lx + rbTextW(label, 10) + 4;
+    const narrowW = rbTextW(label);
+    const narrowOk = lx >= mEndNarrow && (lx + narrowW < nextL || lx > nextR);
+    if (narrowOk) mEndNarrow = lx + narrowW + 4;
+    // 베이스라인 36 = PAD_T(54) − 18: 38단위 글자의 위끝(0.8em)이 캔버스 안에, 아래끝이
+    // 플롯 위쪽 띠(plotTop−6) 위에 오는 자리. PAD_T와 같이 움직인다.
+    parts.push(`<text x="${lx.toFixed(1)}" y="${plotTop - 18}" class="rbb${narrowOk ? "" : " rbbWide"}" fill="rgba(var(--line-rgb),0.55)">${label}</text>`);
   }
 
   // 기준선: 점수차 0(치른 구간) / 고스트 50% 눈금
   parts.push(`<line x1="${PAD_L}" y1="${zeroY.toFixed(1)}" x2="${W - PAD_R}" y2="${zeroY.toFixed(1)}" stroke="rgba(var(--line-rgb),0.35)" stroke-width="1"/>`);
   const y50 = zeroY - 0.5 * halfUp;
   parts.push(`<line x1="${PAD_L}" y1="${y50.toFixed(1)}" x2="${W - PAD_R}" y2="${y50.toFixed(1)}" stroke="rgba(var(--line-rgb),0.18)" stroke-width="0.6" stroke-dasharray="2 4"/>`);
-  parts.push(`<text x="2" y="${(y50 + 3).toFixed(1)}" font-size="8" fill="rgba(var(--line-rgb),0.5)" font-family="IBM Plex Mono, monospace">50%</text>`);
-  parts.push(`<text x="2" y="${(yMargin(maxAbs) + 7).toFixed(1)}" font-size="8" fill="rgba(var(--line-rgb),0.5)" font-family="IBM Plex Mono, monospace">+${maxAbs}</text>`);
-  parts.push(`<text x="2" y="${yMargin(-maxAbs).toFixed(1)}" font-size="8" fill="rgba(var(--line-rgb),0.5)" font-family="IBM Plex Mono, monospace">-${maxAbs}</text>`);
+  // 축 눈금(왼쪽 점수차·50% / 오른쪽 승수)은 좌우 여백(26·40단위) 안에 사는 글자라 넓은 화면
+  // 전용이다: 좁은 화면 32단위에서는 "50%"만 60단위로 여백의 두 배를 넘어 플롯을 덮는다.
+  // 좁은 화면에서는 눈금 대신 아래 두 헤드라인 숫자(기대 · 실제 승수)와 칸 툴팁·캡션이 남는다.
+  parts.push(`<text x="2" y="${(y50 + 3).toFixed(1)}" class="rbb rbbWide" fill="rgba(var(--line-rgb),0.5)">50%</text>`);
+  parts.push(`<text x="2" y="${(yMargin(maxAbs) + 7).toFixed(1)}" class="rbb rbbWide" fill="rgba(var(--line-rgb),0.5)">+${maxAbs}</text>`);
+  parts.push(`<text x="2" y="${yMargin(-maxAbs).toFixed(1)}" class="rbb rbbWide" fill="rgba(var(--line-rgb),0.5)">-${maxAbs}</text>`);
   // 오른쪽 승수 축(누적선용)
-  parts.push(`<text x="${W - PAD_R + 4}" y="${plotTop + 3}" font-size="8" fill="rgba(var(--line-rgb),0.5)" font-family="IBM Plex Mono, monospace">${n}승</text>`);
-  parts.push(`<text x="${W - PAD_R + 4}" y="${plotBot + 3}" font-size="8" fill="rgba(var(--line-rgb),0.5)" font-family="IBM Plex Mono, monospace">0</text>`);
+  parts.push(`<text x="${W - PAD_R + 4}" y="${plotTop + 3}" class="rbb rbbWide" fill="rgba(var(--line-rgb),0.5)">${n}승</text>`);
+  parts.push(`<text x="${W - PAD_R + 4}" y="${plotBot + 3}" class="rbb rbbWide" fill="rgba(var(--line-rgb),0.5)">0</text>`);
 
-  const showAbbrAll = bw >= 20;
-  const showAbbrGhost = bw >= 11;
+  // 상대 약어도 넓은 화면 전용(좁은 화면 32단위면 3글자가 60단위 = 칸 폭의 두 배 이상).
+  // 넓은 화면 10단위에서도 3글자 18.6단위 + 여백이 필요해 칸 폭 21단위 미만이면 안 그린다
+  // (54경기 일정은 칸이 12.9단위라 전부 툴팁으로 - 예전 6.2단위 약어는 9px밖에 안 됐다).
+  const showAbbr = bw >= 21;
   let wins = 0;
   const actualPts: string[] = [`${PAD_L},${plotBot.toFixed(1)}`];
   const expPts: string[] = [`${PAD_L},${plotBot.toFixed(1)}`];
@@ -241,8 +313,13 @@ export function buildSeasonRibbonSvg(input: RibbonInput): { svg: string; stats: 
         );
       }
       if (s.status === "live") {
+        // 38단위에서 "LIVE"는 94단위(54경기 일정의 칸 폭 12.9의 7배)라 개막전·최종전처럼
+        // 가장자리 칸이 진행 중이면 캔버스를 넘는다 - '다음 경기' 라벨과 같은 앵커 뒤집기.
+        const lh = rbTextW("LIVE") / 2;
+        const la = cx(i) - lh < 2 ? "start" : cx(i) + lh > W - 2 ? "end" : "middle";
+        const ltx = la === "start" ? x + 1 : la === "end" ? x + bw - 1 : cx(i);
         inner.push(
-          `<text x="${cx(i).toFixed(1)}" y="${(yTop - 4).toFixed(1)}" font-size="8" font-weight="800" text-anchor="middle" fill="var(--negative)" font-family="IBM Plex Mono, monospace">LIVE</text>`
+          `<text x="${ltx.toFixed(1)}" y="${(yTop - 4).toFixed(1)}" class="rbb" font-weight="800" text-anchor="${la}" fill="var(--negative)" ${RB_HALO}>LIVE</text>`
         );
       }
       const start = s.gameStart ? ` ${s.gameStart.slice(0, 5)}` : "";
@@ -252,22 +329,23 @@ export function buildSeasonRibbonSvg(input: RibbonInput): { svg: string; stats: 
 
       // 개막 'D-N' 플래그(팀이 아직 안 뛰었을 때 첫 미종료 칸) 또는 '다음 경기' 마커
       if (firstPending && s.gmkey === input.nextGmkey) {
-        const label = input.openerDday != null ? (input.openerDday > 0 ? `D-${input.openerDday}` : "D-DAY") : s.status === "live" ? "진행 중" : "다음 경기";
-        const anchor = cx(i) < PAD_L + 30 ? "start" : cx(i) > W - PAD_R - 30 ? "end" : "middle";
+        // 좁은 화면에서 이 라벨은 150단위까지 커진다 - 캔버스 밖으로 나가지 않게 가장자리
+        // 칸에서는 앵커를 뒤집는다(문턱은 32단위 글자의 반폭 기준).
+        const half = rbTextW(nextLabel || "다음 경기") / 2;
+        const anchor = cx(i) - half < 2 ? "start" : cx(i) + half > W - 2 ? "end" : "middle";
         const tx = anchor === "start" ? x + 1 : anchor === "end" ? x + bw - 1 : cx(i);
         inner.push(`<path d="M ${cx(i).toFixed(1)} ${plotTop - 3} l -4 -6 h 8 Z" fill="var(--gold)"/>`);
         inner.push(
-          `<text x="${tx.toFixed(1)}" y="${plotTop - 12}" font-size="9.5" font-weight="800" text-anchor="${anchor}" fill="var(--gold)" font-family="IBM Plex Mono, monospace">${esc(label)}</text>`
+          `<text x="${tx.toFixed(1)}" y="${plotTop - 12}" class="rbb" font-weight="800" text-anchor="${anchor}" fill="var(--gold)" ${RB_HALO}>${esc(nextLabel || "다음 경기")}</text>`
         );
       }
     }
     if (s.gmkey === input.nextGmkey) firstPending = false;
 
     // 상대 약어(칸이 충분히 넓을 때만 - 치른 칸은 툴팁으로 충분)
-    if (showAbbrAll || (!isFinal && showAbbrGhost)) {
-      const fs = bw >= 24 ? 7.5 : 6.2;
+    if (showAbbr) {
       inner.push(
-        `<text x="${cx(i).toFixed(1)}" y="${plotBot + 19}" font-size="${fs}" text-anchor="middle" fill="rgba(var(--line-rgb),${isFinal ? "0.45" : "0.7"})" font-family="IBM Plex Mono, monospace">${esc(
+        `<text x="${cx(i).toFixed(1)}" y="${plotBot + 19}" class="rbb rbbWide" text-anchor="middle" fill="rgba(var(--line-rgb),${isFinal ? "0.45" : "0.7"})">${esc(
           s.oppAbbr
         )}</text>`
       );
@@ -278,21 +356,30 @@ export function buildSeasonRibbonSvg(input: RibbonInput): { svg: string; stats: 
     );
   }
 
-  // 누적선: 점선 = 모델 기대승, 골드 = 실제 승수(치른 구간만)
+  // 누적선: 점선 = 모델 기대승, 골드 = 실제 승수(치른 구간만). 두 라벨은 이 그림의 헤드라인
+  // 숫자라 좁은 화면에서도 남긴다 - 대신 오른쪽 여백(40단위)에 못 들어가므로 캔버스 오른쪽
+  // 끝에 붙이고(anchor=end) 후광을 둘러 막대 위에 얹는다.
+  const expLabel = `기대 ${stats.expWins.toFixed(1)}`;
+  const expY = Math.min(Math.max(lastExpY, plotTop + 12), plotBot - 6) + 3;
+  const expLeft = W - 2 - rbTextW(expLabel);
   if (expPts.length > 1) {
     parts.push(`<polyline points="${expPts.join(" ")}" fill="none" stroke="rgba(var(--line-rgb),0.6)" stroke-width="1.4" stroke-dasharray="3 3"/>`);
-    parts.push(
-      `<text x="${W - PAD_R + 4}" y="${(Math.min(Math.max(lastExpY, plotTop + 12), plotBot - 6) + 3).toFixed(1)}" font-size="8.5" fill="rgba(var(--line-rgb),0.7)" font-family="IBM Plex Mono, monospace">기대 ${stats.expWins.toFixed(
-        1
-      )}</text>`
-    );
+    parts.push(`<text x="${W - 2}" y="${expY.toFixed(1)}" text-anchor="end" class="rbb" fill="rgba(var(--line-rgb),0.7)" ${RB_HALO}>${expLabel}</text>`);
   }
   if (actualPts.length > 1) {
     parts.push(`<polyline points="${actualPts.join(" ")}" fill="none" stroke="var(--gold)" stroke-width="1.8" opacity="0.95"/>`);
-    const lx = actualPts[actualPts.length - 1].split(",")[0];
-    parts.push(`<circle cx="${lx}" cy="${lastActY.toFixed(1)}" r="2.6" fill="var(--gold)"/>`);
+    const lx = Number(actualPts[actualPts.length - 1].split(",")[0]);
+    parts.push(`<circle cx="${lx.toFixed(1)}" cy="${lastActY.toFixed(1)}" r="2.6" fill="var(--gold)"/>`);
+    // 승수 라벨: 오른쪽 끝에서는 점 왼쪽으로 뒤집고, '기대' 라벨과 같은 띠·비슷한 높이면
+    // 위아래로 밀어낸다(둘 다 숫자라 어느 쪽도 지우지 않는다).
+    const wl = `${wins}승`;
+    const flip = lx + 5 + rbTextW(wl) > W - 2;
+    let wy = lastActY - 5;
+    if (expPts.length > 1 && (flip ? lx - 5 : lx + 5 + rbTextW(wl)) > expLeft && Math.abs(wy - expY) < RB_FS_MAX) {
+      wy = expY - RB_FS_MAX - 4 > plotTop ? expY - RB_FS_MAX - 4 : expY + RB_FS_MAX + 4;
+    }
     parts.push(
-      `<text x="${(Number(lx) + 5).toFixed(1)}" y="${(lastActY - 5).toFixed(1)}" font-size="8.5" font-weight="700" fill="var(--gold)" font-family="IBM Plex Mono, monospace">${wins}승</text>`
+      `<text x="${(flip ? lx - 5 : lx + 5).toFixed(1)}" y="${wy.toFixed(1)}" text-anchor="${flip ? "end" : "start"}" class="rbb" font-weight="700" fill="var(--gold)" ${RB_HALO}>${wl}</text>`
     );
   }
 

@@ -190,12 +190,46 @@ function niceTicks(min: number, max: number, step: number): number[] {
   return ticks;
 }
 
+// ── 글자: 뷰박스 단위가 아니라 '렌더 픽셀'을 맞춘다 ────────────────────────────────
+// .scatterSvg는 width:100%이고 지면 폭 = 뷰포트 − 74(.wrap 좌우 36 + .panel 테두리·패딩 38)라
+// 렌더 배율 = (뷰포트 − 74)/720이다. 데스크톱(1108px)은 1.54, 375px 모바일은 0.42 - 3.7배
+// 차이라 font-size 한 값으로 양쪽을 만족시킬 수 없다(예전 9.5단위 = 데스크톱 14.6px·모바일
+// 4.0px). seasonRibbon.ts와 같은 수법으로 SVG 안 <style>에서 뷰포트 폭 구간마다 글자를 갈아
+// 끼운다(SVG에서 CSS px = 사용자 단위). 각 구간 하단의 렌더 픽셀: 1000px→12.9 / 800px→12.1 /
+// 620px→12.1 / 480px→12.4 / 401px→14.1 / 320px→12.3. 마지막 ≤400px 구간(36단위)이 iPhone SE
+// 1세대(320px)를 위한 것 - 31단위로는 (246/720)×31 = 10.6px, 36단위면 12.3px.
+// 한글이 섞이는 라벨(평균 …·선수 이름)이 있어 스택 뒤에 Pretendard를 둔다 - IBM Plex Mono에는
+// 한글 글리프가 없다. 이름표·세로축 제목은 아예 Pretendard(.svsN).
+// 글자가 3.3배가 되면 라벨은 반드시 부딪히므로 크기를 되돌리는 대신 라벨 수를 줄인다:
+// 선수 이름표와 세로축 제목(27자 = 좁은 화면에서 519단위 > 플롯 높이 414)은 .svsW로 넓은 화면
+// 전용(좁은 화면은 점 + 툴팁 + 호출부 캡션), 축 눈금은 32단위 폭으로 재서 두 개 중 하나만 남긴다.
+const SVS_FS_MAX = 36; // 가장 좁은 구간의 글자. 겹침 검사는 언제나 이 최댓값으로 한다.
+const SVS_STYLE =
+  `<style>.svs{font-family:"IBM Plex Mono","Pretendard",monospace;font-size:10px}` +
+  `.svsN{font-family:"Pretendard",sans-serif}` +
+  `@media(max-width:999px){.svs{font-size:12px}.svsW{display:none}}` +
+  `@media(max-width:799px){.svs{font-size:16px}}` +
+  `@media(max-width:619px){.svs{font-size:22px}}` +
+  `@media(max-width:479px){.svs{font-size:31px}}` +
+  `@media(max-width:400px){.svs{font-size:36px}}</style>`;
+const SVS_HALO = `paint-order="stroke" stroke="var(--surface)" stroke-width="3" stroke-linejoin="round"`;
+
+/** 대략 폭 - 한글 글리프 1em, 라틴·숫자 0.62em(careerStrip.ts/seasonRibbon.ts와 같은 근사). */
+function svsTextW(s: string, fs: number = SVS_FS_MAX): number {
+  return [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 127 ? 1 : 0.62) * fs, 0);
+}
+
+// 여백은 '가장 큰 글자'가 기준이다(≤400px 구간의 36단위): 세로 눈금 "1.20"이 89.3단위 + 축까지
+// 10 + 여백 2라 PAD_L 56 → 88 → 102, 가로 끝 눈금 "100%"가 반폭 44.6단위라 PAD_R 20 → 40 → 46,
+// 가로 눈금 + 축 제목 두 줄이 각각 36단위라 PAD_B 46 → 76(눈금 아래끝 485 · 제목 위끝 493),
+// 평균선 라벨(한글 포함 - 베이스라인 위로 0.8em = 28.8)이 플롯 위 PAD_T-8에 앉아 PAD_T 20 → 34
+// → 40. H를 480 → 524 → 530으로 늘려 플롯 높이 414는 그대로 둔다.
 const W = 720,
-  H = 480,
-  PAD_L = 56,
-  PAD_R = 20,
-  PAD_T = 20,
-  PAD_B = 46;
+  H = 530,
+  PAD_L = 102,
+  PAD_R = 46,
+  PAD_T = 40,
+  PAD_B = 76;
 const PLOT_W = W - PAD_L - PAD_R;
 const PLOT_H = H - PAD_T - PAD_B;
 export const SCATTER_VIEWBOX = `0 0 ${W} ${H}`;
@@ -235,39 +269,53 @@ export function buildShotValueScatterSvg(data: ShotValueScatterData): string {
   const xPix = (v: number) => PAD_L + ((v - xMin) / (xMax - xMin)) * PLOT_W;
   const yPix = (v: number) => PAD_T + PLOT_H - ((v - yMin) / (yMax - yMin)) * PLOT_H;
 
-  let svg = "";
+  let svg = SVS_STYLE;
 
   // 그리드 + 축 눈금 - .foot 등 이 사이트가 쓰는 옅은 회색조(var(--ink-faint), 이미 알파
-  // 포함된 토큰)를 그대로.
+  // 포함된 토큰)를 그대로. 격자선은 전부 남기고 '라벨만' 솎는다: 가장 큰 글자(31단위)로 잰
+  // 폭이 눈금 간격을 넘으면 두 개 중 하나만 그린다.
   svg += `<rect x="${PAD_L}" y="${PAD_T}" width="${PLOT_W}" height="${PLOT_H}" fill="none" stroke="var(--ink-faint)" stroke-width="1"/>`;
   const xStep = xMax - xMin > 0.4 ? 0.2 : 0.1;
-  for (const t of niceTicks(xMin, xMax, xStep)) {
+  const xTicks = niceTicks(xMin, xMax, xStep);
+  const xEvery = xTicks.length > 1 && Math.abs(xPix(xTicks[1]) - xPix(xTicks[0])) < svsTextW("100%") + 8 ? 2 : 1;
+  xTicks.forEach((t, i) => {
     const x = xPix(t);
     svg += `<line x1="${x.toFixed(1)}" y1="${PAD_T}" x2="${x.toFixed(1)}" y2="${PAD_T + PLOT_H}" stroke="var(--ink-faint)" stroke-width="0.6" opacity="0.5"/>`;
-    svg += `<text x="${x.toFixed(1)}" y="${PAD_T + PLOT_H + 16}" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)" font-family="IBM Plex Mono, monospace">${Math.round(t * 100)}%</text>`;
-  }
+    if (i % xEvery) return;
+    svg += `<text x="${x.toFixed(1)}" y="${PAD_T + PLOT_H + 24}" text-anchor="middle" class="svs" fill="var(--ink-soft)">${Math.round(t * 100)}%</text>`;
+  });
   const yStep = yMax - yMin > 1.0 ? 0.2 : 0.1;
-  for (const t of niceTicks(yMin, yMax, yStep)) {
+  const yTicks = niceTicks(yMin, yMax, yStep);
+  const yEvery = yTicks.length > 1 && Math.abs(yPix(yTicks[1]) - yPix(yTicks[0])) < SVS_FS_MAX + 4 ? 2 : 1;
+  yTicks.forEach((t, i) => {
     const y = yPix(t);
     svg += `<line x1="${PAD_L}" y1="${y.toFixed(1)}" x2="${PAD_L + PLOT_W}" y2="${y.toFixed(1)}" stroke="var(--ink-faint)" stroke-width="0.6" opacity="0.5"/>`;
-    svg += `<text x="${PAD_L - 8}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9.5" fill="var(--ink-soft)" font-family="IBM Plex Mono, monospace">${t.toFixed(2)}</text>`;
-  }
+    if (i % yEvery) return;
+    svg += `<text x="${PAD_L - 10}" y="${(y + 3).toFixed(1)}" text-anchor="end" class="svs" fill="var(--ink-soft)">${t.toFixed(2)}</text>`;
+  });
 
-  // 축 제목
-  svg += `<text x="${PAD_L + PLOT_W / 2}" y="${H - 6}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink-soft)" font-family="Pretendard, sans-serif">Morey Rate</text>`;
-  svg += `<text x="${14}" y="${PAD_T + PLOT_H / 2}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink-soft)" font-family="Pretendard, sans-serif" transform="rotate(-90 14 ${PAD_T + PLOT_H / 2})">Points Per True Shot Attempt</text>`;
+  // 축 제목 - 세로 제목은 27자라 좁은 화면(31단위 = 519단위)에서 플롯 높이(414)를 넘는다.
+  // 넓은 화면 전용으로 두고, 좁은 화면에서는 호출부 소제목("세로축은 PSA(시도 하나당 실제
+  // 득점)")이 같은 사실을 진다.
+  svg += `<text x="${PAD_L + PLOT_W / 2}" y="${H - 8}" text-anchor="middle" class="svs svsN" font-weight="700" fill="var(--ink-soft)">Morey Rate</text>`;
+  svg += `<text x="26" y="${PAD_T + PLOT_H / 2}" text-anchor="middle" class="svs svsN svsW" font-weight="700" fill="var(--ink-soft)" transform="rotate(-90 26 ${PAD_T + PLOT_H / 2})">Points Per True Shot Attempt</text>`;
 
   // 평균 기준선(가로=PSA, 세로=Morey rate) - 골드 대시. 이 사이트에서 "기준선"은 항상 골드
   // 대시다(커리어 결 띠의 이동평균, 시즌 리본의 누적 승수와 같은 톤).
+  // 두 라벨은 헤드라인 숫자라 좁은 화면에서도 남긴다 - 대신 31단위 반폭만큼은 캔버스 안으로
+  // 밀어 넣고(세로 평균선 라벨), 데이터 위에 얹히므로 후광을 두른다.
   if (avgMoreyPct >= xMin && avgMoreyPct <= xMax) {
     const ax = xPix(avgMoreyPct);
+    const lab = `평균 Morey Rate ${Math.round(avgMoreyPct * 100)}%`;
+    const half = svsTextW(lab) / 2;
+    const tx = Math.min(Math.max(ax, half + 2), W - half - 2);
     svg += `<line x1="${ax.toFixed(1)}" y1="${PAD_T}" x2="${ax.toFixed(1)}" y2="${PAD_T + PLOT_H}" stroke="var(--gold)" stroke-width="1.4" stroke-dasharray="4 3" opacity="0.85"/>`;
-    svg += `<text x="${ax.toFixed(1)}" y="${PAD_T - 6}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--gold)" font-family="IBM Plex Mono, monospace">평균 Morey Rate ${Math.round(avgMoreyPct * 100)}%</text>`;
+    svg += `<text x="${tx.toFixed(1)}" y="${PAD_T - 8}" text-anchor="middle" class="svs" font-weight="700" fill="var(--gold)" ${SVS_HALO}>${lab}</text>`;
   }
   if (avgPsa >= yMin && avgPsa <= yMax) {
     const ay = yPix(avgPsa);
     svg += `<line x1="${PAD_L}" y1="${ay.toFixed(1)}" x2="${PAD_L + PLOT_W}" y2="${ay.toFixed(1)}" stroke="var(--gold)" stroke-width="1.4" stroke-dasharray="4 3" opacity="0.85"/>`;
-    svg += `<text x="${PAD_L + PLOT_W - 4}" y="${(ay - 5).toFixed(1)}" text-anchor="end" font-size="10" font-weight="700" fill="var(--gold)" font-family="IBM Plex Mono, monospace">평균 PSA ${avgPsa.toFixed(2)}</text>`;
+    svg += `<text x="${PAD_L + PLOT_W - 4}" y="${(ay - 6).toFixed(1)}" text-anchor="end" class="svs" font-weight="700" fill="var(--gold)" ${SVS_HALO}>평균 PSA ${avgPsa.toFixed(2)}</text>`;
   }
 
   // 라벨 대상 선정 - "평균에서 정규화 거리가 먼" 순 + TSA 최상위 강제 포함.
@@ -286,7 +334,10 @@ export function buildShotValueScatterSvg(data: ShotValueScatterData): string {
     .forEach((p) => labelSet.add(p.pcode));
 
   // 점(선수) - TSA 큰 것부터 그려야 작은 점이 큰 버블에 완전히 묻히지 않고 위에 겹쳐 보임.
+  // 이름표도 이 순서로 자리를 잡아(표본 큰 선수 우선) 앞서 놓인 이름표와 겹치면 건너뛴다
+  // (careerStrip.ts의 lastLabelEnd 패턴을 2차원으로 - 겹치면 크기가 아니라 개수를 줄인다).
   const ordered = players.slice().sort((a, b) => b.tsa - a.tsa);
+  const placed: [number, number, number, number][] = [];
   for (const p of ordered) {
     const cx = xPix(p.moreyPct);
     const cy = yPix(p.psa);
@@ -297,11 +348,18 @@ export function buildShotValueScatterSvg(data: ShotValueScatterData): string {
     svg += `<a href="/players/${encodeURIComponent(p.pcode)}">`;
     svg += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${color}" opacity="0.78" stroke="var(--surface)" stroke-width="1"><title>${title}</title></circle>`;
 
+    // 이름표는 넓은 화면(10단위 = 12.9px) 전용 - 좁은 화면은 300px 폭에 3글자 이름 14개를
+    // 12px로 놓을 자리 자체가 없다(툴팁 + 호출부 캡션이 그 몫을 진다). 겹침 검사도 10단위로.
     if (labelSet.has(p.pcode)) {
+      const w = svsTextW(p.name, 10);
       const above = cy - r - 6 > PAD_T + 8;
       const ly = above ? cy - r - 5 : cy + r + 11;
-      const lx = Math.min(Math.max(cx, PAD_L + 26), PAD_L + PLOT_W - 26);
-      svg += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="9" font-weight="600" fill="var(--ink)" font-family="Pretendard, sans-serif" paint-order="stroke" stroke="var(--surface)" stroke-width="3" stroke-linejoin="round">${esc(p.name)}</text>`;
+      const lx = Math.min(Math.max(cx, PAD_L + w / 2), PAD_L + PLOT_W - w / 2);
+      const box: [number, number, number, number] = [lx - w / 2 - 2, ly - 10, lx + w / 2 + 2, ly + 3];
+      if (!placed.some((b) => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) {
+        placed.push(box);
+        svg += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" class="svs svsN svsW" font-weight="600" fill="var(--ink)" ${SVS_HALO}>${esc(p.name)}</text>`;
+      }
     }
     svg += `</a>`;
   }

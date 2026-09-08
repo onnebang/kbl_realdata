@@ -669,9 +669,15 @@ export function buildRecentGaugeSvg(row: RecentRow, rate: RecentRate): RecentGau
       // 쌓을 자리를 넘긴 경기는 숫자로 센다 - 그리지 않고 조용히 버리면 "리바운드 0이 열 경기"가
       // 점 넷으로 보인다(조은후 291499의 L15가 정확히 그 모양이다).
       const [tx, ty] = gaugePt(o.frac, G_DOT_R0 + G_STACK_MAX * G_STACK_STEP + 1.2);
+      // font-size는 뷰박스(100) 단위지 픽셀이 아니다. 이 SVG는 .gauge(RecentWindow.module.css,
+      // 격자 트랙 최소 136px · max-width 140px)에 폭 100%로 담기므로 배율이 1.36~1.40이고,
+      // 옛 6.6은 화면에서 9.0px밖에 되지 않았다(글자 바닥 12px 미달). 9면 12.2~12.6px이다.
+      // 그만큼 키우면 글자가 바깥 점 위로 물리므로 표면색 테두리를 글자 밑에 깔아 읽히게
+      // 둔다 - 위 커리어 눈금이 밑선을 까는 것과 같은 수법이다.
       parts.push(
-        `<text x="${n1(tx)}" y="${n1(ty)}" font-size="6.6" text-anchor="middle" dominant-baseline="middle" ` +
-          `fill="var(--ink-soft)" font-family="IBM Plex Mono, monospace">+${o.count}</text>`
+        `<text x="${n1(tx)}" y="${n1(ty)}" font-size="9" text-anchor="middle" dominant-baseline="middle" ` +
+          `fill="var(--ink-soft)" stroke="var(--surface)" stroke-width="2.6" paint-order="stroke" ` +
+          `stroke-linejoin="round" font-family="IBM Plex Mono, monospace">+${o.count}</text>`
       );
     }
   }

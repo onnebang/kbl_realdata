@@ -175,6 +175,34 @@ export function readableInk(color: string, bg: string, lighten: boolean, target 
   return best;
 }
 
+/**
+ * 비텍스트 UI 기준(WCAG 1.4.11 Non-text Contrast). 3px 팀 색 바처럼 "읽는" 것이 아니라
+ * "알아보는" 표식은 4.5:1이 아니라 3:1이다 - 그만큼 원색을 덜 밀어도 된다.
+ */
+export const UI_CONTRAST_TARGET = 3;
+
+/**
+ * 팀 색을 **막대·점 같은 비텍스트 표식**으로 쓸 때의 두 테마 쌍.
+ *
+ * accentFor를 쓰면 안 된다: 그건 딥다크 히어로 위의 별자리 점 전용이라 **다크 한쪽만** 본다.
+ * 실측(하네스, 라이트 카드 #ffffff 위): 고양 소노 #3FA9F5가 2.30:1로 사라진다 - 원색이 이미
+ * 밝아서 accentFor가 손대지 않고 통과시키기 때문이다. 반대로 teamInkPair(4.5:1)는 글자 기준이라
+ * 막대에는 과보정이다(원색에서 그만큼 멀어진다). 그래서 같은 이분탐색을 3:1로만 돌린다.
+ */
+export function teamBarPair(color: string | null | undefined): { light: string; dark: string } {
+  if (!color || relativeLuminance(color) == null) return { light: "#5B5F6E", dark: "#9297A8" };
+  return {
+    light: readableInk(color, LIGHT_TEXT_BG, false, UI_CONTRAST_TARGET),
+    dark: readableInk(color, DARK_TEXT_BG, true, UI_CONTRAST_TARGET),
+  };
+}
+
+/** teamInkStyle과 같은 규약(--tb-l/--tb-d 두 색을 같이 내려보내고 CSS 미디어쿼리가 고른다). */
+export function teamBarStyle(color: string | null | undefined): CSSProperties {
+  const bar = teamBarPair(color);
+  return { "--tb-l": bar.light, "--tb-d": bar.dark } as CSSProperties;
+}
+
 /** 한 팀의 두 테마용 잉크 한 쌍. 색이 없으면 중립 잉크로 폴백한다(팀 색을 지어내지 않는다). */
 export function teamInkPair(color: string | null | undefined): { light: string; dark: string } {
   if (!color || relativeLuminance(color) == null) return { light: "#5B5F6E", dark: "#9297A8" };

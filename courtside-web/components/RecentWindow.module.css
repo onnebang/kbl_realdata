@@ -11,8 +11,8 @@
 .panel {
   margin-top: 14px;
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 14px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
   padding: 16px 18px 14px;
   min-width: 0;
 }
@@ -25,10 +25,11 @@
   margin-bottom: 8px;
 }
 
+/* 한글 표제 규칙 - Pretendard 800 + -0.02em(body 상속이라 서체는 지정하지 않는다). */
 .title {
-  font-size: 13px;
+  font-size: var(--fs-300);
   font-weight: 800;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: var(--ink);
   margin: 0;
 }
@@ -48,10 +49,11 @@
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: var(--fs-100);
+  line-height: var(--lh-data);
   padding: 3px 9px;
-  border-radius: 999px;
+  /* 창 사실 칩 = 데이터 조각 - 하드 엣지(아래 .toggle 계열은 조작하는 것이라 알약을 유지한다). */
+  border-radius: var(--r-led);
   background: var(--surface-soft);
   border: 1px solid rgba(var(--line-rgb), 0.1);
   color: var(--ink-soft);
@@ -59,7 +61,7 @@
 }
 .fact b {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11.5px;
+  font-size: var(--fs-200);
   font-weight: 600;
   color: var(--ink);
 }
@@ -78,10 +80,11 @@
 }
 
 .lede {
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: var(--fs-200);
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
   margin: 0 0 10px;
+  max-width: var(--measure-read);
 }
 .lede b {
   color: var(--ink);
@@ -97,7 +100,7 @@
   margin-bottom: 10px;
 }
 .toggle {
-  font-size: 11.5px;
+  font-size: var(--fs-200);
   font-weight: 700;
   padding: 5px 12px;
   border-radius: 999px;
@@ -120,7 +123,7 @@
 /* 36분당을 만들 수 없는 창(합계 20분 미만)에서는 링크가 아니라 비활성 칩으로 그린다 -
    누를 수 없는 이유를 옆에 적는 편이 조용히 되돌아가는 것보다 정직하다. */
 .toggleOff {
-  font-size: 11.5px;
+  font-size: var(--fs-200);
   font-weight: 700;
   padding: 5px 12px;
   border-radius: 999px;
@@ -130,11 +133,12 @@
   white-space: nowrap;
 }
 .toggleNote {
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: var(--fs-100);
+  line-height: var(--lh-data);
   color: var(--ink-faint);
   flex: 1 1 240px;
   min-width: 0;
+  max-width: var(--measure-read);
 }
 
 /* ── 범례 ──────────────────────────────────────────────────────────────────────── */
@@ -143,7 +147,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 14px;
-  font-size: 10.5px;
+  font-size: var(--fs-100);
   color: var(--ink-soft);
   padding: 7px 0 9px;
   border-top: 1px solid rgba(var(--line-rgb), 0.08);
@@ -192,19 +196,28 @@
 /* ── 지표 게이지 격자 ──────────────────────────────────────────────────────────────
    행 10개에서 게이지 10칸으로. 요청("항목이 작게 표시되다보니 지금 이게 무엇을 표현하는지
    보이지가 않아")의 원인은 크기였다 - 한 행에 430×52 그림이 열 개 쌓이면 점 하나가 2.7px이라
-   축·눈금·점이 서로를 지운다. 칸 하나를 최소 118px로 잡아 같은 정보를 펴서 담는다. */
+   축·눈금·점이 서로를 지운다. 칸 하나를 최소 136px로 잡아 같은 정보를 펴서 담는다.
+
+   136/140은 임의의 숫자가 아니라 lib/recentWindow.ts의 게이지 글자가 요구하는 값이다.
+   그 SVG의 뷰박스는 100이고 폭 100%로 .gauge에 담기므로 배율 = 렌더 폭/100이다. 넘친 경기 수
+   "+N"의 font-size가 9(뷰박스 단위)라 화면 픽셀은 9 × 배율이고, 글자 바닥 12px을 지키려면
+   배율이 1.34 이상이어야 한다. 옛 값(트랙 118 · max-width 108)은 배율이 1.08밖에 되지 않아
+   9.7px, ≤480px에서는 트랙 96이라 8.6px이었다 - lib/recentWindow.ts의 주석은 이미 136/140을
+   전제로 계산해 두었는데 이 파일만 옛 값에 남아 있었다. 트랙 최소 136 → 배율 1.36(12.2px),
+   실제로는 max-width 140에 걸려 1.40(12.6px)이다. */
 /* 36분당에서 점을 생략한 이유 - 격자 위에 한 번만. */
 .omitNote {
   margin: 0 0 8px;
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: var(--fs-200);
+  line-height: var(--lh-data);
   color: var(--ink-faint);
+  max-width: var(--measure-read);
   word-break: keep-all;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
   gap: 14px 10px;
   margin-top: 2px;
 }
@@ -219,7 +232,7 @@
 .gauge {
   position: relative;
   width: 100%;
-  max-width: 108px;
+  max-width: 140px;
   aspect-ratio: 1;
 }
 .ring {
@@ -246,12 +259,14 @@
   gap: 1px;
   pointer-events: none;
 }
-/* 숫자 전용 서체. Big Shoulders Display에는 한글 글리프가 없어 이 클래스는 숫자와 %만 담는다. */
+/* 숫자 전용 서체. Big Shoulders Display에는 한글 글리프가 없어 이 클래스는 숫자와 %만 담는다.
+   게이지 하나의 주인공 숫자라 스코어보드 규칙(globals.css .scoreboard와 같은 다섯 선언). */
 .vMain {
   font-family: "Big Shoulders Display", sans-serif;
-  font-weight: 700;
-  font-size: 27px;
-  line-height: 0.95;
+  font-weight: 800;
+  font-size: var(--fs-600);
+  letter-spacing: -0.01em;
+  line-height: var(--lh-tight);
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
@@ -262,15 +277,15 @@
 /* 라틴 약어(MIN/PTS/FG%)라 모노로 그려도 안전하다. */
 .short {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-size: var(--fs-100);
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
 }
 
 .cellName {
   margin-top: 5px;
-  font-size: 11.5px;
+  font-size: var(--fs-200);
   font-weight: 600;
   color: var(--ink-soft);
   text-align: center;
@@ -281,9 +296,13 @@
   gap: 4px;
   margin-top: 1px;
 }
+/* 위계 - 칸 하나가 12px 다섯 줄이면 무엇을 먼저 읽어야 하는지가 사라진다. 커리어 대비 Δ는
+   이 패널의 두 번째 숫자(첫째는 링 가운데 값)라 캡션 줄들과 같은 급일 수 없다:
+     값 27(--fs-600) > Δ 15(--fs-300) > ±오차 13(--fs-200) > 축·범위·반대 단위 12(--fs-100).
+   바닥이 12px이라 캡션을 내릴 수는 없으니 Δ 쪽을 올려서 벌린다. */
 .dVal {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
+  font-size: var(--fs-300);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -301,9 +320,10 @@
 .dRole {
   color: var(--ink-soft);
 }
+/* ±표준오차 - Δ에 딸린 폭이지 별개의 캡션이 아니다. Δ보다 한 단 낮고 캡션보다 한 단 높다. */
 .dNoise {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-size: var(--fs-200);
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
@@ -315,8 +335,8 @@
   align-items: center;
   gap: 1px;
   margin-top: 3px;
-  font-size: 10px;
-  line-height: 1.4;
+  font-size: var(--fs-100);
+  line-height: var(--lh-data);
   color: var(--ink-faint);
   text-align: center;
   /* 칸이 좁아 한글이 단어 중간에서 끊긴다("점이 없 다") - 어절 단위로만 접는다. */
@@ -332,20 +352,20 @@
 }
 .cellNote {
   margin-top: 3px;
-  font-size: 10px;
-  line-height: 1.4;
+  font-size: var(--fs-100);
+  line-height: var(--lh-data);
   color: var(--ink-faint);
   text-align: center;
   word-break: keep-all;
 }
 
+/* 좁은 화면에서도 트랙 최소를 136 아래로 내리지 않는다 - 96으로 내리면 게이지 배율이 0.96이
+   되어 SVG 안 "+N"이 8.6px로 떨어진다(위 격자 주석의 계산). 375px 화면 기준 지면 303px에
+   136짜리 트랙은 두 칸이 들어가고(2×136+8=280), 칸은 147.5px이라 .gauge는 max-width 140에
+   걸린다. 칸이 넓어졌으므로 값 글자를 줄이던 옛 23px 예외도 지운다(스케일에도 없던 값이다). */
 @media (max-width: 480px) {
   .grid {
-    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
     gap: 12px 8px;
-  }
-  .vMain {
-    font-size: 23px;
   }
 }
 
@@ -358,10 +378,13 @@
   flex-direction: column;
   gap: 4px;
 }
+/* 패널 각주는 칸 안의 캡션(12)보다 한 단 위다 - 정의·경고 문장이라 문장으로 읽혀야 하고,
+   12.5px는 애초에 스케일(12/13/15/17/21/27/34/54)에 없던 값이었다. */
 .note {
-  font-size: 11px;
-  line-height: 1.55;
+  font-size: var(--fs-200);
+  line-height: var(--lh-prose);
   color: var(--ink-faint);
+  max-width: var(--measure-read);
 }
 /* 창 자체가 무의미해지는 경우(커리어가 창보다 짧다·결장이 섞였다)는 각주가 아니라 경고다. */
 .noteWarn {
@@ -375,7 +398,9 @@
 }
 
 .empty {
-  font-size: 12px;
+  font-size: var(--fs-200);
+  line-height: var(--lh-prose);
   color: var(--ink-faint);
   padding: 6px 0;
+  max-width: var(--measure-read);
 }

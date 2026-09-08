@@ -302,8 +302,8 @@ export default async function SeasonLeadersPage({
             </p>
             <p>
               {data.seasonName} 정규시즌 {data.teamGames}경기 기준 · 출전 {data.playersN}명 중 자격
-              통과 {data.qualifiedN}명 · 부문당 최대 {data.topN}명 · Supabase game_player_stats /
-              player_season_wpa 실시간 조회
+              통과 {data.qualifiedN}명 · 부문당 최대 {data.topN}명 · 경기별 선수 기록과 시즌 WPA
+              집계에서 실시간 조회
             </p>
           </div>
         </>

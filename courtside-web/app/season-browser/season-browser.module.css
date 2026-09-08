@@ -9,8 +9,11 @@
   --surface: #ffffff;
   --surface-soft: #eceef3;
   --ink: #14161c;
-  --ink-soft: #5b5f6e;
-  --ink-faint: #9297a880;
+  /* 본문 잉크는 불투명 값(알파 잉크는 --surface-soft 위에서 대비가 무너진다). */
+  --ink-soft: #4a4f5c;
+  /* #6c7180은 이 페이지의 세 배경 중 --surface-soft에서 4.20, --bg에서 4.47로 미달이었다.
+     #676c7b는 #ffffff 5.24 / #eceef3 4.51 / #f4f5f8 4.81로 셋 다 통과한다(globals.css와 같은 값). */
+  --ink-faint: #676c7b;
   --home: #d9640a;
   --home-soft: #d9640a1a;
   --away: #1f6fd6;
@@ -26,8 +29,8 @@
     --surface: #1a1d24;
     --surface-soft: #23272f;
     --ink: #f2f3f7;
-    --ink-soft: #9297a8;
-    --ink-faint: #6a6f7f90;
+    --ink-soft: #a8aebe;
+    --ink-faint: #8d93a3;
     --home: #ff8a3d;
     --home-soft: #ff8a3d26;
     --away: #3ea6ff;
@@ -43,8 +46,8 @@
   --surface: #1a1d24;
   --surface-soft: #23272f;
   --ink: #f2f3f7;
-  --ink-soft: #9297a8;
-  --ink-faint: #6a6f7f90;
+  --ink-soft: #a8aebe;
+  --ink-faint: #8d93a3;
   --home: #ff8a3d;
   --home-soft: #ff8a3d26;
   --away: #3ea6ff;
@@ -59,8 +62,9 @@
   color: var(--ink);
 }
 
+/* 경기 목록이 있는 지면이라 넓은 폭. 산문(.subtitle)은 62ch에서 끊는다. */
 .wrap {
-  max-width: 760px;
+  max-width: var(--measure-wide);
   margin: 0 auto;
   padding: 28px 18px 80px;
 }
@@ -68,14 +72,19 @@
 .headerRow {
   margin-bottom: 18px;
 }
+/* "25-26 시즌 브라우저" - 한글이 섞인 제목이라 Big Shoulders Display(한글 글리프 없음)를
+   걸면 경고 없이 sans-serif로 폴백한다. 한글 표제 = Pretendard 800 + -0.02em. */
 .title {
-  font-family: "Big Shoulders Display", sans-serif;
+  font-family: "Pretendard", system-ui, sans-serif;
   font-weight: 800;
-  font-size: 30px;
-  line-height: 1.1;
+  font-size: var(--fs-700);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.02em;
 }
 .subtitle {
-  font-size: 13px;
+  max-width: var(--measure-read);
+  font-size: var(--fs-300);
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
   margin-top: 6px;
 }
@@ -134,15 +143,17 @@
 
 .panel {
   background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 14px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
   overflow: hidden;
 }
+/* 행 전체가 버튼(박스스코어 모달을 연다)이라 손가락 표적 44px를 항상 지킨다. */
 .gameRow {
   display: grid;
   grid-template-columns: 78px 1fr auto;
   align-items: center;
   gap: 10px;
+  min-height: 44px;
   padding: 10px 14px;
   border-bottom: 1px solid rgba(var(--line-rgb), 0.08);
   cursor: pointer;
@@ -161,18 +172,20 @@
 .gameRow:hover {
   background: var(--surface-soft);
 }
+/* 날짜(2025.03.14)와 "PO" 배지는 기계가 읽는 코드라 모노 유지. */
 .grDate {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-faint);
 }
+/* 배지는 데이터 조각이라 하드 엣지(--r-led). */
 .grCat {
   display: inline-block;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 8.5px;
+  font-size: var(--fs-100);
   color: var(--gold);
   background: var(--gold-soft);
-  border-radius: 4px;
+  border-radius: var(--r-led);
   padding: 1px 4px;
   margin-top: 2px;
 }
@@ -193,12 +206,17 @@
 }
 .grVs {
   color: var(--ink-faint);
-  font-size: 11px;
+  font-size: 12.5px;
 }
+/* 경기 행의 주인공은 점수다 - 행 안에서 가장 큰 것(팀 이름 13px, 날짜 12.5px).
+   숫자와 "-"만 들어오는 자리라 한글 폴백 위험이 없다. */
 .grScore {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: 16px;
+  font-size: var(--fs-500);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
 }
@@ -234,11 +252,11 @@
   font-family: "Pretendard", system-ui, -apple-system, sans-serif;
   color: var(--ink);
   background: var(--surface);
-  border-radius: 14px;
+  border-radius: var(--r-card);
   padding: 20px;
   max-width: 640px;
   width: 100%;
-  border: 1px solid rgba(var(--line-rgb), 0.15);
+  border: 1px solid rgba(var(--line-rgb), 0.14);
   margin-top: 20px;
   margin-bottom: 20px;
 }
@@ -275,23 +293,31 @@
 .bsTeamName {
   font-size: 12.5px;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
+/* 모달의 주인공. 이 화면에서 큰 숫자는 이것 하나다. */
 .bsScore {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
   font-size: 40px;
-  line-height: 1;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
 }
 .bsSep {
   font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
   font-size: 24px;
+  line-height: var(--lh-tight);
   color: var(--ink-faint);
 }
+/* "2025.03.14 · 정규리그" - 한글 분류가 붙으므로 Pretendard + tabular. */
 .bsMeta {
   text-align: center;
-  font-size: 11.5px;
+  font-size: var(--fs-200);
   color: var(--ink-faint);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
   margin-bottom: 16px;
 }
 .bsMetaLeft {
@@ -299,10 +325,11 @@
   margin-bottom: 0;
 }
 
+/* 값 12.5px > 열 제목 --fs-100(12px). 라벨이 값과 같은 크기면 위계가 없다. */
 .bsQuarterTable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 12.5px;
   margin-bottom: 16px;
 }
 .bsQuarterTable th,
@@ -311,11 +338,11 @@
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+/* 열 제목에 한글("계")이 섞여 Pretendard. */
 .bsQuarterTable th {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9.5px;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
-  text-transform: uppercase;
   border-bottom: 1px solid rgba(var(--line-rgb), 0.12);
 }
 .tname {
@@ -333,12 +360,12 @@
   border-left: 1px solid rgba(var(--line-rgb), 0.12);
 }
 
+/* "SK 박스스코어" 같은 한글 제목이 들어온다 - Pretendard. */
 .bsSectionTitle {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-200);
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--ink-faint);
   margin: 18px 0 8px;
 }
@@ -348,7 +375,8 @@
 .tsNums {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   margin-bottom: 4px;
 }
 .tsHome {
@@ -359,14 +387,17 @@
   color: var(--away);
   font-weight: 700;
 }
+/* 가운데 라벨("야투 성공률")은 양쪽 값보다 한 단계 작게. */
 .tsLabel {
+  font-size: var(--fs-100);
   color: var(--ink-soft);
   font-weight: 600;
 }
+/* 미터는 데이터 조각이라 하드 엣지(--r-led). */
 .tsBar {
   display: flex;
   height: 7px;
-  border-radius: 4px;
+  border-radius: var(--r-led);
   overflow: hidden;
   background: var(--surface-soft);
 }
@@ -384,14 +415,14 @@
 .bsPlayers {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 12.5px;
   min-width: 480px;
 }
+/* 첫 열 제목이 한글("선수")이라 Pretendard. */
 .bsPlayers th {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
-  text-transform: uppercase;
   text-align: right;
   padding: 5px 6px;
   border-bottom: 1px solid rgba(var(--line-rgb), 0.14);
@@ -413,12 +444,12 @@
 .bench td:first-child {
   color: var(--ink-faint);
 }
+/* "BENCH" - 라틴 구분자라 모노 유지. */
 .benchSep td {
   padding-top: 4px;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 8.5px;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
-  text-transform: uppercase;
   border-bottom: none;
 }
 
@@ -434,7 +465,7 @@
     padding: 20px 12px 60px;
   }
   .title {
-    font-size: 24px;
+    font-size: var(--fs-600);
   }
   .bsScore {
     font-size: 30px;

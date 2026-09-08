@@ -971,7 +971,7 @@ export default async function TeamPage({
       </div>
 
       <footer className="foot">
-        {teamName} · {factSeason} 시즌 · Supabase에서 실시간 조회
+        {teamName} · {factSeason} 시즌 · 실시간 조회
       </footer>
     </div>
   );

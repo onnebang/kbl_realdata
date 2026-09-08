@@ -1,6 +1,7 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { TeamBadge } from "@/components/TeamBadge";
-import { teamInkStyle } from "@/lib/teamAccent";
+import { teamBarStyle, teamInkStyle } from "@/lib/teamAccent";
 import {
   getSeasons,
   getTeamsForSeason,
@@ -95,10 +96,11 @@ export default async function HomePage({
   return (
     <div className="wrap">
       <div className="title">코트사이드</div>
+      {/* 리드는 사용자가 여기서 하는 일로 쓴다. 예전 문구는 "Supabase에 실제로 적재된 …
+          직접 조회합니다"였는데, 그건 이 화면이 어떻게 만들어졌는지지 사용자가 뭘 할 수
+          있는지가 아니다. */}
       <div className="subtitle">
-        Supabase에 실제로 적재된 KBL 경기 데이터를 직접 조회합니다 - 경기를 선택하면
-        승률 그래프와 박스스코어를 볼 수 있어요. 팀 이름을 누르면 그 팀의 시즌 일정으로
-        이동합니다.
+        경기를 누르면 그날의 승률 흐름과 박스스코어를, 팀 이름을 누르면 그 팀의 시즌을 봅니다.
       </div>
 
       {/* 개막 전(이 시즌 종료 경기 0, 예정 경기 있음)에만 - 첫 경기가 끝나면 자동으로 사라짐.
@@ -131,7 +133,7 @@ export default async function HomePage({
 
       <div className="game-list">
         {games.length === 0 && (
-          <div className="empty-note">조건에 맞는 경기 데이터가 없음(마이그레이션 진행 중일 수 있음)</div>
+          <div className="empty-note">이 조건에 맞는 경기가 없습니다. 시즌이나 팀을 바꿔 보세요.</div>
         )}
         {games.map((g) => {
           // 상태(예정/진행중/종료)는 lib/gameStatus.ts 단일 정의로 판정 - 경기 페이지와
@@ -144,7 +146,8 @@ export default async function HomePage({
           const tag = tags.get(g.gmkey);
           const homeWinPct = g.home_team ? seasonWinPcts.get(g.home_team.tcode) : undefined;
           const awayWinPct = g.away_team ? seasonWinPcts.get(g.away_team.tcode) : undefined;
-          const detailLabel = status === "scheduled" ? "미리보기 →" : status === "live" ? "라이브 보기 →" : "경기 상세보기 →";
+          // 화살표는 붙이지 않는다 - 링크라는 사실은 이미 자리와 색이 말한다.
+          const detailLabel = status === "scheduled" ? "미리보기" : status === "live" ? "라이브 보기" : "경기 상세보기";
           return (
             <div key={g.gmkey} className="game-card">
               <div className="game-card-row">
@@ -160,7 +163,11 @@ export default async function HomePage({
                 <Link
                   href={`/teams/${g.home_team?.tcode}?season=${activeSeason}`}
                   className={`team-name home ${homeWon ? "win" : ""}`}
-                  style={teamInkStyle(g.home_team?.color)}
+                  // --ti-* = 글자색(안 쓰지만 .team-ink 규약 공유), --tb-* = 이름 옆 3px 팀 색 바.
+                  // 막대는 글자가 아니라 표식이라 3:1 기준(teamBarPair)이다 - 4.5:1로 보정하면
+                  // 원색에서 필요 이상으로 멀어지고, accentFor를 쓰면 라이트 테마에서 밝은 팀 색이
+                  // 사라진다(실측: 고양 소노 #3FA9F5가 흰 카드 위 2.30:1).
+                  style={{ ...teamInkStyle(g.home_team?.color), ...teamBarStyle(g.home_team?.color) } as CSSProperties}
                 >
                   {g.home_team?.name ?? g.gmkey}
                 </Link>
@@ -191,7 +198,7 @@ export default async function HomePage({
                 <Link
                   href={`/teams/${g.away_team?.tcode}?season=${activeSeason}`}
                   className={`team-name away ${status === "final" && !homeWon ? "win" : ""}`}
-                  style={teamInkStyle(g.away_team?.color)}
+                  style={{ ...teamInkStyle(g.away_team?.color), ...teamBarStyle(g.away_team?.color) } as CSSProperties}
                 >
                   {g.away_team?.name ?? ""}
                 </Link>
@@ -304,7 +311,7 @@ export default async function HomePage({
       <footer className="foot">
         {activeSeason} 시즌 · 전체 {total}경기 중{" "}
         {games.length > 0 ? `${offset + 1}-${offset + games.length}번째` : "0번째"} 표시(
-        {page}/{pageCount} 페이지) · Supabase 프로젝트 &quot;who are u_kbl&quot;에서 실시간 조회
+        {page}/{pageCount} 페이지)
         {liveGmkeys.length > 0 && ` · 라이브 ${liveGmkeys.length}경기 진행중(30초마다 자동 갱신)`}
       </footer>
     </div>

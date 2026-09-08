@@ -11,38 +11,47 @@
 }
 .figure {
   background: var(--surface-soft);
-  border-radius: 12px;
+  border-radius: var(--r-inset);
   padding: 12px 14px;
 }
 .figureLabel {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-faint);
+  font-size: var(--fs-100);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
 }
 /* 숫자에만 Big Shoulders를 쓴다 - 이 폰트엔 한글 글리프가 없어서 한글이 섞이면 통째로
-   폴백된다(같은 실수를 세 번 했다). 단위 한글은 .figureUnit으로 따로 뺀다. */
+   폴백된다(같은 실수를 세 번 했다). 단위 한글은 .figureUnit으로 따로 뺀다.
+   이 타일이 각 패널(확정 결장 · 외국인 규정)의 주인공 숫자라 스코어보드 목소리로 --fs-700.
+   패널 안 나머지 숫자(표·카드)는 조용히 남는다. */
 .figureVal {
   font-family: "Big Shoulders Display", "IBM Plex Mono", monospace;
   font-weight: 800;
-  font-size: 30px;
+  font-size: var(--fs-700);
   line-height: 1.05;
+  letter-spacing: -0.01em;
   margin-top: 6px;
   font-variant-numeric: tabular-nums;
 }
+/* 단위는 '초'/'분'/'명'과 '%'가 섞여 들어온다(ImportRule·DepartureImpact). font-family:inherit로
+   두면 부모 .figureVal의 두 서체를 그대로 받는데 Big Shoulders Display도 IBM Plex Mono도 한글
+   글리프가 없어서 한글 단위만 시스템 monospace로 튀었다 - 위 주석이 말한 분리가 서체까지는
+   가지 않았던 것. team-profile.module.css .rankSuffix('위')와 같이 본문 서체를 다시 선언한다. */
 .figureUnit {
-  font-family: inherit;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
   font-size: 13px;
   font-weight: 700;
   margin-left: 3px;
   color: var(--ink-soft);
 }
+/* 산문 - 타일이 두 개만 렌더되면(DepartureImpact의 세 번째 타일은 조건부) auto-fit 칸이
+   1180px 지면에서 520px까지 벌어진다. 62자에서 끊는다. */
 .figureSub {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-soft);
   margin-top: 6px;
-  line-height: 1.45;
+  line-height: var(--lh-prose);
+  max-width: var(--measure-read);
   word-break: keep-all;
 }
 
@@ -59,7 +68,8 @@
   align-items: center;
   gap: 10px;
   padding: 7px 8px;
-  border-radius: 9px;
+  /* 표 행은 데이터 조각 - 하드 엣지 */
+  border-radius: var(--r-led);
   text-decoration: none;
   color: var(--ink);
 }
@@ -67,10 +77,9 @@
   background: var(--surface-soft);
 }
 .lossHead {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: var(--fs-100);
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
   padding-bottom: 0;
 }
@@ -88,17 +97,18 @@
 .lossTeamName {
   white-space: nowrap;
 }
+/* 미터 = 데이터 조각(--r-led). 팀 색은 글자가 아니라 이 막대에만 들어간다. */
 .lossTrack {
   position: relative;
   height: 20px;
-  border-radius: 5px;
+  border-radius: var(--r-led);
   background: rgba(var(--line-rgb), 0.1);
   overflow: hidden;
 }
 .lossFill {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 5px;
+  border-radius: var(--r-led);
   opacity: 0.85;
 }
 .lossNames {
@@ -107,16 +117,18 @@
   display: flex;
   align-items: center;
   padding: 0 8px;
-  font-size: 10.5px;
+  font-size: 12.5px;
+  line-height: var(--lh-data);
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 표 머리(.lossHead --fs-100 12px)와 같은 크기라 머리가 값과 동급으로 읽혔다 - 값을 한 눈금 위로. */
 .lossNum {
   text-align: right;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
+  font-size: 12.5px;
   font-variant-numeric: tabular-nums;
 }
 .lossNumMuted {
@@ -127,10 +139,11 @@
   width: fit-content;
   margin-left: auto;
   margin-top: 3px;
-  font-size: 9.5px;
+  font-size: var(--fs-100);
   font-weight: 700;
-  line-height: 1.4;
-  border-radius: 4px;
+  line-height: var(--lh-data);
+  /* 배지 = 데이터 조각 */
+  border-radius: var(--r-led);
   padding: 1px 5px;
   white-space: nowrap;
 }
@@ -144,7 +157,7 @@
 }
 .tierNone {
   background: rgba(var(--line-rgb), 0.12);
-  color: var(--ink-faint);
+  color: var(--ink-soft);
 }
 
 /* 자리(포지션) 구멍 - 총량 표 아래에 붙는 한 줄들 */
@@ -158,8 +171,10 @@
   align-items: baseline;
   gap: 8px;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
+  /* 문장이다 - 62자에서 끊는다 */
+  max-width: var(--measure-read);
   word-break: keep-all;
 }
 .holeTeam {
@@ -168,7 +183,6 @@
   white-space: nowrap;
 }
 .holeVal {
-  font-family: "IBM Plex Mono", monospace;
   font-weight: 700;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -181,8 +195,8 @@
   gap: 10px;
 }
 .slotCard {
-  border: 1px solid rgba(var(--line-rgb), 0.12);
-  border-radius: 12px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-inset);
   border-top-width: 3px;
   padding: 11px 13px 10px;
 }
@@ -193,6 +207,8 @@
   gap: 4px 8px;
   font-weight: 800;
   font-size: 14px;
+  /* 한글 표제(팀 이름) = Pretendard 800 + -0.02em */
+  letter-spacing: -0.02em;
   margin-bottom: 9px;
   text-decoration: none;
   color: var(--ink);
@@ -202,14 +218,13 @@
 }
 .slotIndex {
   margin-left: auto;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
 .seat {
   display: grid;
-  grid-template-columns: 60px 1fr auto;
+  grid-template-columns: 76px 1fr auto;
   align-items: baseline;
   gap: 8px;
   padding: 4px 0;
@@ -220,14 +235,14 @@
   border-top: none;
 }
 .seatRole {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  letter-spacing: 0.04em;
+  font-size: var(--fs-100);
+  letter-spacing: 0.02em;
   color: var(--ink-faint);
   white-space: nowrap;
 }
 .seatName {
   font-weight: 700;
+  font-size: var(--fs-200);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -235,19 +250,18 @@
 }
 .seatFrom {
   font-weight: 400;
-  font-size: 10px;
+  font-size: var(--fs-100);
   color: var(--ink-faint);
   margin-left: 5px;
 }
 .seatStat {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .seatNone {
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--ink-faint);
   white-space: nowrap;
 }
@@ -258,11 +272,10 @@
   margin-top: 8px;
   padding-top: 7px;
   border-top: 1px solid rgba(var(--line-rgb), 0.08);
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--ink-soft);
 }
 .slotFootVal {
-  font-family: "IBM Plex Mono", monospace;
   font-weight: 700;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -280,15 +293,14 @@
 }
 .ruleCol {
   background: var(--surface-soft);
-  border-radius: 12px;
+  border-radius: var(--r-inset);
   padding: 11px 13px;
 }
 .ruleColHead {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-faint);
+  font-size: var(--fs-100);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
   margin-bottom: 7px;
 }
 .quarterStrip {
@@ -297,14 +309,15 @@
   gap: 4px;
   margin-bottom: 7px;
 }
+/* 쿼터 칸 = 데이터 조각(--r-led) */
 .qCell {
-  border-radius: 6px;
+  border-radius: var(--r-led);
   padding: 6px 4px;
   text-align: center;
-  font-size: 10px;
-  line-height: 1.35;
+  font-size: 12.5px;
+  line-height: var(--lh-data);
   background: rgba(var(--line-rgb), 0.08);
-  color: var(--ink-faint);
+  color: var(--ink-soft);
 }
 .qCellOpen {
   background: rgba(214, 168, 69, 0.2);
@@ -313,13 +326,16 @@
 }
 .qCellName {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  letter-spacing: 0.05em;
+  font-size: var(--fs-100);
+  letter-spacing: 0.02em;
 }
+/* 산문 - .ruleCol은 두 개뿐이라 auto-fit이 260px 최소폭이 아니라 지면의 절반을 준다
+   (1180px 지면에서 칸 548px, 패딩 빼고 522px). 62자에서 끊는다. */
 .ruleText {
-  font-size: 11.5px;
-  line-height: 1.5;
+  font-size: var(--fs-200);
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
+  max-width: var(--measure-read);
   word-break: keep-all;
 }
 
@@ -336,9 +352,6 @@
   .lossHead,
   .lossRow {
     min-width: 460px;
-  }
-  .lossHead {
-    font-size: 10.5px;
   }
   .figureRow {
     grid-template-columns: 1fr;
