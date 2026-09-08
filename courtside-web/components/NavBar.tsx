@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/preseason", label: "개막 리포트" },
   { href: "/teams", label: "팀 자세히 보기" },
   { href: "/players", label: "선수 자세히 보기" },
+  { href: "/coaches", label: "감독" },
   // 선수별 조합(WOWY)은 선수 도구라 선수 항목 옆에, 시즌 리더보드는 나머지 리더보드 묶음
   // 맨 앞에 둔다(요청: "시즌별 리더보드 추가 / 선수별 조합").
   { href: "/lineups", label: "선수별 조합" },

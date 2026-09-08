@@ -1,0 +1,270 @@
+/* 감독 프로필 - globals.css :root 토큰만 사용(라이트/다크는 토큰이 바뀐다). 팀/선수 프로필의 시각 언어
+   (Big Shoulders 숫자, IBM Plex Mono 라벨)와 맞추되 히어로 아트는 없다 - 이 페이지의 데이터는 전부
+   '팀 성적을 감독 재임기로 자른 것'이라 감독 개인을 크게 그리지 않는다. 모든 글자 ≥ 11px(375px 기준). */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  margin-top: 6px;
+}
+.kicker {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--ink-faint);
+}
+.sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.badgeLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.unconfirmed {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* ── 카드 ── */
+.card {
+  margin-top: 18px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 14px;
+  padding: 14px 16px 12px;
+}
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  margin-bottom: 8px;
+}
+.cardTitle {
+  font-weight: 800;
+  font-size: 16px;
+}
+.cardKicker {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* ── 상단 타일 ── */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 10px;
+}
+.tile {
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: 12px;
+  padding: 10px 12px 8px;
+  min-width: 0;
+}
+.tileVal {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tileSe {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-left: 4px;
+}
+.tileLabel {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 4px;
+}
+.tileText {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.captions {
+  margin: 12px 0 0;
+  padding: 0 0 0 16px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.captions li + li {
+  margin-top: 2px;
+}
+.note {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+/* ── 표 ── */
+.tableWrap {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.table th {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  text-align: right;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.16);
+}
+.table td {
+  padding: 6px 8px;
+  text-align: right;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.08);
+}
+.table th:first-child,
+.table td:first-child,
+.table th.left,
+.table td.left {
+  text-align: left;
+}
+.table a {
+  color: var(--ink);
+  font-weight: 700;
+}
+.small {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.dim {
+  color: var(--ink-faint);
+}
+/* 진행 중인 시즌 배지(표 행·레이더 칩) - 표본이 작다는 것을 값 옆에서 바로 알리는 용도. */
+.partial {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 5px;
+  border: 1px solid rgba(var(--line-rgb), 0.24);
+  border-radius: 999px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.pos {
+  color: var(--positive);
+}
+.neg {
+  color: var(--negative);
+}
+
+/* ── 레이더 ── */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 10px;
+}
+.radarGrid {
+  display: grid;
+  grid-template-columns: minmax(240px, 340px) 1fr;
+  gap: 12px 20px;
+  align-items: start;
+}
+@media (max-width: 640px) {
+  .radarGrid {
+    grid-template-columns: 1fr;
+  }
+}
+/* min-width = 뷰박스 폭. 이보다 좁아지면 축 라벨(12 유닛)이 11px 아래로 내려가므로 줄이는 대신
+   래퍼(.tableWrap)가 가로로 스크롤한다 - 360px 기기의 실렌더 폭은 290px다. */
+.radarSvg {
+  width: 100%;
+  min-width: 320px;
+  max-width: 340px;
+  height: auto;
+  display: block;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 6px;
+}
+.legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  vertical-align: -1px;
+  margin-right: 4px;
+}
+.swSeason {
+  background: color-mix(in srgb, var(--gold) 30%, transparent);
+  border: 1.5px solid var(--gold);
+}
+.swCareer {
+  border: 1.5px dashed rgba(var(--line-rgb), 0.55);
+}
+.swLeague {
+  border: 1.5px solid rgba(var(--line-rgb), 0.5);
+}
+.swGray {
+  background: var(--ink-faint);
+}
+.aux {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(var(--line-rgb), 0.12);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.aux b {
+  color: var(--ink);
+}
+
+/* ── 챌린지 ── */
+.leagueLine {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.chGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.measuring {
+  margin-top: 18px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
