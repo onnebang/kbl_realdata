@@ -17,16 +17,16 @@
 .banner:hover {
   border-color: var(--gold);
 }
-.kicker {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: var(--fs-100);
-  font-weight: 700;
-  letter-spacing: 0.02em;
+/* 왼쪽 칸은 이제 D-N(또는 '오늘 개막')이다 - 장식 눈썹 대신 배너에서 유일하게 시시각각 바뀌는
+   숫자를 그 자리에 둔다. 스코어보드 서체(라틴·숫자 전용)를 쓸 수 있는 건 "D-25"가 라틴이기
+   때문이고, '오늘 개막'/'개막 3일째'는 한글이라 폴백이 필요하다 - 그래서 서체를 박지 않고
+   본문(Pretendard 800)을 쓴다. 숫자만 tabular-nums로 폭을 고정해 D-9 → D-10에서 안 흔들린다. */
+.dday {
+  font-size: var(--fs-500);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
   color: var(--gold);
-  padding: 4px 8px;
-  border: 1px solid var(--gold);
-  /* 배지 = 데이터 조각(--r-led) */
-  border-radius: var(--r-led);
   white-space: nowrap;
 }
 .main {
@@ -59,7 +59,7 @@
     grid-template-columns: 1fr;
     gap: 8px;
   }
-  .kicker {
+  .dday {
     justify-self: start;
   }
 }

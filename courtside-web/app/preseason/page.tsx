@@ -648,7 +648,7 @@ function DemoCard({ g }: { g: DemoGame }) {
         </div>
       </div>
       <div className={styles.demoWhy}>{g.why}</div>
-      <div className={styles.demoCta}>리플레이 열기 →</div>
+      <div className={styles.demoCta}>리플레이 열기</div>
     </Link>
   );
 }

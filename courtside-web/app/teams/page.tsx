@@ -58,7 +58,7 @@ export default async function TeamsPage() {
                 </div>
               </div>
               <div className={styles.teamLinks}>
-                <span>{cur} 프로필 →</span>
+                <span>{cur} 프로필</span>
                 <span>{prev} 시즌 보기</span>
                 <span>로스터 변화</span>
               </div>

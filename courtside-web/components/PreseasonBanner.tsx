@@ -13,15 +13,18 @@ export async function PreseasonBanner({ season }: { season: string }) {
   const [y, m, day] = opener.firstGameDate.split("-");
   const when = d > 0 ? `D-${d}` : d === 0 ? "오늘 개막" : `개막 ${-d}일째`;
   return (
+    // 예전엔 왼쪽에 대문자 라틴 눈썹(PRESEASON) 배지가 있었다. 뺐다 - 바로 오른쪽 표제가
+    // "26-27 시즌 개막까지 D-25"라고 이미 말하므로 그 배지가 더하는 사실이 없었고, 대문자 눈썹은
+    // 소재와 무관하게 어디에나 붙는 장식이다. 대신 남은 자리를 D-N이 가져간다(그게 진짜 정보다).
     <Link href="/preseason" className={styles.banner}>
-      <span className={styles.kicker}>PRESEASON</span>
+      <span className={styles.dday}>{when}</span>
       <span className={styles.main}>
-        <b>{shortSeason(season)} 시즌 개막까지 {when}</b>
+        <b>{shortSeason(season)} 시즌 개막</b>
         <span className={styles.sub}>
           {y}.{m}.{day} 개막 · 예정 {opener.nGames}경기 반영 · 로스터 변화와 시즌 전망, 그리고 개막 후 중계가 어떻게 보일지 미리 확인
         </span>
       </span>
-      <span className={styles.cta}>개막 리포트 →</span>
+      <span className={styles.cta}>개막 리포트</span>
     </Link>
   );
 }
