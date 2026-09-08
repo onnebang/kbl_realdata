@@ -360,15 +360,24 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
   // ── 4-1. 값 라벨(확대판) ─────────────────────────────────────────────────────────
   // 제보: "L15·L30 가시성" - 막대 높이만으로는 그날 몇 점인지 읽히지 않는다. 칸이 충분히 넓을
   // 때만(7단위+, 40칸 이하) 칸 위에 득점을 적는다. 0점은 적지 않는다(바닥 눈금이 이미 말한다).
-  const showValues = !!opts.valueLabels && mode === "cell" && cw >= 7 && N <= 40;
+  // 칸 폭 하한 8: 6.5단위 모노 두 자리가 7.8단위라 그보다 좁은 칸에서는 이웃을 밟는다
+  // (실측 - 8단위로 찍었더니 9단위 칸에서 9.6단위가 되어 겹쳤다).
+  const showValues = !!opts.valueLabels && mode === "cell" && cw >= 8 && N <= 40;
   if (showValues) {
-    const fv = n1(8 * FS);
+    const fv = n1(6.5 * FS);
     parts.push(`<g pointer-events="none" font-family="${MONO}" font-size="${fv}" font-weight="700" text-anchor="middle" fill="${ink(0.85)}">`);
+    // 이웃과 겹칠 것 같으면 건너뛴다. 두 자리 숫자가 붙은 칸에 연달아 오면 "14"와 "16"이 "1416"으로
+    // 읽힌다(375px 실측). 막대 높이가 이미 값을 말하므로, 겹치느니 몇 개를 안 적는 쪽이 낫다.
+    let lastValEnd = -Infinity;
     for (let i = 0; i < N; i++) {
       const n = nights[i];
       if (n.kind !== "played" || n.pts <= 0) continue;
+      const w = String(n.pts).length * 6.5 * 0.62 * FS;
+      const x = xc(i);
+      if (x - w / 2 < lastValEnd) continue;
       const y = Math.max(TOP + 7 * FS, yOf(n.pts) - 2.5);
-      parts.push(`<text x="${n1(xc(i))}" y="${n1(y)}">${n.pts}</text>`);
+      parts.push(`<text x="${n1(x)}" y="${n1(y)}">${n.pts}</text>`);
+      lastValEnd = x + w / 2 + 1.6 * FS;
     }
     parts.push("</g>");
   }
@@ -482,26 +491,8 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
     parts.push(`<path d="${d}" fill="none" stroke="${haloColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.55" pointer-events="none"/>`);
     parts.push(`<path d="${d}" fill="none" stroke="${lineColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.92" pointer-events="none"/>`);
     maDrawn = maWindow;
-    // 확대판에서는 선의 끝에 창 평균을 적어 "지금 흐름이 몇 점인지"를 숫자로 닫는다.
-    if (showValues) {
-      let lastIdx = -1;
-      for (let i = N - 1; i >= 0; i--) if (nights[i].kind === "played" && ma[i] != null) { lastIdx = i; break; }
-      if (lastIdx >= 0) {
-        const v = ma[lastIdx] as number;
-        const px = xc(lastIdx);
-        const py = BASE - (v / denom) * bandH;
-        const fv = n1(8.5 * FS);
-        const label = `${maWindow}경기 평균 ${v.toFixed(1)}`;
-        const anchor = px > W * 0.6 ? "end" : "start";
-        const tx = anchor === "end" ? px - 6 : px + 6;
-        const ty = Math.max(TOP + 8 * FS, py - 6);
-        parts.push(
-          `<g pointer-events="none" font-family="${MONO}" font-size="${fv}" font-weight="700" text-anchor="${anchor}">` +
-            `<text x="${n1(tx)}" y="${n1(ty)}" fill="${haloColor}" stroke="${haloColor}" stroke-width="3" stroke-linejoin="round">${esc(label)}</text>` +
-            `<text x="${n1(tx)}" y="${n1(ty)}" fill="${lineColor}">${esc(label)}</text></g>`
-        );
-      }
-    }
+    // 선 끝에 "N경기 평균 12.0"을 적어 봤다가 지웠다(2026-09-08, 375px 실측): 그 한 줄이 L15에서
+    // 차트 절반을 가로질러 칸 위 득점 라벨과 겹쳤다. 캡션이 이미 "굵은 선 = N경기 이동평균"을 말한다.
   }
 
   // ── 9. 축 라벨(연도 또는 월) + 득점 축 상한 ────────────────────────────────────────
@@ -512,11 +503,14 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
   const textW = (s: string) => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 127 ? 9 : 5.4) * FS, 0);
   const labelGuard = scaleX - textW(scaleLabel) - 8;
 
-  let lastLabelX = -99;
+  // 가드는 라벨의 '끝'까지 본다. 시작 x만 보면 글자가 커진 곳(행 모드 FS 2.6)에서 라벨 꼬리가
+  // 오른쪽 득점 축 라벨을 밟는다 - 실측으로 "23-2411월"·"4월25점"이 나왔다.
+  let lastLabelEnd = -99;
   const pushLabel = (x: number, text: string, alpha: number) => {
-    if (x - lastLabelX < 22 * FS || x > labelGuard) return;
+    const w = textW(text);
+    if (x < lastLabelEnd + 6 * FS || x + 2 + w > labelGuard) return;
     parts.push(`<text x="${n1(x + 2)}" y="${n1(TOP - 4)}" font-size="${f9}" fill="${ink(alpha)}" font-family="${MONO}">${esc(text)}</text>`);
-    lastLabelX = x;
+    lastLabelEnd = x + 2 + w;
   };
   if (compact) {
     for (let i = 0; i < N; i++) {
@@ -665,11 +659,12 @@ export function buildCareerStripRowsSvg(
       uid: `${opts.uid}r${b.seasonName.slice(0, 4)}`,
       range: { start: b.start, end: b.end + 1 },
       width: len * CELL_MAX_W + PAD_L + PAD_R + (isLast && trailingGap ? GAP_RESERVE : 0),
-      // 글자 배율 2면 라벨 줄(PAD_T)이 26단위가 된다 - 40으로 두면 막대 띠(bandH)가 2단위만 남아
-      // 아무것도 안 보인다(초안의 실수). 80 = 라벨 26 + 막대 42 + 레일 12.
-      height: opts.rowHeight ?? 80,
+      // 배율 2.6이면 라벨 줄(TOP)이 34단위다. 92 = 라벨 34 + 막대 46 + 레일 12.
+      // (초안의 40은 막대 띠가 2단위만 남아 아무것도 안 보였고, 80·배율 2는 375px에서 글자가
+      //  9.5~11.1px로 여전히 작았다 - 하네스 실측 후 92·2.6으로 올려 12.4~14.2px.)
+      height: opts.rowHeight ?? 92,
       detail: "season",
-      fontScale: opts.fontScale ?? 2,
+      fontScale: opts.fontScale ?? 2.6,
       captionHead: `${shortSeason(b.seasonName)} 시즌 ${b.played}경기`,
     });
     if (r) rows.push({ seasonName: b.seasonName, result: r });
