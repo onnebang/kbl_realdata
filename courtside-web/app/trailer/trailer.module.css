@@ -911,6 +911,20 @@
   .playing .split .copy {
     order: 2;
   }
+  /* 머리 쪽에도 HUD 자리를 예약한다. 바닥은 레일 몫으로 58px을 빼 두면서 위는 안 빼 놨더니,
+     320·360px에서 HUD(y 18~45.4)가 화면 프레임 위에 얹혀 'CUT 05/08'이 프레임 크롬 바의
+     경로 글자와 포개졌다(실측 겹침 17.1~29.5px). 18+30 = 48 > 45.4. */
+  .playing .scene {
+    padding-top: calc(var(--t-pad) + 30px);
+  }
+  /* 320px에서 숫자 3칸이 여유 4px로 겨우 한 줄이었다(84×3 + gap 14×2 = 280 / 폭 284).
+     라벨이 한 글자만 길어져도 줄이 접히고 카피가 50px 커진다. 바닥을 풀고 간격을 좁힌다. */
+  .stats {
+    gap: 12px;
+  }
+  .stat {
+    min-width: 0;
+  }
   .playing .ruler,
   .playing .court,
   .playing .wm,
@@ -919,6 +933,19 @@
   }
   .clock {
     font-size: 16px;
+  }
+}
+
+/* 320px 세로 예산. 실측: 가용 484.9px인데 장면 4·5(리드 5줄)가 506.0px을 요구해 21.1px 넘쳤고,
+   align-content:center라 넘친 만큼 위로 밀려 HUD와 겹쳤다. 위 padding-top 예약 30px까지 더하면
+   51px을 돌려받아야 한다. 가장 싼 곳은 화면 프레임의 이미지다 - 38vw로 잘라 320px에서 176→122,
+   프레임 전체 217→163(-54)이 된다. 아래를 자르는 이유: 이 캡처들은 위쪽(내비·히어로·첫 카드)이
+   요지라 하단을 잘라도 무엇을 보여주는 화면인지가 그대로 남는다. */
+@media (max-width: 400px) {
+  .playing .shot img {
+    max-height: 38vw;
+    object-fit: cover;
+    object-position: top;
   }
 }
 
