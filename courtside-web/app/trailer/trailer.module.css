@@ -70,7 +70,13 @@
 .split {
   grid-template-columns: minmax(0, 1fr);
 }
+/* 열을 명시해야 한다. .split만 minmax(0,1fr)을 두고 여기를 비워 뒀더니 암시 열이 max-content로
+   늘어나, 375px에서 가장 긴 한 줄(.tag 'KBL PLAY-BY-PLAY ANALYTICS', letter-spacing .26em)이
+   열 폭을 결정하고 나머지가 그 열 안에서 가운데 정렬됐다 - 워드마크가 오른쪽으로 밀리고 태그는
+   무대 밖으로 잘렸다(실측 375px). 열을 1fr로 묶으면 justify-self:center의 fit-content가 가용
+   폭에서 멈추므로 긴 줄은 그냥 줄바꿈된다. */
 .center {
+  grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   text-align: center;
 }
@@ -506,15 +512,19 @@
   height: auto;
 }
 
+/* 폰 3대는 어느 폭에서도 한 줄에 들어가야 한다. 하한 96px을 박았더니 320px에서
+   3×96 + gap 20 + 무대 패딩 36 = 344 > 320으로 넘쳤다(실측). 칸을 폭에서 나눠 갖게 한다. */
 .phones {
+  --phone-gap: clamp(10px, 2vw, 28px);
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  gap: clamp(10px, 2vw, 28px);
+  gap: var(--phone-gap);
+  width: 100%;
   margin-top: clamp(14px, 2.6vw, 30px);
 }
 .phone {
-  width: clamp(96px, 15vw, 200px);
+  width: min(200px, calc((100% - var(--phone-gap) * 2) / 3));
   border-radius: var(--r-card);
   overflow: hidden;
   border: 1px solid #232c3a;
