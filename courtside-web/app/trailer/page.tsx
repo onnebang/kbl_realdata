@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TrailerScroll } from "@/components/TrailerScroll";
+import { daysUntilKst } from "@/lib/preseason";
 import { COURT_X, HOOP_RIGHT, drawCourtMarkings } from "@/lib/zoneCompare";
 import styles from "./trailer.module.css";
 
@@ -36,14 +37,9 @@ export const metadata: Metadata = {
 // 한 시간마다 다시 굽게 해서 날짜가 바뀌면 늦어도 한 시간 안에 따라온다.
 export const revalidate = 3600;
 
-const OPENING_KST = Date.UTC(2026, 9, 3) - 9 * 3600000; // 2026-10-03 00:00 KST
-
-function daysToOpening(): number {
-  // 서버 시계는 UTC다(Vercel). KST 자정을 기준으로 세지 않으면 한국 시간 00:00~09:00 동안
-  // 하루가 어긋난다. 9시간 밀어서 날짜 경계를 KST에 맞춘 뒤 다시 되돌린다.
-  const kstMidnight = Math.floor((Date.now() + 9 * 3600000) / 86400000) * 86400000 - 9 * 3600000;
-  return Math.max(0, Math.round((OPENING_KST - kstMidnight) / 86400000));
-}
+// 개막까지 남은 날(KST) - lib/preseason.ts의 daysUntilKst로 통일한다. 이 파일이 예전에
+// 같은 계산을 직접 다시 구현하고 있었다(components/CourtsideHero.tsx도 이제 같은 헬퍼를 쓴다).
+const OPENING_DATE = "2026-10-03";
 
 // 첫 절 배경의 코트 - 제품 슛맵이 쓰는 그 좌표계(lib/zoneCompare.ts) 그대로. 손으로 다시 그리지 않는다.
 const COURT_SVG = drawCourtMarkings(HOOP_RIGHT[0], COURT_X[1], -1, "currentColor", 0.7);
@@ -198,7 +194,10 @@ function Headline({ lines }: { lines: [string, string] }) {
 }
 
 export default function TrailerPage() {
-  const dday = daysToOpening();
+  const d = daysUntilKst(OPENING_DATE);
+  // 개막이 지난 뒤에는 이 칩을 아예 접는다(components/CourtsideHero.tsx와 같은 분기) -
+  // 안 그러면 시즌이 시작된 뒤에도 이 페이지가 영원히 "D-DAY"라고 우기게 된다.
+  const dday = d > 0 ? `D-${d}` : d === 0 ? "오늘 개막" : null;
   return (
     <>
       <div className={styles.page}>
@@ -227,10 +226,12 @@ export default function TrailerPage() {
             <div className={styles.tag} data-rise>
               KBL PLAY-BY-PLAY ANALYTICS
             </div>
-            <div className={styles.dday} data-rise>
-              <span className={styles.ddayN}>{dday > 0 ? `D-${dday}` : "D-DAY"}</span>
-              <span className={styles.ddayT}>2026.10.03 개막까지</span>
-            </div>
+            {dday && (
+              <div className={styles.dday} data-rise>
+                <span className={styles.ddayN}>{dday}</span>
+                <span className={styles.ddayT}>2026.10.03 개막까지</span>
+              </div>
+            )}
             <div className={styles.cue} data-rise>
               SCROLL
             </div>

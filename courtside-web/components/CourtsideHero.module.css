@@ -1,0 +1,192 @@
+/* ── 홈 히어로 ──────────────────────────────────────────────────────────────────
+   요청: "첫 화면이 trailer가 되어서 메인에서 압도 할 수 있도록". /trailer의 첫 절(워드마크·
+   태그·D-day·코트 배경)과 같은 어법을 홈 화면 맨 위에 전면으로 낸다 - 단 /trailer의 여덟 절
+   중 하나가 아니라 이 페이지 유일의 히어로라서 글자를 그보다 한 단 더 키운다.
+
+   .wrap의 --measure-wide(1180px) 제약 밖에서 화면 끝까지 번지는 어두운 띠라야 "압도"가
+   된다. 그래서 app/page.tsx가 이 컴포넌트를 <div className="wrap"> 바깥, NavBar 바로
+   아래에 놓는다(app/trailer/page.tsx가 .stage를 .wrap 밖에 두는 것과 같은 구조).
+
+   톤은 선수 프로필 히어로·개막 배너·/trailer와 같은 규약 - 라이트/다크 어느 테마에서도
+   딥다크로 고정하고 색을 전부 직접 칠한다. 액센트만 --home 토큰(라이트 #d9640a가 이 바닥
+   #07090d에서 5.46:1, 다크 #ff8a3d는 그보다 높다 - 실측)을 그대로 쓴다. */
+.hero {
+  --h-void: #07090d;
+  --h-void-2: #0b0f16;
+  --h-ink: #f2f3f7;
+  --h-dim: #aab1c2;
+  --h-faint: #6b7386;
+  --h-gold: #ffd166;
+  --h-line: #1e2531;
+  --h-grid: rgba(242, 243, 247, 0.03);
+  --h-court: rgba(242, 243, 247, 0.14);
+
+  position: relative;
+  overflow: hidden;
+  background: var(--h-void);
+  background-image:
+    radial-gradient(120% 90% at 82% 8%, #131a25 0%, rgba(19, 26, 37, 0) 62%),
+    repeating-linear-gradient(90deg, var(--h-grid) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(0deg, var(--h-grid) 0 1px, transparent 1px 48px);
+  border-bottom: 1px solid var(--h-line);
+  color: var(--h-ink);
+}
+
+.court {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: min(48%, 560px);
+  z-index: 0;
+  color: var(--h-court);
+  pointer-events: none;
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  max-width: var(--measure-wide);
+  margin: 0 auto;
+  padding: clamp(64px, 11vw, 132px) 18px clamp(52px, 8vw, 100px);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: var(--fs-200);
+  letter-spacing: 0.24em;
+  color: var(--h-faint);
+}
+.tag::before {
+  content: "";
+  width: 22px;
+  height: 2px;
+  background: var(--home);
+}
+
+/* 워드마크. 한글이라 Big Shoulders Display(한글 글리프 없음) 대신 Pretendard 800 -
+   globals.css .title 주석이 못박은 그 규칙 그대로. 화면의 유일한 주인공이라 --fs-700보다
+   훨씬 키운다("압도"가 요청이었다). */
+.wordmark {
+  margin-top: 14px;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-weight: 800;
+  font-size: clamp(52px, 10.5vw, 136px);
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+}
+
+.lede {
+  margin-top: 18px;
+  max-width: var(--measure-read);
+  font-size: clamp(var(--fs-400), 1.6vw, var(--fs-500));
+  line-height: var(--lh-prose);
+  color: var(--h-dim);
+  word-break: keep-all;
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(20px, 3vw, 40px);
+  margin-top: clamp(24px, 3.4vw, 40px);
+}
+.stat {
+  min-width: 0;
+}
+.statV {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: clamp(26px, 2.6vw, 36px);
+  line-height: 1;
+  color: var(--home);
+  font-variant-numeric: tabular-nums;
+}
+.statK {
+  margin-top: 5px;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-100);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--h-faint);
+}
+
+/* 개막 전에만 뜨는 D-day. 개막이 지나면(daysUntilKst < 0) 부모가 아예 렌더하지 않는다 -
+   지난 시즌이 시작된 뒤에도 영원히 "D-DAY"라고 우기면 안 된다. */
+.dday {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: clamp(20px, 3vw, 32px);
+  padding: 9px 16px;
+  border: 1px solid #3a3320;
+  border-radius: var(--r-led);
+  background: #12100a;
+}
+.ddayN {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: clamp(22px, 2.6vw, 30px);
+  line-height: 1;
+  color: var(--h-gold);
+  font-variant-numeric: tabular-nums;
+}
+.ddayT {
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-100);
+  color: #b6a97e;
+}
+
+/* 요청 사항과 별개 원칙: 이 저장소는 장식용 화살표를 최근에 걷어냈다(개막 배너 커밋
+   "장식 CTA 화살표 2곳 제거"). 여기서도 "→"·"↓" 글자를 붙이지 않는다 - 버튼 자체가
+   이동 동작임을 이미 말한다. */
+.ctaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: clamp(28px, 4vw, 44px);
+}
+.ctaPrimary {
+  display: inline-flex;
+  align-items: center;
+  padding: 13px 24px;
+  border-radius: var(--r-led);
+  background: var(--home);
+  color: #0b0d12;
+  font-size: var(--fs-300);
+  font-weight: 700;
+}
+.ctaPrimary:focus-visible {
+  outline: 2px solid var(--h-ink);
+  outline-offset: 3px;
+}
+.ctaSecondary {
+  display: inline-flex;
+  align-items: center;
+  padding: 12px 22px;
+  border-radius: var(--r-led);
+  border: 1px solid var(--h-line);
+  color: var(--h-ink);
+  font-size: var(--fs-300);
+  font-weight: 600;
+}
+.ctaSecondary:hover {
+  border-color: #33404f;
+}
+.ctaSecondary:focus-visible {
+  outline: 2px solid var(--home);
+  outline-offset: 2px;
+}
+
+@media (max-width: 700px) {
+  .court {
+    width: 62%;
+    opacity: 0.75;
+  }
+  .stats {
+    gap: 20px 28px;
+  }
+}

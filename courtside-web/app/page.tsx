@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { CourtsideHero } from "@/components/CourtsideHero";
 import { TeamBadge } from "@/components/TeamBadge";
 import { teamBarStyle, teamInkStyle } from "@/lib/teamAccent";
 import {
@@ -94,28 +95,23 @@ export default async function HomePage({
   const pagerDisabled = { opacity: 0.35 } as const;
 
   return (
-    <div className="wrap">
-      <div className="title">코트사이드</div>
-      {/* 리드는 사용자가 여기서 하는 일로 쓴다. 예전 문구는 "Supabase에 실제로 적재된 …
-          직접 조회합니다"였는데, 그건 이 화면이 어떻게 만들어졌는지지 사용자가 뭘 할 수
-          있는지가 아니다. */}
-      <div className="subtitle">
-        경기를 누르면 그날의 승률 흐름과 박스스코어를, 팀 이름을 누르면 그 팀의 시즌을 봅니다.{" "}
-        {/* 소개 페이지(/trailer) 진입점. 내비 주요 5개는 375px에서 전부 닿는 개수라 6번째를 넣지 않고
-            (넣으면 스크롤로 밀린다) 첫 화면 리드 끝에 한 줄로 단다.
-            문구 주의: 한때 40초 자동 재생이었고 그때는 "40초 소개 영상"이었다. 지금은 스크롤
-            페이지라 재생 시간이 없다 - 없는 것을 적지 않는다. */}
-        <Link href="/trailer" style={{ color: "var(--home)", fontWeight: 600, whiteSpace: "nowrap" }}>
-          코트사이드 둘러보기
-        </Link>
-      </div>
+    <>
+      {/* 요청: "첫 화면이 trailer가 되어서 메인에서 압도 할 수 있도록". /trailer의 첫 절과 같은
+          어법(딥다크 무대·워드마크·코트 배경)을 홈 맨 위 전면에 낸다 - .wrap의 1180px 제약
+          밖에서 화면 끝까지 번져야 "압도"가 되므로 .wrap 바깥, NavBar 바로 아래에 둔다
+          (app/trailer/page.tsx가 .stage를 .wrap 밖에 두는 것과 같은 구조). 예전엔 여기가
+          그냥 <div className="title">코트사이드</div> 한 줄이었다 - 페이지에 유일한 <h1>도
+          없었는데, 히어로의 워드마크가 그 자리를 겸한다. */}
+      <CourtsideHero />
+      <div className="wrap">
+        {/* 개막 전(이 시즌 종료 경기 0, 예정 경기 있음)에만 - 첫 경기가 끝나면 자동으로 사라짐.
+            판정은 시즌 전체 개수(counts)로 한다 - finalGames는 이제 "이 페이지의" 종료 경기라,
+            예정 경기가 많은 시즌에서는 1페이지에 종료 경기가 한 건도 안 걸릴 수 있다. */}
+        {counts.final === 0 && total > 0 && <PreseasonBanner season={activeSeason} />}
 
-      {/* 개막 전(이 시즌 종료 경기 0, 예정 경기 있음)에만 - 첫 경기가 끝나면 자동으로 사라짐.
-          판정은 시즌 전체 개수(counts)로 한다 - finalGames는 이제 "이 페이지의" 종료 경기라,
-          예정 경기가 많은 시즌에서는 1페이지에 종료 경기가 한 건도 안 걸릴 수 있다. */}
-      {counts.final === 0 && total > 0 && <PreseasonBanner season={activeSeason} />}
-
-      <form className="filter-form">
+        {/* id="games" - 히어로의 "오늘 경기 보기" 버튼이 여기로 스크롤한다. NavBar가
+            sticky가 아니라서 scroll-margin-top 보정은 필요 없다(실측). */}
+        <form id="games" className="filter-form">
         <select name="season" defaultValue={activeSeason}>
           {seasons.map((s) => (
             <option key={s} value={s}>
@@ -321,6 +317,7 @@ export default async function HomePage({
         {page}/{pageCount} 페이지)
         {liveGmkeys.length > 0 && ` · 라이브 ${liveGmkeys.length}경기 진행중(30초마다 자동 갱신)`}
       </footer>
-    </div>
+      </div>
+    </>
   );
 }
