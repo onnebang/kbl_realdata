@@ -1,23 +1,17 @@
-/* ── 소개 영상(/trailer) ──────────────────────────────────────────────────────────
-   두 가지 상태를 한 마크업으로 낸다.
+/* ── 소개 페이지(/trailer) ────────────────────────────────────────────────────────
+   시간이 아니라 스크롤이 몬다. 40초 자동 재생 플레이어였던 것을 스크롤 페이지로 바꿨다 -
+   요청: "40초 영상이 재생되는게 아니라 (…) 스크롤을 내릴시 해당 내용들이 보이고, 클릭시
+   해당 내용으로 가도록". 샷클락·진행바 8칸·재생/정지·스페이스/←→ 단축키는 전부 없앴다.
 
-   (1) 기본 = 문서. 서버가 8장면을 전부 그려 보내고 CSS는 그냥 세로로 쌓는다. 자바스크립트가
-       없거나, 못 불러왔거나, 사용자가 모션을 원치 않으면(prefers-reduced-motion) 여기서 멈춘다
-       - 그래도 화면·문구·숫자가 전부 읽힌다. 첫 프레임이 곧 완성된 화면이어야 한다는 규칙을
-       비디오 페이지에서도 지키는 방법이다(썸네일·링크 미리보기·크롤러가 보는 것도 이 상태다).
-   (2) .playing = 플레이어. 클라이언트가 붙으면 16:9 무대로 바꾸고 한 장면씩 재생한다.
-
-   모션 규칙(2026-09-09, anime.js 엔진이 첫 틱에서 멈춰 화면이 통째로 사라진 사고 뒤):
-   핵심 콘텐츠(헤드라인·리드·숫자·화면)의 가시성은 어떤 JS 틱에도 걸지 않는다. 진입 모션은
-   전부 .isActive가 붙을 때 발화하는 CSS 키프레임이고, 시작값(opacity 0 등)은 @keyframes 안에만
-   있다 - 정적 규칙에 시작값을 두지 않는다. anime.js는 실패해도 아무것도 안 사라지는 카운트업
-   중간값에만 쓴다.
-
-   무대는 라이트/다크 어느 테마에서도 딥다크로 고정한다 - 선수 프로필 히어로가 이미 쓰는 방식이고
-   (중계 화면의 목소리), 상영관에 테마 토글을 다는 건 의미가 없다. 대신 배경부터 글자까지 전부
-   직접 칠한다. 액센트만 --home 토큰을 그대로 쓴다: 라이트 #d9640a가 이 바닥(#07090d)에서 5.46:1,
-   다크 #ff8a3d는 그보다 높아 두 테마 모두 통과한다(실측). --gold는 라이트 값(#9a6b00)이 3.8:1로
-   떨어져서 히어로와 같은 이유로 다크 값을 직접 박는다. */
+   세 가지를 규칙으로 둔다.
+   (1) 서버 HTML이 곧 완성된 문서다. 정적 규칙에 opacity:0·transform 시작값을 두지 않는다 -
+       시작값은 @keyframes 안에만 있고, 리빌은 .in 클래스가 붙을 때만 발화한다. 자바스크립트가
+       하나도 안 돌아도(또는 모션을 원치 않아도) 8절 전부가 그대로 읽힌다.
+   (2) 절 하나가 그 페이지로 가는 입구다. 절 전체가 링크 면이고 그 안에 다른 링크를 넣지 않는다.
+   (3) 무대는 라이트/다크 어느 테마에서도 딥다크로 고정한다(선수 히어로와 같은 규약 - 중계
+       화면의 목소리). 배경부터 글자까지 직접 칠하고, 액센트만 --home 토큰을 그대로 쓴다:
+       라이트 #d9640a가 이 바닥(#07090d)에서 5.46:1, 다크 #ff8a3d는 그보다 높다(실측).
+       --gold는 라이트 값(#9a6b00)이 3.8:1로 떨어져 히어로와 같은 이유로 다크 값을 직접 박는다. */
 .page {
   --t-void: #07090d;
   --t-void-2: #0b0f16;
@@ -27,22 +21,30 @@
   --t-dim: #9aa2b4;
   --t-faint: #6b7386;
   --t-gold: #ffd166;
-  --t-red: #ff2c56;
-  --t-grid: rgba(242, 243, 247, 0.035);
-  --t-court: rgba(242, 243, 247, 0.14);
-  --t-pad: clamp(18px, 3.4vw, 54px);
+  --t-grid: rgba(242, 243, 247, 0.03);
+  --t-court: rgba(242, 243, 247, 0.12);
+  --t-pad: clamp(20px, 4vw, 64px);
   --e-out: cubic-bezier(0.16, 0.72, 0.24, 1);
   --e-snap: cubic-bezier(0.2, 0.8, 0.2, 1);
-  /* 숫자 착지 스프링 - linear()를 아는 브라우저만 오버슛, 나머지는 스냅 커브. */
-  --e-spring: var(--e-snap);
 
+  position: relative;
   background: var(--t-void);
   color: var(--t-ink);
   border-bottom: 1px solid var(--t-line);
+  /* 바닥 = 장부 격자. 세로 12칸 + 가로 48px. 스크롤 페이지에서는 절마다 깔지 않고 면 전체에 한 번. */
+  background-image:
+    repeating-linear-gradient(90deg, var(--t-grid) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(0deg, var(--t-grid) 0 1px, transparent 1px 48px);
 }
-@supports (animation-timing-function: linear(0, 1)) {
-  .page {
-    --e-spring: linear(0, 0.012, 0.047 2.4%, 0.183 5.1%, 0.756 13.6%, 0.941 17.8%, 1.026 21.9%, 1.062 26.2%, 1.066 30.1%, 1.052 34.6%, 1.014 44.8%, 0.998 55.3%, 1);
+
+/* 앵커로 뛸 때만 부드럽게. 모션을 원치 않으면 즉시 이동한다. 이 규칙은 /trailer의 CSS 청크에만
+   실리므로 다른 페이지의 스크롤에는 영향이 없다. */
+:global(html) {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  :global(html) {
+    scroll-behavior: auto;
   }
 }
 
@@ -50,336 +52,81 @@
   position: relative;
   max-width: var(--measure-wide);
   margin: 0 auto;
-  background: var(--t-void);
-  isolation: isolate;
 }
 
-/* ── 장면 ─────────────────────────────────────────────────────────────────────── */
+/* ── 스크롤 진행선 ────────────────────────────────────────────────────────────────
+   페이지 맨 위에 붙어 남은 분량을 알려 준다. 스크롤 타임라인을 아는 브라우저에서만 자라고
+   (Chrome 115+·Safari 26+), 모르는 브라우저에서는 0폭이라 아무것도 안 보인다 - 자바스크립트 0. */
+.progress {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  height: 2px;
+  background: var(--home);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+@supports (animation-timeline: scroll()) {
+  .progress {
+    animation: progressGrow linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+@keyframes progressGrow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* ── 절(section) ─────────────────────────────────────────────────────────────────
+   높이를 100vh로 고정하지 않는다. 내용이 정하는 높이 + 넉넉한 위아래 여백이라, 첫 화면에서
+   이미 첫 절이 읽히고(썸네일·링크 미리보기가 보는 것도 그 상태다) 스크롤이 하이재킹되지 않는다. */
 .scene {
   position: relative;
-  z-index: 1;
   display: grid;
-  gap: clamp(16px, 3vw, 44px);
+  gap: clamp(20px, 4vw, 56px);
   align-items: center;
-  padding: clamp(26px, 4vw, 52px) var(--t-pad);
-  border-bottom: 1px solid var(--t-line);
+  padding: clamp(56px, 10vw, 120px) var(--t-pad);
+  border-top: 1px solid var(--t-line);
+  scroll-margin-top: 8px;
 }
-.scene:last-of-type {
-  border-bottom: 0;
+.scene:first-of-type {
+  border-top: 0;
 }
 .split {
   grid-template-columns: minmax(0, 1fr);
 }
-/* 열을 명시해야 한다. .split만 minmax(0,1fr)을 두고 여기를 비워 뒀더니 암시 열이 max-content로
-   늘어나, 375px에서 가장 긴 한 줄(.tag 'KBL PLAY-BY-PLAY ANALYTICS', letter-spacing .26em)이
-   열 폭을 결정하고 나머지가 그 열 안에서 가운데 정렬됐다 - 워드마크가 오른쪽으로 밀리고 태그는
-   무대 밖으로 잘렸다(실측 375px). 열을 1fr로 묶으면 justify-self:center의 fit-content가 가용
-   폭에서 멈추므로 긴 줄은 그냥 줄바꿈된다. */
 .center {
   grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   text-align: center;
 }
-
-/* 플레이어 모드: 무대를 16:9로 고정하고 장면을 겹쳐 한 장만 보인다. */
-.playing {
-  position: relative;
-  aspect-ratio: 16 / 9;
-  min-height: 440px;
-  overflow: hidden;
-}
-/* 바닥 = 장부 격자. 세로 12칸 + 가로 48px, 그리고 승률 차트의 50% 기준선 헤어라인 하나.
-   문서 모드에서는 그리지 않는다(쌓인 장면 뒤로 깔리면 읽기를 방해한다). */
-.playing::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(#141b26, #141b26) 0 50% / 100% 1px no-repeat,
-    repeating-linear-gradient(90deg, var(--t-grid) 0 1px, transparent 1px 8.3333%),
-    repeating-linear-gradient(0deg, var(--t-grid) 0 1px, transparent 1px 48px);
-}
-.playing .scene {
-  position: absolute;
-  inset: 0;
-  align-content: center;
-  padding-bottom: calc(var(--t-pad) + 40px);
-  border-bottom: 0;
-  visibility: hidden;
-}
-.playing .isActive {
-  visibility: visible;
-}
-.playing .split {
-  grid-template-columns: minmax(260px, 0.92fr) minmax(0, 1.28fr);
-}
-
-/* 샷클락 와이프 - 장면이 바뀔 때 2px 주황 세로선이 50% 기준선을 가로질러 달린다.
-   기본은 보이지 않고(opacity 0) 키프레임이 도는 480ms만 보인다. 끝나면 left 100%로 무대 밖. */
-.playing .scene::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 2px;
-  background: var(--home);
-  opacity: 0;
-  pointer-events: none;
-}
-.playing .isActive::before {
-  animation: wipe 480ms cubic-bezier(0.7, 0, 0.2, 1) forwards;
-}
-@keyframes wipe {
-  from {
-    left: 0;
-    opacity: 1;
+@media (min-width: 860px) {
+  .split {
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.22fr);
   }
-  to {
-    left: 100%;
-    opacity: 1;
+  /* 좌우를 번갈아 둔다 - 다섯 절이 같은 정렬로 이어지면 스크롤이 한 덩어리로 읽힌다.
+     순서만 바꾸고 마크업은 그대로라 읽기 순서(카피 → 화면)는 유지된다. */
+  .flip {
+    grid-template-columns: minmax(0, 1.22fr) minmax(0, 0.92fr);
+  }
+  .flip .copy {
+    order: 2;
   }
 }
 
-/* 왼쪽 눈금 - 50% 기준선의 축 라벨(승률 100/50/0). 플레이어에서만. */
-.ruler {
-  display: none;
-}
-.playing .ruler {
-  display: block;
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: var(--t-pad);
-  z-index: 0;
-  pointer-events: none;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: var(--fs-100);
-  letter-spacing: 0.04em;
-  color: var(--t-faint);
-  font-variant-numeric: tabular-nums;
-}
-.ruler span {
-  position: absolute;
-  right: 4px;
-  line-height: 1;
-}
-.ruler span:nth-child(1) {
-  top: var(--t-pad);
-}
-.ruler span:nth-child(2) {
-  top: 50%;
-  transform: translateY(-50%);
-}
-.ruler span:nth-child(3) {
-  bottom: calc(var(--t-pad) + 44px);
+/* 절 전체가 링크 면이다(2~6절). 안에 다른 링크를 넣지 않는다 - 중첩 <a>는 HTML 위반이다. */
+a.scene:focus-visible {
+  outline: 2px solid var(--home);
+  outline-offset: -4px;
+  border-radius: var(--r-card);
 }
 
-/* 코트 - lib/zoneCompare.ts의 drawCourtMarkings가 낸 마크업(제품 슛맵과 같은 좌표계).
-   .playing에 들어올 때 한 번 그려지고(path는 dashoffset, rect·circle은 페이드), 장면마다
-   data-q에 따라 좌우로 4% 드리프트한다. 카메라 프레이밍은 없다. */
-.court {
-  display: none;
-}
-.playing .court {
-  display: block;
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 50%;
-  height: 100%;
-  z-index: 0;
-  color: var(--t-court);
-  pointer-events: none;
-  transition: transform 1.4s var(--e-out);
-}
-.playing[data-q="1"] .court,
-.playing[data-q="4"] .court,
-.playing[data-q="7"] .court {
-  transform: translateX(-4%);
-}
-.playing[data-q="3"] .court,
-.playing[data-q="6"] .court {
-  transform: translateX(4%);
-}
-.playing .court path {
-  stroke-dasharray: 1;
-  animation: courtDraw 1.6s var(--e-out) both;
-}
-.playing .court rect,
-.playing .court circle {
-  animation: fadeIn 900ms var(--e-out) both;
-  animation-delay: 500ms;
-}
-@keyframes courtDraw {
-  from {
-    stroke-dashoffset: 1;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-}
-
-/* 워터마크 - 장면 2~6의 표본 크기 하나(Big Shoulders 아웃라인 .10). 숫자만.
-   우상단에 뒀더니 그 자리가 화면 프레임(.shot, 불투명 --t-panel) 칸이라 위 50px 띠만 남고
-   나머지가 가려졌다(리뷰 실측 1180×664). 카피 칸 뒤 왼쪽 아래로 내린다 - 글자 배경이 투명해서
-   아웃라인이 리드 문장 사이로 읽힌다. */
-.wm {
-  display: none;
-}
-.playing .wm {
-  display: block;
-  position: absolute;
-  left: var(--t-pad);
-  bottom: calc(var(--t-pad) + 40px);
-  z-index: -1;
-  font-family: "Big Shoulders Display", sans-serif;
-  font-weight: 800;
-  font-size: clamp(120px, 18vw, 240px);
-  line-height: 1;
-  letter-spacing: -0.02em;
-  color: transparent;
-  -webkit-text-stroke: 1.5px rgba(242, 243, 247, 0.1);
-  font-variant-numeric: tabular-nums;
-  pointer-events: none;
-  user-select: none;
-}
-
-/* ── 진입 모션(전부 .isActive에서 발화하는 CSS - from값은 여기 @keyframes 안에만) ─── */
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-}
-@keyframes reveal {
-  from {
-    clip-path: inset(0 100% 0 0);
-  }
-  to {
-    clip-path: inset(0);
-  }
-}
-@keyframes land {
-  from {
-    opacity: 0;
-    transform: translateY(18px) scale(0.94);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@keyframes shotIn {
-  from {
-    clip-path: inset(0 100% 0 0 round var(--r-inset));
-  }
-  to {
-    clip-path: inset(0 round var(--r-inset));
-  }
-}
-@keyframes charIn {
-  from {
-    opacity: 0;
-    transform: translateY(0.35em);
-  }
-}
-@keyframes phoneIn {
-  from {
-    opacity: 0;
-    transform: translateY(28px);
-  }
-}
-
-.playing .isActive [data-rise] {
-  animation: rise 620ms var(--e-out) both;
-  animation-delay: 60ms;
-}
-.playing .isActive [data-rise]:nth-child(2) {
-  animation-delay: 150ms;
-}
-.playing .isActive [data-rise]:nth-child(3) {
-  animation-delay: 240ms;
-}
-.playing .isActive [data-rise]:nth-child(4) {
-  animation-delay: 330ms;
-}
-.playing .isActive [data-rise]:nth-child(5) {
-  animation-delay: 420ms;
-}
-.playing .isActive .line {
-  animation: reveal 560ms var(--e-out) both;
-}
-.playing .isActive .line:nth-child(2) {
-  animation-delay: 90ms;
-}
-.playing .isActive .v {
-  animation: land 700ms var(--e-spring) both;
-  animation-delay: 200ms;
-}
-.playing .isActive .stat:nth-child(2) .v {
-  animation-delay: 260ms;
-}
-.playing .isActive .stat:nth-child(3) .v {
-  animation-delay: 320ms;
-}
-.playing .isActive .stat:nth-child(4) .v {
-  animation-delay: 380ms;
-}
-.playing .isActive .stat .k {
-  animation: rise 520ms var(--e-out) both;
-  animation-delay: 320ms;
-}
-.playing .isActive .stat:nth-child(2) .k {
-  animation-delay: 380ms;
-}
-.playing .isActive .stat:nth-child(3) .k {
-  animation-delay: 440ms;
-}
-.playing .isActive .stat:nth-child(4) .k {
-  animation-delay: 500ms;
-}
-.playing .isActive .shot {
-  animation: shotIn 640ms var(--e-out) both;
-  animation-delay: 120ms;
-}
-.playing .isActive [data-char] {
-  animation: charIn 560ms var(--e-snap) both;
-}
-.playing .isActive [data-char]:nth-child(2) {
-  animation-delay: 64ms;
-}
-.playing .isActive [data-char]:nth-child(3) {
-  animation-delay: 128ms;
-}
-.playing .isActive [data-char]:nth-child(4) {
-  animation-delay: 192ms;
-}
-.playing .isActive [data-char]:nth-child(5) {
-  animation-delay: 256ms;
-}
-.playing .isActive .phone {
-  animation: phoneIn 720ms var(--e-out) both;
-  animation-delay: 200ms;
-}
-.playing .isActive .phone:nth-child(2) {
-  animation-delay: 310ms;
-}
-.playing .isActive .phone:nth-child(3) {
-  animation-delay: 420ms;
-}
-
-/* ── 로어서드(중계 자막) ──────────────────────────────────────────────────────── */
-/* 한글 라벨은 Pretendard - Plex Mono에 한글 글리프가 없어 이름 없는 폴백으로 떨어졌다(실측). */
+/* ── 로어서드(중계 자막) ──────────────────────────────────────────────────────────
+   한글 라벨은 Pretendard - Plex Mono에 한글 글리프가 없어 이름 없는 폴백으로 떨어졌다(실측). */
 .brow {
   display: inline-flex;
   align-items: center;
@@ -397,8 +144,8 @@
   background: var(--home);
 }
 .headline {
-  margin-top: 10px;
-  font-size: clamp(var(--fs-600), 4.2vw, var(--fs-800));
+  margin-top: 12px;
+  font-size: clamp(var(--fs-600), 4.4vw, var(--fs-800));
   font-weight: 800;
   line-height: var(--lh-tight);
   letter-spacing: -0.02em;
@@ -407,7 +154,7 @@
   display: block;
 }
 .lede {
-  margin-top: 12px;
+  margin-top: 14px;
   max-width: var(--measure-read);
   font-size: clamp(var(--fs-300), 1.5vw, var(--fs-400));
   line-height: var(--lh-prose);
@@ -421,18 +168,18 @@
 .stats {
   display: flex;
   flex-wrap: wrap;
-  gap: clamp(14px, 2.4vw, 34px);
-  margin-top: clamp(14px, 2.4vw, 26px);
+  gap: clamp(12px, 2.4vw, 34px);
+  margin-top: clamp(16px, 2.4vw, 28px);
 }
 .stat {
-  min-width: 84px;
+  min-width: 0;
 }
 /* 숫자는 스코어보드 목소리(Big Shoulders Display). globals.css가 못박은 대로 **한글 금지** -
    글리프가 없어서 단위 글자가 이름 없는 폴백으로 떨어진다. 단위는 .unit이 Pretendard로 받는다. */
 .v {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: clamp(28px, 3.6vw, 46px);
+  font-size: clamp(30px, 3.8vw, 48px);
   line-height: 0.92;
   font-variant-numeric: tabular-nums;
 }
@@ -456,15 +203,41 @@
   letter-spacing: 0.02em;
   color: var(--t-faint);
 }
-/* 표본 한 줄 - 이 장면 숫자의 기준(선수 히어로 .heroBasis 어법). */
+/* 표본 한 줄 - 이 절 숫자의 기준(선수 히어로 .heroBasis 어법). */
 .basis {
-  margin-top: 14px;
+  margin-top: 16px;
   font-family: "Pretendard", system-ui, sans-serif;
   font-size: var(--fs-100);
   font-weight: 500;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--t-faint);
+}
+
+/* 누르면 어디로 가는지 적어 둔다. 절 전체가 링크라 이건 링크가 아니라 표지다. */
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 9px 16px;
+  border: 1px solid var(--t-line);
+  border-radius: var(--r-led);
+  font-size: var(--fs-200);
+  font-weight: 600;
+  color: var(--t-ink);
+  background: var(--t-panel);
+}
+.cta::after {
+  content: "→";
+  color: var(--home);
+  transition: transform 220ms var(--e-out);
+}
+.scene:hover .cta {
+  border-color: #33404f;
+}
+.scene:hover .cta::after {
+  transform: translateX(3px);
 }
 
 /* ── 화면 프레임 ──────────────────────────────────────────────────────────────── */
@@ -476,12 +249,8 @@
   background: var(--t-panel);
   box-shadow: 0 40px 90px -40px rgba(0, 0, 0, 0.95);
 }
-.shot:hover {
+.scene:hover .shot {
   border-color: #33405480;
-}
-.shot:focus-visible {
-  outline: 2px solid var(--home);
-  outline-offset: 3px;
 }
 .chrome {
   display: flex;
@@ -506,14 +275,33 @@
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
 }
-.shot img {
+.shotImg {
   display: block;
   width: 100%;
   height: auto;
 }
+/* 스크롤에 묶인 아주 작은 표류. 스크롤 타임라인을 아는 브라우저에서만 돌고, 모르면 그냥 정지
+   상태다(자바스크립트 0). 프레임이 overflow:hidden이라 1.06배로 깔고 ±2%만 움직인다. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .shotImg {
+      animation: drift linear both;
+      animation-timeline: view();
+      animation-range: entry 0% exit 100%;
+    }
+  }
+}
+@keyframes drift {
+  from {
+    transform: scale(1.06) translateY(-2%);
+  }
+  to {
+    transform: scale(1.06) translateY(2%);
+  }
+}
 
 /* 폰 3대는 어느 폭에서도 한 줄에 들어가야 한다. 하한 96px을 박았더니 320px에서
-   3×96 + gap 20 + 무대 패딩 36 = 344 > 320으로 넘쳤다(실측). 칸을 폭에서 나눠 갖게 한다. */
+   3×96 + gap 20 + 패딩 36 = 344 > 320으로 넘쳤다(실측). 칸을 폭에서 나눠 갖게 한다. */
 .phones {
   --phone-gap: clamp(10px, 2vw, 28px);
   display: flex;
@@ -521,10 +309,10 @@
   align-items: flex-end;
   gap: var(--phone-gap);
   width: 100%;
-  margin-top: clamp(14px, 2.6vw, 30px);
+  margin-top: clamp(18px, 2.6vw, 34px);
 }
 .phone {
-  width: min(200px, calc((100% - var(--phone-gap) * 2) / 3));
+  width: min(210px, calc((100% - var(--phone-gap) * 2) / 3));
   border-radius: var(--r-card);
   overflow: hidden;
   border: 1px solid #232c3a;
@@ -537,12 +325,16 @@
   height: auto;
 }
 .phoneMid {
-  transform: translateY(-14px);
+  transform: translateY(-16px);
 }
 
-/* ── 타이틀·엔딩 ──────────────────────────────────────────────────────────────── */
+/* ── 첫 절: 워드마크 ─────────────────────────────────────────────────────────── */
+.opener {
+  padding-top: clamp(48px, 8vw, 96px);
+  padding-bottom: clamp(56px, 9vw, 110px);
+}
 .wordmark {
-  font-size: clamp(38px, 7vw, 92px);
+  font-size: clamp(40px, 7.4vw, 96px);
   font-weight: 800;
   letter-spacing: -0.035em;
   line-height: 1;
@@ -551,19 +343,17 @@
   display: inline-block;
 }
 .tag {
-  margin-top: 14px;
+  margin-top: 16px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: var(--fs-200);
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
+  letter-spacing: 0.24em;
   color: var(--t-faint);
 }
-/* D-day 칩 - 데이터 조각이라 --r-led 하드 엣지, 플랫. */
 .dday {
   display: inline-flex;
   align-items: baseline;
   gap: 10px;
-  margin-top: clamp(18px, 3vw, 34px);
+  margin-top: clamp(20px, 3vw, 34px);
   padding: 10px 18px;
   border: 1px solid #3a3320;
   border-radius: var(--r-led);
@@ -572,7 +362,7 @@
 .ddayN {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: clamp(24px, 3.2vw, 40px);
+  font-size: clamp(26px, 3.2vw, 40px);
   line-height: 1;
   color: var(--t-gold);
   font-variant-numeric: tabular-nums;
@@ -580,183 +370,287 @@
 .ddayT {
   font-family: "Pretendard", system-ui, sans-serif;
   font-size: var(--fs-100);
-  font-weight: 600;
-  letter-spacing: 0.02em;
   color: #b6a97e;
 }
+/* 스크롤 단서 - 이 페이지가 스크롤로 읽는 물건임을 첫 화면에서 알린다. */
+.cue {
+  margin-top: clamp(28px, 4vw, 48px);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: var(--fs-100);
+  letter-spacing: 0.16em;
+  color: var(--t-faint);
+}
+.cue::after {
+  content: "";
+  display: block;
+  width: 1px;
+  height: 34px;
+  margin: 10px auto 0;
+  background: linear-gradient(var(--home), transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cue::after {
+    animation: cueDrop 1.9s var(--e-out) infinite;
+  }
+}
+@keyframes cueDrop {
+  0% {
+    transform: scaleY(0.2);
+    transform-origin: 50% 0;
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    transform: scaleY(1);
+    transform-origin: 50% 0;
+    opacity: 0;
+  }
+}
+
+/* ── 마지막 절 ───────────────────────────────────────────────────────────────── */
 .endGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: clamp(12px, 2vw, 26px);
+  gap: clamp(14px, 2vw, 28px);
   width: min(760px, 100%);
-  margin-top: clamp(20px, 3vw, 34px);
-  padding-top: clamp(16px, 2.4vw, 24px);
-  border-top: 1px solid var(--t-line);
+  margin-top: clamp(22px, 3vw, 36px);
 }
 .endGrid .stat {
   text-align: center;
 }
 .site {
-  margin-top: clamp(18px, 3vw, 30px);
-  font-family: "Pretendard", system-ui, sans-serif;
-  font-size: var(--fs-200);
-  font-weight: 600;
-  color: var(--home);
-}
-
-/* ── HUD(경기 시계)·컨트롤 - 플레이어 모드에서만 ──────────────────────────────── */
-.hud,
-.rail {
-  display: none;
-}
-.playing .hud {
-  display: flex;
-  position: absolute;
-  top: var(--t-pad);
-  left: var(--t-pad);
-  z-index: 3;
-  align-items: center;
-  gap: 10px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: var(--fs-100);
-  letter-spacing: 0.08em;
-  color: var(--t-faint);
-}
-.q {
-  position: relative;
-  overflow: hidden;
-  padding: 3px 8px;
-  border: 1px solid var(--t-line);
-  border-radius: var(--r-led);
-  color: var(--t-dim);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.q > span {
-  display: inline-block;
-}
-/* 장면 잔여 시간(십분위) - 샷클락. 1.0초 아래로 떨어지면 빨갛게. */
-.clock {
-  font-family: "Big Shoulders Display", sans-serif;
-  font-weight: 800;
-  font-size: 20px;
-  line-height: 1;
-  letter-spacing: 0.02em;
-  color: var(--t-ink);
-  font-variant-numeric: tabular-nums;
-  padding: 2px 6px;
-  border: 1px solid var(--t-line);
-  border-radius: var(--r-led);
-  background: var(--t-panel);
-  min-width: 3.1em;
-  text-align: center;
-}
-.clockLow {
-  color: var(--t-red);
-  border-color: var(--t-red);
-}
-.rec {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--t-red);
-}
-.recOn {
-  animation: blink 1.6s steps(1, end) infinite;
-}
-@keyframes blink {
-  0%,
-  55% {
-    opacity: 1;
-  }
-  56%,
-  100% {
-    opacity: 0.18;
-  }
-}
-
-.playing .rail {
-  display: flex;
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 3;
-  align-items: center;
-  gap: 12px;
-  padding: 10px var(--t-pad) 14px;
-  background: linear-gradient(180deg, rgba(7, 9, 13, 0), rgba(7, 9, 13, 0.92) 42%);
-}
-.ticks {
-  flex: 1;
-  display: flex;
-  gap: 2px;
-}
-.tick {
-  position: relative;
-  height: 2px;
-  border-radius: 0;
-  background: var(--t-court);
-  cursor: pointer;
-  border: 0;
-  padding: 0;
-}
-/* 2px 선은 누르기 어렵다 - 눈에 안 보이는 20px 히트 영역. */
-.tick::after {
-  content: "";
-  position: absolute;
-  inset: -9px 0;
-}
-.tick i {
-  position: absolute;
-  inset: 0 100% 0 0;
-  background: var(--home);
-}
-.tick:focus-visible {
-  outline: 2px solid var(--home);
-  outline-offset: 6px;
-}
-.time {
-  flex: none;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: var(--fs-100);
-  letter-spacing: 0.06em;
-  color: var(--t-faint);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.btn {
-  position: relative;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
+  gap: 8px;
+  margin-top: clamp(22px, 3vw, 34px);
+  padding: 12px 22px;
+  border-radius: var(--r-led);
+  background: var(--home);
+  color: #0b0d12;
+  font-size: var(--fs-300);
+  font-weight: 700;
+}
+.site:focus-visible {
+  outline: 2px solid var(--t-ink);
+  outline-offset: 3px;
+}
+
+/* 표본 워터마크 - 이 절의 숫자 하나를 배경 아웃라인으로. 숫자만(Big Shoulders). */
+.wm {
+  position: absolute;
+  right: var(--t-pad);
+  top: clamp(20px, 4vw, 48px);
+  z-index: 0;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: clamp(96px, 14vw, 200px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(242, 243, 247, 0.07);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  user-select: none;
+}
+.copy,
+.shot,
+.phones {
+  position: relative;
+  z-index: 1;
+}
+
+/* 코트 - lib/zoneCompare.ts의 drawCourtMarkings가 낸 마크업(제품 슛맵과 같은 좌표계).
+   첫 절 배경에만 한 장 깔린다. */
+.court {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: min(46%, 520px);
+  z-index: 0;
+  color: var(--t-court);
+  pointer-events: none;
+}
+
+/* ── 섹션 레일(≥1120px) ──────────────────────────────────────────────────────────
+   앵커 링크 여덟 개. 자바스크립트가 없어도 그냥 작동하고, 있으면 현재 절에 표시가 붙는다. */
+.rail {
+  position: fixed;
+  left: max(14px, calc(50vw - 690px));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+}
+/* 1400px부터만 띄운다. 무대가 최대 1180px이라 그보다 좁으면 레일(약 90px)이 무대의 왼쪽
+   패딩을 파고들어 카피와 겹친다(1280px 실측: 레일 14~104px, 카피 시작 101px). 1400px에서
+   무대는 110px에서 시작하고 레일은 104px에서 끝난다. */
+@media (min-width: 1400px) {
+  .rail {
+    display: flex;
+  }
+}
+.railLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: var(--fs-100);
+  font-weight: 600;
+  color: var(--t-faint);
+  border-radius: var(--r-led);
+}
+.railLink::before {
+  content: "";
+  width: 14px;
+  height: 2px;
+  background: currentColor;
   flex: none;
-  border-radius: 50%;
-  border: 1px solid var(--t-line);
-  background: #0e131b;
+  transition: width 220ms var(--e-out);
+}
+.railLink:hover {
+  color: var(--t-dim);
+}
+.railLink[aria-current="true"] {
   color: var(--t-ink);
-  cursor: pointer;
 }
-.btn:hover {
-  border-color: #33404f;
+.railLink[aria-current="true"]::before {
+  width: 26px;
+  background: var(--home);
 }
-.btn:focus-visible {
+.railLink:focus-visible {
   outline: 2px solid var(--home);
   outline-offset: 2px;
 }
-.btn svg {
-  width: 13px;
-  height: 13px;
-  fill: currentColor;
+
+/* ── 진입 리빌 ───────────────────────────────────────────────────────────────────
+   시작값은 전부 @keyframes 안에만 있다. .in이 없으면(=자바스크립트가 안 돌면) 아무 규칙도
+   적용되지 않아 내용이 그대로 보인다. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@keyframes reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+@keyframes land {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes shotIn {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+}
+@keyframes charIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.35em);
+  }
 }
 
-/* ── 무대 아래 설명(문서·플레이어 양쪽에서 항상 보인다) ──────────────────────── */
+.in [data-rise] {
+  animation: rise 700ms var(--e-out) both;
+}
+.in [data-rise]:nth-child(2) {
+  animation-delay: 80ms;
+}
+.in [data-rise]:nth-child(3) {
+  animation-delay: 160ms;
+}
+.in [data-rise]:nth-child(4) {
+  animation-delay: 240ms;
+}
+.in [data-rise]:nth-child(5) {
+  animation-delay: 320ms;
+}
+.in [data-rise]:nth-child(6) {
+  animation-delay: 400ms;
+}
+.in .line {
+  animation: reveal 620ms var(--e-out) both;
+}
+.in .line:nth-child(2) {
+  animation-delay: 100ms;
+}
+.in .v {
+  animation: land 720ms var(--e-snap) both;
+  animation-delay: 160ms;
+}
+.in .stat:nth-child(2) .v {
+  animation-delay: 230ms;
+}
+.in .stat:nth-child(3) .v {
+  animation-delay: 300ms;
+}
+.in .stat:nth-child(4) .v {
+  animation-delay: 370ms;
+}
+.in .shot {
+  animation: shotIn 760ms var(--e-out) both;
+  animation-delay: 120ms;
+}
+.in [data-char] {
+  animation: charIn 600ms var(--e-snap) both;
+}
+.in [data-char]:nth-child(2) {
+  animation-delay: 70ms;
+}
+.in [data-char]:nth-child(3) {
+  animation-delay: 140ms;
+}
+.in [data-char]:nth-child(4) {
+  animation-delay: 210ms;
+}
+.in [data-char]:nth-child(5) {
+  animation-delay: 280ms;
+}
+.in .phone {
+  animation: shotIn 760ms var(--e-out) both;
+  animation-delay: 140ms;
+}
+.in .phone:nth-child(2) {
+  animation-delay: 240ms;
+}
+.in .phone:nth-child(3) {
+  animation-delay: 340ms;
+}
+
+/* 워치독이 붙이는 클래스(components/TrailerScroll). 리빌만 끄고 첫 절의 스크롤 단서 같은
+   상시 모션은 건드리지 않는다 - 목적은 "못 본 모션을 버리고 내용을 되돌리는 것"이다. */
+.settled [data-rise],
+.settled .line,
+.settled .v,
+.settled .shot,
+.settled [data-char],
+.settled .phone {
+  animation: none !important;
+}
+
+/* ── 무대 아래 설명 ─────────────────────────────────────────────────────────────── */
 .sheet {
   max-width: var(--measure-wide);
   margin: 0 auto;
-  padding: clamp(26px, 4vw, 48px) 18px clamp(40px, 6vw, 72px);
+  padding: clamp(30px, 4vw, 54px) 18px clamp(44px, 6vw, 76px);
 }
 .sheetEyebrow {
   display: inline-flex;
@@ -764,9 +658,8 @@
   gap: 8px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: var(--fs-100);
-  letter-spacing: 0.14em;
-  color: var(--home);
-  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
 }
 .sheetEyebrow::before {
   content: "";
@@ -785,17 +678,11 @@
   max-width: var(--measure-read);
   color: var(--ink-soft);
 }
-.sheetRule {
-  height: 2px;
-  margin-top: 22px;
-  background: var(--home);
-  transform-origin: left center;
-}
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 1px;
-  margin-top: 16px;
+  margin-top: 26px;
   background: rgba(var(--line-rgb), 0.12);
   border: 1px solid rgba(var(--line-rgb), 0.12);
   border-radius: var(--r-card);
@@ -821,140 +708,52 @@
   font-variant-numeric: tabular-nums;
 }
 .cardN {
-  margin-top: 6px;
+  margin-top: 4px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: var(--fs-100);
   letter-spacing: 0.04em;
   color: var(--ink-faint);
-  font-variant-numeric: tabular-nums;
 }
 .card p {
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: var(--fs-200);
   color: var(--ink-soft);
-}
-/* 스크롤 연동 리빌 - 스크롤 타임라인을 아는 브라우저에서만. 시작값은 키프레임 안에만. */
-@keyframes ruleX {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-@keyframes cardIn {
-  from {
-    opacity: 0.6;
-  }
-  to {
-    opacity: 1;
-  }
-}
-@supports (animation-timeline: view()) {
-  .sheetRule {
-    animation: ruleX linear both;
-    animation-timeline: view();
-    animation-range: entry 0% entry 100%;
-  }
-  .card {
-    animation: cardIn linear both;
-    animation-timeline: view();
-    animation-range: entry 0% entry 60%;
-  }
+  line-height: var(--lh-prose);
 }
 .foot {
   display: grid;
   grid-template-columns: 88px 1fr;
-  gap: 6px 12px;
-  margin-top: 24px;
+  gap: 6px 14px;
+  margin-top: 26px;
   font-size: var(--fs-100);
   color: var(--ink-faint);
-  line-height: 1.9;
+  line-height: var(--lh-prose);
 }
 .foot dt {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   letter-spacing: 0.08em;
 }
 .foot dd {
-  font-variant-numeric: tabular-nums;
-}
-.foot kbd {
-  display: inline-block;
-  padding: 0 6px;
-  margin: 0 2px;
-  font-family: "IBM Plex Mono", "Pretendard", ui-monospace, monospace;
-  font-size: var(--fs-100);
-  line-height: 1.6;
-  border: 1px solid rgba(var(--line-rgb), 0.22);
-  border-radius: var(--r-led);
-  background: var(--surface-soft);
-  color: var(--ink-soft);
-}
-.foot a {
-  color: var(--home);
-}
-.foot a:hover {
-  text-decoration: underline;
+  margin: 0;
 }
 
-@media (max-width: 760px) {
-  /* 9:16이어야 한다. 3:4(375×500)는 가용 높이 416px인데 장면 2~6의 화면 프레임(252) + 카피
-     (244~294)가 510~560px이라 위아래로 넘쳐 잘렸다 - 아래로 넘친 쪽이 하필 .stats라 숫자가
-     레일 그라디언트에 덮였다(리뷰 실측). 9:16이면 375×667, 가용 583px로 최악 장면도 들어간다. */
-  .playing {
-    aspect-ratio: 9 / 16;
-  }
-  .playing .split {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
-  }
-  .playing .split .copy {
-    order: 2;
-  }
-  /* 머리 쪽에도 HUD 자리를 예약한다. 바닥은 레일 몫으로 58px을 빼 두면서 위는 안 빼 놨더니,
-     320·360px에서 HUD(y 18~45.4)가 화면 프레임 위에 얹혀 'CUT 05/08'이 프레임 크롬 바의
-     경로 글자와 포개졌다(실측 겹침 17.1~29.5px). 18+30 = 48 > 45.4. */
-  .playing .scene {
-    padding-top: calc(var(--t-pad) + 30px);
-  }
-  /* 320px에서 숫자 3칸이 여유 4px로 겨우 한 줄이었다(84×3 + gap 14×2 = 280 / 폭 284).
-     라벨이 한 글자만 길어져도 줄이 접히고 카피가 50px 커진다. 바닥을 풀고 간격을 좁힌다. */
-  .stats {
-    gap: 12px;
-  }
-  .stat {
-    min-width: 0;
-  }
-  .playing .ruler,
-  .playing .court,
-  .playing .wm,
-  .playing .basis {
+@media (max-width: 859px) {
+  .wm {
     display: none;
   }
-  .clock {
-    font-size: 16px;
-  }
-}
-
-/* 320px 세로 예산. 실측: 가용 484.9px인데 장면 4·5(리드 5줄)가 506.0px을 요구해 21.1px 넘쳤고,
-   align-content:center라 넘친 만큼 위로 밀려 HUD와 겹쳤다. 위 padding-top 예약 30px까지 더하면
-   51px을 돌려받아야 한다. 가장 싼 곳은 화면 프레임의 이미지다 - 38vw로 잘라 320px에서 176→122,
-   프레임 전체 217→163(-54)이 된다. 아래를 자르는 이유: 이 캡처들은 위쪽(내비·히어로·첫 카드)이
-   요지라 하단을 잘라도 무엇을 보여주는 화면인지가 그대로 남는다. */
-@media (max-width: 400px) {
-  .playing .shot img {
-    max-height: 38vw;
-    object-fit: cover;
-    object-position: top;
+  .court {
+    width: 60%;
+    opacity: 0.7;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .playing *,
-  .playing *::before,
-  .playing *::after,
-  .sheetRule,
-  .card {
+  .in *,
+  .in *::before,
+  .in *::after,
+  .progress,
+  .shotImg,
+  .cue::after {
     animation: none !important;
   }
 }
