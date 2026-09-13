@@ -272,19 +272,18 @@ function AdjBreakdown({ proj, cur, prev }: { proj: SeasonProjection; cur: string
         <b>슬롯</b>은 외국인·아시아쿼터 세 자리의 주인이 바뀐 몫, <b>기타</b>는 국내 영입·미계약 등 나머지 로스터 이동, <b>규정</b>은 2·3쿼터
         외국인 2명 허용으로 외국인 2옵션이 경기당 10분을 더 뛴다고 가정했을 때의 몫입니다. 순차 분해라 순서에 따라 배분이 조금 달라집니다.
       </div>
-      {priors && (
-        <div className={styles.note}>
-          <b>KBL 기록이 없어 사전확률로 채운 자리 {adj.priorSlots}개</b> (전체 {adj.totalSlots}개 중): {priors}. 등급은 KBL 첫 시즌 비국내 선수
-          195명(300분+)의 PER 분포 분위수에 배치한 값입니다 — 특급 30.7(상위 10%) · 상급 28.1(상위 25%) · 중급 24.1(중앙값) · 역할 20.8(하위
-          25%) · 아시아쿼터 16.2(중앙값). <b>이 등급은 측정이 아니라 스카우팅 판단입니다.</b>
-        </div>
-      )}
-      {/* 스카우팅 근거 - 사용자가 준 리그 스탯·EASL·연습경기 기사를 등급의 근거로 보여준다.
-          "참고 정도로만"이라는 요청 그대로 접어 두고, 열면 선수별로 무엇을 보고 등급을 매겼는지 나온다.
-          strength_adjustment_player.evidence는 이전까지 저장만 되고 어디에도 렌더되지 않았다. */}
+      {/* 실측 지적: 이 아래로 note 4개 + 스카우팅 근거 토글 1개가 늘 펼쳐진 채 이어져 "논문"처럼
+          읽혔다. 표를 읽는 데 당장 필요한 건 위 이탈/슬롯/기타/규정 정의뿐이고, 나머지("왜 이
+          숫자인지"의 근거)는 하나의 토글로 묶는다 - 사용자가 준 스카우팅 근거(EASL·연습경기
+          기사)를 지우지 않고 그대로 옮긴다. */}
       {priors && (
         <details className={styles.scoutDetails}>
-          <summary className={styles.scoutSummary}>사전확률 {adj.priorSlots}자리의 스카우팅 근거 보기</summary>
+          <summary className={styles.scoutSummary}>사전확률 {adj.priorSlots}자리는 어떻게 정했는지</summary>
+          <div className={styles.note}>
+            KBL 기록이 없는 신입 {adj.priorSlots}명(전체 {adj.totalSlots}자리 중): {priors}. 등급은 KBL 첫 시즌 비국내 선수 195명(300분+)의
+            PER 분위수 기준입니다 — 특급 30.7(상위 10%) · 상급 28.1(상위 25%) · 중급 24.1(중앙값) · 역할 20.8(하위 25%) · 아시아쿼터
+            16.2(중앙값). <b>측정이 아니라 스카우팅 판단입니다.</b>
+          </div>
           <div className={styles.scoutList}>
             {rows.flatMap((t) =>
               (t.adj as NonNullable<typeof t.adj>).team.slots
@@ -305,31 +304,24 @@ function AdjBreakdown({ proj, cur, prev }: { proj: SeasonProjection; cur: string
             )}
           </div>
           <div className={styles.note}>
-            위 근거는 해외 리그 기록·국제대회(EASL)·8~9월 연습경기 기사에서 옮긴 <b>참고 자료</b>이지 KBL 실측이 아닙니다. 리그 간
-            수준 차이를 환산하는 검증된 계수가 없어 숫자를 그대로 쓰지 않고, <b>등급 하나</b>로만 반영했습니다. KBL 팀을 직접 상대한
-            기록(EASL·연습경기)이 있는 선수는 그만큼 등급의 근거가 단단합니다.
+            위 근거는 해외 리그·국제대회(EASL)·연습경기 기사에서 옮긴 <b>참고 자료</b>이지 KBL 실측이 아닙니다. 리그 간 수준 차이를
+            환산할 계수가 없어 <b>등급 하나</b>로만 반영했습니다. KBL 팀을 직접 상대한 기록이 있는 선수는 그만큼 근거가 단단합니다.
+          </div>
+          {/* 신인 드래프트 - 사용자: "11월 9일날 신인 드래프트가 있어서 그 이후로 신인이 들어오긴
+              할건데 ... 작년에 신입들이 활약했던걸 생각하면 추가를 해야할것 같아". 아직 누구인지
+              모르므로 넣을 수 없다. 대신 "빠져 있다"는 사실과 예상 영향을 실측으로 말한다. */}
+          <div className={styles.note}>
+            <b>신인 드래프트({DRAFT_DATE}) 선수는 아직 이 표에 없습니다.</b> 최근 시즌 신인은 국내 출전시간의 1.4~14.0%를 가져갔고
+            ({prev} 9.0%, 분가중 PER 11.0), 이 표가 빈자리를 메우는 <b>팀 뎁스</b>({depthLo}~{depthHi}, 평균 {depthAvg})와 비슷한 수준이라
+            신인이 합류해도 순서가 크게 바뀌진 않을 것으로 봅니다. 다만 뎁스가 얇은 팀({thinTeams})은 영향이 상대적으로 큽니다.
+          </div>
+          <div className={styles.note}>
+            나머지 자리는 실측입니다 - {prev} 기록, 공백 후 복귀면 마지막 KBL 시즌 값에 &quot;다음 시즌 PER&quot; 회귀를 통과시킵니다
+            (비국내 4.65+0.789p·n=131, 공백 복귀 12.29+0.491p·n=38, 국내 연속 3.76+0.690p·n=824). 공백이 길수록 평균으로 당겨지는 힘이
+            세서, 케베 알루마·게이지 프림·패리스 배스·라숀 토마스는 마지막 기록보다 2~4점 낮게 잡힙니다.
           </div>
         </details>
       )}
-      {/* 신인 드래프트 - 사용자: "11월 9일날 신인 드래프트가 있어서 그 이후로 신인이 들어오긴
-          할건데 ... 작년에 신입들이 활약했던걸 생각하면 추가를 해야할것 같아".
-          아직 누구인지 모르므로 넣을 수 없다. 대신 "빠져 있다"는 사실과, 들어왔을 때 얼마나
-          움직일지를 실측으로 말한다. 신인 수치는 15시즌 집계(데이터 시작 왜곡이 있는 첫 두
-          시즌 제외): 국내 출전시간의 1.4~14.0%, 25-26은 9.0%(6명이 500분 이상), 분가중 PER 11.0. */}
-      <div className={styles.note}>
-        <b>신인 드래프트({DRAFT_DATE}) 선수는 아직 이 표에 없습니다.</b> 누가 어느 팀에 갈지 정해지지 않아 넣을 수가 없습니다. 다만 얼마나
-        움직일지는 지난 기록으로 가늠할 수 있습니다 — 최근 시즌 신인들은 국내 출전시간의 1.4~14.0%를 가져갔고({prev}은 9.0%로 그중 6명이
-        500분 이상 뛰었습니다), 그때 신인들의 분가중 PER은 11.0이었습니다. 이 표가 빈자리를 메우는 데 쓰는 <b>팀 뎁스</b>가{" "}
-        {depthLo}~{depthHi}(평균 {depthAvg})이라 <b>신인의 수준과 비슷합니다</b>. 그래서 신인이 합류해도 순서가 크게 바뀌지는 않을 것으로
-        봅니다. 다만 뎁스가 특히 얇은 팀에서는 신인 한 명이 차지하는 몫이 상대적으로 큽니다({thinTeams}). 드래프트 후 명부가 갱신되면 이 표도
-        다시 계산됩니다.
-      </div>
-      <div className={styles.note}>
-        나머지 자리는 실측입니다: {prev} 기록이 있으면 그 값을, 공백 후 복귀면 마지막 KBL 시즌 값을 쓰되, 둘 다 &quot;다음 시즌 PER&quot;
-        회귀를 통과시킵니다(비국내 연속 4.65+0.789p · n=131, 공백 복귀 12.29+0.491p · n=38, 국내 연속 3.76+0.690p · n=824). 공백이 있으면
-        평균으로 회귀하는 힘이 훨씬 세다는 것이 15시즌 실측이라, 케베 알루마·게이지 프림·패리스 배스·라숀 토마스는 마지막 기록보다 2~4점 낮게
-        잡힙니다.
-      </div>
     </>
   );
 }
@@ -382,12 +374,16 @@ function ProjectionSection({
           </>
         )}
       </p>
+      {/* 실측 지적: 이 박스가 max-width로 좁혀져 있어 넓은 화면에서 테두리 안쪽 오른쪽이
+          텅 비어 보였다("레이아웃이 이상하다"). 폭 제한은 CSS에서 뺐다(.adjWarn).
+          내용도 4문장 → 굵은 한 줄(무엇인지) + 한 줄(근거 요약)로 줄였다 - 마지막 문장
+          ("신인 드래프트... 다시 계산합니다")은 아래 AdjBreakdown의 신인 드래프트 note와
+          내용이 겹쳐 그쪽에만 남긴다. */}
       {hasAdj && (
         <div className={styles.adjWarn}>
-          <b>이 표는 맞히려고 만든 게 아닙니다.</b> 오른쪽 승수는 확정 결장 13명, 2·3쿼터 외국인 2명 허용, KBL 기록이 없는 신입 선수{" "}
-          {proj.adjustment?.priorSlots}명의 스카우팅 등급을 넣어 로스터를 다시 조립한 <b>시나리오</b>입니다. KBL 15시즌을 확인해 보니{" "}
-          <b>이탈 정보만으로 다음 시즌을 설명한 설명력은 0.1% 미만</b>이었습니다 — 순서를 보는 용도로만 봐 주세요. 그리고{" "}
-          <b>신인 드래프트(11월 9일) 선수는 아직 이 표에 없습니다.</b> 개막 후 경기가 쌓이면 모델이 실제 결과로 다시 계산합니다.
+          <b className={styles.calloutLead}>이 표는 맞히려는 예측이 아니라 시나리오입니다.</b>
+          확정 결장 13명 · 2·3쿼터 외국인 2명 허용 · 신입 {proj.adjustment?.priorSlots}명의 스카우팅 등급을 반영해 로스터를 다시
+          조립했습니다. 이탈 정보만으로는 다음 시즌 설명력이 0.1% 미만이라, 순서는 참고만 해주세요.
         </div>
       )}
       {hasAdj && (
@@ -399,7 +395,7 @@ function ProjectionSection({
               <span className={`${styles.projWinsFinal} ${styles.deltaUp}`}>31.0</span>
             </span>
             <span>
-              왼쪽은 <b>작년 전력 그대로</b> 계산한 승수, 오른쪽은 <b>올해 변화를 반영</b>한 승수입니다.
+              <b>왼쪽</b> 작년 전력 승수 → <b>오른쪽</b> 올해 반영 승수
             </span>
           </div>
           <div className={styles.readMeItem}>
@@ -408,7 +404,7 @@ function ProjectionSection({
               <span className={`${styles.projMove} ${styles.deltaUp}`}>▲2</span>
             </span>
             <span>
-              순위는 <b>올해 변화를 반영한 기준</b>이고, 화살표는 작년 전력 기준 순위에서 몇 계단 움직였는지입니다.
+              순위는 <b>올해 반영 기준</b> · 화살표는 작년 대비 이동한 계단 수
             </span>
           </div>
           <div className={styles.readMeItem}>
@@ -418,7 +414,7 @@ function ProjectionSection({
               </span>
             </span>
             <span>
-              막대는 <b>10번 중 8번이 들어가는 승수 범위</b>입니다. 길수록 어떻게 될지 모른다는 뜻입니다.
+              <b>10번 중 8번</b>이 들어가는 승수 범위 - 길수록 불확실
             </span>
           </div>
           <div className={styles.readMeItem}>
@@ -430,7 +426,7 @@ function ProjectionSection({
               </span>
             </span>
             <span>
-              칸이 진할수록 <b>그 순위가 될 가능성이 큽니다</b>. 맨 왼쪽이 1위, 맨 오른쪽이 {proj.teams.length}위입니다.
+              진할수록 <b>그 순위 확률이 큼</b> (왼쪽 1위 → 오른쪽 {proj.teams.length}위)
             </span>
           </div>
         </div>
@@ -451,33 +447,38 @@ function ProjectionSection({
         ))}
       </div>
       <div className={styles.note}>
-        {/* 전반기 열을 뺀 이유를 숫자로 밝힌다 - 사용자가 "데이터 중복 같다"고 했고 실제로 그랬다. */}
-        전반기({ROUNDS_HALF}라운드 {GAMES_HALF}경기) 기대승수는 따로 두지 않았습니다. 각 팀의 날짜순 앞 {GAMES_HALF}경기로 실제로
-        계산해 보면 전체 {GAMES_FULL}경기 값의 {halfRatioLo}~{halfRatioHi}배로, <b>사실상 정확히 절반</b>이기 때문입니다(절반으로 봤을 때
-        최대 오차 {halfMaxErr}승). 일정이 균형이라 그렇습니다 — 앞 {GAMES_HALF}경기 안에 상대별 {ROUNDS_HALF}경기가 들어갑니다.{" "}
-        전체 {GAMES_FULL}경기는 일정 편성과 무관하게 매치업 승률만으로 결정됩니다({m.tcodes.length}팀 × 9상대 × {ROUNDS_TOTAL}). 매치업{" "}
-        {m.tcodes.length * (m.tcodes.length - 1)}쌍{" "}
-        {m.filled === 0 ? (
-          <>전부 모델이 직접 매긴 값입니다(동급 팀끼리 홈 {Math.round(m.hcaProb * 1000) / 10}%).</>
-        ) : (
-          <>
-            중 {m.fromModel}쌍은 모델이 직접 매긴 값이고, 아직 그 방향으로 편성되지 않은 {m.filled}쌍은 반대 방향 승률을 홈코트 이점(동급
-            팀끼리 홈 {Math.round(m.hcaProb * 1000) / 10}%)으로 뒤집어 채운 추정입니다.
-          </>
-        )}
+        확률이 낮은 팀은 &quot;0%&quot;가 아니라 <b>&lt;0.01%</b>로 적습니다 - {proj.sims.toLocaleString()}번 시뮬레이션(6강 기준) 중 한 번도
+        안 나왔을 뿐 불가능하다는 뜻은 아니기 때문입니다.
       </div>
-      <div className={styles.note}>
-        1위·PO 확률과 승수 구간은 같은 {GAMES_FULL}경기 일정을 {proj.sims.toLocaleString()}번 돌린 결과입니다(6강 플레이오프 기준). 기대승수가
-        비슷해도 순위 분포는 다를 수 있고, 실제 시즌은 이 분포 안 어느 한 점입니다. 확률이 낮은 팀은 &quot;0%&quot;로 적지 않고{" "}
-        <b>&lt;0.01%</b>로 적습니다 — {proj.sims.toLocaleString()}번 중 한 번도 안 나왔다는 뜻이지 불가능하다는 뜻이 아니기 때문입니다.
-      </div>
+      {/* 실측 지적: "전반기 열을 뺀 이유"·"매치업 승률 산출 방식"은 표를 읽는 데 당장 필요하지
+          않은 방법론 각주인데, 늘 펼쳐져 있어 본문처럼 읽혔다("논문 같다"). 눌러서 보는 방식으로
+          접는다 - 사용자가 "데이터 중복 같다"고 했던 근거(halfRatio 실측)는 그대로 보존한다. */}
+      <details className={styles.scoutDetails}>
+        <summary className={styles.scoutSummary}>승수·확률을 어떻게 계산했는지</summary>
+        <div className={styles.note}>
+          전반기({ROUNDS_HALF}라운드 {GAMES_HALF}경기) 기대승수는 따로 두지 않았습니다 - 전체 {GAMES_FULL}경기 값의{" "}
+          {halfRatioLo}~{halfRatioHi}배로 <b>사실상 정확히 절반</b>이기 때문입니다(오차 최대 {halfMaxErr}승). 매치업{" "}
+          {m.tcodes.length * (m.tcodes.length - 1)}쌍{" "}
+          {m.filled === 0 ? (
+            <>전부 모델이 직접 매긴 값입니다(동급 팀끼리 홈 {Math.round(m.hcaProb * 1000) / 10}%).</>
+          ) : (
+            <>
+              중 {m.fromModel}쌍은 모델이 직접 매긴 값, 나머지 {m.filled}쌍은 반대 방향 승률을 홈코트 이점(동급 팀끼리 홈{" "}
+              {Math.round(m.hcaProb * 1000) / 10}%)으로 뒤집어 채운 추정입니다.
+            </>
+          )}
+        </div>
+        <div className={styles.note}>
+          1위·PO 확률과 승수 범위는 같은 {GAMES_FULL}경기 일정을 {proj.sims.toLocaleString()}번 돌린 결과입니다. 기대승수가 같아도 순위
+          분포는 다를 수 있어 실제 시즌은 이 분포 안 어느 한 점입니다.
+        </div>
+      </details>
       <AdjBreakdown proj={proj} cur={cur} prev={prev} />
       <div className={styles.note}>
-        <b>&quot;기본&quot; 열이 아는 것과 모르는 것.</b> 기본 승률은 {prev} 전력(넷레이팅·라인업 시너지·홈코트)만으로 계산됩니다. 그래서{" "}
-        {knows.departures != null && <>{cur}에 뛰지 않는 것이 확정된 {knows.departures}명도, </>}
-        {knows.ruleChange && <>2·3쿼터 외국인 2명 동시 출전을 허용하는 규정 변경도, </>}로스터 이동도 기본 열에는 들어 있지 않습니다. 그
-        차이를 넣어 본 것이 &quot;조정&quot; 열이고, 아래 섹션들이 각 재료를 하나씩 측정해 보여 줍니다. {cur} 개막 후 경기가 쌓이면 모델이
-        실제 결과로 다시 계산됩니다.
+        <b>&quot;기본&quot; 열은 {prev} 전력(넷레이팅·라인업 시너지·홈코트)만 압니다.</b>{" "}
+        {knows.departures != null && <>{cur} 확정 결장 {knows.departures}명도, </>}
+        {knows.ruleChange && <>규정 변경도, </>}로스터 이동도 모릅니다 - 그 차이를 넣은 것이 &quot;조정&quot; 열입니다. {cur} 개막 후
+        경기가 쌓이면 모델이 실제 결과로 다시 계산됩니다.
       </div>
     </div>
   );
