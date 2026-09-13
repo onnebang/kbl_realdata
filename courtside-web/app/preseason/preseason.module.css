@@ -214,7 +214,7 @@
   background: var(--surface-soft);
 }
 .outlookHead {
-  font-size: var(--fs-100);
+  font-size: var(--fs-200);
   font-weight: 600;
   line-height: var(--lh-data);
   color: var(--ink-faint);
@@ -235,7 +235,9 @@
   align-items: center;
   gap: 8px;
   font-weight: 700;
-  font-size: 13px;
+  /* 이 행의 정체(팀 이름) - 실측 지적: 13px가 옆 숫자들과 구분 없이 뭉개져 읽혔다.
+     본문 단(--fs-300)으로 올려 행의 주인공임을 드러낸다. 넘치면 ellipsis가 처리한다. */
+  font-size: var(--fs-300);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -263,7 +265,7 @@
   background: rgba(var(--line-rgb), 0.32);
 }
 .outlookVal {
-  font-size: 12.5px;
+  font-size: var(--fs-200);
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -278,7 +280,7 @@
   color: var(--ink-faint);
 }
 .outlookPrev {
-  font-size: 12.5px;
+  font-size: var(--fs-200);
   text-align: right;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
@@ -327,7 +329,7 @@
   line-height: 1.25;
 }
 .headlineSub {
-  font-size: 12.5px;
+  font-size: var(--fs-200);
   color: var(--ink-soft);
   margin-top: 4px;
   font-variant-numeric: tabular-nums;
@@ -339,7 +341,7 @@
   margin: 0 0 14px;
   padding: 0;
   list-style: none;
-  font-size: 12px;
+  font-size: var(--fs-200);
 }
 .moveList li {
   display: inline-flex;
@@ -367,7 +369,8 @@
   flex-wrap: wrap;
   gap: 4px 8px;
   font-weight: 800;
-  font-size: 14px;
+  /* 카드의 표제(팀 이름) - 본문 단(--fs-300)으로. */
+  font-size: var(--fs-300);
   letter-spacing: -0.02em;
   margin-bottom: 8px;
   text-decoration: none;
@@ -441,7 +444,7 @@
 }
 .staySummary {
   cursor: pointer;
-  font-size: 12.5px;
+  font-size: var(--fs-200);
   font-weight: 700;
   color: var(--ink-soft);
   padding: 7px 0 3px;
@@ -457,9 +460,11 @@
 .stayDetails[open] > .staySummary::before {
   content: "▾ ";
 }
+/* 이 줄의 정체(선수 이름) - /preseason 팀 카드와 /teams/[tcode] 로스터 변화 패널이 이 컴포넌트를
+   공유한다(components/RosterChangeLine.tsx). 본문 단(--fs-300)으로 올려 두 화면 모두 개선된다. */
 .changeName {
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-300);
   text-decoration: none;
   color: var(--ink);
 }
@@ -467,12 +472,12 @@
   text-decoration: underline;
 }
 .changeRole {
-  font-size: 12.5px;
+  font-size: var(--fs-200);
   color: var(--ink-faint);
   margin-left: 5px;
 }
 .changeStat {
-  font-size: 12.5px;
+  font-size: var(--fs-200);
   color: var(--ink-soft);
   margin-top: 1px;
   font-variant-numeric: tabular-nums;
@@ -504,11 +509,11 @@
 }
 .actTitle {
   font-weight: 800;
-  font-size: 13.5px;
+  font-size: var(--fs-300);
   margin-top: 4px;
 }
 .actBody {
-  font-size: 12px;
+  font-size: var(--fs-200);
   line-height: 1.5;
   color: var(--ink-soft);
   margin-top: 4px;
@@ -561,7 +566,7 @@
   align-items: center;
   gap: 6px;
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: var(--fs-200);
   min-width: 0;
 }
 .demoTeam span {
@@ -586,7 +591,7 @@
   color: var(--ink-faint);
 }
 .demoWhy {
-  font-size: 12px;
+  font-size: var(--fs-200);
   line-height: 1.5;
   color: var(--ink-soft);
 }
@@ -800,14 +805,17 @@
   color: var(--ink);
 }
 
-/* 조정 내역 표 */
+/* 조정 내역 표. 실측 지적: 팀 이름·네 칸 델타가 12.5px 모노 한 크기로 뭉개져 어느 게
+   결론(상대)이고 어느 게 재료(이탈·슬롯·기타·규정)인지 눈으로 구분이 안 됐다. 팀 이름 →
+   본문 단, 델타 네 칸 → 라벨 단, 결론(상대) → 그보다 한 단 더 위로 세 단계를 나눴다.
+   6번째 칸(상대)이 58→64px로 6px 넓어져 minmax(110px,1fr)에서 그만큼 가져간다. */
 .adjGrid {
   display: grid;
   gap: 4px;
 }
 .adjRow {
   display: grid;
-  grid-template-columns: minmax(110px, 1fr) 52px 52px 52px 52px 58px minmax(120px, 1.1fr);
+  grid-template-columns: minmax(110px, 1fr) 52px 52px 52px 52px 64px minmax(120px, 1.1fr);
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
@@ -817,7 +825,7 @@
   background: var(--surface-soft);
 }
 .adjHead {
-  font-size: var(--fs-100);
+  font-size: var(--fs-200);
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--ink-faint);
@@ -830,25 +838,25 @@
   align-items: center;
   gap: 6px;
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: var(--fs-300);
   white-space: nowrap;
   min-width: 0;
 }
 .adjNum {
   text-align: right;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 12.5px;
+  font-size: var(--fs-200);
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
-/* 이 표의 결론 칸(상대) - 앞 네 칸(모노 12.5px)보다 한 단계 위로 올려 스코어보드 목소리를 준다.
+/* 이 표의 결론 칸(상대) - 앞 네 칸(모노 --fs-200)보다 한 단계 위로 올려 스코어보드 목소리를 준다.
    같은 요소에 .adjNum이 함께 걸리는데 이 규칙이 뒤에 있어 서체·크기를 덮어쓴다.
    --fs-600은 위 예상 승수 표가 이미 쓰고 있다 - 한 패널에 큰 숫자는 하나. */
 .adjTotal {
   font-family: "Big Shoulders Display", sans-serif;
   color: var(--ink);
   font-weight: 800;
-  font-size: var(--fs-300);
+  font-size: var(--fs-400);
   letter-spacing: -0.01em;
 }
 .adjTrack {
@@ -985,19 +993,16 @@
     line-height: 1.25;
   }
 
-  /* 조정의 내역: 7열 최소 496px. 여기서 열을 접으면 이 표의 존재 이유인 이탈·슬롯·기타·규정
-     세부가 통째로 사라지므로, 접지 않고 가로 스크롤로 넘긴다. */
+  /* 조정의 내역: 7열 각 칸의 최소 폭 합(110+52×4+64+120) + gap 8px×6 = 550px. 여기서 열을
+     접으면 이 표의 존재 이유인 이탈·슬롯·기타·규정 세부가 통째로 사라지므로, 접지 않고
+     가로 스크롤로 넘긴다. */
   .adjGrid {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
   .adjHead,
   .adjRow {
-    min-width: 520px;
-  }
-
-  .actBody {
-    font-size: 12.5px;
+    min-width: 552px;
   }
 }
 
@@ -1011,7 +1016,7 @@
 .scoutSummary {
   cursor: pointer;
   padding: 10px 0;
-  font-size: 12.5px;
+  font-size: var(--fs-200);
   font-weight: 700;
   color: var(--ink-soft);
   list-style: none;
@@ -1040,23 +1045,20 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  font-size: 13px;
+  font-size: var(--fs-200);
 }
 .scoutTier {
-  font-size: 12.5px;
+  font-size: var(--fs-200);
   color: var(--ink-soft);
 }
+/* 실제로 읽어야 하는 근거 문단이라(스카우팅 판단의 본문) 다른 각주(--fs-100)보다 한 단
+   위인 본문 단(--fs-300)으로 - 12px는 이런 밀도의 분석 문장을 읽기엔 너무 작았다. */
 .scoutEv {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--fs-300);
   line-height: var(--lh-prose);
   color: var(--ink-soft);
   /* 산문(스카우팅 근거 문단) - 62자에서 끊는다 */
   max-width: var(--measure-read);
   word-break: keep-all;
-}
-@media (max-width: 430px) {
-  .scoutEv {
-    font-size: 12.5px;
-  }
 }
