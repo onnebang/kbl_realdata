@@ -48,12 +48,13 @@ export default async function Image({ params }: { params: Promise<{ gmkey: strin
   }
 
   return ogCard({
-    kicker: `${when}${time} · ${g.season_category ?? "KBL"}`,
+    kicker: `${when}${status === "scheduled" ? "" : time} · ${g.season_category ?? "KBL"}`, // 예정은 시각을 가운데에 크게
     matchup: {
       away: a,
       home: h,
       awayScore: status === "scheduled" ? null : g.away_score,
       homeScore: status === "scheduled" ? null : g.home_score,
+      center: status === "scheduled" && g.game_start ? (g.game_start as string).slice(0, 5) : undefined,
       note,
     },
   });

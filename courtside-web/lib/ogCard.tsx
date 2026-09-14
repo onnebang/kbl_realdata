@@ -59,7 +59,8 @@ export type OgCardProps = {
   sub?: string;
   /** 왼쪽 세로 막대 색(팀). 없으면 골드. */
   accent?: string;
-  matchup?: { away: OgTeam; home: OgTeam; awayScore: number | null; homeScore: number | null; note?: string };
+  /** 점수가 없으면(예정 경기) 점수 자리를 비우고 가운데에 center(팁오프 시각)를 크게 쓴다. */
+  matchup?: { away: OgTeam; home: OgTeam; awayScore: number | null; homeScore: number | null; center?: string; note?: string };
 };
 
 /** 긴 이름(외국인 선수 한글 표기 등)이 한 줄을 넘지 않게 글자 수로 크기를 줄인다. */
@@ -74,9 +75,11 @@ function TeamSide({ team, score, align }: { team: OgTeam; score: number | null; 
         <div style={{ width: 14, height: 48, background: team.accent }} />
         <div style={{ fontSize: team.name.length > 7 ? 44 : 52, fontWeight: 800, color: INK, letterSpacing: "-0.02em" }}>{team.name}</div>
       </div>
-      <div style={{ fontFamily: "Big Shoulders", fontSize: 200, fontWeight: 800, color: INK, lineHeight: 1, marginTop: 12 }}>
-        {score == null ? "-" : String(score)}
-      </div>
+      {score != null && (
+        <div style={{ fontFamily: "Big Shoulders", fontSize: 200, fontWeight: 800, color: INK, lineHeight: 1, marginTop: 12 }}>
+          {String(score)}
+        </div>
+      )}
     </div>
   );
 }
@@ -84,9 +87,13 @@ function TeamSide({ team, score, align }: { team: OgTeam; score: number | null; 
 export async function ogCard({ kicker, title, sub, accent = GOLD, matchup }: OgCardProps): Promise<ImageResponse> {
   const body = matchup ? (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "center" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: matchup.center ? "center" : "flex-end" }}>
         <TeamSide team={matchup.away} score={matchup.awayScore} align="left" />
-        <div style={{ fontSize: 40, fontWeight: 600, color: INK_SOFT, paddingBottom: 90 }}>@</div>
+        {matchup.center ? (
+          <div style={{ fontFamily: "Big Shoulders", fontSize: 150, fontWeight: 800, color: GOLD, lineHeight: 1 }}>{matchup.center}</div>
+        ) : (
+          <div style={{ fontSize: 40, fontWeight: 600, color: INK_SOFT, paddingBottom: 90 }}>@</div>
+        )}
         <TeamSide team={matchup.home} score={matchup.homeScore} align="right" />
       </div>
       {matchup.note && <div style={{ fontSize: 34, fontWeight: 600, color: INK_SOFT, marginTop: 24 }}>{matchup.note}</div>}
