@@ -2185,15 +2185,16 @@ table.data-table td:nth-child(2) {
   text-align: right;
 }
 /* 요청: "표를 확실하게 보이게" - data-table 공통 기본값(13px/12px)은 다른 9개 페이지가
-   같이 쓰므로 거기는 그대로 두고, 이 표에만 override로 키운다. */
-.replay-court-table {
+   같이 쓰므로 거기는 그대로 두고, 이 표에만 override로 키운다. table.data-table 쪽이
+   타입+클래스 선택자라 명시도가 더 높으므로, 여기도 table.을 붙여 이겨야 한다. */
+table.replay-court-table {
   font-size: 14.5px;
 }
-.replay-court-table th {
+table.replay-court-table th {
   font-size: 13px;
   padding: 8px 9px;
 }
-.replay-court-table td {
+table.replay-court-table td {
   padding: 8px 9px;
 }
 .replay-court-row.bench {
