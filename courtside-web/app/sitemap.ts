@@ -27,7 +27,14 @@ async function entityPaths(): Promise<string[]> {
   ];
 }
 
+// 빌드 때 만들지 않는다 - 빌드 환경의 DB 키가 틀리면(프리뷰에서 실제로 "Invalid API key") 사이트맵 하나
+// 때문에 배포 전체가 실패했다. 요청 때 만들고, 조회가 실패하면 목록 페이지만이라도 내보낸다.
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const paths = await cached(entityPaths, ["sitemap", PRESEASON_SEASON], TTL.batchDaily);
+  const paths = await cached(entityPaths, ["sitemap", PRESEASON_SEASON], TTL.batchDaily).catch((e) => {
+    console.error("[sitemap] 경기·선수·팀·감독 목록 조회 실패 - 목록 페이지만 내보냄", e);
+    return [] as string[];
+  });
   return [...LIST_PAGES, ...paths].map((p) => ({ url: `${SITE_URL}${p}` }));
 }
