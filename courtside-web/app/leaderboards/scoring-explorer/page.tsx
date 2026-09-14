@@ -12,6 +12,7 @@ import {
 } from "@/lib/shotValueScatter";
 import ScoringExplorerClient from "@/components/ScoringExplorerClient";
 import { WidgetBoundary } from "@/components/WidgetBoundary";
+import ShotTrend from "./ShotTrend";
 import styles from "./scoring-explorer.module.css";
 
 // web/scoring_distribution_template.html 리디자인(리디자인 대상: 이 leaderboards 그룹에서
@@ -32,11 +33,13 @@ const DIMS: Dimension[] = ["league", "coach"];
 // 필요해 클라이언트 상태(ScoringExplorerClient)가 필수였지만, 이 탭은 "시즌 하나 고르면 리그
 // 전체 로스터가 한 번에 뜨는" 단순 조회라 이 사이트 기본 컨벤션(query-param + <form> GET, JS
 // 없음)으로 충분 - 탭 자체도 ?tab=으로 전환.
-type TabKey = "heatmap" | "scatter";
+// "trend"(2026-09-15)가 옛 "heatmap" 탭을 대체한다 - 옛 링크 ?tab=heatmap도 trend로 받는다. 코트 지도 재생은
+// 같은 탭에서 ?map=1일 때만 아래에 붙인다(마운트 즉시 무거운 조회를 하는 클라이언트라 기본으로 띄우지 않는다).
+type TabKey = "trend" | "scatter";
 // 순서를 뒤집었다 - 사용자가 실제로 쓰는 화면(산점도)이 기본이어야 한다.
 const TABS: { key: TabKey; label: string }[] = [
   { key: "scatter", label: "슛 선택 지도" },
-  { key: "heatmap", label: "리그 슛 선택의 변화" },
+  { key: "trend", label: "KBL 슛의 15년" },
 ];
 
 // searchParams가 없어져(엔티티 전환은 이제 클라이언트 Server Action) Next.js가 이 페이지를
@@ -98,26 +101,25 @@ function ScatterLegend({ tsaMin, tsaMax }: { tsaMin: number; tsaMax: number }) {
 export default async function ScoringExplorerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; season?: string }>;
+  searchParams: Promise<{ tab?: string; season?: string; map?: string }>;
 }) {
-  const { tab, season } = await searchParams;
-  const activeTab: TabKey = tab === "heatmap" ? "heatmap" : "scatter";
+  const { tab, season, map } = await searchParams;
+  const activeTab: TabKey = tab === "trend" || tab === "heatmap" ? "trend" : "scatter";
 
   return (
     <div className={styles.pageRoot}>
       <div className={styles.wrap}>
         <div className={styles.title}>슈팅 리포트</div>
         <div className={styles.subtitle}>
-          &quot;어디서 던지느냐&quot;와 &quot;그 자리를 득점으로 바꾸느냐&quot;는 다른 문제입니다. 앞 화면은 선수 한 명씩
-          그 둘을 좌표로 찍어 리그 안에서의 자리를 보여주고, 뒤 화면은 KBL 전체의 슛 선택이 15시즌 동안
-          어떻게 옮겨 갔는지를 보여줍니다. 팀·선수 개인의 슛 지도는 각자의 상세 페이지에 더 자세히 있습니다.
+          &quot;어디서 던지느냐&quot;와 &quot;그 자리를 득점으로 바꾸느냐&quot;는 다른 문제입니다. 슛 선택 지도는 선수 한 명씩 그 둘을
+          좌표로 찍어 리그 안의 자리를 보여주고, KBL 슛의 15년은 리그와 팀의 슛 구성이 어떻게 바뀌었고 효율은 어땠는지를 보여줍니다.
         </div>
 
         <div className={styles.tabRow}>
           {TABS.map((t) => (
             <Link
               key={t.key}
-              href={t.key === "heatmap" ? "?tab=heatmap" : `?tab=scatter${season ? `&season=${encodeURIComponent(season)}` : ""}`}
+              href={`?tab=${t.key}${season ? `&season=${encodeURIComponent(season)}` : ""}`}
               className={`${styles.tabLink} ${activeTab === t.key ? styles.tabLinkActive : ""}`}
             >
               {t.label}
@@ -125,8 +127,15 @@ export default async function ScoringExplorerPage({
           ))}
         </div>
 
-        {activeTab === "heatmap" ? (
-          <HeatmapTab />
+        {activeTab === "trend" ? (
+          <>
+            <ShotTrend activeSeason={season} mapHref={`?tab=trend${season ? `&season=${encodeURIComponent(season)}` : ""}&map=1#court-map`} />
+            {map === "1" && (
+              <div id="court-map">
+                <HeatmapTab />
+              </div>
+            )}
+          </>
         ) : (
           <ScatterTab activeSeason={season} />
         )}

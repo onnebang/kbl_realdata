@@ -1,0 +1,398 @@
+/* "KBL 슛의 15년" 탭 - scoring-explorer.module.css의 .pageRoot 토큰(--surface/--ink/--hot/--line-rgb) 안에서 그린다.
+   색 규칙: 이야기의 주인공인 3점만 --hot, 중거리·페인트존은 잉크 농도 두 단계(좋고 나쁨이 아니라 구역 구분).
+   숫자 목소리는 Big Shoulders(숫자·%·. 만), 한글은 Pretendard. 움직임 없음. */
+
+.panel {
+  margin-top: 18px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
+  padding: 18px 20px;
+}
+.empty {
+  margin-top: 18px;
+  padding: 30px;
+  text-align: center;
+  color: var(--ink-faint);
+}
+
+.three {
+  background: var(--hot);
+}
+.mid {
+  background: rgba(var(--line-rgb), 0.16);
+}
+.paint {
+  background: rgba(var(--line-rgb), 0.42);
+}
+
+/* ── 머리 숫자 두 개 ── */
+.headline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 48px;
+}
+.statNums {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.statNum {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: clamp(40px, 6vw, 60px);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.statHot {
+  color: var(--hot);
+}
+.statArrow {
+  font-size: var(--fs-500);
+  color: var(--ink-faint);
+}
+.statLabel {
+  margin-top: 6px;
+  font-size: var(--fs-200);
+  font-weight: 600;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.lede {
+  margin: 16px 0 0;
+  max-width: 72ch;
+  font-size: var(--fs-300);
+  line-height: var(--lh-prose);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 15시즌 차트 ── */
+.chartBlock {
+  margin-top: 20px;
+}
+.chartTitle {
+  margin: 14px 0 8px;
+  font-size: var(--fs-200);
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.cols {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  height: 220px;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.3);
+}
+.col {
+  display: flex;
+  flex-direction: column-reverse;
+  min-width: 0;
+}
+.seg {
+  position: relative;
+}
+.col .seg:first-child {
+  border-radius: 0;
+}
+.col .seg:last-child {
+  border-radius: var(--r-led) var(--r-led) 0 0;
+}
+.segVal {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: var(--fs-300);
+  color: #fff;
+  white-space: nowrap;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sw {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.line {
+  position: relative;
+  height: 120px;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.3);
+}
+.line svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.gridLine {
+  stroke: rgba(var(--line-rgb), 0.12);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.gridTick {
+  position: absolute;
+  left: 0;
+  transform: translateY(50%);
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  background: var(--surface);
+  padding-right: 4px;
+}
+.ppsLine {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+.ppsDot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: 0 0 -3.5px -3.5px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+.ppsVal {
+  position: absolute;
+  transform: translate(-50%, -8px);
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: var(--fs-300);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-shadow: 0 0 3px var(--surface), 0 0 3px var(--surface);
+}
+.xLabels {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ink-faint);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── 구역별 성공률 ── */
+.sectionTitle {
+  font-size: var(--fs-400);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.sectionTitle::before {
+  content: "";
+  flex: none;
+  width: 11px;
+  height: 1.1em;
+  background: var(--hot);
+  clip-path: polygon(0 0, 100% 0, 50% 100%, 0 100%);
+}
+.rateGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.rateCard {
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: var(--r-inset);
+  padding: 12px 14px;
+  min-width: 0;
+}
+.rateTitle {
+  font-size: var(--fs-200);
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.rateNums {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+}
+.rateNum {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: var(--fs-600);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.rateArrow {
+  color: var(--ink-faint);
+}
+.rateSpark {
+  display: block;
+  width: 100%;
+  height: 44px;
+  margin-top: 8px;
+}
+.sparkLine {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.6;
+}
+.rateRange {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 팀별 표 ── */
+.teamHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.seasonForm {
+  display: flex;
+  gap: 8px;
+}
+.seasonForm select {
+  font-family: "Pretendard", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  background: var(--surface);
+  color: var(--ink);
+}
+.seasonSubmit {
+  font-family: "Pretendard", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 7px 16px;
+  min-height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: var(--hot);
+  color: #fff;
+  cursor: pointer;
+}
+.tableWrap {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+.teamTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.teamTable th {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  text-align: right;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.16);
+}
+.teamTable td {
+  padding: 7px 8px;
+  text-align: right;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.08);
+}
+.teamTable .left {
+  text-align: left;
+}
+.teamCell {
+  border-left: 3px solid var(--tb-l, var(--ink-faint));
+  font-weight: 700;
+}
+.teamCell a {
+  color: var(--ink);
+}
+@media (prefers-color-scheme: dark) {
+  .teamCell {
+    border-left-color: var(--tb-d, var(--ink-faint));
+  }
+}
+.leagueRow td {
+  font-weight: 700;
+  background: rgba(var(--line-rgb), 0.04);
+}
+.dim {
+  color: var(--ink-faint);
+}
+.mixBar {
+  display: flex;
+  width: 220px;
+  height: 12px;
+  border-radius: var(--r-led);
+  overflow: hidden;
+}
+.mixBar span {
+  display: block;
+  height: 100%;
+}
+.note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink-faint);
+}
+.captions {
+  margin: 14px 0 0;
+  padding-left: 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.mapLink {
+  margin-top: 16px;
+}
+.mapLink a {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  border-bottom: 2px solid var(--hot);
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 14px 14px;
+  }
+  .cols,
+  .xLabels {
+    gap: 3px;
+  }
+  .cols {
+    height: 180px;
+  }
+  .segVal {
+    font-size: 12px;
+  }
+  .rateGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mixBar {
+    width: 140px;
+  }
+}
