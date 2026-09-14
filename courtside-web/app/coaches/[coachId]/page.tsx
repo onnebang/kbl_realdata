@@ -14,6 +14,7 @@ import {
   CHALLENGE_CAPTION,
   CHALLENGE_ALL3_NOTE,
   MEASURING_NOTE,
+  TIMEOUT_CAPTIONS,
   SHORT_SEASON,
   PARTIAL_SEASON_NOTE,
   CAREER_MIN_SEASONS,
@@ -28,7 +29,7 @@ import styles from "./coach-profile.module.css";
 import dir from "@/components/Directory.module.css";
 
 // 감독 프로필. 데이터·판정은 lib/coachPage.ts 머리 주석 참고 - 이 페이지는 사실(승-패·득실·팀 스타일·
-// 챌린지 사용 성향)만 그리고 '감독 효과'·'랭킹'·'성공률'은 그리지 않는다. 클라이언트 JS 0.
+// 작전타임 호출 성향·챌린지 사용 성향)만 그리고 '감독 효과'·'랭킹'·'성공률'은 그리지 않는다. 클라이언트 JS 0.
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ coachId: string }> }): Promise<Metadata> {
@@ -37,7 +38,7 @@ export async function generateMetadata({ params }: { params: Promise<{ coachId: 
   if (!p) return {};
   return {
     title: `${p.coach.name} 감독`,
-    description: `${p.coach.name} 감독 프로필 · 시즌별 승패와 득실, 로테이션 스타일, 재임기 팀 스타일`,
+    description: `${p.coach.name} 감독 프로필 · 시즌별 승패와 득실, 재임기 팀 스타일, 작전타임·챌린지 사용 성향`,
   };
 }
 
@@ -56,7 +57,8 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
   const p = await getCoachProfile(coachId);
   if (!p) notFound();
 
-  const { coach, seasons, career, careerStyle, currentTeam, challengeLeague } = p;
+  const { coach, seasons, career, careerStyle, currentTeam, challengeLeague, timeoutCareer } = p;
+  const timeoutSeasons = seasons.filter((s): s is CoachSeasonRow & { timeout: NonNullable<CoachSeasonRow["timeout"]> } => s.timeout != null);
   const lastSeason = seasons[seasons.length - 1];
   // 진행 중인 시즌 = 데이터셋의 마지막 시즌이면서 아직 54경기에 못 미치는 경우(경기 수만으로 보면
   // 2019-20 42경기 팀이 6년 뒤에도 '진행 중'이 된다 - lib/coachPage.ts isPartialSeason 주석 참고).
@@ -349,7 +351,71 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
         </section>
       )}
 
-      {/* (d) 챌린지 사용 성향 - 리그 요약은 항상 최신 1행이라, 이 감독의 기록이 없으면 카드째 뺀다 */}
+      {/* (d) 작전타임 호출 성향 - '언제 부르는가'만. 부른 뒤 첫 공격 효율은 노이즈라 싣지 않는다(캡션). 색·순위 없음. */}
+      {timeoutSeasons.length > 0 && (
+        <section className={styles.card}>
+          <div className={styles.cardHead}>
+            <span className={styles.cardTitle}>작전타임 호출 성향</span>
+            <span className={styles.cardKicker}>정규시즌 · 감독 값 옆 회색은 그 시즌 리그 평균</span>
+          </div>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>시즌</th>
+                  <th className={styles.left}>팀</th>
+                  <th>경기당 호출</th>
+                  <th>호출 직전 상대 연속 득점</th>
+                  <th>4쿼터 비중</th>
+                  <th>호출 · 경기</th>
+                </tr>
+              </thead>
+              <tbody>
+                {timeoutSeasons.map((s) => (
+                  <tr key={s.seasonName + s.tcode}>
+                    <td>
+                      {seasonLabel(s.seasonName)}
+                      {s === partialSeason && <span className={styles.partial}>진행 중 · {s.timeout.games}경기</span>}
+                    </td>
+                    <td className={styles.left}>{s.teamName}</td>
+                    <td>
+                      {s.timeout.perGame.toFixed(2)}회 <span className={styles.dim}>{s.timeout.league.perGame.toFixed(2)}</span>
+                    </td>
+                    <td>
+                      {s.timeout.oppRunMean.toFixed(1)}점 <span className={styles.dim}>{s.timeout.league.oppRunMean.toFixed(1)}</span>
+                    </td>
+                    <td>
+                      {Math.round(s.timeout.q4Share * 100)}% <span className={styles.dim}>{Math.round(s.timeout.league.q4Share * 100)}%</span>
+                    </td>
+                    <td className={styles.small}>
+                      {s.timeout.timeouts} · {s.timeout.games}
+                    </td>
+                  </tr>
+                ))}
+                {timeoutCareer && timeoutCareer.seasons > 1 && (
+                  <tr>
+                    <td>통산 {timeoutCareer.seasons}시즌</td>
+                    <td className={styles.left} />
+                    <td>{timeoutCareer.perGame.toFixed(2)}회</td>
+                    <td>{timeoutCareer.oppRunMean.toFixed(1)}점</td>
+                    <td>{Math.round(timeoutCareer.q4Share * 100)}%</td>
+                    <td className={styles.small}>
+                      {timeoutCareer.timeouts} · {timeoutCareer.games}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <ul className={styles.captions}>
+            {TIMEOUT_CAPTIONS.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* (e) 챌린지 사용 성향 - 리그 요약은 항상 최신 1행이라, 이 감독의 기록이 없으면 카드째 뺀다 */}
       {challengeLeague && challenges.length > 0 && (
         <section className={styles.card}>
           <div className={styles.cardHead}>
@@ -396,7 +462,7 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
         </section>
       )}
 
-      {/* (e) 측정 중 */}
+      {/* (f) 준비 중 */}
       <div className={styles.measuring}>{MEASURING_NOTE}</div>
     </div>
   );

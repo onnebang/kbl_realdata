@@ -11,7 +11,8 @@ import { displayTeamName } from "./teamNames";
 //   F 커리어 기본  weak  → 승-패·득실은 사실로 내되 '감독 효과/랭킹' 금지, 캡션 3개 필수(RECORD_CAPTIONS).
 //   D 전술 프로필  weak  → 이름은 "재임기 팀 스타일"(DNA 아님). 6축 z, |z|<SE 축은 회색.
 //   E 챌린지       noise → 성공률·WPA 없음. 리그 요약 한 줄 + 사용 성향(순위 없이).
-//   ATO·로테이션·클러치는 측정 중 - 여기 없다(MEASURING_NOTE 한 줄만).
+//   ATO           noise → 부른 뒤 첫 공격 효율(PPP)은 싣지 않는다. '언제 부르는가'(coach_timeout_tendency, 분할 r 0.59~0.77)만.
+//   로테이션·클러치는 아직 화면에 없다(MEASURING_NOTE 한 줄만).
 // 통산은 시즌 행을 경기 수로 가중해 웹에서 만든다(정규시즌만). 2026-27은 stats가 없어 이름·팀만.
 
 /** 경기당 마진 SD(2011-12~2025-26 팀-경기) - build_coach_profile.py MARGIN_SD와 같은 값. 통산 넷마진 SE = 이 값/√G. */
@@ -33,7 +34,13 @@ export const STYLE_CAPTION =
   "정규시즌 팀 기록을 감독 재임 시즌 기준으로 집계. 로스터 영향 포함 — 감독 교체보다 로스터 회전율이 변화를 더 설명함(페이스 축만 감독 교체에 반응)";
 export const CHALLENGE_CAPTION =
   "2025-26 정규시즌 12/4~4/8 187경기만 기록됨(그 이전 83경기는 코드 미기록). 챌린지 성공 여부는 KBL 기록에 없어 산출하지 않음. 감독 간 빈도 차이는 통계적으로 우연 수준(셔플 P=0.50)";
-export const MEASURING_NOTE = "측정 중: ATO 효율 · 로테이션 · 클러치 성향 — 검정이 끝나기 전에는 싣지 않는다";
+export const MEASURING_NOTE = "준비 중: 로테이션 · 클러치 성향 — 검정 결과대로 정리되기 전에는 싣지 않는다";
+/** 결과 coach2_r03(2026-09-07, 정규시즌 15시즌 작전타임 32,988건)의 표시 권고 그대로. */
+export const TIMEOUT_CAPTIONS = [
+  "작전타임을 '언제' 부르는가는 감독 성향이다 - 한 시즌을 홀·짝 경기로 나눠도 같은 값이 나온다(상대 연속 득점 r 0.77 · 경기당 호출 0.73 · 4쿼터 비중 0.59). 좋고 나쁨이 아니라 스타일이고, 승패와의 관계는 검증하지 않았다.",
+  "작전타임 직후 첫 공격 득점은 1.02점으로 다른 데드볼 공격(1.04점)과 같다(15시즌 28,239회). 감독 간 차이가 표본오차와 구분되지 않아 감독별 효율은 싣지 않는다.",
+  "상대 연속 득점 = 호출 시점까지, 호출한 팀이 마지막으로 득점한 뒤 상대가 넣은 점수. 경기당 호출은 작전타임이 기록된 경기로 나눈다(2013-14는 27경기에 기록이 없다). 4쿼터 비중에 연장은 넣지 않는다.",
+];
 /** all3_pct는 n_ch>=3 비율이다 - 허용은 3회지만 4회로 기록된 팀-경기가 2025-26에 8건 있다(DB 재계산). */
 export const CHALLENGE_ALL3_NOTE = "‘3회 이상’ = 허용 3회를 다 쓴 경기 + 4회로 기록된 팀-경기 8건(연장 5건 · 연장 없는 경기 3건 - 로깅 오류 가능성)";
 /** 2019-20은 코로나 중단으로 팀당 42~43경기. */
@@ -125,6 +132,10 @@ export type ChallengeLeague = {
   leadingN: number;
 };
 
+/** 작전타임 호출 성향 한 묶음(감독-시즌, 리그 시즌, 통산이 같은 모양). */
+export type TimeoutTendency = { games: number; timeouts: number; perGame: number; oppRunMean: number; q4Share: number };
+export type CoachTimeout = TimeoutTendency & { seasonName: string; tcode: string; league: TimeoutTendency };
+
 export type CoachCareer = {
   g: number;
   w: number;
@@ -150,6 +161,7 @@ export type CoachSeasonRow = {
   record: CoachSeasonRecord;
   style: CoachSeasonStyle | null;
   challenge: CoachChallenge | null;
+  timeout: CoachTimeout | null;
 };
 
 export type CurrentTeam = TeamRef & { seasonName: string; confirmed: boolean };
@@ -161,6 +173,8 @@ export type CoachProfile = {
   careerStyle: CoachCareerStyle | null;
   currentTeam: CurrentTeam | null;
   challengeLeague: ChallengeLeague | null;
+  /** 작전타임 호출 성향 통산(시즌 행을 호출 수로 가중). 기록 시즌이 없으면 null. */
+  timeoutCareer: (TimeoutTendency & { seasons: number }) | null;
   /** 집계 테이블 전체의 시즌 범위(캡션 "정규시즌 2011-12~2025-26"용 - 감독 개인 재임 범위가 아니다). */
   dataRange: { first: string; last: string };
 };
@@ -226,6 +240,33 @@ function toLeague(r: Record<string, unknown>): ChallengeLeague {
     perGame: n(r.per_game), perTeamGame: n(r.per_team_game), all3Pct: n(r.all3_pct), q4Pct: n(r.q4_pct),
     q4Under5: n(r.q4_under5), q4Under2: n(r.q4_under2),
     trailingN: n(r.trailing_n), tiedN: n(r.tied_n), leadingN: n(r.leading_n),
+  };
+}
+
+/** 여러 행을 하나로: 경기당 호출 = 호출 합 / 경기 합, 상대 연속 득점·4쿼터 비중 = 호출 수 가중 평균. */
+export function poolTimeouts(rows: TimeoutTendency[]): TimeoutTendency | null {
+  const games = rows.reduce((s, r) => s + r.games, 0);
+  const timeouts = rows.reduce((s, r) => s + r.timeouts, 0);
+  if (!games || !timeouts) return null;
+  return {
+    games,
+    timeouts,
+    perGame: timeouts / games,
+    oppRunMean: rows.reduce((s, r) => s + r.oppRunMean * r.timeouts, 0) / timeouts,
+    q4Share: rows.reduce((s, r) => s + r.q4Share * r.timeouts, 0) / timeouts,
+  };
+}
+
+function toTimeout(r: Record<string, unknown>): TimeoutTendency & { coachId: number; seasonName: string; tcode: string } {
+  return {
+    coachId: n(r.coach_id),
+    seasonName: r.season_name as string,
+    tcode: r.tcode as string,
+    games: n(r.games),
+    timeouts: n(r.timeouts),
+    perGame: n(r.per_game),
+    oppRunMean: n(r.opp_run_mean),
+    q4Share: n(r.q4_share),
   };
 }
 
@@ -309,19 +350,22 @@ async function computeCoachList(): Promise<CoachListRow[]> {
 }
 
 export function getCoachProfile(coachId: number): Promise<CoachProfile | null> {
-  return cached(() => computeCoachProfile(coachId), ["coachProfile", String(coachId), PRESEASON_SEASON], TTL.batchDaily, [TAG.build]);
+  // 키의 v2 = 작전타임 필드 추가(2026-09-15). Data Cache는 배포를 넘어 살아 있어서, 모양이 바뀌면 키를 올려야 옛 객체가 안 나온다.
+  return cached(() => computeCoachProfile(coachId), ["coachProfile-v2", String(coachId), PRESEASON_SEASON], TTL.batchDaily, [TAG.build]);
 }
 
 async function computeCoachProfile(coachId: number): Promise<CoachProfile | null> {
   const { data: coach } = await supabase.from("coaches").select("coach_id, name").eq("coach_id", coachId).maybeSingle();
   if (!coach) return null;
-  const [{ data: records }, { data: styles }, { data: usage }, { data: league }, { data: lo }, { data: hi }, current, teams] = await Promise.all([
+  const [{ data: records }, { data: styles }, { data: usage }, { data: league }, { data: lo }, { data: hi }, { data: timeouts }, current, teams] = await Promise.all([
     supabase.from("coach_season_record").select("*").eq("coach_id", coachId),
     supabase.from("coach_season_style").select("*").eq("coach_id", coachId),
     supabase.from("coach_challenge_usage").select("*").eq("coach_id", coachId),
     supabase.from("coach_challenge_league").select("*").order("season_name", { ascending: false }).limit(1),
     supabase.from("coach_season_record").select("season_name").order("season_name", { ascending: true }).limit(1),
     supabase.from("coach_season_record").select("season_name").order("season_name", { ascending: false }).limit(1),
+    // 리그 시즌 평균도 같은 표에서 만들어야 해서 전체를 읽는다 - 감독-시즌 150행(시즌당 10행씩 는다, 1,000행 캡 아래).
+    supabase.from("coach_timeout_tendency").select("*"),
     fetchCurrentTeams(),
     getAllTeams(),
   ]);
@@ -329,8 +373,13 @@ async function computeCoachProfile(coachId: number): Promise<CoachProfile | null
   const recs = ((records ?? []) as Record<string, unknown>[]).map(toRecord).sort((a, b) => a.seasonName.localeCompare(b.seasonName));
   const styleRows = ((styles ?? []) as Record<string, unknown>[]).map(toStyle);
   const chRows = ((usage ?? []) as Record<string, unknown>[]).map(toChallenge);
+  const toRows = ((timeouts ?? []) as Record<string, unknown>[]).map(toTimeout);
+  const mineTo = toRows.filter((t) => t.coachId === coachId);
+  const leagueTo = (season: string) => poolTimeouts(toRows.filter((t) => t.seasonName === season));
   const seasons: CoachSeasonRow[] = recs.map((record) => {
     const team = teamOf(record.tcode);
+    const to = mineTo.find((t) => t.seasonName === record.seasonName && t.tcode === record.tcode);
+    const toLeague = to ? leagueTo(to.seasonName) : null;
     return {
       seasonName: record.seasonName,
       tcode: record.tcode,
@@ -339,8 +388,13 @@ async function computeCoachProfile(coachId: number): Promise<CoachProfile | null
       record,
       style: styleRows.find((s) => s.seasonName === record.seasonName && s.tcode === record.tcode) ?? null,
       challenge: chRows.find((c) => c.seasonName === record.seasonName && c.tcode === record.tcode) ?? null,
+      timeout:
+        to && toLeague
+          ? { seasonName: to.seasonName, tcode: to.tcode, games: to.games, timeouts: to.timeouts, perGame: to.perGame, oppRunMean: to.oppRunMean, q4Share: to.q4Share, league: toLeague }
+          : null,
     };
   });
+  const careerTo = poolTimeouts(mineTo);
   const cur = current.get(coachId);
   const lg = (league ?? [])[0] as Record<string, unknown> | undefined;
   return {
@@ -350,6 +404,7 @@ async function computeCoachProfile(coachId: number): Promise<CoachProfile | null
     careerStyle: aggregateCareerStyle(styleRows),
     currentTeam: cur ? { ...teamOf(cur.tcode), seasonName: PRESEASON_SEASON, confirmed: cur.confirmed } : null,
     challengeLeague: lg ? toLeague(lg) : null,
+    timeoutCareer: careerTo ? { ...careerTo, seasons: new Set(mineTo.map((t) => t.seasonName)).size } : null,
     dataRange: { first: (lo?.[0]?.season_name as string | undefined) ?? "", last: (hi?.[0]?.season_name as string | undefined) ?? "" },
   };
 }

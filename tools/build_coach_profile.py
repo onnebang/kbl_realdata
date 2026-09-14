@@ -8,6 +8,9 @@
   coach_season_style    : D. 포팩터 8축 원값 + 시즌 내 10팀 z(+리그 평균). 레이더 6축은 웹이 고른다.
   coach_challenge_usage : E. 챌린지(229) 사용 성향(2025-26 12/4 이후 187경기 윈도). 성공률·WPA 없음.
   coach_challenge_league: E. 같은 윈도의 리그 요약 한 줄.
+  coach_timeout_tendency: 작전타임 '호출 성향'(2026-09-15). 결과 coach2_r03(ATO)의 부수 지표 - ATO 효율 자체는
+                          verdict noise(감독-시즌 신뢰도 0.04)라 만들지 않고, 분할 r 0.59~0.77로 재현되는 세 가지만:
+                          경기당 호출 · 호출 직전 상대 연속 득점 · 4쿼터 비중.
 세 테이블 전부 RLS on + 정책 0(서버 전용, service_role만 읽는다). 절대 using(true) 정책을 붙이지 말 것.
 idempotent: drop & create.
 
@@ -66,6 +69,15 @@ create table coach_challenge_league (
   trailing_n int not null, tied_n int not null, leading_n int not null
 );
 alter table coach_challenge_league enable row level security;
+
+drop table if exists coach_timeout_tendency;
+create table coach_timeout_tendency (
+  coach_id bigint not null, season_name text not null, tcode text not null,
+  games int not null, timeouts int not null, per_game double precision not null,
+  opp_run_mean double precision not null, q4_share double precision not null,
+  primary key (coach_id, season_name, tcode)
+);
+alter table coach_timeout_tendency enable row level security;
 """
 
 # F. 결과 sql 1)+2)에 tcode를 group by에 넣은 것(팀-시즌당 감독 1명이라 행 수는 같다 - 아래 assert).
@@ -184,6 +196,43 @@ group by 1
 """
 
 
+# 작전타임 호출 성향. 측정 스크립트(ato_lib)는 포제션을 상태기계로 나눴지만 이 세 지표는 포제션이 필요 없다 -
+# 작전타임(003) 이벤트 행의 누적 점수만으로 된다.
+#   opp_run   = 호출 시점까지, 호출한 팀이 마지막으로 득점한 뒤 상대가 넣은 점수.
+#               home_score가 같은 구간(= 홈이 득점하지 않은 구간) 안에서 away_score의 누적 최솟값을 빼면 된다.
+#               점수는 줄지 않으므로 같은 home_score 값의 행은 연속이다.
+#   per_game  = 호출 수 / 호출이 1건 이상 기록된 경기 수(측정 정의 그대로 - 2013-14는 27경기에 003 기록 자체가 없다).
+#   q4_share  = 4쿼터 비중(연장 X1~X3 제외 - 리그 Q4 37.8% / OT 0.9%).
+# 검산: 측정 CSV(ato_timing_coach_season.csv)와 25-26 감독 10명 네 값 전부 일치, 11-12는 3명이 호출 1~2건 차이
+# (측정은 포제션 창을 못 잡은 작전타임 33건을 뺐다). 15시즌 전체 약 10초, 작전타임 32,988건.
+SQL_TIMEOUT = """
+insert into coach_timeout_tendency
+with g as (
+  select gmkey, season_name, home_tcode, away_tcode, home_coach_id, away_coach_id
+  from games where season_category = '정규시즌' and is_ended
+), ev as (
+  select e.gmkey, e.quarter, e.action_code, e.tcode,
+         e.away_score - min(e.away_score) over (partition by e.gmkey, e.home_score order by e.event_order) as run_vs_home,
+         e.home_score - min(e.home_score) over (partition by e.gmkey, e.away_score order by e.event_order) as run_vs_away
+  from game_events e join g on g.gmkey = e.gmkey
+), tos as (
+  select g.season_name, ev.gmkey, ev.tcode,
+         case when ev.tcode = g.home_tcode then g.home_coach_id else g.away_coach_id end as coach_id,
+         case when ev.tcode = g.home_tcode then ev.run_vs_home else ev.run_vs_away end as opp_run,
+         ev.quarter = 'Q4' as q4
+  from ev join g on g.gmkey = ev.gmkey
+  where ev.action_code = '003' and ev.tcode in (g.home_tcode, g.away_tcode)
+)
+select coach_id, season_name, tcode,
+       count(distinct gmkey) games, count(*) timeouts,
+       count(*)::double precision / count(distinct gmkey) per_game,
+       avg(opp_run)::double precision opp_run_mean,
+       avg(q4::int)::double precision q4_share
+from tos where coach_id is not null
+group by 1, 2, 3
+"""
+
+
 def main():
     c = psycopg2.connect(load_database_url())
     c.autocommit = False
@@ -193,10 +242,11 @@ def main():
     cur.execute(SQL_STYLE)
     cur.execute(SQL_CH_COACH)
     cur.execute(SQL_CH_LEAGUE)
+    cur.execute(SQL_TIMEOUT)
     c.commit()
 
     counts = {}
-    for t in ("coach_season_record", "coach_season_style", "coach_challenge_usage", "coach_challenge_league"):
+    for t in ("coach_season_record", "coach_season_style", "coach_challenge_usage", "coach_challenge_league", "coach_timeout_tendency"):
         cur.execute("select count(*) from " + t)
         counts[t] = cur.fetchone()[0]
         print("%-24s %d행" % (t, counts[t]))
@@ -248,6 +298,22 @@ def main():
     for name, games, ch, pg, q4 in cur.fetchall():
         print("챌린지 %s %d경기 %d회 경기당 %.2f Q4 %.3f" % (name, games, ch, pg, q4))
         assert (name, ch, round(pg, 2), round(q4, 3)) in (("김효범", 88, 2.38, 0.352), ("전희철", 65, 1.76, 0.323)), (name, ch, pg, q4)
+
+    # 작전타임 호출 성향 - 측정 CSV(ato_timing_coach_season.csv) 25-26 값 재현.
+    cur.execute(
+        "select c.name, t.timeouts, t.opp_run_mean, t.q4_share, t.per_game from coach_timeout_tendency t "
+        "join coaches c on c.coach_id=t.coach_id where t.season_name='2025-2026' and c.name in ('양동근','조상현') order by 1"
+    )
+    for name, n_to, run, q4, pg in cur.fetchall():
+        print("작전타임 %s %d회 상대런 %.4f Q4 %.4f 경기당 %.4f" % (name, n_to, run, q4, pg))
+        assert (name, n_to, round(run, 4), round(q4, 4), round(pg, 4)) in (
+            ("양동근", 234, 4.6966, 0.3547, 4.3333),
+            ("조상현", 220, 3.2636, 0.3773, 4.0741),
+        ), (name, n_to, run, q4, pg)
+    cur.execute("select sum(timeouts) from coach_timeout_tendency where season_name <> '2026-2027'")
+    total = cur.fetchone()[0]
+    print("작전타임 15시즌 합 %d회" % total)
+    assert total == 32988, total
     c.close()
     print("OK")
 

@@ -12,7 +12,7 @@ export default async function Image({ params }: { params: Promise<{ coachId: str
   if (!p) return ogCard({ kicker: "감독 프로필", title: "코트사이드", sub: "감독을 찾을 수 없음" });
   const team = p.currentTeam ?? p.seasons[p.seasons.length - 1]?.team ?? null;
   return ogCard({
-    kicker: "감독 프로필 · 커리어 승패·로테이션 스타일",
+    kicker: "감독 프로필 · 커리어 승패·팀 스타일·작전타임 성향",
     title: `${p.coach.name} 감독`,
     sub: team ? (p.currentTeam ? team.name : `마지막 팀 ${team.name}`) : undefined,
     accent: team ? accentFor(team.tcode, team.color) : undefined,
