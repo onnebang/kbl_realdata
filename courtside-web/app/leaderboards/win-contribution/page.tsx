@@ -133,6 +133,8 @@ function WeightScatter({ players, perPoint, r }: { players: WeightPoint[]; perPo
   // 선 위/아래로 가장 멀리 떨어진 선수(득점 대비 비율)만 이름을 단다 - 순위가 아니라 읽을 거리.
   const byRatio = players.filter((p) => p.pts >= 400).map((p) => ({ p, ratio: p.wpa / (p.pts * perPoint) - 1 })).sort((a, b) => b.ratio - a.ratio);
   const labeled = new Set([...byRatio.slice(0, 3), ...byRatio.slice(-3)].map((x) => x.p.pcode));
+  // 좁은 화면에서는 위·아래 끝 한 명씩만 - 이름표가 점을 덮는다.
+  const primary = new Set([byRatio[0]?.p.pcode, byRatio[byRatio.length - 1]?.p.pcode]);
   const lineEnd = Math.min(yMax, xMax * perPoint);
   return (
     <div className={styles.scatterWrap}>
@@ -172,7 +174,7 @@ function WeightScatter({ players, perPoint, r }: { players: WeightPoint[]; perPo
             return (
               <span
                 key={`l-${p.pcode}`}
-                className={`${styles.dotLabel} ${left > 70 ? styles.dotLabelLeft : ""}`}
+                className={`${styles.dotLabel} ${left > 70 ? styles.dotLabelLeft : ""} ${primary.has(p.pcode) ? "" : styles.dotLabelMinor}`}
                 style={{ left: `${left}%`, bottom: `${(Math.max(0, p.wpa) / yMax) * 100}%` }}
               >
                 {p.playerName}

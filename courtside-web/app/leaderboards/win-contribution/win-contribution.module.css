@@ -447,6 +447,9 @@
   .scatter {
     aspect-ratio: 4 / 3;
   }
+  .dotLabelMinor {
+    display: none;
+  }
   .table td {
     height: 44px;
   }
