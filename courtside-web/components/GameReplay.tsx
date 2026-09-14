@@ -339,13 +339,28 @@ function ScrubTrack({
   idx,
   quarterOrder,
   firstIdxByQuarter,
+  playing,
+  speedMs,
 }: {
   events: GameEvent[];
   idx: number;
   quarterOrder: string[];
   firstIdxByQuarter: Map<string, number>;
+  playing: boolean;
+  speedMs: number;
 }) {
   const n = events.length;
+  // 요청: "재생시 바가 툭툭 끊기지 않고 부드럽게 다음 중계로". 재생은 speedMs마다 한 칸씩
+  // 전진하므로, 한 칸 전진일 때만 위치를 speedMs 동안 선형으로 흘려 다음 틱과 이어 붙인다.
+  // 스크럽·쿼터 이동·처음으로 같은 큰 점프는 즉시 옮긴다(되감기가 미끄러지면 오히려 어색하다).
+  const [prevIdx, setPrevIdx] = useState(idx);
+  const [glide, setGlide] = useState(false);
+  if (prevIdx !== idx) {
+    setPrevIdx(idx);
+    setGlide(playing && idx - prevIdx === 1);
+  }
+  const pct = n > 1 ? (idx / (n - 1)) * 100 : 0;
+  const motion = { left: `${pct}%`, transitionDuration: glide ? `${speedMs}ms` : "0ms" };
   // 곡선은 idx와 무관하므로 events가 바뀔 때만 다시 만든다(스크럽 한 틱마다 800점 path를
   // 새로 잇지 않기 위해서 - 움직이는 건 아래 마커뿐이다).
   // 면(채움)과 선(경계)을 따로 만든다. 44px 트랙에서 채움만으로는 - 특히 팀 색이 어두우면 -
@@ -369,9 +384,8 @@ function ScrubTrack({
     return { areaPath: `${line} L ${SCRUB_W} ${SCRUB_H} L 0 ${SCRUB_H} Z`, linePath: line };
   }, [events, n]);
 
-  const markerX = n > 1 ? (idx / (n - 1)) * SCRUB_W : 0;
-
   return (
+    <>
     <svg className="replay-scrub-svg" viewBox={`0 0 ${SCRUB_W} ${SCRUB_H}`} preserveAspectRatio="none" aria-hidden="true">
       {/* 위쪽 = 원정 몫. 곡선이 아래를 덮으면 남는 부분이 그대로 원정 승률이 된다. */}
       <rect x={0} y={0} width={SCRUB_W} height={SCRUB_H} className="replay-scrub-away" />
@@ -391,15 +405,12 @@ function ScrubTrack({
         const x = (first / (n - 1)) * SCRUB_W;
         return <line key={q} x1={x} y1={0} x2={x} y2={SCRUB_H} className="replay-scrub-qline" vectorEffect="non-scaling-stroke" />;
       })}
-      <line
-        x1={markerX}
-        y1={0}
-        x2={markerX}
-        y2={SCRUB_H}
-        className="replay-scrub-marker"
-        vectorEffect="non-scaling-stroke"
-      />
     </svg>
+    {/* SVG 속성(x1/x2)은 CSS로 전환할 수 없어서 재생 위치는 HTML로 그린다 - 아직 안 온
+        구간을 흐리게 덮는 막 + 재생 헤드. 둘이 같은 left로 함께 흐른다. */}
+    <div className="replay-scrub-future" style={motion} aria-hidden="true" />
+    <div className="replay-scrub-head" style={motion} aria-hidden="true" />
+    </>
   );
 }
 
@@ -1549,7 +1560,7 @@ export default function GameReplay({
             aria-label={transportExpanded ? "재생 컨트롤 접기" : "재생 컨트롤 펼치기"}
             aria-expanded={transportExpanded}
           >
-            <ScrubTrack events={events} idx={idx} quarterOrder={quarterOrder} firstIdxByQuarter={firstIdxByQuarter} />
+            <ScrubTrack events={events} idx={idx} quarterOrder={quarterOrder} firstIdxByQuarter={firstIdxByQuarter} playing={playing} speedMs={speedMs} />
           </button>
           <button
             type="button"
@@ -1581,7 +1592,7 @@ export default function GameReplay({
         {transportExpanded && (
           <div className="replay-sticky-expand">
             <div className="replay-scrub">
-              <ScrubTrack events={events} idx={idx} quarterOrder={quarterOrder} firstIdxByQuarter={firstIdxByQuarter} />
+              <ScrubTrack events={events} idx={idx} quarterOrder={quarterOrder} firstIdxByQuarter={firstIdxByQuarter} playing={playing} speedMs={speedMs} />
               <div className="replay-scrub-qlabels" aria-hidden="true">
                 {quarterOrder.map((q) => {
                   const first = firstIdxByQuarter.get(q);

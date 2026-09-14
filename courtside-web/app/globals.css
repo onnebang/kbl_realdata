@@ -2350,9 +2350,48 @@ table.replay-court-table td {
   stroke: rgba(var(--line-rgb), 0.3);
   stroke-width: 1;
 }
-.replay-scrub-marker {
-  stroke: var(--ink);
-  stroke-width: 2;
+/* 재생 위치 - ScrubTrack이 한 칸 전진일 때만 transition-duration을 speedMs로 넣어 다음 틱까지
+   선형으로 흘린다(요청: "바가 툭툭 끊기지 않고 부드럽게"). 아직 안 온 구간은 표면색 막으로
+   흐리게 덮어, 곡선이 재생 헤드를 따라 "그려져 나가는" 것처럼 보이게 한다. */
+.replay-scrub-future,
+.replay-scrub-head {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  transition-property: left;
+  transition-timing-function: linear;
+}
+.replay-scrub-future {
+  right: 0;
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+}
+.replay-scrub-head {
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+}
+/* 큰 스크러버에서는 헤드가 손잡이 역할도 한다 - 네이티브 range 손잡이는 틱마다 점프하므로
+   투명하게 두고(잡는 영역은 그대로), 같은 자리의 이 원이 부드럽게 따라간다. */
+.replay-scrub .replay-scrub-head::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3px solid var(--ink);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+}
+@media (prefers-reduced-motion: reduce) {
+  .replay-scrub-future,
+  .replay-scrub-head {
+    transition: none !important;
+  }
 }
 .replay-scrub-qlabels {
   position: absolute;
@@ -2399,20 +2438,15 @@ table.replay-court-table td {
   appearance: none;
   width: 24px;
   height: 24px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 3px solid var(--ink);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  /* 보이는 손잡이는 .replay-scrub-head::after(부드럽게 흐름) - 이건 잡는 영역만 남긴다. */
+  opacity: 0;
   /* 트랙 92px에서 24px 손잡이를 세로 중앙에: (92-24)/2 */
   margin-top: 34px;
 }
 .replay-sticky-expand .replay-slider::-moz-range-thumb {
   width: 24px;
   height: 24px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 3px solid var(--ink);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  opacity: 0;
 }
 .replay-transport-row {
   display: flex;
