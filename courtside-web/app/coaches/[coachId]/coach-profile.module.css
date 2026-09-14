@@ -365,9 +365,20 @@
   gap: 12px 20px;
   align-items: start;
 }
+/* 그리드 칸은 기본 min-width:auto라 표의 최소 폭만큼 늘어나 페이지 전체를 옆으로 밀었다(z 눈금
+   막대를 넣은 뒤 375px에서 472px) - 칸을 줄 수 있게 풀어 .tableWrap이 안에서 스크롤하게 한다. */
+.radarGrid > * {
+  min-width: 0;
+}
 @media (max-width: 640px) {
   .radarGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .zBar {
+    width: 48px;
+  }
+  .zCell {
+    gap: 6px;
   }
 }
 /* min-width = 뷰박스 폭(320). 이보다 좁아지면 축 라벨(12 유닛)이 12px 아래로 내려가므로 줄이는 대신
