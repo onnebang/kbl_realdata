@@ -188,14 +188,27 @@
 }
 /* 섹션 번호는 표제 묶음의 일부지 그 패널의 주인공 숫자가 아니다 - 제목과 같은 단으로
    내려 27px 자리를 데이터(예상 승수·점수)에 넘긴다. */
+/* 요청: "스포츠의 역동성 + 데이터 분석의 정교함". 선수·팀·감독 프로필과 같은 중계 자막(chyron)
+   언어로 - 다만 이 리포트의 구간은 실제로 순서가 있는 1·2·3·4라 번호를 버리지 않고, 사선으로
+   잘린 금색 탭 안에 번호를 새긴다. 숫자 전용이라 Big Shoulders 안전. */
 .sectionNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.9em;
+  height: 1.3em;
+  padding: 0 0.55em 0 0.4em;
+  margin-right: 10px;
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: var(--fs-500);
+  font-size: var(--fs-400);
+  line-height: 1;
   letter-spacing: -0.01em;
-  color: var(--gold);
-  margin-right: 8px;
-  vertical-align: -2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--surface);
+  background: var(--gold);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 0.4em) 100%, 0 100%);
+  vertical-align: 0.12em;
 }
 
 /* ── 1. 시즌 전망 ── */
@@ -876,15 +889,17 @@
   height: 14px;
   border-radius: var(--r-led);
   background: rgba(var(--line-rgb), 0.07);
-  overflow: hidden;
 }
+/* 0점 기준선 - 막대 위아래로 삐져나오는 진한 선(선수·팀 프로필 막대의 리그 중간 눈금과 같은 언어). */
 .adjZero {
   position: absolute;
   left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(var(--line-rgb), 0.3);
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(var(--line-rgb), 0.55);
+  z-index: 1;
 }
 .adjBar {
   position: absolute;
@@ -894,9 +909,38 @@
 }
 .adjBarUp {
   background: #3f9c62;
+  transform-origin: left center;
 }
 .adjBarDown {
   background: #d64545;
+  transform-origin: right center;
+}
+/* 화면에 들어올 때 0점에서 좌우로 한 번 뻗고, 승수 범위 띠는 가운데서 벌어진다(스크롤 연동 - JS 없음).
+   미지원 브라우저·reduced-motion은 완성된 모습. */
+@supports (animation-timeline: view()) {
+  .adjBar,
+  .projBand {
+    animation: psSweep linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 30%;
+  }
+  .projBand {
+    transform-origin: center;
+  }
+}
+@keyframes psSweep {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .adjBar,
+  .projBand {
+    animation: none !important;
+  }
 }
 
 /* 승수 80% 구간 - 트랙 전체가 리그의 승수 범위, 막대가 그 팀의 80% 구간, 흰 점이 기대승수.
