@@ -65,8 +65,11 @@ $$;
 
 -- 3) 경기 승률 곡선(홈 기준) - 카드 미니 곡선용. 30초 칸마다 마지막 값 하나(경기당 ~90점).
 --    경과초: Q1~Q4 600초씩, 연장 X1~X4 300초씩(lib/postgameReport.ts cumulativeElapsed와 같은 정의).
+--    **경기당 1행(jsonb 배열)으로 돌려준다** - 점 단위 행으로 주면 18경기 ≈ 1,460행이 PostgREST 응답 상한 1,000행에서
+--    조용히 잘려 카드 곡선이 비었다(첫 배포에서 실제로 겪음).
+drop function if exists public.game_winprob_series(text[]);
 create or replace function public.game_winprob_series(p_gmkeys text[])
-returns table (gmkey text, elapsed int, home_win_prob double precision)
+returns table (gmkey text, points jsonb)
 language sql stable as $$
   with ev as (
     select e.gmkey, e.event_order, e.home_win_prob,
@@ -77,9 +80,14 @@ language sql stable as $$
      where e.gmkey = any(p_gmkeys) and e.home_win_prob is not null
        and e.quarter in ('Q1','Q2','Q3','Q4','X1','X2','X3','X4')
   )
-  select distinct on (gmkey, elapsed / 30) gmkey, elapsed, home_win_prob::double precision
-    from ev
-   order by gmkey, elapsed / 30, event_order desc
+  , bucket as (
+    select distinct on (gmkey, elapsed / 30) gmkey, elapsed, home_win_prob
+      from ev
+     order by gmkey, elapsed / 30, event_order desc
+  )
+  select gmkey, jsonb_agg(jsonb_build_array(elapsed, round(home_win_prob::numeric, 4)) order by elapsed)
+    from bucket
+   group by gmkey
 $$;
 
 -- 4) 득점의 무게 - 선수별 시즌 득점과 WPA(득점한 팀 입장). 둘 다 같은 이벤트에서 세서 기준이 같다.

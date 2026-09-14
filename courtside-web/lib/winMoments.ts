@@ -89,12 +89,13 @@ type ComebackRow = {
   winner_tcode: string; min_prob: number; min_quarter: string; min_clock_min: number; min_clock_sec: number;
   min_home_score: number; min_away_score: number;
 };
-type SeriesRow = { gmkey: string; elapsed: number; home_win_prob: number };
+/** game_winprob_series는 경기당 1행 - [경과초, 홈 승률] 배열(경과초 오름차순). */
+type SeriesRow = { gmkey: string; points: [number, number][] };
 type WeightRow = { pcode: string; player_name: string | null; tcode: string; games: number; pts: number; wpa: number };
 
 /** 홈 기준 곡선을 주인공 팀 기준으로 뒤집고, 끝을 실제 결과(이기면 1, 지면 0)로 닫는다. */
-function sideCurve(series: SeriesRow[], isHome: boolean, won: boolean): CurvePoint[] {
-  const pts: CurvePoint[] = series.map((r) => [r.elapsed, isHome ? r.home_win_prob : 1 - r.home_win_prob]);
+function sideCurve(series: [number, number][], isHome: boolean, won: boolean): CurvePoint[] {
+  const pts: CurvePoint[] = series.map(([t, p]) => [t, isHome ? Number(p) : 1 - Number(p)]);
   const end = Math.max(REGULATION_SEC, pts.length ? pts[pts.length - 1][0] : 0);
   pts.push([end, won ? 1 : 0]);
   return pts;
@@ -123,7 +124,7 @@ async function computeWinMoments(season: string): Promise<WinMoments> {
   ]);
   const gmkeys = [...new Set([...playRows.map((r) => r.gmkey), ...comebackRows.map((r) => r.gmkey)])];
   const seriesRows = gmkeys.length ? await rpc<SeriesRow>("game_winprob_series", { p_gmkeys: gmkeys }) : [];
-  const seriesOf = (gmkey: string) => seriesRows.filter((r) => r.gmkey === gmkey).sort((a, b) => a.elapsed - b.elapsed);
+  const seriesOf = (gmkey: string) => seriesRows.find((r) => r.gmkey === gmkey)?.points ?? [];
 
   const plays: BigPlay[] = playRows.map((r) => {
     const isHome = r.tcode === r.home_tcode;
@@ -194,7 +195,8 @@ async function computeWinMoments(season: string): Promise<WinMoments> {
 }
 
 export const getWinMoments = cachedFn(computeWinMoments, {
-  name: "winMoments",
+  name: "winMoments-v2", // v2: 곡선이 응답 상한에 잘려 비던 캐시를 버린다
+
   ttl: TTL.batchDaily,
   tags: (season) => [TAG.batch, TAG.season(String(season))],
 });

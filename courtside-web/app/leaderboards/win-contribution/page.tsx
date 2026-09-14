@@ -136,7 +136,10 @@ function WeightScatter({ players, perPoint, r }: { players: WeightPoint[]; perPo
   const lineEnd = Math.min(yMax, xMax * perPoint);
   return (
     <div className={styles.scatterWrap}>
-      <div className={styles.yAxisLabel}>시즌 WPA 합계 ↑</div>
+      <div className={styles.axisRow}>
+        <span>↑ 시즌 WPA 합계</span>
+        <span>위 끝 {yMax}</span>
+      </div>
       <div className={styles.scatter}>
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           {[25, 50, 75].map((g) => (
@@ -176,14 +179,12 @@ function WeightScatter({ players, perPoint, r }: { players: WeightPoint[]; perPo
               </span>
             );
           })}
-        <span className={styles.axisTick} style={{ left: "100%", bottom: 0 }}>
-          {xMax}점
-        </span>
-        <span className={`${styles.axisTick} ${styles.axisTickY}`} style={{ left: 0, bottom: "100%" }}>
-          {yMax}
-        </span>
       </div>
-      <div className={styles.xAxisLabel}>시즌 득점 →</div>
+      <div className={styles.axisRow}>
+        <span>0</span>
+        <span>시즌 득점 →</span>
+        <span>{xMax}점</span>
+      </div>
       <div className={styles.legend}>
         <span>
           <i className={styles.legendLine} /> 리그 평균 무게(1점당 WPA {perPoint.toFixed(4)})
