@@ -205,18 +205,28 @@
   border-radius: var(--r-card);
   padding: 16px 18px;
 }
+/* 브랜드 일관성: 선수별 조합·선수·감독 프로필과 같은 중계 자막(chyron) 표제 - 사선으로 잘린 팀 색
+   탭 + 한 단 큰 Pretendard 800. 예전엔 13px 회색 눈썹이라 이 페이지만 표제 언어가 달랐다. 팀 색은
+   잉크와 섞어 남색 계열도 다크 표면에서 보이게. */
 .panelTitle {
+  --team-ink: color-mix(in srgb, var(--team, var(--home)) 72%, var(--ink) 28%);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  /* globals.css .panel-title과 같은 단(--fs-200). 패널 안의 값(13px)·라벨(12~12.5px)보다
-     작아지지 않게. */
-  font-size: var(--fs-200);
-  font-weight: 700;
-  color: var(--ink-soft);
-  letter-spacing: 0.02em;
-  margin-bottom: 10px;
+  font-size: var(--fs-400);
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+}
+.panelTitle::before {
+  content: "";
+  flex: none;
+  width: 11px;
+  height: 1.15em;
+  background: var(--team-ink);
+  clip-path: polygon(0 0, 100% 0, 50% 100%, 0 100%);
 }
 /* 기준 시즌 칩 - 문구는 lib/seasonFocus.ts basisChip/statSeasonChip만이 만든다(다섯 어휘).
    "이 숫자가 어느 시즌 것인가"를 제목 옆에서 즉시 읽히게 하는 게 목적. 한글 칩이라 모노는
@@ -288,24 +298,28 @@
    보이게 하는 것이 목적이고, 담는 것(패널·카드)만 --r-card로 둥글다. */
 .pctTrack {
   position: relative;
-  height: 10px;
+  height: 12px;
   border-radius: var(--r-led);
   background: var(--surface-soft);
-  overflow: hidden;
 }
+/* 채움 끝 2px 밝은 모서리 - 값이 멈춘 자리를 선으로 짚는다(선수 퍼센타일 막대와 같은 언어). */
 .pctFill {
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: var(--r-led);
-  opacity: 0.9;
+  opacity: 0.92;
+  box-shadow: inset -2px 0 0 color-mix(in srgb, #fff 60%, transparent);
+  transform-origin: left center;
 }
+/* 리그 중간 눈금 - 막대 위아래로 삐져나오는 진한 선. */
 .pctMid {
   position: absolute;
   left: 50%;
-  top: -1px;
-  bottom: -1px;
-  width: 1px;
-  background: rgba(var(--line-rgb), 0.28);
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(var(--line-rgb), 0.55);
 }
 /* 값은 라벨(.pctLabel 12.5px)·캡션(.pctNote 12.5px)보다 한 단 위여야 한다 - 같은 크기면
    행에서 무엇이 데이터인지 사라진다. */
@@ -784,24 +798,28 @@
 }
 .rankTrack {
   position: relative;
-  height: 10px;
+  height: 12px;
   border-radius: var(--r-led);
   background: var(--surface-soft);
-  overflow: hidden;
 }
+/* 채움 끝 2px 밝은 모서리 - 값이 멈춘 자리를 선으로 짚는다(선수 퍼센타일 막대와 같은 언어). */
 .rankFill {
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: var(--r-led);
-  opacity: 0.9;
+  opacity: 0.92;
+  box-shadow: inset -2px 0 0 color-mix(in srgb, #fff 60%, transparent);
+  transform-origin: left center;
 }
+/* 리그 중간 눈금 - 막대 위아래로 삐져나오는 진한 선. */
 .rankMid {
   position: absolute;
   left: 50%;
-  top: -1px;
-  bottom: -1px;
-  width: 1px;
-  background: rgba(var(--line-rgb), 0.28);
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(var(--line-rgb), 0.55);
 }
 .rankValue {
   font-family: "IBM Plex Mono", monospace;
@@ -985,5 +1003,63 @@
   }
   .schedCat {
     font-size: 12px;
+  }
+}
+
+/* ── 막대 머리줄: 가운데 눈금의 뜻 ── */
+.barHeadRow {
+  margin-bottom: -2px;
+}
+.barScale {
+  position: relative;
+  height: 14px;
+}
+.barScale span {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-100);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.barHeadRight {
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-100);
+  line-height: 1;
+  color: var(--ink-faint);
+  text-align: right;
+  white-space: nowrap;
+}
+/* 패널이 화면에 들어올 때 막대가 한 번 쓸고 지나간다(스크롤 연동, JS 없음 - 선수 프로필과 같은 동작).
+   미지원 브라우저·reduced-motion은 완성된 막대. */
+@supports (animation-timeline: view()) {
+  .pctFill,
+  .rankFill {
+    animation: teamBarSweep linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 30%;
+  }
+}
+@keyframes teamBarSweep {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pctFill,
+  .rankFill {
+    animation: none !important;
+  }
+}
+@media (max-width: 640px) {
+  .barHeadRight {
+    visibility: hidden;
   }
 }

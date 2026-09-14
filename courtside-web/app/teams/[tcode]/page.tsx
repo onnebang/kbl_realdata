@@ -150,6 +150,14 @@ function FourFactorsPanel({ ff, seasonName }: { ff: TeamFourFactors | null; seas
         <div key={side}>
           <div className={styles.ffSideTitle}>{title}</div>
           <div className={styles.pctGrid}>
+            <div className={`${styles.pctRow} ${styles.barHeadRow}`} aria-hidden="true">
+              <div />
+              <div className={styles.barScale}>
+                <span>리그 중간</span>
+              </div>
+              <div className={styles.barHeadRight}>값 (리그 평균)</div>
+              <div className={styles.barHeadRight}>순위</div>
+            </div>
             {ff.axes
               .filter((a) => a.side === side)
               .map((a) => (
@@ -309,7 +317,10 @@ function TeamRankPanel({ stats, row }: { stats: TeamSeasonStats | null; row: Tea
               {/* 바 칸은 머리글을 비운다 - 요청한 컬럼은 지표/값/리그 평균/순위 네 개이고,
                   바는 그 순위를 눈으로 읽게 하는 보조 장치라 캡션에서 한 번만 설명한다
                   (좁은 화면에서 머리글이 두 줄로 접혀 행 높이가 흔들리는 문제도 함께 해결). */}
-              <div />
+              {/* 바 칸 머리 = 가운데 눈금의 뜻 하나만(선수 퍼센타일 막대와 같은 언어). */}
+              <div className={styles.barScale}>
+                <span>리그 중간</span>
+              </div>
               <div className={styles.rankHeadRight}>값</div>
               <div className={styles.rankHeadRight}>리그 평균</div>
               <div className={styles.rankHeadRight}>순위</div>
@@ -708,7 +719,7 @@ export default async function TeamPage({
   const ribbon = buildSeasonRibbonSvg({ slots: ribbonSlots, teamColor: accent, nextGmkey: next?.gmkey ?? null, openerDday });
 
   return (
-    <div className={`wrap ${styles.pageRoot}`}>
+    <div className={`wrap ${styles.pageRoot}`} style={{ "--team": team.color } as CSSProperties}>
       <Link href="/" className="back-link">
         ← 경기 목록
       </Link>
