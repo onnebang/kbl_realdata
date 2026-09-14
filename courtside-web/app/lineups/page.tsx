@@ -136,6 +136,8 @@ function PlayerTile({
 function MateRow({ m, maxAbs }: { m: WowyMate; maxAbs: number }) {
   // 막대 폭은 이 표 안의 |차이| 최댓값 기준 비율. 0에 가까운 값도 보이도록 하한 3%.
   const pct = Math.max(3, Math.min(100, (Math.abs(m.diff) / maxAbs) * 100));
+  // |차이| < 오차 폭이면 막대도 흐리게 - 줄다리기에서 "누가 당겼는지 말할 수 없는" 행이다.
+  const noise = Math.abs(m.diff) < m.diffSe ? ` ${styles.diffFillNoise}` : "";
   return (
     <tr>
       <td>
@@ -188,14 +190,40 @@ function MateRow({ m, maxAbs }: { m: WowyMate; maxAbs: number }) {
         {/* 숫자를 바로 왼쪽 칸에 두었으므로 막대는 장식이다(스크린리더에서 숨김). */}
         <div className={styles.diffBar} aria-hidden="true">
           <div className={`${styles.diffHalf} ${styles.diffLeft}`}>
-            {m.diff < 0 && <div className={`${styles.diffFill} ${styles.diffFillNeg}`} style={{ width: `${pct}%` }} />}
+            {m.diff < 0 && <div className={`${styles.diffFill} ${styles.diffFillNeg}${noise}`} style={{ width: `${pct}%` }} />}
           </div>
           <div className={`${styles.diffHalf} ${styles.diffRight}`}>
-            {m.diff > 0 && <div className={`${styles.diffFill} ${styles.diffFillPos}`} style={{ width: `${pct}%` }} />}
+            {m.diff > 0 && <div className={`${styles.diffFill} ${styles.diffFillPos}${noise}`} style={{ width: `${pct}%` }} />}
           </div>
         </div>
       </td>
     </tr>
+  );
+}
+
+/**
+ * 표 위 두 장 - 차이가 가장 큰 쪽과 가장 작은 쪽. 이 표는 "누가 잘 맞는가"의 증거가 아니라 "그
+ * 시간대 마진"이라(아래 캡션) '최고/최악의 짝' 대신 무엇을 잰 것인지 그대로 이름 붙이고,
+ * |차이| < 오차 폭이면 카드에도 그 사실을 적는다.
+ */
+function Spotlight({ m, kind }: { m: WowyMate; kind: "with" | "without" }) {
+  const noise = Math.abs(m.diff) < m.diffSe;
+  const mate = m.members[0];
+  return (
+    <div className={`${styles.spot} ${kind === "with" ? styles.spotWith : styles.spotWithout}`}>
+      <div className={styles.spotKicker}>{kind === "with" ? "같이 뛸 때 가장 좋았던 동료" : "따로일 때 가장 좋았던 동료"}</div>
+      <div className={styles.spotMain}>
+        {mate && <Avatar m={mate} size={44} />}
+        <Link href={m.href} className={styles.spotName}>
+          {m.name}
+        </Link>
+        <div className={`${styles.spotDiff} ${noise ? styles.diffMuted : (signClass(m.diff) ?? "")}`}>{fmtNet(m.diff)}</div>
+      </div>
+      <div className={styles.spotSub}>
+        같이 {fmtNet(m.with.netPer40)} · 따로 {fmtNet(m.without.netPer40)} · 차이 오차 {fmtSe(m.diffSe)}
+        {noise && <b> · 오차 범위 안</b>}
+      </div>
+    </div>
   );
 }
 
@@ -408,6 +436,7 @@ export default async function LineupsPage({
       {wowy && (
         <>
           <section className={styles.subject} style={accent ? ({ "--team": accent } as CSSProperties) : undefined}>
+            <span className={styles.subjectSlash} aria-hidden="true" />
             <div className={styles.subjectHead}>
               <Avatar
                 m={{
@@ -467,7 +496,7 @@ export default async function LineupsPage({
                 </div>
                 <div className={styles.tileLabel}>마진</div>
               </div>
-              <div>
+              <div className={styles.tileLead}>
                 <div className={`${styles.tileVal} ${signClass(wowy.subject.onCourt.netPer40) ?? ""}`}>
                   {fmtNet(wowy.subject.onCourt.netPer40)}
                 </div>
@@ -507,6 +536,16 @@ export default async function LineupsPage({
               {groupSize === 2 ? "동료별 조합 · 차이 내림차순" : `${groupSize}인 조합(주인공 포함) · 함께 뛴 시간 순`}{" "}
               {mates.length > 0 && `· ${mates.length}${groupSize === 2 ? "명" : "개"}`}
             </div>
+            {groupSize === 2 && mates.length >= 2 && (() => {
+              const best = mates.reduce((a, b) => (b.diff > a.diff ? b : a));
+              const worst = mates.reduce((a, b) => (b.diff < a.diff ? b : a));
+              return (
+                <div className={styles.spotRow}>
+                  {best.diff > 0 && <Spotlight m={best} kind="with" />}
+                  {worst.diff < 0 && <Spotlight m={worst} kind="without" />}
+                </div>
+              );
+            })()}
             {mates.length > 0 ? (
               <MateTable mates={mates} maxAbs={maxAbs} head={groupSize === 2 ? "동료" : `함께 뛴 ${groupSize - 1}명`} />
             ) : (
