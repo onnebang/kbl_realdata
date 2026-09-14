@@ -158,7 +158,8 @@ create table shot_log (
   made        boolean not null,
   unique (gmkey, pcode, shot_order)   -- 마이그레이션 재실행 시 ON CONFLICT로 중복 방지
 );
-create index idx_shotlog_game_player on shot_log(gmkey, pcode, shot_order);
+-- (gmkey, pcode, shot_order)는 위 unique 제약이 이미 인덱스다. 선수 커리어 조회용 pcode 인덱스만 따로(shot_log_indexes.sql).
+create index idx_shot_log_pcode on shot_log(pcode);
 
 -- 플레이바이플레이 + 승률 타임라인 - "코트사이드" 라이브 리플레이의 핵심 데이터인데
 -- 원래 SQLite 스키마엔 아예 없었음(그 스키마는 결과 확정 경기만 모델링).
