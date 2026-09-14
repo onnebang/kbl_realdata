@@ -2353,6 +2353,73 @@ table.replay-court-table td {
 /* 재생 위치 - ScrubTrack이 한 칸 전진일 때만 transition-duration을 speedMs로 넣어 다음 틱까지
    선형으로 흘린다(요청: "바가 툭툭 끊기지 않고 부드럽게"). 아직 안 온 구간은 표면색 막으로
    흐리게 덮어, 곡선이 재생 헤드를 따라 "그려져 나가는" 것처럼 보이게 한다. */
+/* ── 승률 추이 차트(플레이바이플레이 위) ─────────────────────────────────────
+   선·면은 늘어나는 SVG, 점·라벨은 실제 px인 HTML이다(GameReplay.tsx WinProbLiveChart 주석).
+   라벨은 주변 본문과 같은 Pretendard(SIL OFL)·라벨 단(--fs-200)으로 - 예전 SVG 글자는 뷰박스
+   배율 탓에 데스크톱에서 26px 모노로 떠 보였다. */
+.wp-chart {
+  position: relative;
+  height: 150px;
+  margin: 4px 0 14px;
+}
+.wp-chart-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+.wp-dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 1.5px var(--surface);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.wp-dot-live {
+  width: 6px;
+  height: 6px;
+  background: var(--negative);
+  box-shadow: none;
+}
+.wp-lbl {
+  position: absolute;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-200);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding: 3px 6px;
+  border-radius: var(--r-led);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  pointer-events: none;
+}
+.wp-lbl-prob {
+  color: currentColor;
+  transform: translate(-50%, calc(-100% - 8px));
+}
+.wp-lbl-prob.below {
+  transform: translate(-50%, 8px);
+}
+.wp-lbl-live {
+  top: 4px;
+  color: var(--negative);
+  transform: translateX(6px);
+}
+.wp-lbl-live.end {
+  transform: translateX(calc(-100% - 6px));
+}
+@media (max-width: 640px) {
+  .wp-chart {
+    height: 120px;
+  }
+}
+
 .replay-scrub-future,
 .replay-scrub-head {
   position: absolute;

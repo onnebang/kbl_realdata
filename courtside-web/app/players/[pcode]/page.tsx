@@ -207,64 +207,50 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
     );
   }
 
-  const W = 640,
-    H = 230,
-    // 왼쪽 축 라벨('100%')을 9 -> 12단위로 키우면 x=2에서 폭 29단위를 먹는다 - 30이면 밴드
-    // 왼쪽 끝에 물려서 34로 넓힌다(밴드는 그만큼 오른쪽에서 시작).
-    PAD_L = 34,
-    // 오른쪽에 밴드 이름·최신 비율을 직접 적는다(범례와 스와치를 눈으로 맞추지 않게).
-    PAD_R = 78,
-    PAD_T = 10,
-    PAD_B = 22;
-  const plotW = W - PAD_L - PAD_R;
-  const plotH = H - PAD_T - PAD_B;
+  // 요청: "그래프 글자가 너무 크다 - 주변과 어울리게". 예전엔 640단위 뷰박스를 지면 폭(최대
+  // ~1100px)으로 늘려 12단위 라벨이 데스크톱에서 20px대 모노로 커졌다. 밴드(면)만 늘어나는 SVG로
+  // 두고, 존 라벨·시즌 눈금·축 라벨은 실제 px인 HTML로 올린다(본문 서체 Pretendard, 라벨 단).
+  // 좌표는 0~1 비율로 계산해 CSS 퍼센트 위치에 그대로 쓴다.
   const n = mix.length;
-  const xAt = (i: number) => PAD_L + (i / (n - 1)) * plotW;
-  const yAt = (share: number) => PAD_T + plotH - share * plotH;
-
-  // 존별 누적 상단선 - rim부터 아래에서 위로.
+  const xFrac = (i: number) => i / (n - 1);
+  // 누적 상단선 - rim부터 아래에서 위로. SVG는 0~100 뷰박스(preserveAspectRatio="none").
   const cumAt = (i: number, uptoZoneIdx: number) => DNA_ZONES.slice(0, uptoZoneIdx + 1).reduce((s, z) => s + mix[i].shares[z], 0);
   const bandPath = (zoneIdx: number) => {
-    const top = mix.map((_, i) => `${xAt(i).toFixed(1)},${yAt(cumAt(i, zoneIdx)).toFixed(1)}`);
+    const top = mix.map((_, i) => `${(xFrac(i) * 100).toFixed(2)},${((1 - cumAt(i, zoneIdx)) * 100).toFixed(2)}`);
     const bottom = mix
-      .map((_, i) => `${xAt(i).toFixed(1)},${yAt(zoneIdx === 0 ? 0 : cumAt(i, zoneIdx - 1)).toFixed(1)}`)
+      .map((_, i) => `${(xFrac(i) * 100).toFixed(2)},${((1 - (zoneIdx === 0 ? 0 : cumAt(i, zoneIdx - 1))) * 100).toFixed(2)}`)
       .reverse();
     return `M ${top.join(" L ")} L ${bottom.join(" L ")} Z`;
   };
 
-  // 시즌 축 눈금. 라벨을 9 -> 12단위로 키우면 "21-22"가 37단위라, 시즌이 많을 때 맨 끝 눈금과
-  // 그 앞 눈금이 부딪힌다(n=20·tickEvery=3이면 마지막 두 눈금 간격이 28단위). 크기를 되돌리는
-  // 대신 부딪히는 **앞** 라벨을 솎아낸다 - 마지막 시즌 라벨은 언제나 남는다(lib/careerStrip.ts의
-  // lastLabelEnd/lastValEnd와 같은 방식).
+  // 시즌 눈금. 플롯 폭은 데스크톱에서 최소 ~440px(이 레이아웃은 641px 이상에서만 보인다)이라
+  // "21-22" 한 개(~40px)가 차지하는 비율은 최대 0.095 - 그보다 가까우면 앞 라벨을 솎아낸다
+  // (마지막 시즌 라벨은 언제나 남는다).
   const tickEvery = Math.max(1, Math.ceil(n / 8));
-  const TICK_LABEL_W = 37;
+  const TICK_GAP = 0.095;
   const tickIdx: number[] = [];
   for (let i = 0; i < n; i++) if (i % tickEvery === 0) tickIdx.push(i);
   if (tickIdx[tickIdx.length - 1] !== n - 1) tickIdx.push(n - 1);
   for (let i = tickIdx.length - 1; i > 0; i--) {
-    if (xAt(tickIdx[i]) - xAt(tickIdx[i - 1]) < TICK_LABEL_W) tickIdx.splice(i - 1, 1);
+    if (xFrac(tickIdx[i]) - xFrac(tickIdx[i - 1]) < TICK_GAP) tickIdx.splice(i - 1, 1);
   }
 
-  // 오른쪽 끝 라벨 - 마지막 시즌 기준 밴드의 세로 중앙에 존 이름과 비율. 3% 미만 밴드는
-  // 적을 자리가 없어 생략하고(범례가 대신 든다), 남은 라벨끼리 겹치면 아래로 밀어 뗀다.
+  // 오른쪽 라벨 - 마지막 시즌 기준 밴드의 세로 중앙(0=위, 1=아래). 3% 미만 밴드는 생략.
+  // 플롯 높이 238px에서 라벨 한 줄(~17px)이 0.072 - 그보다 붙으면 아래로 밀고, 넘치면 바닥에서 위로 되민다.
   const last = n - 1;
+  const LABEL_GAP = 0.075;
   const labels = DNA_ZONES.map((z, zi) => {
     const top = cumAt(last, zi);
     const bottom = zi === 0 ? 0 : cumAt(last, zi - 1);
-    return { z, share: mix[last].shares[z], y: yAt((top + bottom) / 2) };
+    return { z, share: mix[last].shares[z], y: 1 - (top + bottom) / 2 };
   })
     .filter((l) => l.share >= 0.03)
     .sort((a, b) => a.y - b.y);
-  // 최소 간격은 라벨 크기를 따라간다(12단위 × 1.25) - 12로 두면 키운 글자끼리 겹친다.
-  const LABEL_GAP = 15;
   for (let i = 1; i < labels.length; i++) {
     if (labels[i].y - labels[i - 1].y < LABEL_GAP) labels[i].y = labels[i - 1].y + LABEL_GAP;
   }
-  // 아래로만 밀면 바닥 밴드가 전부 얇을 때(3점 88% + 나머지 3%씩) 마지막 라벨이 뷰박스(230)
-  // 밖으로 나간다. 넘치면 바닥(210 - 시즌 눈금 222 위)에 붙이고 위로 되민다. 라벨 다섯 개가
-  // 60단위라 위로 밀려도 210-60 = 150이라 위쪽으로는 절대 안 넘친다.
   for (let i = labels.length - 1; i >= 0; i--) {
-    const maxY = i === labels.length - 1 ? 210 : labels[i + 1].y - LABEL_GAP;
+    const maxY = i === labels.length - 1 ? 0.96 : labels[i + 1].y - LABEL_GAP;
     if (labels[i].y > maxY) labels[i].y = maxY;
   }
 
@@ -287,42 +273,37 @@ function ShootingDnaChart({ mix }: { mix: SeasonZoneMix[] }) {
   return (
     <div>
       <div className={styles.dnaWide}>
-      <svg className={styles.dnaSvg} viewBox={`0 0 ${W} ${H}`}>
-        {/* 밴드 사이에 패널색 실선을 얇게 둘러 인접 밴드가 서로 번지지 않게. */}
-        {DNA_ZONES.map((z, zi) => (
-          <path key={z} d={bandPath(zi)} fill={DNA_COLORS[z]} opacity={0.9} stroke="var(--surface)" strokeWidth={0.7} />
-        ))}
-        {/* 존 이름(한글) + 비율. IBM Plex Mono에는 한글 글리프가 없어 '근거리'가 이름 없는
-            시스템 폴백으로 떨어졌다 - 숫자는 모노로 두되 폴백을 Pretendard로 이름 짓는다.
-            폭: 최악의 라벨 '근거리 100%'가 12단위에서 약 66단위, 라벨 자리는 PAD_R-6 = 72단위. */}
-        {labels.map((l) => (
-          <text
-            key={l.z}
-            x={W - PAD_R + 6}
-            y={l.y + 4}
-            fontSize={12}
-            fill={DNA_COLORS[l.z]}
-            fontFamily='"IBM Plex Mono", "Pretendard", monospace'
-            fontWeight={700}
-          >
-            {DNA_ZONE_LABELS[l.z]} {Math.round(l.share * 100)}%
-          </text>
-        ))}
-        {[0.25, 0.5, 0.75].map((g) => (
-          <line key={g} x1={PAD_L} y1={yAt(g)} x2={W - PAD_R} y2={yAt(g)} stroke="var(--surface)" strokeWidth={0.6} opacity={0.5} />
-        ))}
-        {tickIdx.map((i) => (
-          <text key={mix[i].season} x={xAt(i)} y={H - 8} fontSize={12} textAnchor="middle" fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
-            {shortSeason(mix[i].season)}
-          </text>
-        ))}
-        <text x={2} y={yAt(1) + 9} fontSize={12} fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
-          100%
-        </text>
-        <text x={2} y={yAt(0)} fontSize={12} fill="var(--ink-faint)" fontFamily="IBM Plex Mono, monospace">
-          0%
-        </text>
-      </svg>
+      <div className={styles.dnaChart}>
+        <div className={styles.dnaAxis} aria-hidden="true">
+          <span style={{ top: 0 }}>100%</span>
+          <span style={{ bottom: 0 }}>0%</span>
+        </div>
+        <div className={styles.dnaPlot}>
+          <svg className={styles.dnaSvg} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            {/* 밴드 사이에 패널색 실선을 얇게 둘러 인접 밴드가 서로 번지지 않게. */}
+            {DNA_ZONES.map((z, zi) => (
+              <path key={z} d={bandPath(zi)} fill={DNA_COLORS[z]} opacity={0.9} stroke="var(--surface)" strokeWidth={0.7} vectorEffect="non-scaling-stroke" />
+            ))}
+            {[25, 50, 75].map((g) => (
+              <line key={g} x1={0} y1={g} x2={100} y2={g} stroke="var(--surface)" strokeWidth={0.6} opacity={0.5} vectorEffect="non-scaling-stroke" />
+            ))}
+          </svg>
+        </div>
+        <div className={styles.dnaLabels}>
+          {labels.map((l) => (
+            <span key={l.z} style={{ top: `${l.y * 100}%`, color: DNA_COLORS[l.z] }}>
+              {DNA_ZONE_LABELS[l.z]} {Math.round(l.share * 100)}%
+            </span>
+          ))}
+        </div>
+        <div className={styles.dnaTicks} aria-hidden="true">
+          {tickIdx.map((i) => (
+            <span key={mix[i].season} style={{ left: `${xFrac(i) * 100}%` }} className={i === n - 1 ? styles.dnaTickEnd : i === 0 ? styles.dnaTickStart : undefined}>
+              {shortSeason(mix[i].season)}
+            </span>
+          ))}
+        </div>
+      </div>
       <div className={styles.pctNote}>오른쪽 라벨 = {shortSeason(latest.season)} 비율</div>
       </div>
       {/* 모바일: 시즌 행 × 존 열. 640단위 뷰박스를 303px로 줄이면 밴드 라벨이 4px가 되어 안 읽힌다(제보).

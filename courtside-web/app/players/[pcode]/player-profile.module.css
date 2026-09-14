@@ -625,10 +625,61 @@
 }
 
 /* ── 슈팅 DNA ─────────────────────────────────────────────────────────────────── */
+/* 슈팅 DNA(데스크톱) - 밴드는 늘어나는 SVG, 라벨·눈금·축은 실제 px HTML(page.tsx 주석).
+   글자는 주변 본문과 같은 Pretendard(SIL OFL) 라벨 단 - 예전 SVG 글자는 지면 폭 배율로 20px대까지 컸다. */
+.dnaChart {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 104px;
+  grid-template-rows: 238px 24px;
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.dnaAxis,
+.dnaPlot,
+.dnaLabels,
+.dnaTicks {
+  position: relative;
+}
+.dnaAxis span {
+  position: absolute;
+  left: 0;
+  font-size: var(--fs-100);
+  line-height: 1;
+  color: var(--ink-faint);
+}
 .dnaSvg {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
   display: block;
+}
+.dnaLabels span {
+  position: absolute;
+  left: 8px;
+  transform: translateY(-50%);
+  font-size: var(--fs-200);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.dnaTicks {
+  grid-column: 2;
+}
+.dnaTicks span {
+  position: absolute;
+  top: 6px;
+  transform: translateX(-50%);
+  font-size: var(--fs-100);
+  line-height: 1;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.dnaTicks .dnaTickStart {
+  transform: none;
+}
+.dnaTicks .dnaTickEnd {
+  transform: translateX(-100%);
 }
 .dnaSingleBar {
   display: flex;

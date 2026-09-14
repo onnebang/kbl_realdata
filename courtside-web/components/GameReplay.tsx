@@ -497,69 +497,49 @@ function WinProbLiveChart({ events, idx, homeColor, live }: { events: GameEvent[
   const leadX = xOf(valid.length - 1);
   const leadY = yOf(valid[valid.length - 1].e.home_win_prob as number);
 
-  // 라벨 크기는 뷰박스 단위다. 이 SVG는 폭 640 뷰박스를 지면 폭(뷰포트 - 74: .wrap 36 +
-  // .panel 36 + 테두리 2)에 넣고 height는 150 고정 + meet이라 배율 = min(지면폭/640, 150/150)
-  // = min(지면폭/640, 1)이다. 26단위 한 값으로는 좁은 끝을 못 덮는다:
-  // 375px → 26 × 301/640 = 12.2px(통과)지만 360px → 11.6px, 320px → 10.0px로 바닥 12px 미달.
-  // SVG 안 <style>의 미디어쿼리는 인라인 DOM이라 문서 뷰포트로 평가되므로 구간마다 글자를
-  // 갈아끼운다(lib/seasonRibbon.ts RB_STYLE과 같은 수법). 각 구간 하단 렌더 픽셀:
-  // 375px → 26 × 0.470 = 12.2 / 360px → 28 × 0.447 = 12.5 / 320px → 32 × 0.384 = 12.3.
-  // JS는 어느 구간이 걸렸는지 모르므로 **배치는 언제나 최댓값 32단위로 계산한다**(seasonRibbon의
-  // RB_FS_MAX와 같은 이유). 데스크톱(26단위)에서는 여백이 그만큼 더 벌어질 뿐 겹치지 않는다.
-  const LABEL_STYLE =
-    `.wpLbl{font-size:26px}` +
-    `@media(max-width:374px){.wpLbl{font-size:28px}}` +
-    `@media(max-width:359px){.wpLbl{font-size:32px}}`;
-  // 키운 라벨 둘이 부딪히는 자리를 뗀다: 라이브를 따라가는 중이면 마커가 곡선 맨 앞에 있어
-  // (mx === leadX) '진행중'과 승률 라벨이 같은 x에 온다. 32단위 글자 상자는 위끝 0.85em =
-  // 27.2, 아랫끝 0.23em = 7.4다(26단위에서 22/6이던 값의 32/26배).
-  // '진행중'은 위쪽 띠에 고정 - 베이스라인 28(> 27.2라 위가 안 잘림), 아랫끝 35.4.
-  // 승률 라벨은 점 위에 자리가 있을 때(my ≥ 80 → 위끝 my - 41.2 ≥ 38.8 > 35.4)만 위로 붙이고,
-  // 아니면 그 띠 아래로 내린다(하한 66 → 위끝 38.8). 종료 경기엔 '진행중'이 없어 띠를 비워둘
-  // 이유가 없다 - 위끝이 잘리지 않을 만큼(28)만 띄운다. 점(r 4.5)과는 my + 36(위끝 my + 8.8,
-  // 점 아랫끝 my + 4.5에서 4.3 뗌)으로 벌린다. my < 80 가지라 베이스라인은 최대 116 < 150.
-  const pctY = my >= 80 ? my - 14 : Math.max(live ? 66 : 28, my + 36);
-  // "100%"는 32단위에서 폭이 79단위(4자 × 0.62em)다 - 중앙 정렬이라 양끝에서 반폭 40만큼 물린다.
-  const pctX = Math.min(W - 40, Math.max(40, mx));
+  // 요청: "wpLbl 텍스트가 너무 크다 - 주변과 어울리게". 예전엔 라벨을 SVG <text>로 그려서 글자
+  // 크기가 뷰박스 단위(26~32)였고, 화면 폭에 따라 배율이 달라져 데스크톱에선 26px로 본문(13px)의
+  // 두 배가 됐다. 라벨과 점은 HTML로 올려 실제 px로 고정하고(본문 서체 Pretendard, 라벨 단 13px),
+  // 선·면만 SVG에 남긴다. SVG는 preserveAspectRatio="none"으로 지면 폭을 꽉 채우고, 선 굵기는
+  // non-scaling-stroke로 지킨다 - 늘어나도 원이 타원이 되지 않게 점은 HTML이다.
+  const pct = (x: number, span: number) => `${(x / span) * 100}%`;
+  // 승률 라벨: 점 위에 자리가 있으면 위, 아니면 아래(진행중 라벨이 위쪽 띠를 쓴다).
+  // 위쪽 45% 안이면 위로 올릴 자리가 없다(라벨 높이+간격 ~27px가 150/120px 차트의 윗 띠와 겹침).
+  const pctAbove = my >= H * 0.45;
+  const probPct = Math.round((marker.e.home_win_prob as number) * 100);
 
   return (
-    <svg className="team-ink" viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 150, display: "block", ...teamInkStyle(homeColor) }}>
-      <style>{LABEL_STYLE}</style>
-      {live && leadX < W - 0.5 && (
-        // 아직 안 치른 시간 - 곡선이 없는 영역임을 명시적으로 칠해서 "여기까지가 전부"라는
-        // 오독을 막는다.
-        <rect x={leadX} y={0} width={W - leadX} height={H} fill="var(--ink-faint)" opacity={0.07} />
-      )}
-      <line x1={0} y1={midY} x2={W} y2={midY} stroke="var(--ink-faint)" strokeWidth={1} strokeDasharray="3,4" />
-      {quarterBounds.map((b) => (
-        <line key={b.q} x1={b.x} y1={0} x2={b.x} y2={H} stroke="var(--ink-faint)" strokeWidth={1} opacity={0.35} />
-      ))}
-      <path d={areaPath} fill="currentColor" fillOpacity={0.12} />
-      <path d={linePath} fill="none" stroke="currentColor" strokeWidth={2} />
+    <div className="wp-chart team-ink" style={teamInkStyle(homeColor)}>
+      <svg className="wp-chart-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
+        {live && leadX < W - 0.5 && (
+          // 아직 안 치른 시간 - 곡선이 없는 영역임을 명시적으로 칠해서 "여기까지가 전부"라는
+          // 오독을 막는다.
+          <rect x={leadX} y={0} width={W - leadX} height={H} fill="var(--ink-faint)" opacity={0.07} />
+        )}
+        <line x1={0} y1={midY} x2={W} y2={midY} stroke="var(--ink-faint)" strokeWidth={1} strokeDasharray="3,4" vectorEffect="non-scaling-stroke" />
+        {quarterBounds.map((b) => (
+          <line key={b.q} x1={b.x} y1={0} x2={b.x} y2={H} stroke="var(--ink-faint)" strokeWidth={1} opacity={0.35} vectorEffect="non-scaling-stroke" />
+        ))}
+        <path d={areaPath} fill="currentColor" fillOpacity={0.12} />
+        <path d={linePath} fill="none" stroke="currentColor" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        <line x1={mx} y1={0} x2={mx} y2={H} stroke="var(--ink-faint)" strokeWidth={1} strokeDasharray="2,3" vectorEffect="non-scaling-stroke" />
+      </svg>
       {live && (
         <>
-          <circle cx={leadX} cy={leadY} r={3} fill="var(--negative)" />
-          {/* 한글이라 IBM Plex Mono를 뺀다(글리프 없음) - 한글 표제 서체 Pretendard 800.
-              폭이 3글자 × 32 = 96단위라 오른쪽 끝 뒤집기 기준도 88 -> 104로 넓힌다. */}
-          <text
-            className="wpLbl"
-            x={Math.min(W - 2, leadX + 6)}
-            y={28}
-            textAnchor={leadX > W - 104 ? "end" : "start"}
-            fontWeight={800}
-            fill="var(--negative)"
-            fontFamily='"Pretendard", system-ui, -apple-system, sans-serif'
-          >
+          <span className="wp-dot wp-dot-live" style={{ left: pct(leadX, W), top: pct(leadY, H) }} />
+          <span className={`wp-lbl wp-lbl-live${leadX > W * 0.85 ? " end" : ""}`} style={{ left: pct(leadX, W) }}>
             진행중
-          </text>
+          </span>
         </>
       )}
-      <line x1={mx} y1={0} x2={mx} y2={H} stroke="var(--ink-faint)" strokeWidth={1} strokeDasharray="2,3" />
-      <circle cx={mx} cy={my} r={4.5} fill="currentColor" stroke="var(--surface)" strokeWidth={1.5} />
-      <text className="wpLbl" x={pctX} y={pctY} textAnchor="middle" fontWeight={700} fill="currentColor" fontFamily="IBM Plex Mono, monospace">
-        {Math.round((marker.e.home_win_prob as number) * 100)}%
-      </text>
-    </svg>
+      <span className="wp-dot" style={{ left: pct(mx, W), top: pct(my, H) }} />
+      <span
+        className={`wp-lbl wp-lbl-prob${pctAbove ? " above" : " below"}`}
+        style={{ left: `clamp(22px, ${pct(mx, W)}, calc(100% - 22px))`, top: pct(my, H) }}
+      >
+        {probPct}%
+      </span>
+    </div>
   );
 }
 
