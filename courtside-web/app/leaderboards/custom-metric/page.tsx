@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getSeasonsWithMetricData, getSeasonPlayerMetrics } from "@/lib/customMetric";
 import CustomMetricBuilder from "@/components/CustomMetricBuilder";
+import { WidgetBoundary } from "@/components/WidgetBoundary";
 
 export default async function CustomMetricPage({ searchParams }: { searchParams: Promise<{ season?: string }> }) {
   const { season } = await searchParams;
@@ -31,7 +32,9 @@ export default async function CustomMetricPage({ searchParams }: { searchParams:
       </form>
 
       {players.length > 0 ? (
-        <CustomMetricBuilder players={players} />
+        <WidgetBoundary name="커스텀 지표">
+          <CustomMetricBuilder players={players} />
+        </WidgetBoundary>
       ) : (
         <div className="panel">
           <div className="empty-note">이 시즌은 조건(10경기 이상)을 충족하는 선수가 없음</div>

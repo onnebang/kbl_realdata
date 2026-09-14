@@ -11,6 +11,7 @@ import {
   MIN_SAMPLE,
 } from "@/lib/shotValueScatter";
 import ScoringExplorerClient from "@/components/ScoringExplorerClient";
+import { WidgetBoundary } from "@/components/WidgetBoundary";
 import styles from "./scoring-explorer.module.css";
 
 // web/scoring_distribution_template.html 리디자인(리디자인 대상: 이 leaderboards 그룹에서
@@ -144,7 +145,11 @@ async function HeatmapTab() {
   // 기본은 리그 - 이 화면이 남은 이유 자체가 "리그 전체의 변화"다.
   const defaultEntity = entityOptionsByDim.league[0] ?? null;
 
-  return <ScoringExplorerClient entityOptionsByDim={entityOptionsByDim} initialDim="league" initialEntity={defaultEntity} />;
+  return (
+    <WidgetBoundary name="득점 분포 탐색기">
+      <ScoringExplorerClient entityOptionsByDim={entityOptionsByDim} initialDim="league" initialEntity={defaultEntity} />
+    </WidgetBoundary>
+  );
 }
 
 async function ScatterTab({ activeSeason }: { activeSeason?: string }) {

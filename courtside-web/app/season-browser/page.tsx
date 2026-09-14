@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getSeasons, getSeasonGames, formatSeasonShort } from "@/lib/seasonBrowser";
 import SeasonBrowserBoard from "@/components/SeasonBrowserBoard";
+import { WidgetBoundary } from "@/components/WidgetBoundary";
 import styles from "./season-browser.module.css";
 
 // web/season_browser_template.html 포팅 - 홈 화면(app/page.tsx)이 "최근 경기 훑어보기"라면
@@ -45,7 +46,9 @@ export default async function SeasonBrowserPage({
           </form>
         </div>
 
-        <SeasonBrowserBoard games={games} />
+        <WidgetBoundary name="시즌 경기 목록">
+          <SeasonBrowserBoard games={games} />
+        </WidgetBoundary>
       </div>
     </div>
   );

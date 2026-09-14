@@ -236,6 +236,28 @@ a {
   padding: 28px 18px 80px;
 }
 
+/* ── 위젯 오류 경계(components/WidgetBoundary.tsx) - 위젯 자리에만 뜨는 안내 ── */
+.widget-error {
+  border: 1px dashed rgba(var(--line-rgb), 0.28);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.widget-error-title {
+  font-size: var(--fs-400);
+  font-weight: 800;
+  color: var(--ink);
+}
+.widget-error-detail {
+  margin: 0;
+  font-size: var(--fs-200);
+  color: var(--ink-soft);
+}
+
 /* ── 페이지 이동 뼈대(app/loading.tsx) ─────────────────────────────────────────
    정적인 면만 - 반짝임·펄스 없음(움직이는 건 라이브 점 하나). 크기는 대부분 페이지의 첫 화면
    구성(히어로 밴드 -> 요약 타일 3개 -> 본문 패널)을 따라 레이아웃이 크게 튀지 않게. */

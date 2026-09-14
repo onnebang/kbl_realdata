@@ -21,6 +21,7 @@ import { InsightCard } from "@/components/InsightCard";
 import { deriveGameStatus } from "@/lib/gameStatus";
 import LiveGameProvider from "@/components/LiveGameProvider";
 import LiveScore from "@/components/LiveScore";
+import { WidgetBoundary } from "@/components/WidgetBoundary";
 
 type TeamRef = { tcode: string; name: string; abbr: string; color: string; logo_url: string | null } | null;
 
@@ -1029,6 +1030,7 @@ export default async function GamePage({
       {status !== "scheduled" && game.home_team && game.away_team && derivedEvents.length > 0 && (
         <div className="game-act">
           <ActHeader num={2} title="경기중 인터랙티브 문자중계" />
+          <WidgetBoundary name="인터랙티브 문자중계">
           <GameReplay
             /* 페이로드 감사(2026-09): 예전엔 derivedEvents를 그대로 넘겼는데, 그 배열의
                action_label(14,060B) / player_name(12,855B) / elapsed·runHome·runAway·surge
@@ -1068,6 +1070,7 @@ export default async function GamePage({
                (getPlayerNames 주석) - 그래서 이 prop은 예전 그대로 라이브 전용. */
             liveNames={status === "live" ? Object.fromEntries(liveNames) : undefined}
           />
+          </WidgetBoundary>
         </div>
       )}
 
