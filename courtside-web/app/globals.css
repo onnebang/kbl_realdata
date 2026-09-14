@@ -236,6 +236,49 @@ a {
   padding: 28px 18px 80px;
 }
 
+/* ── 페이지 이동 뼈대(app/loading.tsx) ─────────────────────────────────────────
+   정적인 면만 - 반짝임·펄스 없음(움직이는 건 라이브 점 하나). 크기는 대부분 페이지의 첫 화면
+   구성(히어로 밴드 -> 요약 타일 3개 -> 본문 패널)을 따라 레이아웃이 크게 튀지 않게. */
+.route-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.route-loading-label {
+  font-size: var(--fs-200);
+  font-weight: 600;
+  color: var(--ink-faint);
+}
+.route-loading-hero,
+.route-loading-card,
+.route-loading-panel {
+  background: var(--surface-soft);
+  border-radius: var(--r-card);
+}
+.route-loading-hero {
+  height: clamp(160px, 26vw, 240px);
+}
+.route-loading-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.route-loading-card {
+  height: 96px;
+  border-radius: var(--r-inset);
+}
+.route-loading-panel {
+  height: 320px;
+}
+@media (max-width: 640px) {
+  .route-loading-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .route-loading-row .route-loading-card:nth-child(n + 2) {
+    display: none;
+  }
+}
+
 /* ── 스코어보드 유틸리티 ──────────────────────────────────────────────────────
    중계 화면의 목소리. 점수·등번호·큰 스탯값·승-패·순위 숫자에만 건다.
    **한글 금지** - Big Shoulders Display에는 한글 글리프가 없어서 한글이 섞이면
