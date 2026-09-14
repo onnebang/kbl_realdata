@@ -227,7 +227,7 @@ export async function getHomeSeasonFacts(tcode: string, season: string): Promise
   for (const g of rows) if (g.home_coach_id != null) coachCount.set(Number(g.home_coach_id), (coachCount.get(Number(g.home_coach_id)) ?? 0) + 1);
   let coachId: number | null = null,
     coachGames = 0;
-  for (const [id, n] of coachCount) if (n > coachGames) (coachId = id), (coachGames = n);
+  for (const [id, n] of coachCount) if (n > coachGames) { coachId = id; coachGames = n; }
   let coachName: string | null = null;
   if (coachId != null) {
     const { data: c } = await supabase.from("coaches").select("name").eq("coach_id", coachId).maybeSingle();

@@ -88,8 +88,6 @@ export async function getSeasonsWithFormData(): Promise<string[]> {
   return (data ?? []).map((r) => r.season_name as string);
 }
 
-type GameStatRow = { pcode: string; gmkey: string; games: { game_date: string } | null };
-
 /** form_index_season RPC 한 행. tools/rpc_form_index.sql 참고. */
 type FormRpcRow = {
   pcode: string;

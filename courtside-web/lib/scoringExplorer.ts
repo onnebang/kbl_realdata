@@ -5,7 +5,6 @@ import { supabaseServer as supabase } from "./supabaseServer";
 // 클라이언트도 쓰는 모양은 ./scoringExplorerShape에 있다(그쪽은 Supabase를 import하지 않는다).
 export { GRID, buildHeatmapSvg };
 export type { Dimension, EntityOption, EntitySeasonGrids, GridCell, GridResult };
-import { drawCourtMarkings } from "./zoneCompare";
 import { currentTeamName } from "./teamNames";
 
 // "득점 분포 탐색기" 아티팩트(claude.ai 원본, web/scoring_distribution_template.html) 리디자인

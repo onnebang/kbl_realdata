@@ -143,13 +143,15 @@ function PlayerTable({ title, players }: { title: string; players: PlayerRow[] }
 }
 
 export default function SeasonBrowserModal({ game, onClose }: { game: SeasonGameRow; onClose: () => void }) {
-  const [data, setData] = useState<BoxScoreData | null>(null);
-  const [loadError, setLoadError] = useState(false);
+  // 결과를 어느 경기 것인지와 함께 들고, 지금 경기와 다르면 없는 셈 친다 - 경기가 바뀔 때 effect 안에서
+  // 상태를 비우면(setState) 렌더가 한 번 더 돈다(react-hooks/set-state-in-effect).
+  const [result, setResult] = useState<{ gmkey: string; data: BoxScoreData | null; error: boolean } | null>(null);
+  const current = result?.gmkey === game.gmkey ? result : null;
+  const data = current?.data ?? null;
+  const loadError = current?.error ?? false;
 
   useEffect(() => {
     let cancelled = false;
-    setData(null);
-    setLoadError(false);
     const params = new URLSearchParams({
       gmkey: game.gmkey,
       home: game.home_team?.tcode ?? "",
@@ -161,10 +163,10 @@ export default function SeasonBrowserModal({ game, onClose }: { game: SeasonGame
         return r.json();
       })
       .then((json) => {
-        if (!cancelled) setData(json);
+        if (!cancelled) setResult({ gmkey: game.gmkey, data: json, error: false });
       })
       .catch(() => {
-        if (!cancelled) setLoadError(true);
+        if (!cancelled) setResult({ gmkey: game.gmkey, data: null, error: true });
       });
     return () => {
       cancelled = true;

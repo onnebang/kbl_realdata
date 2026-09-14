@@ -283,7 +283,6 @@ export function buildCareerStripSvg(grain: CareerGrain, opts: CareerStripOptions
       ? all.length - opts.recentN
       : 0;
   const rangeEnd = opts.range ? Math.max(rangeStart + 1, Math.min(all.length, opts.range.end)) : all.length;
-  const crop = rangeStart; // 이름 유지 - 아래 이동평균 slice·§10이 쓴다
   const nights = all.slice(rangeStart, rangeEnd);
   const N = nights.length;
   const cropped = rangeStart > 0 || rangeEnd < all.length;

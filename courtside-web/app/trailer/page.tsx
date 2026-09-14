@@ -1,3 +1,5 @@
+/* eslint-disable @next/next/no-img-element -- public/trailer 스크린샷은 이미 60~100KB로 줄인 고정 JPG에 width/height·lazy를 직접 준다.
+   next/image로 바꾸면 deviceSizes 상한(1080) 때문에 1280px 캡처가 오히려 흐려진다(next.config.ts images). */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TrailerScroll } from "@/components/TrailerScroll";

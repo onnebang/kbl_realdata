@@ -26,6 +26,8 @@ export function ErrorScreen({
         <p className="es-detail">{detail}</p>
         <div className="es-actions">
           {action}
+          {/* <Link>이 아니라 <a>: 오류 화면에서는 전체 새로고침으로 깨진 클라이언트 상태를 버린다(global-error는 라우터도 없을 수 있다). */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a className="es-btn es-btn-ghost" href="/">
             경기 목록으로
           </a>

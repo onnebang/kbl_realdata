@@ -63,8 +63,8 @@ export default function ScoringExplorerClient({
   const [seasonIdx, setSeasonIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   // 기본 엔티티의 전체 이력도 마운트 직후 Server Action으로 불러오므로(위 page.tsx 주석)
-  // 처음부터 로딩 상태로 시작.
-  const [loading, setLoading] = useState(true);
+  // 처음부터 로딩 상태로 시작(기본 엔티티가 없으면 불러올 것도 없다).
+  const [loading, setLoading] = useState(Boolean(initialEntity));
 
   const [query, setQuery] = useState(initialEntity?.label ?? "");
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -95,13 +95,21 @@ export default function ScoringExplorerClient({
   }, [playing, seasons.length]);
 
   // "리그 평균과 비교" 체크 시 리그 데이터를 딱 한 번만 지연 로드(끄고 다시 켜도 재사용).
-  useEffect(() => {
-    if (!compareLeague || leagueData || leagueLoading) return;
+  // 예전엔 compareLeague를 보는 effect가 로딩 상태를 켰다 - 체크하는 그 이벤트에서 바로 부른다.
+  function toggleCompareLeague(on: boolean) {
+    setCompareLeague(on);
+    if (!on || leagueData || leagueLoading) return;
     setLeagueLoading(true);
     fetchEntitySeasonGridsAction("league", "league")
       .then(setLeagueData)
       .finally(() => setLeagueLoading(false));
-  }, [compareLeague, leagueData, leagueLoading]);
+  }
+
+  function applyGrids(result: EntitySeasonGrids) {
+    setSeasons(result.seasons);
+    setGrids(result.grids);
+    setSeasonIdx(Math.max(0, result.seasons.length - 1));
+  }
 
   async function pickEntity(nextDim: Dimension, id: string) {
     const opt = (entityOptionsByDim[nextDim] ?? []).find((e) => e.id === id);
@@ -113,10 +121,7 @@ export default function ScoringExplorerClient({
     setPlaying(false);
     setLoading(true);
     try {
-      const result = await fetchEntitySeasonGridsAction(nextDim, id);
-      setSeasons(result.seasons);
-      setGrids(result.grids);
-      setSeasonIdx(Math.max(0, result.seasons.length - 1));
+      applyGrids(await fetchEntitySeasonGridsAction(nextDim, id));
     } finally {
       setLoading(false);
     }
@@ -124,10 +129,18 @@ export default function ScoringExplorerClient({
 
   // 마운트 직후 기본 엔티티(팀 이름순 첫 팀)의 전체 이력을 Server Action으로 불러옴 - SSR에서
   // 미리 굽지 않는 이유는 app/leaderboards/scoring-explorer/page.tsx 상단 주석 참고.
+  // dim·entity·query·loading의 초기값이 이미 기본 엔티티라 여기서는 결과만 받아 넣는다.
+  const initialId = initialEntity?.id;
   useEffect(() => {
-    if (initialEntity) pickEntity(initialDim, initialEntity.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!initialId) return;
+    let cancelled = false;
+    fetchEntitySeasonGridsAction(initialDim, initialId)
+      .then((result) => !cancelled && applyGrids(result))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [initialDim, initialId]);
 
   function handleDimChange(nextDim: Dimension) {
     setQuery("");
@@ -203,7 +216,7 @@ export default function ScoringExplorerClient({
           </div>
 
           <label className={styles.compareLabel}>
-            <input type="checkbox" checked={compareLeague} onChange={(e) => setCompareLeague(e.target.checked)} />
+            <input type="checkbox" checked={compareLeague} onChange={(e) => toggleCompareLeague(e.target.checked)} />
             리그 평균과 비교 (최근 3시즌)
           </label>
         </div>

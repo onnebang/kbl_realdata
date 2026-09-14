@@ -143,8 +143,7 @@ function escapeSvgText(s: string): string {
 }
 
 export function buildCourtDotsSvg<T extends ShotRow>(shots: T[], color: string, getMeta?: (shot: T) => ShotDotMeta | null): string {
-  const HX = HOOP_RIGHT[0],
-    HY = HOOP_RIGHT[1];
+  const HX = HOOP_RIGHT[0];
   let svg = `<rect x="${COURT_X[0]}" y="${COURT_Y[0]}" width="${COURT_X[1] - COURT_X[0]}" height="${COURT_Y[1] - COURT_Y[0]}" fill="#d9b98a" stroke="var(--ink-faint)" stroke-width="2"/>`;
   svg += drawCourtMarkings(HX, COURT_X[1], -1, "#fff", 1.6);
 
