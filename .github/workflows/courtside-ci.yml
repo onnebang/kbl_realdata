@@ -1,0 +1,28 @@
+# 코트사이드 웹 코드 검사 - 타입 검사 + lint. 빌드는 Vercel이 배포 때 한다(여기서 돌리면 DB 키 없이
+# 빌드해야 해서 실제 배포와 조건이 달라진다). 배포가 끝난 뒤의 확인은 courtside-smoke.yml.
+name: courtside-ci
+
+on:
+  push:
+    branches: [main]
+    paths: ["courtside-web/**", ".github/workflows/courtside-ci.yml"]
+  pull_request:
+    paths: ["courtside-web/**", ".github/workflows/courtside-ci.yml"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: courtside-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: courtside-web/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx eslint .

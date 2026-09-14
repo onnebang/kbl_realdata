@@ -1,0 +1,40 @@
+# Vercel 배포(프리뷰·프로덕션)가 끝날 때마다 실제 주소로 스모크 검사.
+#
+# 왜 상태 코드만 보지 않나: app/loading.tsx가 생긴 뒤로는 페이지가 스트리밍되어, 서버에서 오류가 나도 HTTP는
+# 200이고 본문에 오류 화면(components/ErrorScreen.tsx의 class="es-code")이 들어간다. 그래서 본문도 본다.
+# /api/health는 이 배포의 커밋과 DB 조회(probe)를 확인한다 - 키가 무효인 배포는 사이트 전체가 깨진다
+# (프로젝트 메모: 2026-09-05 장애, 2026-09-14 프리뷰 키 무효).
+name: courtside-smoke
+
+on: deployment_status
+
+jobs:
+  smoke:
+    if: github.event.deployment_status.state == 'success' && contains(github.event.deployment.environment, 'courtside-web')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE: ${{ github.event.deployment_status.environment_url }}
+      SHA: ${{ github.event.deployment.sha }}
+    steps:
+      - name: 페이지와 health 확인
+        run: |
+          fail=0
+          echo "대상: $BASE (커밋 ${SHA:0:7})"
+          health=$(curl -s --max-time 30 "$BASE/api/health")
+          echo "health: $health"
+          echo "$health" | grep -q "\"commit\":\"${SHA:0:7}\"" || { echo "::error::health 커밋이 ${SHA:0:7}이 아님"; fail=1; }
+          echo "$health" | grep -q '"probe":"ok"' || { echo "::error::DB 조회(probe) 실패 - SUPABASE_SERVICE_ROLE_KEY 확인"; fail=1; }
+          for p in / /preseason /teams /players /coaches /leaderboards/season /players/290790 /teams/66 /games/S47G03N18; do
+            body=$(mktemp)
+            code=$(curl -s --max-time 60 -o "$body" -w "%{http_code}" "$BASE$p")
+            size=$(wc -c < "$body")
+            if [ "$code" != "200" ]; then
+              echo "::error::$p HTTP $code"; fail=1
+            elif grep -q 'class="es-code"' "$body"; then
+              echo "::error::$p 오류 화면이 렌더됨"; fail=1
+            else
+              echo "ok  $p  ${size}B"
+            fi
+          done
+          exit $fail
