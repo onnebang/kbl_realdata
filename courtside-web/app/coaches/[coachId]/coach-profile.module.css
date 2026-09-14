@@ -3,6 +3,52 @@
    IBM Plex Mono는 라틴·정렬 숫자에만 남긴다(한글 글리프가 없어 조용히 폴백한다).
    히어로 아트는 없다 - 이 페이지의 데이터는 전부 '팀 성적을 감독 재임기로 자른 것'이라
    감독 개인을 크게 그리지 않는다. 모든 글자 ≥ 12px(375px 기준). */
+/* 요청: "스포츠의 역동성 + 데이터 분석의 정교함". 헤더를 중계 하단 자막(lower third)처럼 - 선수별
+   조합·선수 프로필과 같은 언어: 사선으로 잘린 팀 색 블록, 오른쪽 팀 색 사선 띠, 옅은 팀 색 워시.
+   팀 색은 잉크와 섞어 남색 계열도 다크 표면에서 보이게. */
+.hero {
+  --team-ink: color-mix(in srgb, var(--team, var(--gold)) 72%, var(--ink) 28%);
+  position: relative;
+  overflow: hidden;
+  margin-top: 14px;
+  padding: 18px 20px 16px 30px;
+  border-radius: var(--r-card);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  background: linear-gradient(100deg, color-mix(in srgb, var(--team, var(--gold)) 20%, var(--surface)) 0%, var(--surface) 55%);
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  background: var(--team-ink);
+  clip-path: polygon(0 0, 100% 0, 45% 100%, 0 100%);
+}
+.heroSlash {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 260px;
+  background: repeating-linear-gradient(115deg, var(--team-ink) 0 10px, transparent 10px 24px);
+  opacity: 0.3;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 75%);
+  mask-image: linear-gradient(to right, transparent, #000 75%);
+  pointer-events: none;
+}
+.hero .head,
+.hero .sub {
+  position: relative;
+}
+.hero .head {
+  margin-top: 0;
+}
+/* 한글 이름 - Pretendard 800(Big Shoulders는 한글 글리프 없음). */
+.heroName {
+  font-size: clamp(30px, 5vw, 44px);
+}
 .head {
   display: flex;
   flex-wrap: wrap;
@@ -62,6 +108,18 @@
   font-size: var(--fs-400);
   line-height: var(--lh-tight);
   letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+/* 중계 자막(chyron) 탭 - 카드마다 구간 박자를 만든다. 헤더와 같은 팀 색이 없으니 금색 잉크. */
+.cardTitle::before {
+  content: "";
+  flex: none;
+  width: 11px;
+  height: 1.15em;
+  background: var(--gold);
+  clip-path: polygon(0 0, 100% 0, 50% 100%, 0 100%);
 }
 .cardKicker {
   font-size: 12.5px;
@@ -198,6 +256,94 @@
 }
 .neg {
   color: var(--negative);
+}
+
+/* ── 정교함: 숫자 옆 눈금 막대 ── */
+/* 시즌별 넷마진 - 가운데 0에서 좌우로. 축척은 표 안 |넷마진| 최댓값(최소 ±5). */
+.netBarCell {
+  width: 140px;
+  min-width: 110px;
+}
+.divBar {
+  position: relative;
+  height: 10px;
+  border-radius: var(--r-led);
+  background: var(--surface-soft);
+}
+.divBar::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(var(--line-rgb), 0.5);
+}
+.divFill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.divPos {
+  left: 50%;
+  background: var(--positive);
+}
+.divNeg {
+  right: 50%;
+  background: var(--negative);
+}
+/* 스타일 z - -2…0…+2 눈금 위의 점. 옅은 띠 = ±SE(그 안이면 "≈"라 리그 평균과 구분 불가).
+   점만 쓰는 이유: z는 크기가 아니라 위치라서 막대 면적이 과장된다. */
+.zCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.zBar {
+  position: relative;
+  display: inline-block;
+  width: 76px;
+  height: 10px;
+  border-radius: var(--r-led);
+  background: var(--surface-soft);
+  flex: none;
+}
+.zBar::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: rgba(var(--line-rgb), 0.5);
+}
+.zBand {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+  background: rgba(var(--line-rgb), 0.12);
+}
+.zDot {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1.5px var(--surface);
+  z-index: 1;
+}
+.zDot.divPos,
+.zDot.divNeg {
+  left: auto;
+  right: auto;
+}
+.zDotDim {
+  background: var(--ink-faint);
 }
 
 /* ── 레이더 ── */

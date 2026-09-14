@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TeamBadge } from "@/components/TeamBadge";
@@ -58,11 +59,19 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
   const hasShortSeason = seasons.some((s) => s.seasonName === SHORT_SEASON);
   // 카드 머리글은 challengeLeague(최신 1행)의 시즌이라 타일 라벨에 그 타일의 시즌을 함께 적는다.
   const challenges = seasons.filter((s) => s.challenge).map((s) => s.challenge!);
+  // 헤더 팀 색 - 현 소속팀, 없으면 마지막으로 맡은 팀.
+  const heroColor = currentTeam?.color ?? lastSeason?.team.color ?? null;
+  // 시즌별 넷마진 막대 축척 - 표 안 |넷마진| 최댓값(최소 ±5점)이라 표 안에서만 비교한다.
+  const netMax = Math.max(5, ...seasons.map((s) => Math.abs(s.record.net)));
 
   return (
     <div className="wrap">
+      {/* 요청: "스포츠의 역동성 + 데이터 분석의 정교함". 헤더를 중계 하단 자막처럼 - 팀 색 사선 블록과
+          사선 띠(선수별 조합·선수 프로필과 같은 언어). */}
+      <section className={styles.hero} style={heroColor ? ({ "--team": heroColor } as CSSProperties) : undefined}>
+      <span className={styles.heroSlash} aria-hidden="true" />
       <div className={styles.head}>
-        <div className="title">{coach.name}</div>
+        <div className={`title ${styles.heroName}`}>{coach.name}</div>
         <span className={styles.kicker}>감독 · 정규시즌 기준</span>
       </div>
       <div className={styles.sub}>
@@ -84,6 +93,7 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
           감독 목록
         </Link>
       </div>
+      </section>
 
       {/* (a) 상단 타일 */}
       {career && (
@@ -164,6 +174,7 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
                   <th>승률</th>
                   <th>득 / 실</th>
                   <th>넷마진</th>
+                  <th aria-hidden="true" />
                   <th>홈 · 원정</th>
                 </tr>
               </thead>
@@ -186,6 +197,15 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
                       {s.record.pf.toFixed(1)} / {s.record.pa.toFixed(1)}
                     </td>
                     <td className={pctCls(s.record.net)}>{signed(s.record.net)}</td>
+                    <td className={styles.netBarCell} aria-hidden="true">
+                      {/* 가운데 0에서 좌(마이너스)/우(플러스)로 - 숫자는 바로 왼쪽 칸에 있다. */}
+                      <div className={styles.divBar}>
+                        <span
+                          className={`${styles.divFill} ${s.record.net >= 0 ? styles.divPos : styles.divNeg}`}
+                          style={{ width: `${(Math.min(Math.abs(s.record.net), netMax) / netMax) * 50}%` }}
+                        />
+                      </div>
+                    </td>
                     <td className={styles.small}>
                       {s.record.homeW}-{s.record.homeG - s.record.homeW} · {s.record.awayW}-{s.record.awayG - s.record.awayW}
                     </td>
@@ -247,8 +267,19 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
                         <tr key={a.key}>
                           <td title={a.note ?? undefined}>{a.label}</td>
                           <td className={sig ? undefined : styles.dim}>
-                            {signed(z, 2)}
-                            {sig ? "" : " ≈"}
+                            <span className={styles.zCell}>
+                              {/* z 눈금: -2 … 0 … +2, 가운데 줄 = 리그 평균, 옅은 띠 = ±SE(이 안이면 ≈).
+                                  숫자는 옆에 그대로 두고 막대는 장식으로 숨긴다. */}
+                              <span className={styles.zBar} aria-hidden="true">
+                                <span className={styles.zBand} style={{ width: `${(Math.min(a.se, 2) / 2) * 50 * 2}%` }} />
+                                <span
+                                  className={`${styles.zDot} ${sig ? (z >= 0 ? styles.divPos : styles.divNeg) : styles.zDotDim}`}
+                                  style={{ left: `${50 + (Math.max(-2, Math.min(2, z)) / 2) * 50}%` }}
+                                />
+                              </span>
+                              {signed(z, 2)}
+                              {sig ? "" : " ≈"}
+                            </span>
                           </td>
                           <td>
                             {radarSeason.style.raw[a.raw].toFixed(1)}
