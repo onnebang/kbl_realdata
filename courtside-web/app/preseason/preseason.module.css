@@ -173,7 +173,8 @@
   line-height: var(--lh-prose);
   color: var(--ink-soft);
   margin: 0 0 12px;
-  max-width: var(--measure-read);
+  /* .note와 같은 이유로 62ch 제한을 뺀다 - 이 문단 바로 밑에 패널 전체 폭짜리 표/타일이
+     오는데 문단만 좁으면 "제목·표는 넓고 설명만 좁다"로 어색해 보인다. */
 }
 .note {
   /* 실측 지적: 표 밑에 이런 각주가 여러 개 이어지면 12px 한 크기로는 "논문"처럼 읽힌다.

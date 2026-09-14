@@ -262,7 +262,6 @@
   line-height: var(--lh-data);
   color: var(--hero-ink-soft);
   margin-top: 6px;
-  max-width: var(--measure-read);
 }
 .heroFootNote {
   font-family: "Pretendard", system-ui, -apple-system, sans-serif;
@@ -271,7 +270,6 @@
   line-height: var(--lh-data);
   color: var(--hero-ink-faint);
   margin-top: 2px;
-  max-width: var(--measure-read);
 }
 
 /* 윈도우 토글 */
@@ -392,7 +390,6 @@
   line-height: var(--lh-data);
   color: var(--ink-soft);
   margin-top: 8px;
-  max-width: var(--measure-read);
 }
 /* 최근 구간 패널 안의 두 번째 소제목 - 옛 '최근 N경기 평균' 패널을 이 패널로 접으면서 생겼다.
    같은 창(L5~L30)을 두 문법으로 읽는다는 걸 선 하나로 구분해 준다: 위는 밤별 결(띠), 아래는
@@ -625,7 +622,6 @@
   color: var(--ink-faint);
   margin-top: 10px;
   line-height: var(--lh-data);
-  max-width: var(--measure-read);
 }
 
 /* ── 슈팅 DNA ─────────────────────────────────────────────────────────────────── */

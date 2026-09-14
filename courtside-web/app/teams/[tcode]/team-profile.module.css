@@ -235,12 +235,12 @@
   padding: 2px 8px;
   white-space: nowrap;
 }
-/* 패널마다 붙는 기준·정직성 캡션. 산문이므로 한 줄 길이를 지면 폭에서 끊는다. */
+/* 패널마다 붙는 기준·정직성 캡션. 바로 위 표/막대 리스트가 패널 전체 폭이라, 62ch로
+   좁히면 "표는 넓고 각주만 좁다"로 어색해 보인다 - 지면 폭에 맞춘다. */
 .pctNote {
   font-size: 12.5px;
   color: var(--ink-faint);
   margin-top: 10px;
-  max-width: var(--measure-read);
   line-height: var(--lh-prose);
 }
 .sw {

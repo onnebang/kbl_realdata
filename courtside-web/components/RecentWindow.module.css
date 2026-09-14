@@ -138,7 +138,6 @@
   color: var(--ink-faint);
   flex: 1 1 240px;
   min-width: 0;
-  max-width: var(--measure-read);
 }
 
 /* ── 범례 ──────────────────────────────────────────────────────────────────────── */
@@ -211,7 +210,6 @@
   font-size: var(--fs-200);
   line-height: var(--lh-data);
   color: var(--ink-faint);
-  max-width: var(--measure-read);
   word-break: keep-all;
 }
 
@@ -384,7 +382,6 @@
   font-size: var(--fs-200);
   line-height: var(--lh-prose);
   color: var(--ink-faint);
-  max-width: var(--measure-read);
 }
 /* 창 자체가 무의미해지는 경우(커리어가 창보다 짧다·결장이 섞였다)는 각주가 아니라 경고다. */
 .noteWarn {
