@@ -3153,11 +3153,14 @@ footer.foot {
    .team-name(경기 카드)은 이 목록에서 뺐다 - 거기서는 같은 --ti-l/--ti-d를 글자색이
    아니라 이름 옆 3px 세로 바로 쓴다(위 .team-name.home/.away 참고). 색이 꼭 글자에
    있어야 하는 자리(리플레이 스코어보드 팀명·라인업 헤더 등)만 .team-ink로 남는다. */
-.team-ink {
+/* 클래스를 두 번 적어 명시도를 올린다 - .team-ink는 요소마다 명시적으로 붙이는 opt-in이라
+   ".insight-card-text b"나 ".ts-nums .ts-home"처럼 문맥으로 색을 거는 규칙보다 이겨야 한다
+   (예전엔 인라인 color가 이겼는데, 인라인을 이 규약으로 옮기면서 문맥 규칙에 밀렸다). */
+.team-ink.team-ink {
   color: var(--ti-l, inherit);
 }
 @media (prefers-color-scheme: dark) {
-  .team-ink {
+  .team-ink.team-ink {
     color: var(--ti-d, inherit);
   }
 }
