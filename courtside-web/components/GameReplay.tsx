@@ -330,6 +330,32 @@ function plannedTotalSec(lastQuarter: string): number {
 // 곡선 아래(=홈 승률)와 위(=원정)를 팀 색으로 갈라 칠한다. 44px 높이에서도 "지금 어느 쪽으로
 // 기울었나"가 숫자 없이 읽힌다. 팀 색을 원색 그대로 쓰면 남색 계열이 다크 표면에 묻히므로
 // CSS에서 잉크와 섞는다(.replay-scrub-home/.replay-scrub-away).
+// 요청: "점수랑 승률도 부드럽게 올라가도록". 값이 바뀌면 지금 보이는 숫자에서 새 값까지
+// ms 동안 세어 올라간다(15→18이면 16·17을 거친다). 재생 중에는 재생 헤드와 같은 speedMs·선형이라
+// 다음 틱과 끊김 없이 이어지고, ms=0(스크럽·쿼터 이동)이면 다음 프레임에 바로 새 값이다.
+// rAF 콜백 안에서만 setState하므로 effect 본문에서 동기 setState를 부르지 않는다.
+function CountUp({ value, ms, decimals = 0 }: { value: number; ms: number; decimals?: number }) {
+  const [shown, setShown] = useState(value);
+  const shownRef = useRef(value);
+  useEffect(() => {
+    const from = shownRef.current;
+    if (from === value) return;
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = ms > 0 ? Math.min(1, (now - start) / ms) : 1;
+      const v = from + (value - from) * t;
+      shownRef.current = v;
+      setShown(v);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, ms]);
+  const f = 10 ** decimals;
+  return <>{Math.round(shown * f) / f}</>;
+}
+
 const SCRUB_W = 1000;
 const SCRUB_H = 100;
 const SCRUB_MAX_POINTS = 320; // 이벤트 800개짜리 경기도 path 문자열이 짧게 유지된다
@@ -1179,6 +1205,11 @@ export default function GameReplay({
     const pm = finalPlusMinus.get(p.pcode) ?? 0;
     return <td className={pm > 0 ? "replay-pm pos" : pm < 0 ? "replay-pm neg" : "replay-pm"}>{pm > 0 ? `+${pm}` : pm}</td>;
   };
+  // 점수·승률 숫자가 세어 올라가는 시간 - 재생 중엔 재생 헤드와 같은 speedMs(다음 틱과 이어짐),
+  // 라이브를 따라가는 중이면 새 플레이가 들어올 때 짧게, 수동 스크럽·쿼터 이동은 즉시.
+  const countMs = playing ? speedMs : live && following ? 400 : 0;
+  const homePct = row.home_win_prob != null ? row.home_win_prob * 100 : null;
+
   const COURT_COLS = 1 + BOX_HEADERS[boxView].length + BOX_TAIL; // 선수 + 뷰별 칸 + (+/-, 온/오프)
   const courtHeaderRow = (key: string) => (
     <tr key={key}>
@@ -1532,12 +1563,12 @@ export default function GameReplay({
             <span className="replay-sticky-team">{homeTeam.abbr}</span>
           </div>
           <div className="replay-sticky-nums">
-            <span className="replay-sticky-score">{row.home_score}</span>
+            <span className="replay-sticky-score"><CountUp value={row.home_score} ms={countMs} /></span>
             <span className="replay-sticky-clock">
               {live && <span className="live-dot" />}
               {clockStr(row)}
             </span>
-            <span className="replay-sticky-score">{row.away_score}</span>
+            <span className="replay-sticky-score"><CountUp value={row.away_score} ms={countMs} /></span>
           </div>
           <div className="replay-sticky-side">
             <span className="replay-sticky-team">{awayTeam.abbr}</span>
@@ -1551,7 +1582,7 @@ export default function GameReplay({
             computePushNotifications가 토스트로 따로 알리므로 이 줄에서 다시 안 적는다. */}
         <div className="replay-sticky-control">
           <span className="replay-sticky-prob">
-            {row.home_win_prob != null ? `${Math.round(row.home_win_prob * 100)}%` : ""}
+            {homePct != null && <><CountUp value={homePct} ms={countMs} />%</>}
           </span>
           <button
             type="button"
@@ -1584,7 +1615,7 @@ export default function GameReplay({
             {transportExpanded ? "▾" : "▴"}
           </button>
           <span className="replay-sticky-prob">
-            {row.home_win_prob != null ? `${Math.round((1 - row.home_win_prob) * 100)}%` : ""}
+            {homePct != null && <><CountUp value={100 - homePct} ms={countMs} />%</>}
           </span>
         </div>
         {/* 펼침 단 - 예전엔 화면 하단 고정바 안에 있던 내용을 그대로 옮겨왔다. 탭했을 때만
@@ -1691,7 +1722,7 @@ export default function GameReplay({
             <div className="replay-team-name team-ink" style={teamInkStyle(homeTeam.color)}>
               {homeTeam.name}
             </div>
-            <div className="replay-team-score">{row.home_score}</div>
+            <div className="replay-team-score"><CountUp value={row.home_score} ms={countMs} /></div>
           </div>
           <div className="replay-sb-sep">:</div>
           <div className="replay-team-col">
@@ -1699,7 +1730,7 @@ export default function GameReplay({
             <div className="replay-team-name team-ink" style={teamInkStyle(awayTeam.color)}>
               {awayTeam.name}
             </div>
-            <div className="replay-team-score">{row.away_score}</div>
+            <div className="replay-team-score"><CountUp value={row.away_score} ms={countMs} /></div>
           </div>
         </div>
 
@@ -1708,13 +1739,13 @@ export default function GameReplay({
             <div className="replay-prob-row">
               <div>
                 <span className="replay-prob-pct team-ink" style={teamInkStyle(homeTeam.color)}>
-                  {Math.round(row.home_win_prob * 100)}%
+                  <CountUp value={row.home_win_prob * 100} ms={countMs} />%
                 </span>
                 <span className="replay-prob-label">승리확률</span>
               </div>
               <div style={{ textAlign: "right" }}>
                 <span className="replay-prob-pct team-ink" style={teamInkStyle(awayTeam.color)}>
-                  {Math.round((1 - row.home_win_prob) * 100)}%
+                  <CountUp value={(1 - row.home_win_prob) * 100} ms={countMs} />%
                 </span>
                 <span className="replay-prob-label">승리확률</span>
               </div>
