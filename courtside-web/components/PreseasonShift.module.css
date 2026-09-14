@@ -365,7 +365,9 @@
    + gap)이라 360px 화면에서 가운데 1fr 칸이 짜부라졌고, 헤더 "결장 선수 (막대 = 팀 출전시간
    몫)"가 한 글자씩 세로로 쌓여 표가 비어 보였다(실측 제보).
    열을 접으면 출전시간·득점·선발 비교가 사라지므로 가로 스크롤로 넘긴다. */
-@media (max-width: 430px) {
+/* 경계 640px: .lossRow 최소 460px + 패널 안쪽 여백이 들어가려면 뷰포트 ~560px가 필요하다. 430px에
+   걸어 두면 440px 폰(아이폰 Pro Max)에서 이름 막대 칸이 16px로 짜부라졌다(실측). */
+@media (max-width: 640px) {
   .lossGrid {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
