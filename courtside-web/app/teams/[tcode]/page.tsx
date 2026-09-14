@@ -83,9 +83,11 @@ export const maxDuration = 60;
 export async function generateMetadata({ params }: { params: Promise<{ tcode: string }> }): Promise<Metadata> {
   const team = (await getAllTeams()).get((await params).tcode); // 캐시된 팀 표 - 페이지 조회를 늘리지 않는다
   if (!team) return {};
+  // teams.name은 옛 이름일 수 있다(60 = "전주 KCC") - 화면과 같은 규칙으로 이번 시즌 이름을 쓴다.
+  const name = displayTeamName(team.tcode, team.name, PRESEASON_SEASON);
   return {
-    title: team.name,
-    description: `${team.name} 팀 프로필 · 시즌 전망, 로스터 변화, 팀 DNA, 경기 일정`,
+    title: name,
+    description: `${name} 팀 프로필 · 시즌 전망, 로스터 변화, 팀 DNA, 경기 일정`,
   };
 }
 

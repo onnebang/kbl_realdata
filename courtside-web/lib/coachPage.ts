@@ -321,7 +321,7 @@ async function fetchCurrentTeams(): Promise<Map<number, { tcode: string; confirm
 }
 
 export function getCoachList(): Promise<CoachListRow[]> {
-  return cached(computeCoachList, ["coachList", PRESEASON_SEASON], TTL.batchDaily, [TAG.build]);
+  return cached(computeCoachList, ["coachList-v2", PRESEASON_SEASON], TTL.batchDaily, [TAG.build]);
 }
 
 async function computeCoachList(): Promise<CoachListRow[]> {
@@ -344,14 +344,14 @@ async function computeCoachList(): Promise<CoachListRow[]> {
       coachId: id,
       name: c.name as string,
       career: aggregateCareer(byCoach.get(id) ?? [], teamOf),
-      currentTeam: cur ? { ...teamOf(cur.tcode), seasonName: PRESEASON_SEASON, confirmed: cur.confirmed } : null,
+      currentTeam: cur ? { ...teamOf(cur.tcode), name: displayTeamName(cur.tcode, teamOf(cur.tcode).name, PRESEASON_SEASON), seasonName: PRESEASON_SEASON, confirmed: cur.confirmed } : null,
     };
   });
 }
 
 export function getCoachProfile(coachId: number): Promise<CoachProfile | null> {
   // 키의 v2 = 작전타임 필드 추가(2026-09-15). Data Cache는 배포를 넘어 살아 있어서, 모양이 바뀌면 키를 올려야 옛 객체가 안 나온다.
-  return cached(() => computeCoachProfile(coachId), ["coachProfile-v2", String(coachId), PRESEASON_SEASON], TTL.batchDaily, [TAG.build]);
+  return cached(() => computeCoachProfile(coachId), ["coachProfile-v3", String(coachId), PRESEASON_SEASON], TTL.batchDaily, [TAG.build]);
 }
 
 async function computeCoachProfile(coachId: number): Promise<CoachProfile | null> {
@@ -402,7 +402,7 @@ async function computeCoachProfile(coachId: number): Promise<CoachProfile | null
     seasons,
     career: aggregateCareer(recs, teamOf),
     careerStyle: aggregateCareerStyle(styleRows),
-    currentTeam: cur ? { ...teamOf(cur.tcode), seasonName: PRESEASON_SEASON, confirmed: cur.confirmed } : null,
+    currentTeam: cur ? { ...teamOf(cur.tcode), name: displayTeamName(cur.tcode, teamOf(cur.tcode).name, PRESEASON_SEASON), seasonName: PRESEASON_SEASON, confirmed: cur.confirmed } : null,
     challengeLeague: lg ? toLeague(lg) : null,
     timeoutCareer: careerTo ? { ...careerTo, seasons: new Set(mineTo.map((t) => t.seasonName)).size } : null,
     dataRange: { first: (lo?.[0]?.season_name as string | undefined) ?? "", last: (hi?.[0]?.season_name as string | undefined) ?? "" },

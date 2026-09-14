@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getSeasons, getSeasonGames, formatSeasonShort } from "@/lib/seasonBrowser";
+import { getLeaderboardSeasons } from "@/lib/seasonLeaders";
 import SeasonBrowserBoard from "@/components/SeasonBrowserBoard";
 import { WidgetBoundary } from "@/components/WidgetBoundary";
 import styles from "./season-browser.module.css";
@@ -14,8 +15,9 @@ export default async function SeasonBrowserPage({
   searchParams: Promise<{ season?: string }>;
 }) {
   const { season } = await searchParams;
-  const seasons = await getSeasons();
-  const activeSeason = season && seasons.includes(season) ? season : seasons[0];
+  const [seasons, playedSeasons] = await Promise.all([getSeasons(), getLeaderboardSeasons()]);
+  // 기본 시즌은 경기가 끝난 가장 최근 시즌 - seasons[0]은 개막 전 26-27이라 "경기 데이터가 아직 없습니다" 빈 화면이었다.
+  const activeSeason = season && seasons.includes(season) ? season : (playedSeasons[0] ?? seasons[0]);
   const games = activeSeason ? await getSeasonGames(activeSeason) : [];
 
   const regularCount = games.filter((g) => g.season_category === "정규시즌").length;

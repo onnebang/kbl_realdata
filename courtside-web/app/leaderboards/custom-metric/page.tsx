@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { getSeasonsWithMetricData, getSeasonPlayerMetrics } from "@/lib/customMetric";
+import { getLeaderboardSeasons } from "@/lib/seasonLeaders";
 import CustomMetricBuilder from "@/components/CustomMetricBuilder";
 import { WidgetBoundary } from "@/components/WidgetBoundary";
 
 export default async function CustomMetricPage({ searchParams }: { searchParams: Promise<{ season?: string }> }) {
   const { season } = await searchParams;
-  const seasons = await getSeasonsWithMetricData();
-  const activeSeason = season ?? seasons[0];
+  const [seasons, playedSeasons] = await Promise.all([getSeasonsWithMetricData(), getLeaderboardSeasons()]);
+  // 기본 시즌은 정규시즌 경기가 끝난 가장 최근 시즌 - seasons[0]은 개막 전 26-27이라 "조건을 충족하는 선수가 없음" 빈 화면이었다.
+  const activeSeason = season && seasons.includes(season) ? season : (playedSeasons[0] ?? seasons[0]);
   const players = activeSeason ? await getSeasonPlayerMetrics(activeSeason) : [];
 
   return (
