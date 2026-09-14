@@ -301,6 +301,12 @@
   gap: 8px;
   justify-content: flex-end;
 }
+/* 숫자 칸 폭을 고정해야 행마다 눈금 막대가 같은 x에 선다("+0.03 ≈"와 "-0.73"은 폭이 다르다). */
+.zNum {
+  display: inline-block;
+  min-width: 4.6em;
+  text-align: right;
+}
 .zBar {
   position: relative;
   display: inline-block;

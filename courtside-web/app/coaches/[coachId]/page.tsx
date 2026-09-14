@@ -277,8 +277,10 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
                                   style={{ left: `${50 + (Math.max(-2, Math.min(2, z)) / 2) * 50}%` }}
                                 />
                               </span>
-                              {signed(z, 2)}
-                              {sig ? "" : " ≈"}
+                              <span className={styles.zNum}>
+                                {signed(z, 2)}
+                                {sig ? "" : " ≈"}
+                              </span>
                             </span>
                           </td>
                           <td>
