@@ -2264,6 +2264,23 @@ python live_collector.py --max-runtime 21600 --stall-timeout 5400
 수동 실행도 그대로 된다: `python live_collector.py`(경기 전에 켜두면 30분 전까지 대기).
 태스크 확인: `Get-ScheduledTaskInfo KBL_LiveCollector`, 끄기: `Disable-ScheduledTask KBL_LiveCollector`.
 
+**감시 - 멈추면 Discord 알림 (2026-09-14, `tools/live_collector_watch.sql`)** - 감시는 노트북이 아니라
+Supabase pg_cron(`watch_live_collector`, 1분마다)에서 돌아서 노트북이 꺼져 있어도 알림이 온다.
+수집기는 경기마다 폴링할 때마다 `live_collector_status`에 심박(성공 시각·이벤트 수·마지막 오류)을 남긴다.
+
+| 알림 | 조건 | 흔한 원인 |
+|---|---|---|
+| 🔴 수집기 응답 없음 | 예정 시각 20분 전부터, 10분 넘게 성공한 폴링이 없음 | 노트북 꺼짐·잠듦·로그아웃, 네트워크, DB 오류 |
+| 🟠 문자중계 멈춤 | 폴링은 되는데 25분 넘게 새 이벤트 없음(시작 전이면 예정 시각부터) | 경기 지연·중단, 진행 중 API 응답 이상, 종료 판정 실패 |
+| 🟢 해제 | 위 조건이 풀림 | 폴링 재개 / 경기 종료 처리 / 감시 창(예정+6시간) 끝 |
+
+같은 문제로는 한 번만 울리고, 종류가 바뀌면 다시, 풀리면 해제 알림을 보낸다(`live_alert_log`).
+`DRYRUN-` 합성 경기는 감시하지 않는다. 테이블·함수는 anon/authenticated에서 막혀 있다.
+
+웹훅 등록(Supabase SQL 편집기에서 직접 - 토큰이라 저장소에 남기지 않는다):
+`select vault.create_secret('<Discord 웹훅 URL>', 'discord_live_alert_webhook');` 후
+`select public.send_live_alert('테스트');`. 지금 걸린 문제 보기: `select * from live_collector_problems();`
+
 `DATABASE_URL`은 `tools/.env.supabase`에서 자동 로드된다(`sync_upcoming_games.load_env_supabase`
 재사용) - 스케줄러 환경에 환경변수가 없어도 동작.
 

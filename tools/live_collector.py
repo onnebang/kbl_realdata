@@ -1080,6 +1080,37 @@ def fetch_schedule_entries(date_str):
         return {}
 
 
+def write_status(conn, gmkey, events=None, error=None):
+    """감시용 심박(live_collector_status) - Supabase pg_cron이 이걸 보고 멈춤을 Discord로 알린다
+    (tools/live_collector_watch.sql). 적재와 별도 트랜잭션이고 실패해도 삼킨다 - 감시 때문에
+    수집이 깨지면 안 된다. 이벤트 수가 늘었을 때만 last_event_at을 올린다."""
+    try:
+        with conn.cursor() as cur:
+            if error is None:
+                cur.execute("""
+                    insert into live_collector_status as s (gmkey, last_ok_at, events, last_event_at)
+                    values (%s, now(), %s, case when %s > 0 then now() end)
+                    on conflict (gmkey) do update set
+                      last_ok_at = now(),
+                      last_event_at = case when excluded.events > s.events then now()
+                                           else s.last_event_at end,
+                      events = greatest(excluded.events, s.events),
+                      last_error = null""", (gmkey, events, events))
+            else:
+                cur.execute("""
+                    insert into live_collector_status as s (gmkey, last_error, last_error_at)
+                    values (%s, %s, now())
+                    on conflict (gmkey) do update set last_error = excluded.last_error,
+                                                     last_error_at = now()""", (gmkey, error[:300]))
+        conn.commit()
+    except Exception as e:  # noqa: BLE001
+        try:
+            conn.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        log(f"  (경고) 감시 심박 기록 실패({gmkey}): {type(e).__name__}: {e}")
+
+
 def poll_cycle(conn, ingestors, pending, snapshot_fn, schedule=None, reconcile=True):
     """폴링 1주기 - pending에 남은 경기마다 (스냅샷 -> ingest -> 종료면 정산).
     **정산이 성공한 경기만** pending에서 빠진다.
@@ -1113,11 +1144,13 @@ def poll_cycle(conn, ingestors, pending, snapshot_fn, schedule=None, reconcile=T
             # 커밋이 확정된 뒤에야 '직전 주기 이벤트 수'를 올린다(ingest 주석 참고).
             if summary.get("events"):
                 ingestors[gk]._last_event_count = summary["events"]
+            write_status(conn, gk, events=summary.get("events") or 0)
         except Exception as e:  # noqa: BLE001
             try:
                 conn.rollback()
             except Exception:  # noqa: BLE001
                 pass
+            write_status(conn, gk, error=f"{type(e).__name__}: {e}")
             log(f"  {gk}: 폴링 실패({type(e).__name__}: {e}) - 이번 주기는 건너뛰고 계속")
             log("    " + traceback.format_exc().strip().replace("\n", "\n    "))
             summaries.append({"gmkey": gk, "error": f"{type(e).__name__}: {e}",
