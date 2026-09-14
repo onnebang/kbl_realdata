@@ -131,11 +131,27 @@ function PercentilePanel({ profile, seasonName }: { profile: PercentileProfile |
   return (
     <>
       <div className={styles.pctGrid}>
+        {/* 눈금 머리줄 - 막대 칸과 같은 격자라 0/25/50/75/100이 막대 위 정확한 자리에 선다.
+            "79"가 무엇 대비 79인지(리그 중앙값 50에서 얼마나 떨어졌나)를 숫자 없이도 읽게. */}
+        <div className={`${styles.pctRow} ${styles.pctScaleRow}`} aria-hidden="true">
+          <div />
+          <div className={styles.pctScale}>
+            {[0, 25, 50, 75, 100].map((t) => (
+              <span key={t} className={t === 50 ? styles.pctScaleMid : t === 25 || t === 75 ? styles.pctScaleQuart : undefined} style={{ left: `${t}%` }}>
+                {t === 50 ? "50 리그 중앙" : t}
+              </span>
+            ))}
+          </div>
+          <div className={styles.pctScaleHead}>기록</div>
+          <div className={styles.pctScaleHead}>백분위</div>
+        </div>
         {profile.axes.map((a) => (
           <div className={styles.pctRow} key={a.key}>
             <div className={styles.pctLabel}>{a.label}</div>
             <div className={styles.pctTrack}>
               <div className={styles.pctFill} style={{ width: `${a.percentile}%`, background: percentileColor(a.percentile) }} />
+              <div className={styles.pctQuart} style={{ left: "25%" }} />
+              <div className={styles.pctQuart} style={{ left: "75%" }} />
               <div className={styles.pctMid} />
             </div>
             <div className={styles.pctValue}>{a.display}</div>
@@ -629,7 +645,7 @@ export default async function PlayerPage({
   const clutchFga = clutch ? clutch.totals.fg2a + clutch.totals.fg3a : 0;
 
   return (
-    <div className={`wrap ${styles.pageRoot}`}>
+    <div className={`wrap ${styles.pageRoot}`} style={{ "--team": teamColor } as CSSProperties}>
       <Link href="/" className="back-link">
         ← 경기 목록
       </Link>

@@ -309,16 +309,28 @@
 }
 /* 패널 표제 - 한글이 들어오므로 Pretendard 800 + -0.02em(중계 화면의 표제 규칙).
    12.5px 회색 눈썹이던 것을 표제 크기로 되돌린다: 아래 값(27~34px)과 순서가 생긴다. */
+/* 요청: "스포츠의 역동성 + 데이터 분석의 정교함". 표제를 중계 자막(chyron)처럼 - 앞에 사선으로
+   잘린 팀 색 탭을 세우고 한 단 키운다. 모든 패널이 같은 둥근 상자라 긴 벽처럼 읽히던 페이지에
+   구간마다 박자가 생긴다. 팀 색은 잉크와 섞어 남색 계열도 다크 표면에서 보이게. */
 .panelTitle {
-  font-size: var(--fs-300);
+  --team-ink: color-mix(in srgb, var(--team, var(--gold)) 72%, var(--ink) 28%);
+  font-size: var(--fs-400);
   font-weight: 800;
   color: var(--ink);
   letter-spacing: -0.02em;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
+}
+.panelTitle::before {
+  content: "";
+  flex: none;
+  width: 11px;
+  height: 1.15em;
+  background: var(--team-ink);
+  clip-path: polygon(0 0, 100% 0, 50% 100%, 0 100%);
 }
 /* 기준 시즌 칩 - lib/seasonFocus.ts basisChip()이 만든 다섯 어휘만 들어온다(패널 제목이 원문
    시즌 문자열을 직접 쓰지 않도록). 대문자 변환은 한글에 무의미하므로 해제. */
@@ -561,7 +573,44 @@
 /* ── 리그 퍼센타일 프로필(NBA.com식 가로 바) ─────────────────────────────────────── */
 .pctGrid {
   display: grid;
-  gap: 8px;
+  gap: 9px;
+}
+/* 눈금 머리줄 - 막대 칸 위에 0/25/50/75/100을 정확한 자리에 세운다. */
+.pctScaleRow {
+  margin-bottom: -2px;
+}
+.pctScale {
+  position: relative;
+  height: 14px;
+}
+.pctScale span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-100);
+  line-height: 1;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pctScale span:first-child {
+  transform: none;
+}
+.pctScale span:last-child {
+  transform: translateX(-100%);
+}
+.pctScale .pctScaleMid {
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+.pctScaleHead {
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-100);
+  line-height: 1;
+  color: var(--ink-faint);
+  text-align: right;
+  white-space: nowrap;
 }
 .pctRow {
   display: grid;
@@ -580,25 +629,57 @@
 /* 미터는 데이터 조각 - 알약이 아니라 하드 엣지. */
 .pctTrack {
   position: relative;
-  height: 10px;
+  height: 12px;
   border-radius: var(--r-led);
   background: var(--surface-soft);
-  overflow: hidden;
 }
+/* 채움 끝에 밝은 2px 모서리 - 값이 정확히 어디서 멈췄는지를 면이 아니라 선으로 짚는다. */
 .pctFill {
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: var(--r-led);
-  opacity: 0.9;
+  opacity: 0.92;
+  box-shadow: inset -2px 0 0 color-mix(in srgb, #fff 60%, transparent);
+  transform-origin: left center;
 }
-/* 리그 중앙값(50) 눈금 - 바가 어디쯤인지 즉시 읽히게. */
+/* 사분위 눈금(25·75)은 옅게, 리그 중앙값(50)은 막대 위아래로 삐져나오게 진하게. */
+.pctQuart {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(var(--line-rgb), 0.18);
+}
 .pctMid {
   position: absolute;
   left: 50%;
-  top: -1px;
-  bottom: -1px;
-  width: 1px;
-  background: rgba(var(--line-rgb), 0.28);
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(var(--line-rgb), 0.55);
+}
+/* 이 패널이 화면에 들어올 때 막대가 왼쪽에서 한 번 쓸고 지나간다(스크롤 연동 - JS 없음).
+   지원 안 하는 브라우저는 처음부터 완성된 막대를 본다. */
+@supports (animation-timeline: view()) {
+  .pctFill {
+    animation: pctSweep linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 30%;
+  }
+}
+@keyframes pctSweep {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pctFill {
+    animation: none !important;
+  }
 }
 .pctValue {
   font-family: "IBM Plex Mono", monospace;
@@ -799,6 +880,12 @@
   .pctRow {
     grid-template-columns: 40px 1fr 52px 26px;
     gap: 7px;
+  }
+  /* 좁은 막대에서는 25·75 숫자가 "50 리그 중앙"과 겹치고, 26px 칸에 "백분위"가 안 들어간다 -
+     눈금선은 막대 안에 그대로 두고 글자만 뺀다. */
+  .pctScale .pctScaleQuart,
+  .pctScaleHead {
+    visibility: hidden;
   }
 }
 
