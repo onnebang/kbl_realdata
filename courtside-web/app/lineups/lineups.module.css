@@ -26,7 +26,6 @@
   font-size: var(--fs-300);
   line-height: var(--lh-prose);
   color: var(--ink-soft);
-  max-width: var(--measure-read);
   margin: 6px 0 14px;
 }
 

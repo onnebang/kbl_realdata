@@ -16,12 +16,12 @@
   letter-spacing: 0.02em;
   color: var(--ink-faint);
 }
-/* 산문 - 한 줄 길이는 지면 폭 토큰이 정한다(68ch 하드코딩 제거). */
+/* 이 문단 밑에 팀별 카드 그리드가 지면 전체 폭으로 온다 - 62ch로 좁히면 "제목·카드는
+   넓고 설명만 좁다"로 어색해 보인다(다른 페이지의 panelLede/note와 같은 이유). */
 .lede {
   font-size: 13px;
   line-height: var(--lh-prose);
   color: var(--ink-soft);
-  max-width: var(--measure-read);
   margin: 6px 0 14px;
 }
 
@@ -274,7 +274,6 @@ a.playerRow:hover {
   font-size: 12.5px;
   color: var(--ink-faint);
   margin-top: 12px;
-  max-width: var(--measure-read);
   line-height: var(--lh-prose);
 }
 /* 이 시즌에 안 뛰는 선수(군 입대·해외 진출·미계약) - 명부에는 있지만 전력이 아니다. */
