@@ -173,8 +173,6 @@
   font-size: 12px;
   line-height: var(--lh-prose);
   color: var(--ink-soft);
-  /* 문장이다 - 62자에서 끊는다 */
-  max-width: var(--measure-read);
   word-break: keep-all;
 }
 .holeTeam {

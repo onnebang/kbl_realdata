@@ -273,7 +273,6 @@
 
 /* ── 챌린지 ── */
 .leagueLine {
-  max-width: var(--measure-read);
   font-size: 12.5px;
   font-variant-numeric: tabular-nums;
   line-height: 1.55;
@@ -287,7 +286,6 @@
 }
 .measuring {
   margin-top: 18px;
-  max-width: var(--measure-read);
   font-size: 12.5px;
   color: var(--ink-faint);
 }

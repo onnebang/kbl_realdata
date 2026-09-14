@@ -82,7 +82,6 @@
   letter-spacing: -0.02em;
 }
 .subtitle {
-  max-width: var(--measure-read);
   font-size: var(--fs-300);
   line-height: var(--lh-prose);
   color: var(--ink-soft);

@@ -271,7 +271,6 @@ a {
 }
 
 .subtitle {
-  max-width: var(--measure-read);
   font-size: var(--fs-300);
   color: var(--ink-soft);
   margin-top: 6px;
@@ -926,7 +925,6 @@ table.data-table td:nth-child(2) {
   margin-bottom: 6px;
 }
 .report-text {
-  max-width: var(--measure-read);
   font-size: var(--fs-300);
   line-height: var(--lh-prose);
   color: var(--ink-soft);
@@ -956,7 +954,6 @@ table.data-table td:nth-child(2) {
 }
 .report-list {
   margin: 0;
-  max-width: var(--measure-read);
   padding-left: 20px;
   font-size: 13px;
   line-height: 1.8;
@@ -1063,7 +1060,6 @@ table.data-table td:nth-child(2) {
   margin-bottom: 3px;
 }
 .insight-card-text {
-  max-width: var(--measure-read);
   font-size: 13px;
   line-height: var(--lh-prose);
   color: var(--ink-soft);
@@ -1125,7 +1121,6 @@ table.data-table td:nth-child(2) {
 }
 .ace-note {
   margin-top: 6px;
-  max-width: var(--measure-read);
   font-size: 12.5px;
   line-height: 1.6;
   color: var(--ink-soft);
@@ -2502,7 +2497,6 @@ table.replay-court-table td {
   color: var(--ink-faint);
 }
 .replay-box-note {
-  max-width: var(--measure-read);
   font-size: 12.5px;
   line-height: 1.55;
   color: var(--ink-faint);
@@ -2955,8 +2949,8 @@ tr.replay-dnp-row td {
 footer.foot {
   margin-top: 30px;
   padding-top: 14px;
+  /* 구분선이 지면 폭을 다 쓰는 요소라 62ch로 자르면 선이 화면 중간에서 끊긴다. */
   border-top: 1px solid rgba(var(--line-rgb), 0.1);
-  max-width: var(--measure-read);
   color: var(--ink-faint);
   font-size: 12.5px;
   font-family: "Pretendard", sans-serif;
@@ -2971,7 +2965,6 @@ footer.foot {
   margin-top: 10px;
   padding-top: 9px;
   border-top: 1px dashed rgba(var(--line-rgb), 0.14);
-  max-width: var(--measure-read);
   color: var(--ink-faint);
   font-size: 12.5px;
   line-height: 1.55;
@@ -3029,7 +3022,6 @@ footer.foot {
   margin-top: 8px;
   padding-top: 7px;
   border-top: 1px dashed rgba(var(--line-rgb), 0.15);
-  max-width: var(--measure-read);
   font-size: 12.5px;
   line-height: 1.65;
   color: var(--ink-soft);
@@ -3040,7 +3032,6 @@ footer.foot {
    한 단계 작고 흐리게. 프록시/추정을 사실처럼 읽히지 않게 하는 장치라 절대 숨기지 않는다. */
 .report-caveat {
   margin: 4px 0 0;
-  max-width: var(--measure-read);
   font-size: 12.5px;
   line-height: var(--lh-prose);
   color: var(--ink-soft);

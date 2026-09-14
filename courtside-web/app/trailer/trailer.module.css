@@ -675,7 +675,6 @@ a.scene:focus-visible {
 }
 .sheetLede {
   margin-top: 8px;
-  max-width: var(--measure-read);
   color: var(--ink-soft);
 }
 .cards {

@@ -70,7 +70,6 @@
 .subtitle {
   font-size: var(--fs-300);
   color: var(--ink-soft);
-  max-width: var(--measure-read);
   margin-top: 8px;
   line-height: var(--lh-prose);
 }
@@ -275,7 +274,6 @@
 
 .explainBox {
   margin-top: 14px;
-  max-width: var(--measure-read);
   font-size: var(--fs-100);
   line-height: 1.8;
   color: var(--ink-soft);
@@ -292,7 +290,6 @@
   margin-top: 30px;
   padding-top: 16px;
   border-top: 1px solid rgba(var(--line-rgb), 0.1);
-  max-width: var(--measure-read);
   color: var(--ink-faint);
   font-size: 12.5px;
   font-family: "Pretendard", system-ui, sans-serif;

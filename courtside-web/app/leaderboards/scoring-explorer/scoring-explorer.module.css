@@ -66,7 +66,6 @@
 .subtitle {
   font-size: var(--fs-300);
   color: var(--ink-soft);
-  max-width: var(--measure-read);
   margin-top: 8px;
   line-height: var(--lh-prose);
 }
@@ -261,7 +260,6 @@
   margin-top: 24px;
   padding-top: 14px;
   border-top: 1px solid rgba(var(--line-rgb), 0.1);
-  max-width: var(--measure-read);
   color: var(--ink-faint);
   font-size: 12.5px;
   font-family: "Pretendard", system-ui, sans-serif;
@@ -315,7 +313,6 @@
   color: var(--ink-soft);
   line-height: var(--lh-prose);
   margin-top: 4px;
-  max-width: var(--measure-read);
 }
 .seasonForm {
   display: flex;
@@ -354,7 +351,6 @@
 }
 .scatterHint {
   margin-top: 8px;
-  max-width: var(--measure-read);
   font-size: 12.5px;
   color: var(--ink-faint);
   line-height: var(--lh-prose);

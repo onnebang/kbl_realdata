@@ -32,7 +32,6 @@
   font-size: var(--fs-700);
 }
 .subtitleWidth {
-  max-width: var(--measure-read);
 }
 .seasonForm {
   display: flex;
@@ -169,7 +168,6 @@
 
 .explainBox {
   margin-top: 14px;
-  max-width: var(--measure-read);
   font-size: var(--fs-100);
   line-height: 1.8;
   color: var(--ink-soft);

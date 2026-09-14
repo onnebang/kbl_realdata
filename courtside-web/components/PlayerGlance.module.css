@@ -140,9 +140,8 @@
   font-size: var(--fs-100);
   color: var(--ink-soft);
   line-height: 1.5;
-  /* 조각이 이어 붙어 한 문장처럼 읽히는 줄이다 - 카드 폭(1180px 지면에서 1070px)을
-     다 쓰지 않고 62자에서 접는다. */
-  max-width: var(--measure-read);
+  /* 예전엔 62자에서 접었는데, 구분선(border-top)이 카드 폭을 다 쓰는 요소라 선만 화면
+     중간에서 끊겨 보였다 - 카드 폭에 맞춘다(다른 각주/캡션과 같은 규칙). */
 }
 /* 짧은 숫자 조각은 한 덩어리로 붙여 둔다. max-width/overflow는 안전장치 - flex 아이템은
    min-width:auto라서 nowrap 텍스트가 컨테이너보다 길면 페이지를 옆으로 밀어버린다. */
@@ -459,7 +458,6 @@
   font-size: 12.5px;
   line-height: var(--lh-data);
   color: var(--ink-faint);
-  max-width: var(--measure-read);
 }
 .moreList {
   margin: 8px 0 0;
@@ -467,7 +465,6 @@
   font-size: 12.5px;
   line-height: var(--lh-prose);
   color: var(--ink-faint);
-  max-width: var(--measure-read);
 }
 .defs {
   margin: 12px 0 0;
@@ -491,7 +488,6 @@
   font-size: 12.5px;
   line-height: var(--lh-data);
   color: var(--ink-faint);
-  max-width: var(--measure-read);
   word-break: keep-all;
   overflow-wrap: anywhere;
 }

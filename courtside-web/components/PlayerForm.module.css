@@ -52,7 +52,6 @@
   line-height: var(--lh-prose);
   color: var(--ink-soft);
   margin: 0 0 10px;
-  max-width: var(--measure-read);
 }
 .lede b {
   color: var(--ink);
@@ -128,7 +127,6 @@
   font-size: var(--fs-200);
   line-height: var(--lh-prose);
   color: var(--ink-soft);
-  max-width: var(--measure-read);
 }
 .spanGrid {
   display: grid;
@@ -317,7 +315,6 @@
   line-height: var(--lh-data);
   color: var(--ink-faint);
   margin-top: 2px;
-  max-width: var(--measure-read);
 }
 .tAxisNum {
   font-family: "IBM Plex Mono", monospace;
@@ -330,7 +327,6 @@
   line-height: var(--lh-data);
   margin-top: 3px;
   color: var(--ink-soft);
-  max-width: var(--measure-read);
 }
 
 /* ── 표 ───────────────────────────────────────────────────────────────────────────── */
@@ -543,7 +539,6 @@
   color: var(--ink-faint);
   padding-left: 12px;
   position: relative;
-  max-width: var(--measure-read);
 }
 .noteList li::before {
   content: "!";
@@ -595,7 +590,6 @@
   font-size: 12.5px;
   line-height: var(--lh-prose);
   color: var(--ink-faint);
-  max-width: var(--measure-read);
 }
 .methodList b {
   color: var(--ink-soft);

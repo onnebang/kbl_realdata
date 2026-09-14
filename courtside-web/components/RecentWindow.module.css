@@ -84,7 +84,6 @@
   line-height: var(--lh-prose);
   color: var(--ink-soft);
   margin: 0 0 10px;
-  max-width: var(--measure-read);
 }
 .lede b {
   color: var(--ink);

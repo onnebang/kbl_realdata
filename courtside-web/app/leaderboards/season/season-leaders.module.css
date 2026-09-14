@@ -27,7 +27,6 @@
   font-size: var(--fs-300);
   line-height: var(--lh-prose);
   color: var(--ink-soft);
-  max-width: var(--measure-read);
   margin: 8px 0 0;
 }
 .seasonForm {
@@ -74,7 +73,6 @@
   padding: 10px 14px;
   border-radius: var(--r-inset);
   background: var(--surface-soft);
-  max-width: var(--measure-read);
   font-size: var(--fs-200);
   line-height: 1.7;
   color: var(--ink-soft);
@@ -93,7 +91,6 @@
   background: var(--gold-soft);
   border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
   color: var(--ink);
-  max-width: var(--measure-read);
   font-size: var(--fs-100);
   line-height: var(--lh-prose);
 }
@@ -367,7 +364,6 @@ details[open] > .moreSummary::before {
   margin-top: 9px;
   padding-top: 8px;
   border-top: 1px solid rgba(var(--line-rgb), 0.08);
-  max-width: var(--measure-read);
   font-size: 12.5px;
   line-height: 1.55;
   color: var(--ink-soft);
@@ -406,7 +402,6 @@ details[open] > .moreSummary::before {
   margin-top: 26px;
   padding-top: 14px;
   border-top: 1px solid rgba(var(--line-rgb), 0.1);
-  max-width: var(--measure-read);
   font-size: 12.5px;
   line-height: 1.7;
   color: var(--ink-faint);

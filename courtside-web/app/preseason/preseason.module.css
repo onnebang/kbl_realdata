@@ -1070,7 +1070,5 @@
   font-size: var(--fs-300);
   line-height: var(--lh-prose);
   color: var(--ink-soft);
-  /* 산문(스카우팅 근거 문단) - 62자에서 끊는다 */
-  max-width: var(--measure-read);
   word-break: keep-all;
 }
