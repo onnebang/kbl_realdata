@@ -151,7 +151,7 @@ export default async function ShotTrend({ activeSeason, mapHref }: { activeSeaso
               <span className={t.statNum}>{last.pps.toFixed(2)}</span>
             </div>
             <div className={t.statLabel}>
-              야투 1개당 득점 · 15시즌 내내 {Math.min(...ppsVals).toFixed(2)}~{Math.max(...ppsVals).toFixed(2)}
+              {`야투 1개당 득점 · 15시즌 내내 ${Math.min(...ppsVals).toFixed(2)}~${Math.max(...ppsVals).toFixed(2)}`}
             </div>
           </div>
         </div>
