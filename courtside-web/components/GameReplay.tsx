@@ -770,48 +770,21 @@ export default function GameReplay({
     }, LIVE_TOAST_DEBOUNCE_MS);
   }, [events, live, pushToast]);
 
-  // 요청: "스크롤을 내리면 상단에 점수/팀/예상승률/현재 쿼터 시간등을 작게 틀 고정" - 처음엔
-  // 순수 CSS position:sticky였는데, "자기 자신이 줄어들거나 사라지는 sticky 요소가 있으면
-  // 브라우저가 scrollY를 0으로 되돌린다"는 실제 버그를 겪음(레퍼런스 아티팩트가 이미 겪고
-  // 고친 것과 동일 - courtside_template.html 3692~3726행 주석 참고). 그래서 이 프로젝트도
-  // 같은 구조로 포팅: 전체 스코어보드는 이제 sticky가 아닌 완전히 평범한 카드(그냥 스크롤을
-  // 따라 지나감, 자기 높이가 안 바뀜)이고, "고정" 역할은 완전히 별개의 position:fixed 요소
-  // (아래 .replay-sticky-bar)가 전담 - display가 아니라 transform(translateY)+"show"
-  // 클래스로만 등장/퇴장시켜서 문서 레이아웃/스크롤 높이에 전혀 영향을 안 줌. 스코어보드
-  // 바로 아래(그 카드가 끝나는 지점)에 심어둔 sentinel을 IntersectionObserver로 지켜보다가
-  // 화면 밖으로 나가면 켬 - 인앱브라우저 등 IO 동작이 들쭉날쭉한 웹뷰 대비 scroll 이벤트
-  // 폴백도 이중화(둘 중 하나만 붙어도 정상 동작).
-  const stickySentinelRef = useRef<HTMLDivElement | null>(null);
-  const [stickyVisible, setStickyVisible] = useState(false);
   /** 박스스코어 표 세 장 중 지금 보고 있는 것. */
   const [boxView, setBoxView] = useState<BoxView>("basic");
-  /** 하단 고정 재생바 노출 - 리플레이 패널이 화면에 걸쳐 있는 동안만. */
+  // 요청: "상단 점수판과 하단의 재생바를 상단쪽에 합치되". 예전엔 상단 바(스코어보드를
+  // 지나쳤을 때만)와 하단 바(리플레이 패널이 화면 어디든 걸쳐 있으면)가 서로 다른 조건으로
+  // 따로 떠 있었다. 하나로 합친 뒤에는 더 넓은 쪽(아래 panelRef 기반 조건)을 그대로 쓴다 -
+  // 좁은 조건을 썼다면 사용자가 아직 메인 스코어보드를 보고 있는 동안 재생 버튼에 손이 안
+  // 닿는 퇴보가 생긴다. 문서 흐름 밖의 position:fixed + transform(translateY)+"show"
+  // 클래스로만 등장/퇴장(문서 레이아웃/스크롤 높이에 영향 없음 - 위쪽 주석의 sticky 버그 회피
+  // 구조 유지).
+  /** 합쳐진 고정 바 노출 - 리플레이 패널이 화면에 걸쳐 있는 동안만. */
   const [transportVisible, setTransportVisible] = useState(false);
-  /* 요청: "ESPN에는 없는 재생 버튼을 어떻게" - 평소엔 스크러버+재생 버튼만 보이는 미니바로
-     접어 두고, 탭하면 Q1~4·배속·이전/다음 버튼이 펼쳐진다(음악 앱 미니플레이어와 같은 패턴). */
+  /* 요청: "ESPN에는 없는 재생 버튼을 어떻게" - 평소엔 스파크라인+재생 버튼만 보이는 컨트롤
+     줄로 접어 두고, 탭하면 큰 그래프+Q1~4·배속·이전/다음 버튼이 아래로 펼쳐진다(음악 앱
+     미니플레이어와 같은 패턴). */
   const [transportExpanded, setTransportExpanded] = useState(false);
-  useEffect(() => {
-    const el = stickySentinelRef.current;
-    if (!el) return;
-    const updateFromRect = () => setStickyVisible(el.getBoundingClientRect().bottom <= 0);
-    let observer: IntersectionObserver | null = null;
-    if ("IntersectionObserver" in window) {
-      observer = new IntersectionObserver(([entry]) => setStickyVisible(!entry.isIntersecting), { threshold: 0 });
-      observer.observe(el);
-    }
-    window.addEventListener("scroll", updateFromRect, { passive: true });
-    updateFromRect();
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("scroll", updateFromRect);
-    };
-  }, []);
-
-  // 요청: "리플레이 재생바를, 가장 하단에 고정시키도록,(상단에 점수와 예상승률, 팀명 시간등등을
-  // 고정한것처럼)". 상단 바와 같은 구조(문서 흐름 밖의 position:fixed + show 클래스)로 만들되,
-  // 켜지는 조건은 반대다 - 상단 바는 "스코어보드를 지나쳤을 때", 하단 재생바는 "리플레이 패널이
-  // 화면에 걸쳐 있는 동안". 패널을 완전히 지나가면(경기 후 리포트를 읽는 중) 스스로 사라져서
-  // 그 아래 내용을 가리지 않는다. 아래 panelRef를 그대로 재사용한다(별도 sentinel 불필요).
   useEffect(() => {
     const update = () => {
       const el = panelRef.current;
@@ -1195,21 +1168,6 @@ export default function GameReplay({
     const pm = finalPlusMinus.get(p.pcode) ?? 0;
     return <td className={pm > 0 ? "replay-pm pos" : pm < 0 ? "replay-pm neg" : "replay-pm"}>{pm > 0 ? `+${pm}` : pm}</td>;
   };
-  // 상단 고정 바의 한 줄짜리 "지금 흐름". 점수차는 위 점수 숫자 두 개로 이미 보이므로
-  // 여기서 다시 적지 않는다(요청: "점수차이는 굳이 안 적어도 될것 같아") - 런은 6-0 이상일
-  // 때만 (아래 flow-chip의 RUN_THRESHOLD와 같은 기준 - 같은 화면에서 두 기준이 달라지면
-  // 안 된다). 서지 우선순위도 flow-chip과 동일하게 맞춘다. 할 말이 없으면 null - 빈 span만
-  // 남고 승률 %(양옆 .replay-sticky-prob)는 그대로 보인다.
-  const stickyFlow = (() => {
-    if (row.surge) {
-      const t = row.surge.side === "home" ? homeTeam : awayTeam;
-      return `${t.abbr} ${surgeScoreText(row.surge)} 몰아치기`;
-    }
-    if (row.runHome >= PUSH_RUN_THRESHOLD) return `${homeTeam.abbr} ${row.runHome}-0 런`;
-    if (row.runAway >= PUSH_RUN_THRESHOLD) return `${awayTeam.abbr} ${row.runAway}-0 런`;
-    return null;
-  })();
-
   const COURT_COLS = 1 + BOX_HEADERS[boxView].length + BOX_TAIL; // 선수 + 뷰별 칸 + (+/-, 온/오프)
   const courtHeaderRow = (key: string) => (
     <tr key={key}>
@@ -1549,13 +1507,12 @@ export default function GameReplay({
 
       <div className="panel-title">인터랙티브 리플레이</div>
 
-      {/* 요청: "스크롤을 내리면 상단에 점수/팀/예상승률/현재 쿼터 시간등을 작게 틀 고정" -
-          position:sticky가 아니라 항상 존재하는 별개의 position:fixed 요소를 show 클래스로
-          등장/퇴장시킴(문서 레이아웃에 영향 없음 - 위 useEffect의 IntersectionObserver/scroll
-          폴백이 stickySentinelRef를 지켜보다가 켬/끔). 아래 .replay-scoreboard는 이제 완전히
-          평범한 카드 - 이 컴포넌트 안 어디서도 sticky를 쓰지 않음. */}
+      {/* 요청: "상단 점수판과 하단의 재생바를 상단쪽에 합치되, 사이즈는 기존 상단 점수판을
+          넘지 않도록". position:sticky가 아니라 항상 존재하는 별개의 position:fixed 요소를
+          show 클래스로 등장/퇴장(문서 레이아웃에 영향 없음). 아래 .replay-scoreboard는
+          완전히 평범한 카드 - 이 컴포넌트 안 어디서도 sticky를 쓰지 않음. */}
       <div
-        className={`replay-sticky-bar${stickyVisible ? " show" : ""}`}
+        className={`replay-sticky-bar${transportVisible ? " show" : ""}`}
         style={{ "--h": homeTeam.color, "--a": awayTeam.color } as CSSProperties}
       >
         <div className="replay-sticky-main">
@@ -1576,23 +1533,142 @@ export default function GameReplay({
             <TeamBadge team={awayTeam} size={26} />
           </div>
         </div>
-        {/* 승률을 숫자 두 개가 아니라 좌우로 갈리는 막대 하나로. 읽지 않고 보기만 해도
-            어느 쪽으로 기울었는지가 들어온다(요청: "좀더 ... 잘 보이도록"). */}
-        {row.home_win_prob != null && (
-          <div className="replay-sticky-probbar" title={`${homeTeam.abbr} ${Math.round(row.home_win_prob * 100)}%`}>
-            <span className="replay-sticky-probfill home" style={{ width: `${row.home_win_prob * 100}%` }} />
-            <span className="replay-sticky-probfill away" style={{ width: `${(1 - row.home_win_prob) * 100}%` }} />
-          </div>
-        )}
-        <div className="replay-sticky-flowrow">
+        {/* 예전엔 승률 분할막대 + "흐름" 텍스트 줄이 따로 있었다. 그 두 줄 자리에 하단
+            재생바를 합친다 - 단색 막대가 아니라 ScrubTrack을 작게 재사용해 실제 승률
+            추이(스파크라인)를 보여주고, 재생 버튼과 펼침 화살표를 옆에 붙인다. 점수차
+            텍스트("KCC +13")는 이미 위 점수 숫자로 보이고, 런/몰아치기는
+            computePushNotifications가 토스트로 따로 알리므로 이 줄에서 다시 안 적는다. */}
+        <div className="replay-sticky-control">
           <span className="replay-sticky-prob">
             {row.home_win_prob != null ? `${Math.round(row.home_win_prob * 100)}%` : ""}
           </span>
-          <span className="replay-sticky-flow">{stickyFlow}</span>
+          <button
+            type="button"
+            className="replay-mini-scrub"
+            onClick={() => setTransportExpanded((v) => !v)}
+            aria-label={transportExpanded ? "재생 컨트롤 접기" : "재생 컨트롤 펼치기"}
+            aria-expanded={transportExpanded}
+          >
+            <ScrubTrack events={events} idx={idx} quarterOrder={quarterOrder} firstIdxByQuarter={firstIdxByQuarter} />
+          </button>
+          <button
+            type="button"
+            className="replay-sticky-play"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (idx >= events.length - 1) setIdx(0);
+              setPlaying((p) => !p);
+            }}
+            aria-label={playing ? "일시정지" : "재생"}
+          >
+            {playing ? "❚❚" : "▶"}
+          </button>
+          <button
+            type="button"
+            className="replay-transport-toggle"
+            onClick={() => setTransportExpanded((v) => !v)}
+            aria-label={transportExpanded ? "재생 컨트롤 접기" : "재생 컨트롤 펼치기"}
+            aria-expanded={transportExpanded}
+          >
+            {transportExpanded ? "▾" : "▴"}
+          </button>
           <span className="replay-sticky-prob">
             {row.home_win_prob != null ? `${Math.round((1 - row.home_win_prob) * 100)}%` : ""}
           </span>
         </div>
+        {/* 펼침 단 - 예전엔 화면 하단 고정바 안에 있던 내용을 그대로 옮겨왔다. 탭했을 때만
+            렌더되므로 평소(접힌) 바 높이에는 전혀 영향이 없다. */}
+        {transportExpanded && (
+          <div className="replay-sticky-expand">
+            <div className="replay-scrub">
+              <ScrubTrack events={events} idx={idx} quarterOrder={quarterOrder} firstIdxByQuarter={firstIdxByQuarter} />
+              <div className="replay-scrub-qlabels" aria-hidden="true">
+                {quarterOrder.map((q) => {
+                  const first = firstIdxByQuarter.get(q);
+                  if (first == null || events.length < 2) return null;
+                  return (
+                    <span key={q} className="replay-scrub-qlabel" style={{ left: `${(first / (events.length - 1)) * 100}%` }}>
+                      {q}
+                    </span>
+                  );
+                })}
+              </div>
+              <input
+                type="range"
+                className="replay-slider"
+                min={0}
+                max={events.length - 1}
+                value={idx}
+                aria-label="재생 위치"
+                onChange={(e) => {
+                  setPlaying(false);
+                  setIdx(Number(e.target.value));
+                }}
+              />
+            </div>
+            <div className="replay-transport-row">
+              <div className="replay-controls">
+                <button type="button" className="replay-btn" onClick={() => setIdx(0)} aria-label="처음으로">
+                  ⏮
+                </button>
+                <button type="button" className="replay-btn" onClick={() => setIdx((i) => Math.max(0, i - 1))} aria-label="이전">
+                  ◀
+                </button>
+                <button
+                  type="button"
+                  className="replay-btn replay-btn-play"
+                  onClick={() => {
+                    if (idx >= events.length - 1) setIdx(0);
+                    setPlaying((p) => !p);
+                  }}
+                >
+                  {playing ? "일시정지" : "재생"}
+                </button>
+                <button type="button" className="replay-btn" onClick={advanceForward} aria-label="다음">
+                  ▶
+                </button>
+                <button
+                  type="button"
+                  className="replay-btn"
+                  onClick={() => {
+                    setPlaying(false);
+                    setIdx(events.length - 1);
+                  }}
+                  aria-label="끝으로"
+                >
+                  ⏭
+                </button>
+                <select value={speedMs} onChange={(e) => setSpeedMs(Number(e.target.value))} className="replay-speed">
+                  <option value={600}>0.5x</option>
+                  <option value={300}>1x</option>
+                  <option value={120}>2x</option>
+                  <option value={50}>4x</option>
+                </select>
+              </div>
+              <div className="replay-quarter-btns">
+                {quarterOrder.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    className={`replay-quarter-btn ${row.quarter === q ? "active" : ""}`}
+                    onClick={() => {
+                      setPlaying(false);
+                      setIdx(firstIdxByQuarter.get(q) ?? 0);
+                    }}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+              <div className="replay-transport-clock">
+                <span className="replay-transport-time">{clockStr(row)}</span>
+                <span className="replay-transport-pos">
+                  {(idx + 1).toLocaleString()} / {events.length.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="replay-scoreboard">
@@ -1679,11 +1755,6 @@ export default function GameReplay({
           </table>
         </div>
       </div>
-
-      {/* sentinel - 전체 스코어보드가 끝나는 지점. 이게 화면 밖으로 나가는 순간을
-          IntersectionObserver가 감지해서 위 .replay-sticky-bar를 켬(내용 없는 1px 높이 - 그
-          자체는 레이아웃에 영향 없음). */}
-      <div className="replay-sticky-sentinel" ref={stickySentinelRef} />
 
       {/* pcode가 아니라 player_name으로 판단해야 한다(2026-09-02) - 라이브 경기에서는
           pcode는 있는데 이름이 아직 안 붙는 경우가 있고, 그때 예전 코드는 문자 그대로
@@ -1797,134 +1868,6 @@ export default function GameReplay({
         </div>
       )}
 
-      {/* 아래 재생 컨트롤은 문서 흐름이 아니라 화면 하단 고정 바 안에 있다(요청).
-          .replay-transport는 position:fixed라 이 자리에 공간을 차지하지 않는다. */}
-      <div
-        className={`replay-transport${transportVisible ? " show" : ""}`}
-        style={{ "--h": homeTeam.color, "--a": awayTeam.color } as CSSProperties}
-      >
-      <div className="replay-transport-inner">
-      {/* 스크러버 트랙 자체가 승률 곡선이다. 손잡이를 끄는 일이 곧 경기의 이야기를 되감는
-          일이 되고, 트랙에 찍힌 쿼터 경계선이 "지금 어디인가"를 계속 말해 준다. */}
-      <div className="replay-scrub">
-        <ScrubTrack events={events} idx={idx} quarterOrder={quarterOrder} firstIdxByQuarter={firstIdxByQuarter} />
-        <div className="replay-scrub-qlabels" aria-hidden="true">
-          {quarterOrder.map((q) => {
-            const first = firstIdxByQuarter.get(q);
-            if (first == null || events.length < 2) return null;
-            return (
-              <span key={q} className="replay-scrub-qlabel" style={{ left: `${(first / (events.length - 1)) * 100}%` }}>
-                {q}
-              </span>
-            );
-          })}
-        </div>
-        <input
-          type="range"
-          className="replay-slider"
-          min={0}
-          max={events.length - 1}
-          value={idx}
-          aria-label="재생 위치"
-          onChange={(e) => {
-            setPlaying(false);
-            setIdx(Number(e.target.value));
-          }}
-        />
-      </div>
-      <div className="replay-transport-row">
-      <div className="replay-controls">
-        {transportExpanded && (
-          <>
-            <button type="button" className="replay-btn" onClick={() => setIdx(0)} aria-label="처음으로">
-              ⏮
-            </button>
-            <button type="button" className="replay-btn" onClick={() => setIdx((i) => Math.max(0, i - 1))} aria-label="이전">
-              ◀
-            </button>
-          </>
-        )}
-        <button
-          type="button"
-          className="replay-btn replay-btn-play"
-          onClick={() => {
-            if (idx >= events.length - 1) setIdx(0);
-            setPlaying((p) => !p);
-          }}
-        >
-          {playing ? "일시정지" : "재생"}
-        </button>
-        {transportExpanded && (
-          <>
-            <button
-              type="button"
-              className="replay-btn"
-              onClick={advanceForward}
-              aria-label="다음"
-            >
-              ▶
-            </button>
-            <button
-              type="button"
-              className="replay-btn"
-              onClick={() => {
-                setPlaying(false);
-                setIdx(events.length - 1);
-              }}
-              aria-label="끝으로"
-            >
-              ⏭
-            </button>
-            <select value={speedMs} onChange={(e) => setSpeedMs(Number(e.target.value))} className="replay-speed">
-              <option value={600}>0.5x</option>
-              <option value={300}>1x</option>
-              <option value={120}>2x</option>
-              <option value={50}>4x</option>
-            </select>
-          </>
-        )}
-      </div>
-
-      {/* 요청: "재생 버튼을 ESPN에는 없는데 어떻게" - 평소엔 스크러버+재생 버튼만 보이는
-          미니바, 아래 토글을 탭하면 Q1~4·배속·이전/다음이 펼쳐진다. */}
-      {transportExpanded && (
-        <div className="replay-quarter-btns">
-          {quarterOrder.map((q) => (
-            <button
-              key={q}
-              type="button"
-              className={`replay-quarter-btn ${row.quarter === q ? "active" : ""}`}
-              onClick={() => {
-                setPlaying(false);
-                setIdx(firstIdxByQuarter.get(q) ?? 0);
-              }}
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-      )}
-      {transportExpanded && (
-        <div className="replay-transport-clock">
-          <span className="replay-transport-time">{clockStr(row)}</span>
-          <span className="replay-transport-pos">
-            {(idx + 1).toLocaleString()} / {events.length.toLocaleString()}
-          </span>
-        </div>
-      )}
-      <button
-        type="button"
-        className="replay-transport-toggle"
-        onClick={() => setTransportExpanded((v) => !v)}
-        aria-label={transportExpanded ? "재생 컨트롤 접기" : "재생 컨트롤 펼치기"}
-        aria-expanded={transportExpanded}
-      >
-        {transportExpanded ? "▾" : "▴"}
-      </button>
-      </div>
-      </div>
-      </div>
-
       {objProb != null && actProb != null && (
         <div className="replay-explain">
           <div className="report-section-title">왜 이 승률인가</div>
@@ -2004,9 +1947,6 @@ export default function GameReplay({
           )}
         </div>
       )}
-
-      {/* 하단 고정 재생바가 패널 마지막 내용을 가리지 않도록 그 높이만큼 여백. */}
-      <div className="replay-transport-spacer" aria-hidden />
     </div>
   );
 }

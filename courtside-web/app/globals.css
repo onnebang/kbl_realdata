@@ -629,10 +629,8 @@ select {
     animation: none;
   }
   .replay-sticky-bar,
-  .replay-sticky-probfill,
   .replay-split-home,
-  .replay-split-away,
-  .replay-transport {
+  .replay-split-away {
     transition: none;
   }
   .replay-push-toast {
@@ -1575,15 +1573,17 @@ table.data-table td:nth-child(2) {
    sticky가 아니라 처음부터 끝까지 항상 DOM에 존재하는 별개의 position:fixed 요소 - "붙었다
    떨어졌다"는 상태 계산 자체가 없어서 위 버그가 원천적으로 발생 안 함. display가 아니라
    transform(translateY)+"show" 클래스로만 등장/퇴장시켜서 문서 레이아웃/스크롤 높이에 전혀
-   영향을 안 줌(스크롤 위치가 흔들릴 메커니즘 자체가 없어짐) - GameReplay.tsx의
-   IntersectionObserver(+scroll 폴백)가 .replay-sticky-sentinel을 보고 show를 토글. */
-/* 요청: "상단의 점수고정이 잘 안보이는데, 사이즈를 더 키워주고 ... 좀더 점수와, 중계흐름이
-   잘 보이도록". 한 줄에 7개 span을 늘어놓던 것을 세 층으로 다시 쌓았다:
-     1층 점수  - 15px -> 34px(Big Shoulders Display, 숫자만이라 한글 글리프 문제 없음)
-     2층 승률  - 숫자 두 개 대신 좌우로 갈리는 막대 하나. 읽지 않고 보기만 해도 기울기가 보인다.
-     3층 흐름  - 점수차와 진행 중인 런("SK 8-0 런"). 바 어디에도 없던 '지금 흐름'이 여기 들어간다.
-   높이는 40px 남짓에서 90px 안팎이 되지만, 여전히 position:fixed + transform이라 문서
-   레이아웃과 스크롤 높이에는 영향이 없다(sticky가 스크롤을 되돌리던 버그를 피하는 구조 유지). */
+   영향을 안 줌(스크롤 위치가 흔들릴 메커니즘 자체가 없어짐) - GameReplay.tsx의 panelRef 기반
+   useEffect(리플레이 패널이 화면에 걸쳐 있는 동안)가 show를 토글. */
+/* 요청: "상단 점수판과 하단의 재생바를 상단쪽에 합치되, 사이즈는 기존 상단 점수판을 넘지
+   않도록". 지금은 2단 + 조건부 펼침 단:
+     1층 메인   - 배지/약어/점수(Big Shoulders Display, 34px→54px)/시계.
+     2층 컨트롤 - 승률 %·미니 스파크라인(ScrubTrack 재사용)·재생 버튼·펼침 화살표를 한 줄에.
+                  예전 승률 막대+흐름 텍스트(2개 층) 자리를 이 한 줄이 대신해서 평소 높이는
+                  그대로거나 더 작다.
+     펼침 단    - 탭했을 때만 렌더(.replay-sticky-expand) - 큰 스크러버+Q1~4+배속 등, 평소
+                  높이 예산과 무관.
+   여전히 position:fixed + transform이라 문서 레이아웃과 스크롤 높이에는 영향이 없다. */
 .replay-sticky-bar {
   position: fixed;
   top: 0;
@@ -1625,48 +1625,53 @@ table.data-table td:nth-child(2) {
   align-items: center;
   gap: 12px;
 }
-.replay-sticky-probbar {
+/* 요청: "상단 점수판과 하단의 재생바를 상단쪽에 합치되, 사이즈는 기존 상단 점수판을
+   넘지 않도록". 예전 승률 분할막대(.replay-sticky-probbar) + 흐름 텍스트 줄
+   (.replay-sticky-flowrow)이 있던 자리를 이 한 줄이 대신한다 - 높이 예산은 그 둘의
+   합(11px 막대 + 줄 간격 5px + ~17px 텍스트 줄)과 같거나 더 작게. */
+.replay-sticky-control {
   display: flex;
-  height: 11px;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+}
+/* 재생바의 그래프(ScrubTrack)를 그대로 재사용 - 단색 막대가 아니라 실제 승률 추이. 버튼
+   이라 기본 스타일을 지우고 .replay-scrub과 같은 트랙 모양만 작게(14px) 남긴다. */
+.replay-mini-scrub {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 14px;
+  border: none;
+  padding: 0;
+  margin: 0;
   border-radius: var(--r-led);
   overflow: hidden;
   background: var(--surface-soft);
+  cursor: pointer;
 }
-.replay-sticky-probfill {
-  display: block;
-  transition: width 0.2s ease-out;
-}
-/* 팀 색을 원색 그대로 쓰면 남색 계열(부산 KCC #0C2340)이 다크 표면에 묻힌다 - 잉크와 섞어
-   두 테마 모두에서 최소 대비를 확보한다(개막 리포트 순위 띠와 같은 규칙). */
-.replay-sticky-probfill.home {
-  background: var(--h, var(--home));
-  background: color-mix(in srgb, var(--h, var(--home)) 76%, var(--ink) 24%);
-}
-.replay-sticky-probfill.away {
-  background: var(--a, var(--away));
-  background: color-mix(in srgb, var(--a, var(--away)) 76%, var(--ink) 24%);
-}
-.replay-sticky-flowrow {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+.replay-sticky-play {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-}
-.replay-sticky-flowrow > :last-child {
-  text-align: right;
-}
-.replay-sticky-flow {
-  font-family: "Pretendard", system-ui, sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--ink-soft);
-  white-space: nowrap;
+  justify-content: center;
+  font-size: 11px;
+  background: var(--home);
+  color: #fff;
+  cursor: pointer;
 }
 .replay-sticky-bar.show {
   transform: translateY(0);
 }
-.replay-sticky-sentinel {
-  height: 1px;
+/* 펼침 단 - 탭했을 때만 렌더되므로 평소 바 높이 예산과 무관(요청: "사이즈는 기존 상단
+   점수판을 넘지 않도록"는 접힌 기본 상태 기준). 예전 하단 고정 재생바 안에 있던 내용을
+   그대로 옮겨왔다. */
+.replay-sticky-expand {
+  padding-top: 4px;
 }
 /* 요청: "팀승률/팀/점수/시간/점수/팀/팀승률 순으로 가독성 좋게, 대칭이 되도록" - 예전엔
    "DB 8"/"20 LG"처럼 팀명+점수가 한 덩어리, 승률 두 개도 한 덩어리(가운데 " - "로 붙임)라
@@ -1714,11 +1719,11 @@ table.data-table td:nth-child(2) {
   font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
 }
-.replay-sticky-flowrow > .replay-sticky-prob:first-child {
+.replay-sticky-control > .replay-sticky-prob:first-child {
   color: var(--h, var(--home));
   color: color-mix(in srgb, var(--h, var(--home)) 72%, var(--ink) 28%);
 }
-.replay-sticky-flowrow > .replay-sticky-prob:last-child {
+.replay-sticky-control > .replay-sticky-prob:last-child {
   color: var(--a, var(--away));
   color: color-mix(in srgb, var(--a, var(--away)) 72%, var(--ink) 28%);
 }
@@ -2294,34 +2299,11 @@ table.replay-court-table td {
   background: #fff;
 }
 
-/* ── 하단 고정 재생바 ────────────────────────────────────────────────────────────
-   요청: "리플레이 재생바를, 가장 하단에 고정시키도록,(상단에 점수와 예상승률, 팀명 시간등등을
-   고정한것처럼)". 구조는 .replay-sticky-bar와 대칭 - position:fixed + transform으로만
-   등장/퇴장시켜 문서 높이에 영향을 주지 않는다(sticky가 스크롤 위치를 되돌리는 버그 회피).
-   .wrap과 같은 900px로 가운데 정렬해서 본문과 폭이 어긋나지 않게. */
-.replay-transport {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 41;
-  transform: translateY(110%);
-  transition: transform 0.16s ease-out;
-  pointer-events: none;
-}
-.replay-transport.show {
-  transform: translateY(0);
-  pointer-events: auto;
-}
-.replay-transport-inner {
-  max-width: var(--measure-wide);
-  margin: 0 auto;
-  background: var(--surface);
-  border-top: 1px solid rgba(var(--line-rgb), 0.12);
-  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.18);
-  padding: 10px 16px calc(11px + env(safe-area-inset-bottom, 0px));
-  border-radius: var(--r-card) var(--r-card) 0 0;
-}
+/* ── 재생 컨트롤(펼침 단) ──────────────────────────────────────────────────────
+   요청: "상단 점수판과 하단의 재생바를 상단쪽에 합치되". 예전엔 이 내용이 화면 하단에
+   따로 고정된 .replay-transport 안에 있었다 - 이제는 .replay-sticky-bar 안, 합쳐진
+   컨트롤 줄(.replay-sticky-control) 바로 아래 .replay-sticky-expand로 옮겨왔다.
+   .replay-sticky-bar가 이미 position:fixed라 별도 포지셔닝이 필요 없다. */
 
 /* ── 스크러버 = 승률 트랙 ──────────────────────────────────────────────────────
    요청: "하단의 재생바가 잘 안보이는데 ... 좀더 점수와, 중계흐름이 잘 보이도록".
@@ -2398,7 +2380,7 @@ table.replay-court-table td {
   padding: 1px 3px;
 }
 /* 입력 자체는 투명하게 깔고 손잡이만 보인다 - 트랙 그림이 그대로 비쳐 보이게. */
-.replay-transport .replay-slider {
+.replay-sticky-expand .replay-slider {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -2409,15 +2391,15 @@ table.replay-court-table td {
   appearance: none;
   cursor: pointer;
 }
-.replay-transport .replay-slider::-webkit-slider-runnable-track {
+.replay-sticky-expand .replay-slider::-webkit-slider-runnable-track {
   background: transparent;
   height: 100%;
 }
-.replay-transport .replay-slider::-moz-range-track {
+.replay-sticky-expand .replay-slider::-moz-range-track {
   background: transparent;
   height: 100%;
 }
-.replay-transport .replay-slider::-webkit-slider-thumb {
+.replay-sticky-expand .replay-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 24px;
@@ -2429,7 +2411,7 @@ table.replay-court-table td {
   /* 트랙 92px에서 24px 손잡이를 세로 중앙에: (92-24)/2 */
   margin-top: 34px;
 }
-.replay-transport .replay-slider::-moz-range-thumb {
+.replay-sticky-expand .replay-slider::-moz-range-thumb {
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -2444,11 +2426,11 @@ table.replay-court-table td {
   flex-wrap: wrap;
   gap: 10px;
 }
-.replay-transport .replay-controls,
-.replay-transport .replay-quarter-btns {
+.replay-sticky-expand .replay-controls,
+.replay-sticky-expand .replay-quarter-btns {
   margin-bottom: 0;
 }
-/* 스코어보드가 화면 밖으로 나가면 상단 바가 시계를 들지만, 재생바에도 한 번 더 둔다 -
+/* 스코어보드가 화면 밖으로 나가면 상단 바가 시계를 들지만, 펼침 단에도 한 번 더 둔다 -
    스크러버를 끄는 동안 눈이 아래에 있기 때문. */
 .replay-transport-clock {
   display: grid;
@@ -2468,22 +2450,12 @@ table.replay-court-table td {
   font-size: 12px;
   color: var(--ink-faint);
 }
-/* 하단 바가 커진 만큼 여백도 같이 - 패널 마지막 내용이 바 뒤로 숨지 않게. */
-.replay-transport-spacer {
-  height: 156px;
-}
 @media (max-width: 640px) {
-  .replay-transport-inner {
-    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
-  }
-  .replay-transport .replay-quarter-btn {
+  .replay-sticky-expand .replay-quarter-btn {
     padding: 7px 11px;
   }
   .replay-transport-clock {
     display: none;
-  }
-  .replay-transport-spacer {
-    height: 168px;
   }
   /* 좁은 화면에서는 점수가 가장 먼저 커야 한다 - 로고와 약어를 줄이고 숫자를 지킨다. */
   .replay-sticky-bar {
@@ -2494,9 +2466,6 @@ table.replay-court-table td {
   }
   .replay-sticky-team {
     font-size: 13px;
-  }
-  .replay-sticky-flow {
-    font-size: 12.5px;
   }
 }
 
