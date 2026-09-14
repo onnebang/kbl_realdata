@@ -787,6 +787,9 @@ export default function GameReplay({
   const [boxView, setBoxView] = useState<BoxView>("basic");
   /** 하단 고정 재생바 노출 - 리플레이 패널이 화면에 걸쳐 있는 동안만. */
   const [transportVisible, setTransportVisible] = useState(false);
+  /* 요청: "ESPN에는 없는 재생 버튼을 어떻게" - 평소엔 스크러버+재생 버튼만 보이는 미니바로
+     접어 두고, 탭하면 Q1~4·배속·이전/다음 버튼이 펼쳐진다(음악 앱 미니플레이어와 같은 패턴). */
+  const [transportExpanded, setTransportExpanded] = useState(false);
   useEffect(() => {
     const el = stickySentinelRef.current;
     if (!el) return;
@@ -1192,19 +1195,19 @@ export default function GameReplay({
     const pm = finalPlusMinus.get(p.pcode) ?? 0;
     return <td className={pm > 0 ? "replay-pm pos" : pm < 0 ? "replay-pm neg" : "replay-pm"}>{pm > 0 ? `+${pm}` : pm}</td>;
   };
-  // 상단 고정 바의 한 줄짜리 "지금 흐름". 점수차는 항상, 런은 6-0 이상일 때만
-  // (아래 flow-chip의 RUN_THRESHOLD와 같은 기준 - 같은 화면에서 두 기준이 달라지면 안 된다).
-  // 서지 우선순위도 flow-chip과 동일하게 맞춘다.
+  // 상단 고정 바의 한 줄짜리 "지금 흐름". 점수차는 위 점수 숫자 두 개로 이미 보이므로
+  // 여기서 다시 적지 않는다(요청: "점수차이는 굳이 안 적어도 될것 같아") - 런은 6-0 이상일
+  // 때만 (아래 flow-chip의 RUN_THRESHOLD와 같은 기준 - 같은 화면에서 두 기준이 달라지면
+  // 안 된다). 서지 우선순위도 flow-chip과 동일하게 맞춘다. 할 말이 없으면 null - 빈 span만
+  // 남고 승률 %(양옆 .replay-sticky-prob)는 그대로 보인다.
   const stickyFlow = (() => {
-    const diff = row.home_score - row.away_score;
-    const lead = diff === 0 ? "동점" : `${diff > 0 ? homeTeam.abbr : awayTeam.abbr} +${Math.abs(diff)}`;
     if (row.surge) {
       const t = row.surge.side === "home" ? homeTeam : awayTeam;
-      return `${lead} · ${t.abbr} ${surgeScoreText(row.surge)} 몰아치기`;
+      return `${t.abbr} ${surgeScoreText(row.surge)} 몰아치기`;
     }
-    if (row.runHome >= PUSH_RUN_THRESHOLD) return `${lead} · ${homeTeam.abbr} ${row.runHome}-0 런`;
-    if (row.runAway >= PUSH_RUN_THRESHOLD) return `${lead} · ${awayTeam.abbr} ${row.runAway}-0 런`;
-    return lead;
+    if (row.runHome >= PUSH_RUN_THRESHOLD) return `${homeTeam.abbr} ${row.runHome}-0 런`;
+    if (row.runAway >= PUSH_RUN_THRESHOLD) return `${awayTeam.abbr} ${row.runAway}-0 런`;
+    return null;
   })();
 
   const COURT_COLS = 1 + BOX_HEADERS[boxView].length + BOX_TAIL; // 선수 + 뷰별 칸 + (+/-, 온/오프)
@@ -1831,12 +1834,16 @@ export default function GameReplay({
       </div>
       <div className="replay-transport-row">
       <div className="replay-controls">
-        <button type="button" className="replay-btn" onClick={() => setIdx(0)} aria-label="처음으로">
-          ⏮
-        </button>
-        <button type="button" className="replay-btn" onClick={() => setIdx((i) => Math.max(0, i - 1))} aria-label="이전">
-          ◀
-        </button>
+        {transportExpanded && (
+          <>
+            <button type="button" className="replay-btn" onClick={() => setIdx(0)} aria-label="처음으로">
+              ⏮
+            </button>
+            <button type="button" className="replay-btn" onClick={() => setIdx((i) => Math.max(0, i - 1))} aria-label="이전">
+              ◀
+            </button>
+          </>
+        )}
         <button
           type="button"
           className="replay-btn replay-btn-play"
@@ -1847,54 +1854,73 @@ export default function GameReplay({
         >
           {playing ? "일시정지" : "재생"}
         </button>
-        <button
-          type="button"
-          className="replay-btn"
-          onClick={advanceForward}
-          aria-label="다음"
-        >
-          ▶
-        </button>
-        <button
-          type="button"
-          className="replay-btn"
-          onClick={() => {
-            setPlaying(false);
-            setIdx(events.length - 1);
-          }}
-          aria-label="끝으로"
-        >
-          ⏭
-        </button>
-        <select value={speedMs} onChange={(e) => setSpeedMs(Number(e.target.value))} className="replay-speed">
-          <option value={600}>0.5x</option>
-          <option value={300}>1x</option>
-          <option value={120}>2x</option>
-          <option value={50}>4x</option>
-        </select>
+        {transportExpanded && (
+          <>
+            <button
+              type="button"
+              className="replay-btn"
+              onClick={advanceForward}
+              aria-label="다음"
+            >
+              ▶
+            </button>
+            <button
+              type="button"
+              className="replay-btn"
+              onClick={() => {
+                setPlaying(false);
+                setIdx(events.length - 1);
+              }}
+              aria-label="끝으로"
+            >
+              ⏭
+            </button>
+            <select value={speedMs} onChange={(e) => setSpeedMs(Number(e.target.value))} className="replay-speed">
+              <option value={600}>0.5x</option>
+              <option value={300}>1x</option>
+              <option value={120}>2x</option>
+              <option value={50}>4x</option>
+            </select>
+          </>
+        )}
       </div>
 
-      <div className="replay-quarter-btns">
-        {quarterOrder.map((q) => (
-          <button
-            key={q}
-            type="button"
-            className={`replay-quarter-btn ${row.quarter === q ? "active" : ""}`}
-            onClick={() => {
-              setPlaying(false);
-              setIdx(firstIdxByQuarter.get(q) ?? 0);
-            }}
-          >
-            {q}
-          </button>
-        ))}
-      </div>
-      <div className="replay-transport-clock">
-        <span className="replay-transport-time">{clockStr(row)}</span>
-        <span className="replay-transport-pos">
-          {(idx + 1).toLocaleString()} / {events.length.toLocaleString()}
-        </span>
-      </div>
+      {/* 요청: "재생 버튼을 ESPN에는 없는데 어떻게" - 평소엔 스크러버+재생 버튼만 보이는
+          미니바, 아래 토글을 탭하면 Q1~4·배속·이전/다음이 펼쳐진다. */}
+      {transportExpanded && (
+        <div className="replay-quarter-btns">
+          {quarterOrder.map((q) => (
+            <button
+              key={q}
+              type="button"
+              className={`replay-quarter-btn ${row.quarter === q ? "active" : ""}`}
+              onClick={() => {
+                setPlaying(false);
+                setIdx(firstIdxByQuarter.get(q) ?? 0);
+              }}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+      {transportExpanded && (
+        <div className="replay-transport-clock">
+          <span className="replay-transport-time">{clockStr(row)}</span>
+          <span className="replay-transport-pos">
+            {(idx + 1).toLocaleString()} / {events.length.toLocaleString()}
+          </span>
+        </div>
+      )}
+      <button
+        type="button"
+        className="replay-transport-toggle"
+        onClick={() => setTransportExpanded((v) => !v)}
+        aria-label={transportExpanded ? "재생 컨트롤 접기" : "재생 컨트롤 펼치기"}
+        aria-expanded={transportExpanded}
+      >
+        {transportExpanded ? "▾" : "▴"}
+      </button>
       </div>
       </div>
       </div>

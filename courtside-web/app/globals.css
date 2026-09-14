@@ -1627,7 +1627,7 @@ table.data-table td:nth-child(2) {
 }
 .replay-sticky-probbar {
   display: flex;
-  height: 8px;
+  height: 11px;
   border-radius: var(--r-led);
   overflow: hidden;
   background: var(--surface-soft);
@@ -1695,7 +1695,8 @@ table.data-table td:nth-child(2) {
 .replay-sticky-score {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: var(--fs-700);
+  /* 요청: ESPN 중계처럼 점수 고정바를 더 크게. */
+  font-size: var(--fs-800);
   line-height: 0.92;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
@@ -2183,6 +2184,18 @@ table.data-table td:nth-child(2) {
 .replay-court-table td:nth-child(2) {
   text-align: right;
 }
+/* 요청: "표를 확실하게 보이게" - data-table 공통 기본값(13px/12px)은 다른 9개 페이지가
+   같이 쓰므로 거기는 그대로 두고, 이 표에만 override로 키운다. */
+.replay-court-table {
+  font-size: 14.5px;
+}
+.replay-court-table th {
+  font-size: 13px;
+  padding: 8px 9px;
+}
+.replay-court-table td {
+  padding: 8px 9px;
+}
 .replay-court-row.bench {
   opacity: 0.55;
 }
@@ -2316,7 +2329,9 @@ table.data-table td:nth-child(2) {
    곡선 아래가 홈, 위가 원정. 세로선은 쿼터 경계, 굵은 선이 지금 위치다. */
 .replay-scrub {
   position: relative;
-  height: 44px;
+  /* 요청: "그래프를 확실하게 보이게" - viewBox+preserveAspectRatio="none"이라 컨테이너
+     높이만 키우면 SVG 좌표 계산은 그대로 더 크게 그려진다(ScrubTrack 로직 변경 없음). */
+  height: 92px;
   /* 이건 담는 것이 아니라 미터다(승률 트랙) - 하드 엣지. */
   border-radius: var(--r-led);
   overflow: hidden;
@@ -2345,7 +2360,7 @@ table.data-table td:nth-child(2) {
   fill: none;
   stroke: var(--h, var(--home));
   stroke: color-mix(in srgb, var(--h, var(--home)) 40%, var(--ink) 60%);
-  stroke-width: 2;
+  stroke-width: 3;
   stroke-linejoin: round;
 }
 .replay-scrub-mid {
@@ -2368,10 +2383,10 @@ table.data-table td:nth-child(2) {
 }
 .replay-scrub-qlabel {
   position: absolute;
-  top: 3px;
+  top: 4px;
   transform: translateX(4px);
   font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--ink);
   letter-spacing: 0.02em;
@@ -2404,17 +2419,18 @@ table.data-table td:nth-child(2) {
 .replay-transport .replay-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--surface);
   border: 3px solid var(--ink);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
-  margin-top: 12px;
+  /* 트랙 92px에서 24px 손잡이를 세로 중앙에: (92-24)/2 */
+  margin-top: 34px;
 }
 .replay-transport .replay-slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--surface);
   border: 3px solid var(--ink);
@@ -2473,7 +2489,7 @@ table.data-table td:nth-child(2) {
     padding: 8px 12px 9px;
   }
   .replay-sticky-score {
-    font-size: 30px;
+    font-size: 42px;
   }
   .replay-sticky-team {
     font-size: 13px;
@@ -2553,6 +2569,21 @@ table.data-table td:nth-child(2) {
   background: var(--home);
   border-color: var(--home);
   color: #fff;
+}
+/* 미니바 접기/펼치기 토글 - 평소엔 재생 버튼 옆에 작은 화살표만. */
+.replay-transport-toggle {
+  font-size: 13px;
+  line-height: 1;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--line-rgb), 0.2);
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.replay-transport-toggle:hover {
+  border-color: var(--home);
+  color: var(--home);
 }
 .replay-speed {
   font-family: "IBM Plex Mono", monospace;
