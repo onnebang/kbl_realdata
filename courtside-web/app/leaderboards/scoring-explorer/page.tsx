@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getAllEntityOptions, type Dimension, type EntityOption } from "@/lib/scoringExplorer";
 import {
@@ -190,3 +191,8 @@ async function ScatterTab({ activeSeason }: { activeSeason?: string }) {
     </div>
   );
 }
+
+export const metadata: Metadata = {
+  title: "슈팅 리포트",
+  description: "리그와 감독별 슛 가치, 슛 선택 분포",
+};

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { PlayerPhoto } from "@/components/PlayerPhoto";
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
@@ -78,7 +79,16 @@ import { normalizePos } from "@/lib/playerStatus";
 // 있다. /preseason과 같은 값 - 캐시 히트에서는 훨씬 빨리 끝나고, 이 값은 상한일 뿐이다.
 export const maxDuration = 60;
 
-type TeamInfo = { tcode: string; name: string; abbr: string; color: string; logo_url: string | null };
+export async function generateMetadata({ params }: { params: Promise<{ tcode: string }> }): Promise<Metadata> {
+  const team = (await getAllTeams()).get((await params).tcode); // 캐시된 팀 표 - 페이지 조회를 늘리지 않는다
+  if (!team) return {};
+  return {
+    title: team.name,
+    description: `${team.name} 팀 프로필 · 시즌 전망, 로스터 변화, 팀 DNA, 경기 일정`,
+  };
+}
+
+type TeamInfo ={ tcode: string; name: string; abbr: string; color: string; logo_url: string | null };
 
 /**
  * 2·3차 파도의 추정 패널(4팩터·존 구성비·로스터 기여도·베스트 유닛·기록표·리더·순위표·리본

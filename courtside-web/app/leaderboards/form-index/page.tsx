@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
 import {
@@ -199,3 +200,8 @@ export default async function FormIndexPage({
     </div>
   );
 }
+
+export const metadata: Metadata = {
+  title: "폼 지수",
+  description: "최근 경기 흐름으로 본 선수 폼 순위",
+};

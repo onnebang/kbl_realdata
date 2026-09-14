@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getTeams, shortSeason, PRESEASON_SEASON } from "@/lib/preseason";
@@ -311,3 +312,8 @@ export default async function SeasonLeadersPage({
     </div>
   );
 }
+
+export const metadata: Metadata = {
+  title: "시즌 리더보드",
+  description: "득점·리바운드·어시스트 등 부문별 시즌 순위",
+};

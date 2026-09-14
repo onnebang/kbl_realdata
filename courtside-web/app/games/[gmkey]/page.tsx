@@ -1,5 +1,6 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { Metadata } from "next";
+import { cache, type ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
 import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBox } from "@/lib/postgameReport";
@@ -101,7 +102,8 @@ type EventRow = {
   objective_prob: number | null;
 };
 
-async function getGame(gmkey: string): Promise<GameInfo | null> {
+// React cache - generateMetadata와 페이지가 같은 요청 안에서 한 번만 조회한다(요청 단위라 라이브 점수가 굳지 않는다).
+const getGame = cache(async (gmkey: string): Promise<GameInfo | null> => {
   const { data, error } = await supabase
     .from("games")
     .select(
@@ -125,7 +127,7 @@ async function getGame(gmkey: string): Promise<GameInfo | null> {
   if (game.home_team) game.home_team.name = displayTeamName(game.home_team.tcode, game.home_team.name, game.season_name);
   if (game.away_team) game.away_team.name = displayTeamName(game.away_team.tcode, game.away_team.name, game.season_name);
   return game;
-}
+});
 
 async function getTeamStats(gmkey: string) {
   const { data } = await supabase
@@ -424,6 +426,27 @@ function soft<T>(label: string, p: Promise<T>, fallback: NoInfer<T>): Promise<T>
 
 // 캐시 미스에서 40회 안팎의 DB 왕복이 겹칠 수 있다(감사 실측). 다른 무거운 페이지와 같은 안전장치.
 export const maxDuration = 60;
+
+export async function generateMetadata({ params }: { params: Promise<{ gmkey: string }> }): Promise<Metadata> {
+  const game = await getGame((await params).gmkey);
+  if (!game) return {};
+  const away = game.away_team?.name ?? "원정";
+  const home = game.home_team?.name ?? "홈";
+  const status = deriveGameStatus(game);
+  const date = game.game_date.slice(2).replaceAll("-", ".");
+  if (status === "final") {
+    return {
+      title: `${away} ${game.away_score} : ${game.home_score} ${home} (${date})`,
+      description: "최종 결과 · 경기 중 승률 흐름, 박스스코어, 슛차트, 승부처",
+    };
+  }
+  return {
+    title: `${away} vs ${home} (${date}${game.game_start ? ` ${game.game_start.slice(0, 5)}` : ""})`,
+    description: status === "live"
+      ? "진행 중 · 실시간 승률과 문자중계"
+      : "경기 전 모델 승률, 최근 흐름, 매치업 인사이트",
+  };
+}
 
 export default async function GamePage({
   params,

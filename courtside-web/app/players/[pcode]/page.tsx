@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import {
@@ -68,6 +69,15 @@ import styles from "./player-profile.module.css";
 // 세 파도 21개 조회가 콜드 캐시에서 겹치면(커리어 슛 전체 페이지네이션 + 팀 경기 페이지 +
 // RPC 셋) Vercel 기본 서버리스 제한을 넘길 수 있다 - app/page.tsx·leaderboards와 같은 안전장치.
 export const maxDuration = 60;
+
+export async function generateMetadata({ params }: { params: Promise<{ pcode: string }> }): Promise<Metadata> {
+  const info = await getPlayerInfo((await params).pcode); // cachedFn - 페이지와 같은 캐시 키
+  if (!info) return {};
+  return {
+    title: info.name,
+    description: `${info.name} 선수 프로필 · 커리어 기록, 슈팅 DNA, 리그 퍼센타일, 승리 기여도`,
+  };
+}
 
 // 선택적 패널 전용 soft 폴백(감사 지적: 세 파도 21개 조회가 하나의 실패 도메인이라 클러치 RPC
 // 하나가 타임아웃 나도 선수 페이지 전체가 error.tsx가 됐다). 여기서만 삼키되 조용히 삼키지는

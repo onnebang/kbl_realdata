@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { TeamBadge } from "@/components/TeamBadge";
@@ -137,3 +138,8 @@ export default async function CoachesPage() {
     </div>
   );
 }
+
+export const metadata: Metadata = {
+  title: "감독",
+  description: "KBL 감독 목록 · 통산 승패와 재임 팀",
+};

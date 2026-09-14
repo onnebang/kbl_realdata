@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { TeamBadge } from "@/components/TeamBadge";
@@ -814,3 +815,8 @@ export default async function PreseasonPage() {
     </div>
   );
 }
+
+export const metadata: Metadata = {
+  title: "개막 리포트",
+  description: "확정 로스터로 다시 계산한 시즌 전망, 팀 간 이동, 결장 선수의 영향",
+};

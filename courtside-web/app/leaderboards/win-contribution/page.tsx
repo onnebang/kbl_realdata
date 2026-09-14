@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getSeasonsWithWpaData, getWinContributionLeaderboard, type SortKey } from "@/lib/winContributionLeaderboard";
@@ -150,3 +151,8 @@ export default async function WinContributionPage({
     </div>
   );
 }
+
+export const metadata: Metadata = {
+  title: "승리 기여도",
+  description: "경기 중 승률을 얼마나 움직였는지(WPA)로 본 선수 순위",
+};

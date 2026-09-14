@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { TeamBadge } from "@/components/TeamBadge";
@@ -74,3 +75,8 @@ export default async function TeamsPage() {
     </div>
   );
 }
+
+export const metadata: Metadata = {
+  title: "팀 자세히 보기",
+  description: "KBL 팀 목록 · 시즌 전망과 로스터 변화에서 팀 프로필로",
+};

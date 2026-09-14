@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { PlayerPhoto } from "@/components/PlayerPhoto";
 import type { CSSProperties } from "react";
@@ -129,3 +130,8 @@ export default async function PlayersPage({ searchParams }: { searchParams: Prom
     </div>
   );
 }
+
+export const metadata: Metadata = {
+  title: "선수 자세히 보기",
+  description: "KBL 선수 명단 · 확정 로스터와 지난 시즌 기록에서 선수 프로필로",
+};

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getSeasonsWithMetricData, getSeasonPlayerMetrics } from "@/lib/customMetric";
 import CustomMetricBuilder from "@/components/CustomMetricBuilder";
 
@@ -43,3 +44,8 @@ export default async function CustomMetricPage({ searchParams }: { searchParams:
     </div>
   );
 }
+
+export const metadata: Metadata = {
+  title: "커스텀 지표",
+  description: "가중치를 직접 정해 만드는 선수 지표",
+};

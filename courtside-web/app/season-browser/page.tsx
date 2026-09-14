@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getSeasons, getSeasonGames, formatSeasonShort } from "@/lib/seasonBrowser";
 import SeasonBrowserBoard from "@/components/SeasonBrowserBoard";
 import styles from "./season-browser.module.css";
@@ -49,3 +50,8 @@ export default async function SeasonBrowserPage({
     </div>
   );
 }
+
+export const metadata: Metadata = {
+  title: "시즌 브라우저",
+  description: "한 시즌 전체 경기를 검색·필터하고 박스스코어까지",
+};

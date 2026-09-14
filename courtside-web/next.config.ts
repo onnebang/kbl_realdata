@@ -12,6 +12,11 @@ import type { NextConfig } from "next";
 // 그래서 이 headers() 블록을 통째로 지웠다. Cache-Control/x-courtside-cdn은 이제 proxy.ts가
 // 유일하게 만든다(그 파일의 CDN_CACHEABLE_PATHS 주석에 대상 라우트·근거가 그대로 있다).
 const nextConfig: NextConfig = {
+  // 공유 미리보기 태그(og:title/og:image)를 모든 요청에서 <head>에 넣는다. 기본값은 목록에 있는
+  // 봇에만 그러고 나머지는 본문 뒤에 흘려 보내는데(스트리밍 메타데이터), 카카오톡 스크래퍼
+  // (kakaotalk-scrap)는 그 목록에 없어 JS 없이 <head>만 읽으면 제목·이미지를 못 본다.
+  // generateMetadata는 전부 캐시된 조회(선수·팀·감독)나 페이지와 공유하는 요청 캐시(경기)라 비용이 거의 없다.
+  htmlLimitedBots: /.*/,
   images: {
     // KBL 공식 선수 사진. 원본이 470x609 PNG(평균 402KB)인데 화면에는 34~44px로 그린다 -
     // /players 한 장이 31개만 걸어도 11.9MB였고(실측), 로스터 213명 사진이 다 채워지면

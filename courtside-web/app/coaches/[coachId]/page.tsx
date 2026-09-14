@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TeamBadge } from "@/components/TeamBadge";
@@ -29,6 +30,16 @@ import dir from "@/components/Directory.module.css";
 // 감독 프로필. 데이터·판정은 lib/coachPage.ts 머리 주석 참고 - 이 페이지는 사실(승-패·득실·팀 스타일·
 // 챌린지 사용 성향)만 그리고 '감독 효과'·'랭킹'·'성공률'은 그리지 않는다. 클라이언트 JS 0.
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ coachId: string }> }): Promise<Metadata> {
+  const { coachId } = await params;
+  const p = /^\d{1,9}$/.test(coachId) ? await getCoachProfile(Number(coachId)) : null; // 캐시됨 - 페이지와 같은 키
+  if (!p) return {};
+  return {
+    title: `${p.coach.name} 감독`,
+    description: `${p.coach.name} 감독 프로필 · 시즌별 승패와 득실, 로테이션 스타일, 재임기 팀 스타일`,
+  };
+}
 
 // 색은 표시값(반올림 후)의 부호로 판정한다 - signed()와 같은 기준이라 "표시는 0.0인데 빨강"이 없다.
 const pctCls = (v: number) => {

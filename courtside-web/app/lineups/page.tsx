@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { PlayerPhoto } from "@/components/PlayerPhoto";
 import type { CSSProperties } from "react";
@@ -634,3 +635,8 @@ export default async function LineupsPage({
     </div>
   );
 }
+
+export const metadata: Metadata = {
+  title: "선수별 조합",
+  description: "같이 뛸 때와 빠졌을 때 - 선수 조합별 득실 마진",
+};
