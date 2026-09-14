@@ -2,6 +2,7 @@ import { supabaseServer as supabase } from "./supabaseServer";
 import { displayTeamName } from "./teamNames";
 import { deriveGameStatus, type GameStatus } from "./gameStatus";
 import { PRESEASON_SEASON, isRealGmkey } from "./preseason";
+import { cachedFn, TTL } from "./cachePolicy";
 
 // courtside_template.html의 renderMatchups()/renderStandings()가 쓰던 pregameDetail(h2h/
 // seasonStats/schedule/standings)을 courtside-web에도 - 그쪽은 Python 빌드타임에 미리
@@ -361,7 +362,11 @@ export async function getTeamNextGame(tcode: string, seasonName = PRESEASON_SEAS
 }
 
 /** 이 시즌 이 팀이 치른(종료된) 정규시즌 실제 경기 수 - lib/seasonFocus.ts resolveTeamSeasons의 입력. */
-export async function getTeamPlayedRegCount(tcode: string, seasonName: string): Promise<number> {
+// 캐시(2026-09-15): 팀 페이지가 요청마다 읽고 있었다(프로덕션 로그). 경기가 끝날 때 바뀌는 값이라 예정
+// 경기와 같은 10분 - 기준 시즌 전환(5경기)이 최대 10분 늦는 정도는 괜찮다.
+export const getTeamPlayedRegCount = cachedFn(computeTeamPlayedRegCount, { name: "teamPlayedRegCount", ttl: TTL.scheduled });
+
+async function computeTeamPlayedRegCount(tcode: string, seasonName: string): Promise<number> {
   const { data } = await supabase
     .from("games")
     .select("gmkey")

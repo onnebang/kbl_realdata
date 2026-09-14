@@ -1,5 +1,6 @@
 import { supabaseServer as supabase } from "./supabaseServer";
 import { displayTeamName } from "./teamNames";
+import { cachedFn, TAG, TTL } from "./cachePolicy";
 
 // "폼 지수" 리더보드(claude.ai/code/artifact 폼지수 리더보드) 포팅 - tools/build_form_index.py의
 // 로직을 그대로 라이브 쿼리로 옮김. 원본은 "2025-2026 시즌 마지막 5경기"로 고정이었지만,
@@ -75,7 +76,12 @@ export function formWindowLabel(w: number): string {
   return w <= 0 ? "시즌 전체" : `최근 ${w}경기`;
 }
 
-export async function getSeasonsWithFormData(): Promise<string[]> {
+// 캐시(2026-09-15): 요청마다 시즌 뷰 + RPC + 팀 표를 다시 읽고 있었다(프로덕션 로그). 폼 지수는
+// 끝난 경기(daily_batch)로만 바뀐다.
+export const getSeasonsWithFormData = cachedFn(computeSeasonsWithFormData, { name: "formSeasons", ttl: TTL.batchDaily, tags: () => [TAG.batch] });
+export const getFormIndexLeaderboard = cachedFn(computeFormIndexLeaderboard, { name: "formIndex", ttl: TTL.batchDaily, tags: () => [TAG.batch] });
+
+async function computeSeasonsWithFormData(): Promise<string[]> {
   // seasons 테이블을 그대로 쓰면 아직 한 경기도 안 치른 시즌(개막 전 2026-2027)이 맨 앞에 와서
   // 기본 진입이 빈 표가 된다. 그래서 "실제로 경기를 치른 시즌"만 남겨야 하는데, games를 직접
   // 훑으면 **PostgREST 1,000행 상한에 잘린다** - 3,993행 중 앞 1,000행만 오니 distinct 결과가
@@ -111,7 +117,7 @@ type FormRpcRow = {
  * expected_pts를 pcode별 비교). 존 경계·상수를 고칠 일이 생기면 이 파일의 classifyShot과
  * tools/rpc_form_index.sql을 **반드시 같이** 고쳐야 한다 - 한쪽만 고치면 조용히 어긋난다.
  */
-export async function getFormIndexLeaderboard(
+async function computeFormIndexLeaderboard(
   seasonName: string,
   windowGames: number = 5,
   sortKey: FormSortKey = "deltaPer100",

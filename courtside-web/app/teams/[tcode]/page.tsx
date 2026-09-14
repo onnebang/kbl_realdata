@@ -4,6 +4,7 @@ import { PlayerPhoto } from "@/components/PlayerPhoto";
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
+import { cachedFn, TTL } from "@/lib/cachePolicy";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getTeamPlayedRegCount, type TeamFixture, type StandingsRow } from "@/lib/matchups";
 import { getAllTeams } from "@/lib/playerProfile";
@@ -103,15 +104,22 @@ function soft<T>(tcode: string, what: string, p: Promise<T>, fallback: T): Promi
   });
 }
 
-async function getTeam(tcode: string): Promise<TeamInfo | null> {
-  const { data } = await supabase.from("teams").select("tcode, name, abbr, color, logo_url").eq("tcode", tcode).maybeSingle();
-  return data as TeamInfo | null;
-}
+// 둘 다 캐시(2026-09-15): 요청마다 읽고 있었다(프로덕션 로그). teams·seasons는 준-상수.
+const getTeam = cachedFn(
+  async (tcode: string): Promise<TeamInfo | null> => {
+    const { data } = await supabase.from("teams").select("tcode, name, abbr, color, logo_url").eq("tcode", tcode).maybeSingle();
+    return data as TeamInfo | null;
+  },
+  { name: "teamRow", ttl: TTL.reference }
+);
 
-async function getSeasons(): Promise<string[]> {
-  const { data } = await supabase.from("seasons").select("season_name").order("season_name", { ascending: false });
-  return (data ?? []).map((s) => s.season_name);
-}
+const getSeasons = cachedFn(
+  async (): Promise<string[]> => {
+    const { data } = await supabase.from("seasons").select("season_name").order("season_name", { ascending: false });
+    return (data ?? []).map((s) => s.season_name);
+  },
+  { name: "teamPageSeasons", ttl: TTL.batchDaily }
+);
 
 function fmtDate(d: string) {
   const [y, m, day] = d.split("-");

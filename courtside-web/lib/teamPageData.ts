@@ -1,5 +1,5 @@
 import { supabaseServer as supabase } from "./supabaseServer";
-import { TAG, TTL, cachedFn } from "./cachePolicy";
+import { TAG, TTL, cachedFn, cachedMap } from "./cachePolicy";
 import { PRESEASON_SEASON, isRealGmkey, type RosterChange, type TeamRosterChanges } from "./preseason";
 import { getHeadToHead, getStandingsAsOf, getTeamSeasonFixtures, type TeamFixture } from "./matchups";
 import { normalizePos, type PlayerPos } from "./playerStatus";
@@ -76,7 +76,12 @@ export type PregameFeatureRow = {
   awayNetRtg: number | null;
 };
 
-export async function getPregameFeatures(gmkeys: string[]): Promise<Map<string, PregameFeatureRow>> {
+// 캐시(2026-09-15): 팀 페이지가 요청마다 읽고 있었다(프로덕션 로그). pregame_features는 daily_batch만 바꾼다.
+export function getPregameFeatures(gmkeys: string[]): Promise<Map<string, PregameFeatureRow>> {
+  return cachedMap(() => computePregameFeatures(gmkeys), ["pregameFeatures", ...gmkeys], TTL.scheduled, [TAG.batch]);
+}
+
+async function computePregameFeatures(gmkeys: string[]): Promise<Map<string, PregameFeatureRow>> {
   const map = new Map<string, PregameFeatureRow>();
   for (let i = 0; i < gmkeys.length; i += 200) {
     const { data } = await supabase
@@ -243,7 +248,9 @@ export async function getHomeSeasonFacts(tcode: string, season: string): Promise
 }
 
 /** 이 팀이 실제로 경기한 마지막 시즌(해체 팀의 focusSeason 판정용). 없으면 null. */
-export async function getTeamLastPlayedSeason(tcode: string): Promise<string | null> {
+export const getTeamLastPlayedSeason = cachedFn(computeTeamLastPlayedSeason, { name: "teamLastPlayedSeason", ttl: TTL.batchDaily, tags: () => [TAG.batch] });
+
+async function computeTeamLastPlayedSeason(tcode: string): Promise<string | null> {
   const { data } = await supabase
     .from("games")
     .select("season_name")

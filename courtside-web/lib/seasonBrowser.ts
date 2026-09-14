@@ -1,5 +1,6 @@
 import { supabaseServer as supabase } from "./supabaseServer";
 import { displayTeamName } from "./teamNames";
+import { cachedFn, TAG, TTL } from "./cachePolicy";
 
 // 시즌 브라우저(app/season-browser) 데이터 레이어 - web/season_browser_template.html 포팅.
 // 원본 정적 템플릿은 한 시즌(283경기) 전체의 게임목록+박스스코어를 미리 구운 JSON
@@ -35,12 +36,19 @@ export type SeasonGameRow = {
   away_team: SeasonTeamRef;
 };
 
-export async function getSeasons(): Promise<string[]> {
-  const { data } = await supabase.from("seasons").select("season_name").order("season_name", { ascending: false });
-  return (data ?? []).map((s) => s.season_name);
-}
+// 캐시(2026-09-15): 요청마다 시즌 목록 + 시즌 경기 전체를 다시 읽고 있었다(프로덕션 로그). 경기 목록은
+// 진행 중 경기의 점수도 담기므로(home_score가 경기 중에도 채워진다) 예정 경기와 같은 10분.
+export const getSeasons = cachedFn(
+  async (): Promise<string[]> => {
+    const { data } = await supabase.from("seasons").select("season_name").order("season_name", { ascending: false });
+    return (data ?? []).map((s) => s.season_name);
+  },
+  { name: "browserSeasons", ttl: TTL.batchDaily }
+);
 
-export async function getSeasonGames(seasonName: string): Promise<SeasonGameRow[]> {
+export const getSeasonGames = cachedFn(computeSeasonGames, { name: "browserSeasonGames", ttl: TTL.scheduled, tags: (s) => [TAG.season(s ?? "")] });
+
+async function computeSeasonGames(seasonName: string): Promise<SeasonGameRow[]> {
   const { data, error } = await supabase
     .from("games")
     .select(

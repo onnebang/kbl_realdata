@@ -1,4 +1,5 @@
 import { supabaseServer as supabase } from "./supabaseServer";
+import { cachedFn, TAG, TTL } from "./cachePolicy";
 import { getTeams, prevSeasonName, roleFromNote, type TeamInfo } from "./preseason";
 
 // 26-27 외국인 출전 규정 변경 - 요청의 두 번째 절반.
@@ -130,17 +131,27 @@ function median(xs: number[]): number | null {
  * 읽는다(코트 위 동시 출전 구조로 아시아쿼터/외국인을 복원한 결과 - 25-26엔 등록 구분이
  * DB에 없다).
  */
+// 조회 결과(평범한 행 배열)만 캐시한다 - 개막 리포트가 요청마다 이 셋을 다시 읽고 있었다(2026-09-15
+// 프로덕션 로그 실측). 슬롯·규정 표는 build_import_slots.py(수동), 확정 명단은 import_roster(수동)가 바꾼다.
+const fetchImportRuleRows = cachedFn(
+  async (season: string) => {
+    const prevSeason = prevSeasonName(season);
+    const [slotRes, ruleRes, rosterRes] = await Promise.all([
+      supabase
+        .from("import_slot_season")
+        .select("tcode, pcode, player_name, slot, games, minutes, mpg, per, pts40, fg_pct, q2_mpg, q3_mpg")
+        .eq("season_name", prevSeason),
+      supabase.from("import_rule_season").select("*").eq("season_name", prevSeason).maybeSingle(),
+      supabase.from("season_roster").select("tcode, pcode, player_name, note").eq("season_name", season),
+    ]);
+    return { slotRes: { data: slotRes.data }, ruleRes: { data: ruleRes.data }, rosterRes: { data: rosterRes.data } };
+  },
+  { name: "importRuleRows", ttl: TTL.batchDaily, tags: () => [TAG.build] }
+);
+
 export async function getImportRuleReport(season: string): Promise<ImportRuleReport | null> {
   const prevSeason = prevSeasonName(season);
-  const [teamMap, slotRes, ruleRes, rosterRes] = await Promise.all([
-    getTeams(season),
-    supabase
-      .from("import_slot_season")
-      .select("tcode, pcode, player_name, slot, games, minutes, mpg, per, pts40, fg_pct, q2_mpg, q3_mpg")
-      .eq("season_name", prevSeason),
-    supabase.from("import_rule_season").select("*").eq("season_name", prevSeason).maybeSingle(),
-    supabase.from("season_roster").select("tcode, pcode, player_name, note").eq("season_name", season),
-  ]);
+  const [teamMap, { slotRes, ruleRes, rosterRes }] = await Promise.all([getTeams(season), fetchImportRuleRows(season)]);
   const slotRows = (slotRes.data ?? []) as SlotRow[];
   const rule = ruleRes.data as {
     court_sec: number;

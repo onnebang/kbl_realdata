@@ -4,6 +4,7 @@ import { PlayerPhoto } from "@/components/PlayerPhoto";
 import type { CSSProperties } from "react";
 import { TeamBadge } from "@/components/TeamBadge";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
+import { cachedMap, TTL } from "@/lib/cachePolicy";
 import { PRESEASON_SEASON, getSeasonOpener, shortSeason } from "@/lib/preseason";
 import { getLeaderboardSeasons } from "@/lib/seasonLeaders";
 import {
@@ -94,7 +95,12 @@ function Avatar({ m, size = 28 }: { m: WowyMember; size?: number }) {
  * 없으면 등번호 타일로 폴백한다 - /players 디렉터리와 같은 규칙.
  * 고른 팀의 로스터(9~13명)만 조회하므로 한 번의 가벼운 쿼리다.
  */
-async function fetchPhotos(pcodes: string[]): Promise<Map<string, string>> {
+function fetchPhotos(pcodes: string[]): Promise<Map<string, string>> {
+  // 캐시(2026-09-15): 요청마다 읽고 있었다(프로덕션 로그). 사진은 sync_player_photos(수동)만 바꾼다.
+  return cachedMap(() => fetchPhotosRaw(pcodes), ["lineupPhotos", ...[...pcodes].sort()], TTL.batchDaily);
+}
+
+async function fetchPhotosRaw(pcodes: string[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   if (!pcodes.length) return map;
   const { data } = await supabase.from("players").select("pcode, photo_url").in("pcode", pcodes);

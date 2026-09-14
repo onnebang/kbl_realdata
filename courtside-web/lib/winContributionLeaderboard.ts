@@ -1,5 +1,6 @@
 import { supabaseServer as supabase } from "./supabaseServer";
 import { displayTeamName } from "./teamNames";
+import { cachedFn, TAG, TTL } from "./cachePolicy";
 
 // "승리 기여도 리더보드" 아티팩트(claude.ai/code/artifact/97168d9d...) 포팅. 원본은
 // Python으로 미리 계산해 정적 HTML에 박아넣은 스냅샷(LB_DATA.bySeason)이었지만, 여기는
@@ -27,7 +28,16 @@ export type SortKey = "totalWpa" | "wpaPerGame" | "posWpa" | "negWpa" | "games" 
 // 테이블이 2591행이라 range 없이 select하면 Supabase 기본 max_rows(1000)에 조용히
 // 잘림(rarity.ts의 getGameRarity에서 이미 한 번 겪은 버그와 동일 원인) - pcode 오름차순이
 // 기본 정렬이라 앞쪽 1000행만 오면 시즌 15개 중 일부만(그것도 무작위로) 보임. 페이지네이션.
-export async function getSeasonsWithWpaData(): Promise<string[]> {
+// 두 함수 다 캐시(2026-09-15): 요청마다 시즌 목록 3페이지 + 순위표를 다시 읽고 있었다(프로덕션 로그).
+// player_season_wpa는 build_wpa 계열 배치가 바꾼다.
+export const getSeasonsWithWpaData = cachedFn(computeSeasonsWithWpaData, { name: "wpaSeasons", ttl: TTL.batchDaily, tags: () => [TAG.batch] });
+export const getWinContributionLeaderboard = cachedFn(computeWinContributionLeaderboard, {
+  name: "wpaLeaderboard",
+  ttl: TTL.batchDaily,
+  tags: () => [TAG.batch],
+});
+
+async function computeSeasonsWithWpaData(): Promise<string[]> {
   const PAGE = 1000;
   const set = new Set<string>();
   for (let from = 0; ; from += PAGE) {
@@ -39,7 +49,7 @@ export async function getSeasonsWithWpaData(): Promise<string[]> {
   return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
 }
 
-export async function getWinContributionLeaderboard(seasonName: string, sortKey: SortKey = "totalWpa", ascending = false): Promise<WpaRow[]> {
+async function computeWinContributionLeaderboard(seasonName: string, sortKey: SortKey = "totalWpa", ascending = false): Promise<WpaRow[]> {
   const { data, error } = await supabase
     .from("player_season_wpa")
     .select(

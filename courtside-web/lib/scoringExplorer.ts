@@ -98,10 +98,13 @@ export async function fetchAllPagesBounded<T>(
 
 // 시즌 목록(순서만 필요 - 실제 어느 시즌에 데이터가 있는지는 getEntitySeasonGrids가 개별
 // 엔티티 단위로 다시 계산).
-export async function getSeasonsWithShots(): Promise<string[]> {
-  const { data } = await supabase.from("seasons").select("season_name").order("season_name", { ascending: false });
-  return (data ?? []).map((s) => s.season_name);
-}
+export const getSeasonsWithShots = cachedFn(
+  async (): Promise<string[]> => {
+    const { data } = await supabase.from("seasons").select("season_name").order("season_name", { ascending: false });
+    return (data ?? []).map((s) => s.season_name);
+  },
+  { name: "shotSeasons", ttl: TTL.batchDaily }
+);
 
 // 검색 드롭다운용 "이 차원의 전체 이력 상 존재하는 모든 엔티티" 목록 - 원본 아티팩트는
 // DATA[dim]을 총 시도 횟수 내림차순으로 정렬해서 보여줬지만(entityListFor), 그 정렬 기준

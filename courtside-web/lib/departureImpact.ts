@@ -1,4 +1,5 @@
 import { supabaseServer as supabase } from "./supabaseServer";
+import { cachedFn, TAG, TTL } from "./cachePolicy";
 import { getTeams, prevSeasonName, type TeamInfo } from "./preseason";
 
 // 확정 이탈이 각 팀에서 무엇을 가져갔는가 - 요청("해당 인원들을 제외하고 ... 시즌 리포트와
@@ -144,15 +145,21 @@ const addTo = (a: DepartureShare, b: DepartureShare) => {
  * 달라 "팀 합계 대비 몫"의 분모가 팀마다 다른 뜻이 된다).
  * 집계 표가 아직 없는 시즌이면 null - 화면은 이 섹션만 빼고 그린다.
  */
+// 집계 표 조회만 캐시(요청마다 읽고 있었다 - 2026-09-15 프로덕션 로그). build_departure_impact(수동)가 바꾼다.
+const fetchDepartureRows = cachedFn(
+  async (season: string) => {
+    const [teamRes, playerRes] = await Promise.all([
+      supabase.from("departure_impact_team").select("*").eq("season_name", season),
+      supabase.from("departure_impact_player").select("*").eq("season_name", season),
+    ]);
+    return { teamRows: (teamRes.data ?? []) as Row[], playerRows: (playerRes.data ?? []) as Row[] };
+  },
+  { name: "departureRows", ttl: TTL.manualBuild, tags: () => [TAG.build] }
+);
+
 export async function getDepartureReport(season: string): Promise<DepartureReport | null> {
   const prevSeason = prevSeasonName(season);
-  const [teamMap, teamRes, playerRes] = await Promise.all([
-    getTeams(season),
-    supabase.from("departure_impact_team").select("*").eq("season_name", season),
-    supabase.from("departure_impact_player").select("*").eq("season_name", season),
-  ]);
-  const teamRows = (teamRes.data ?? []) as Row[];
-  const playerRows = (playerRes.data ?? []) as Row[];
+  const [teamMap, { teamRows, playerRows }] = await Promise.all([getTeams(season), fetchDepartureRows(season)]);
   if (!teamRows.length || !playerRows.length) return null;
 
   const players: DepartedPlayer[] = playerRows

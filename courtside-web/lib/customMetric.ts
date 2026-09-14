@@ -2,6 +2,7 @@ import { METRIC_COMPONENTS, type ComponentKey, type MetricPlayerRow } from "./cu
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import { supabaseServer as supabase } from "./supabaseServer";
 import { displayTeamName } from "./teamNames";
+import { cachedFn, TAG, TTL } from "./cachePolicy";
 
 // "커스텀 지표 빌더"(perthirtysix.com의 create-advanced-metric 페이지 레퍼런스) - 원본은
 // "얼마나 중요한 스탯인지" 슬라이더로 가중치를 조절하면 실시간으로 순위가 바뀌는 CUSTOM
@@ -26,7 +27,11 @@ const MIN_GP = 10;
 export { METRIC_COMPONENTS, type ComponentKey, type MetricPlayerRow } from "./customMetricShape";
 
 
-export async function getSeasonsWithMetricData(): Promise<string[]> {
+// 캐시(2026-09-15): 요청마다 한 시즌 박스스코어 전체를 페이지로 다시 받고 있었다(프로덕션 로그).
+export const getSeasonsWithMetricData = cachedFn(computeSeasonsWithMetricData, { name: "metricSeasons", ttl: TTL.batchDaily, tags: () => [TAG.batch] });
+export const getSeasonPlayerMetrics = cachedFn(computeSeasonPlayerMetrics, { name: "seasonPlayerMetrics", ttl: TTL.batchDaily, tags: () => [TAG.batch] });
+
+async function computeSeasonsWithMetricData(): Promise<string[]> {
   const { data } = await supabase.from("seasons").select("season_name").order("season_name", { ascending: false });
   return (data ?? []).map((s) => s.season_name);
 }
@@ -58,7 +63,7 @@ function stddev(xs: number[], m: number) {
   return Math.sqrt(variance);
 }
 
-export async function getSeasonPlayerMetrics(seasonName: string): Promise<MetricPlayerRow[]> {
+async function computeSeasonPlayerMetrics(seasonName: string): Promise<MetricPlayerRow[]> {
   const rows = await fetchAllPagesBounded<StatRow>((from, to) =>
     supabase
       .from("game_player_stats")
