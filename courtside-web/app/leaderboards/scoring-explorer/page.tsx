@@ -154,8 +154,14 @@ async function HeatmapTab() {
 
 async function ScatterTab({ activeSeason }: { activeSeason?: string }) {
   const seasons = await getSeasonsForScatter();
-  const season = activeSeason && seasons.includes(activeSeason) ? activeSeason : seasons[0];
-  const data = season ? await getShotValueScatterData(season) : null;
+  let season = activeSeason && seasons.includes(activeSeason) ? activeSeason : seasons[0];
+  let data = season ? await getShotValueScatterData(season) : null;
+  // 개막 직후엔 새 시즌이 목록 맨 앞에 오지만 TSA 기준을 넘는 선수가 아직 없다 - 시즌을 고르지 않은
+  // 기본 진입이면 직전 시즌을 보여준다(고른 시즌은 그대로 두고 빈 안내를 띄운다).
+  if (!activeSeason && data && data.players.length === 0 && seasons[1]) {
+    season = seasons[1];
+    data = await getShotValueScatterData(season);
+  }
   const svg = data ? buildShotValueScatterSvg(data) : "";
 
   return (

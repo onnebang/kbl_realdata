@@ -2,7 +2,8 @@ import { supabaseServer as supabase } from "./supabaseServer";
 import { cachedFn, TTL, TAG } from "./cachePolicy";
 import { classifyShot } from "./formIndex";
 import { computeTSA, computePSA, computeMoreyPct } from "./shotImpactChart";
-import { fetchAllPagesBounded, getSeasonsWithShots, MIN_SAMPLE } from "./scoringExplorer";
+import { fetchAllPagesBounded, MIN_SAMPLE } from "./scoringExplorer";
+import { getLeaderboardSeasons } from "./seasonLeaders";
 
 // "고효율 슛 선택과 슈팅 효율" 리그 전체 산점도(Morey rate x PSA, 버블 크기 = TSA) - 득점 분포
 // 탐색기의 새 탭. lib/shotImpactChart.ts가 이미 세운 TSA/PSA/MOREY% 공식(computeTSA/computePSA/
@@ -34,8 +35,12 @@ export type ShotValueScatterData = {
   tsaMax: number;
 };
 
+/**
+ * 예전엔 seasons 테이블 전체(getSeasonsWithShots)를 줘서 맨 앞이 개막 전 2026-27이었고, 기본 진입이
+ * "표본 기준을 충족하는 선수가 없음" 빈 화면이었다(2026-09-15 확인). 정규시즌 경기가 끝난 시즌만.
+ */
 export async function getSeasonsForScatter(): Promise<string[]> {
-  return getSeasonsWithShots();
+  return getLeaderboardSeasons();
 }
 
 type BoxAgg = { pts: number; fga: number; fta: number };
