@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { teamInkStyle } from "@/lib/teamAccent";
 import { POS_LABEL_KO, type AceEntry, type PreviewInsight } from "@/lib/matchupInsights";
 
 // 프리뷰 스카우팅 인사이트(요청 항목 1~6) 카드 + 경기 후 채점(항목 7, actual prop) - 기존
@@ -153,7 +154,7 @@ export function InsightCard({
       title = "코트사이드 최종 예측";
       body = (
         <>
-          <b style={{ color: hColor }}>{homeTname}</b> 승률 {Math.round(insight.homeProb * 100)}% · <b style={{ color: aColor }}>{awayTname}</b> 승률{" "}
+          <b className="team-ink" style={teamInkStyle(hColor)}>{homeTname}</b> 승률 {Math.round(insight.homeProb * 100)}% · <b className="team-ink" style={teamInkStyle(aColor)}>{awayTname}</b> 승률{" "}
           {Math.round(insight.awayProb * 100)}%
         </>
       );

@@ -523,7 +523,7 @@ function WinProbLiveChart({ events, idx, homeColor, live }: { events: GameEvent[
   const pctX = Math.min(W - 40, Math.max(40, mx));
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 150, display: "block" }}>
+    <svg className="team-ink" viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 150, display: "block", ...teamInkStyle(homeColor) }}>
       <style>{LABEL_STYLE}</style>
       {live && leadX < W - 0.5 && (
         // 아직 안 치른 시간 - 곡선이 없는 영역임을 명시적으로 칠해서 "여기까지가 전부"라는
@@ -534,8 +534,8 @@ function WinProbLiveChart({ events, idx, homeColor, live }: { events: GameEvent[
       {quarterBounds.map((b) => (
         <line key={b.q} x1={b.x} y1={0} x2={b.x} y2={H} stroke="var(--ink-faint)" strokeWidth={1} opacity={0.35} />
       ))}
-      <path d={areaPath} fill={homeColor} fillOpacity={0.12} />
-      <path d={linePath} fill="none" stroke={homeColor} strokeWidth={2} />
+      <path d={areaPath} fill="currentColor" fillOpacity={0.12} />
+      <path d={linePath} fill="none" stroke="currentColor" strokeWidth={2} />
       {live && (
         <>
           <circle cx={leadX} cy={leadY} r={3} fill="var(--negative)" />
@@ -555,8 +555,8 @@ function WinProbLiveChart({ events, idx, homeColor, live }: { events: GameEvent[
         </>
       )}
       <line x1={mx} y1={0} x2={mx} y2={H} stroke="var(--ink-faint)" strokeWidth={1} strokeDasharray="2,3" />
-      <circle cx={mx} cy={my} r={4.5} fill={homeColor} stroke="var(--surface)" strokeWidth={1.5} />
-      <text className="wpLbl" x={pctX} y={pctY} textAnchor="middle" fontWeight={700} fill={homeColor} fontFamily="IBM Plex Mono, monospace">
+      <circle cx={mx} cy={my} r={4.5} fill="currentColor" stroke="var(--surface)" strokeWidth={1.5} />
+      <text className="wpLbl" x={pctX} y={pctY} textAnchor="middle" fontWeight={700} fill="currentColor" fontFamily="IBM Plex Mono, monospace">
         {Math.round((marker.e.home_win_prob as number) * 100)}%
       </text>
     </svg>
@@ -970,7 +970,7 @@ export default function GameReplay({
     <div className={`replay-leaders-player ${side}`}>
       {playerPhoto(best?.p.pcode ?? null, "replay-leaders-photo")}
       <div className="replay-leaders-info">
-        <div className="replay-leaders-val" style={best ? { color } : undefined}>
+        <div className={best ? "replay-leaders-val team-ink" : "replay-leaders-val"} style={best ? teamInkStyle(color) : undefined}>
           {best ? best.v : "-"}
         </div>
         {best && (
@@ -1442,7 +1442,7 @@ export default function GameReplay({
       <div className="replay-poss-group" style={{ "--pg-color": color } as CSSProperties} key={rows[0].event_order}>
         <div className="replay-poss-banner">
           <TeamBadge team={team ? { name: team.name, abbr: team.abbr, color: team.color, logoUrl: team.logoUrl } : null} size={18} />
-          <span className="replay-poss-team-name" style={{ color }}>
+          <span className={team ? "replay-poss-team-name team-ink" : "replay-poss-team-name"} style={team ? teamInkStyle(team.color) : { color }}>
             {team?.name ?? ""}
           </span>
           {oppTeam && <span className="replay-poss-vs-tag">vs {oppTeam.abbr}</span>}
@@ -1770,7 +1770,7 @@ export default function GameReplay({
             </thead>
             <tbody>
               <tr>
-                <td className="replay-quarter-tname" style={{ color: homeTeam.color }}>
+                <td className="replay-quarter-tname team-ink" style={teamInkStyle(homeTeam.color)}>
                   {homeTeam.abbr}
                 </td>
                 {homeByQ.map((c, i) => (
@@ -1782,7 +1782,7 @@ export default function GameReplay({
                 <td className="replay-quarter-total">{row.home_score}</td>
               </tr>
               <tr>
-                <td className="replay-quarter-tname" style={{ color: awayTeam.color }}>
+                <td className="replay-quarter-tname team-ink" style={teamInkStyle(awayTeam.color)}>
                   {awayTeam.abbr}
                 </td>
                 {awayByQ.map((c, i) => (
@@ -1816,11 +1816,11 @@ export default function GameReplay({
       <div className="replay-leaders">
         <div className="panel-title">GAME LEADERS</div>
         <div className="replay-leaders-teams">
-          <div className="replay-leaders-team-tag home" style={{ color: homeTeam.color }}>
+          <div className="replay-leaders-team-tag home team-ink" style={teamInkStyle(homeTeam.color)}>
             <TeamBadge team={homeTeam} size={18} />
             {homeTeam.name}
           </div>
-          <div className="replay-leaders-team-tag away" style={{ color: awayTeam.color }}>
+          <div className="replay-leaders-team-tag away team-ink" style={teamInkStyle(awayTeam.color)}>
             {awayTeam.name}
             <TeamBadge team={awayTeam} size={18} />
           </div>

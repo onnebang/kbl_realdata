@@ -326,11 +326,11 @@ function tsBarRow(
   return (
     <div className="ts-row" key={label}>
       <div className="ts-nums">
-        <span className="ts-home" style={{ color: hColor }}>
+        <span className="ts-home team-ink" style={teamInkStyle(hColor)}>
           {hDisp}
         </span>
         <span className="ts-label">{label}</span>
-        <span className="ts-away" style={{ color: aColor }}>
+        <span className="ts-away team-ink" style={teamInkStyle(aColor)}>
           {aDisp}
         </span>
       </div>
@@ -354,11 +354,11 @@ function tsPctRow(label: string, hMade: number, hAtt: number, aMade: number, aAt
   return (
     <div className="ts-row" key={label}>
       <div className="ts-nums">
-        <span className="ts-home" style={{ color: hColor }}>
+        <span className="ts-home team-ink" style={teamInkStyle(hColor)}>
           {hPct}% <span className="ts-raw">{hMade}-{hAtt}</span>
         </span>
         <span className="ts-label">{label}</span>
-        <span className="ts-away" style={{ color: aColor }}>
+        <span className="ts-away team-ink" style={teamInkStyle(aColor)}>
           <span className="ts-raw">{aMade}-{aAtt}</span> {aPct}%
         </span>
       </div>
@@ -965,7 +965,7 @@ export default async function GamePage({
                           const tm = teamMetaByTcode.get(r.tcode);
                           const isCurrent = r.tcode === game.home_team?.tcode || r.tcode === game.away_team?.tcode;
                           return (
-                            <tr key={r.tcode} style={isCurrent ? { color: tm?.color } : undefined}>
+                            <tr key={r.tcode} className={isCurrent ? "team-ink" : undefined} style={isCurrent ? teamInkStyle(tm?.color) : undefined}>
                               <td>{i + 1}</td>
                               <td style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                 <TeamBadge team={tm ? { ...tm, logoUrl: tm.logo_url } : null} size={18} />
