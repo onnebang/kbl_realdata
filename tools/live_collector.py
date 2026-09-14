@@ -70,8 +70,8 @@ migrate_to_supabase.py --gmkeys + migrate_game_events_to_supabase.py --gmkeys --
   python live_collector.py --dry-run-source S47G03N16 --speed 60
                                                   # API 대신 끝난 경기를 재생(오프라인 검증)
 
-Windows 작업 스케줄러에 상시 서비스로 등록하는 건 이번 작업 범위 밖(사용자 판단 사항) -
-대신 --once가 "1분마다 실행" 트리거에 그대로 맞게 만들어뒀다. README의 운용 섹션 참고.
+무인 실행은 작업 스케줄러 KBL_LiveCollector(2026-09-14)가 매일 13:00부터 10분마다 이
+스크립트를 띄운다(떠 있으면 무시). 조건과 한계는 README의 운용 섹션 참고.
 """
 import argparse
 import datetime
@@ -149,6 +149,13 @@ RECONCILE_MAX_ATTEMPTS = 10
 MAX_RUNTIME_SEC = 12 * 3600
 STALL_TIMEOUT_SEC = 2 * 3600
 
+# 무인 실행(작업 스케줄러 KBL_LiveCollector, 2026-09-14). 수집기는 경기 시작 전에 미리 떠 있고,
+# 각 경기는 예정 시각 이 시간 전부터만 폴링한다. 예전엔 뜨자마자 오늘 경기 전부를 60초마다
+# 두드렸고, 아직 시작 전인 경기도 스톨 시계가 그 순간부터 돌아서 - 14:00·16:30 두 경기가 있는
+# 날 13:30에 켜면 16:30 경기가 15:30에 "2시간 동안 새 이벤트 없음"으로 시작도 전에 떨어졌다
+# (개막일 10/3이 정확히 이 편성). 이제 스톨 시계는 예정 시각부터 돈다(drop_stalled).
+PREGAME_LEAD_SEC = 30 * 60
+
 
 def log(msg):
     print(f"[live {datetime.datetime.now(KST).strftime('%H:%M:%S')}] {msg}", flush=True)
@@ -156,6 +163,37 @@ def log(msg):
 
 def kst_today():
     return datetime.datetime.now(KST).strftime("%Y-%m-%d")
+
+
+def tipoff_epoch(game_date, game_start):
+    """games.game_date(date) + game_start(time, KST) -> epoch 초. 시각을 모르면 0(= 바로 폴링)."""
+    if not game_date or not game_start:
+        return 0.0
+    return datetime.datetime.combine(game_date, game_start, tzinfo=KST).timestamp()
+
+
+def due_games(pending, tipoffs, now, lead=PREGAME_LEAD_SEC):
+    """지금 폴링할 경기 = 예정 시각 lead초 전을 지난 경기. 그 전엔 KBL API를 두드리지 않는다."""
+    return {gk for gk in pending if tipoffs.get(gk, 0.0) - lead <= now}
+
+
+def drop_stalled(pending, progress, summaries, now, stall_timeout):
+    """이번 주기 요약으로 진전(이벤트 수 증가) 시각을 갱신하고, stall_timeout 넘게 진전이 없는
+    경기를 돌려준다. progress는 gmkey -> (시계 시작/마지막 진전 시각, 본 이벤트 수).
+    시작 전 경기는 run()이 시계를 예정 시각에 맞춰 넣으므로 경기 전 대기 시간은 세지 않는다."""
+    for s in summaries:
+        seen = s.get("events") or 0
+        if seen > progress.get(s["gmkey"], (now, 0))[1]:
+            progress[s["gmkey"]] = (now, seen)
+    return {gk for gk in pending if now - progress.get(gk, (now, 0))[0] >= stall_timeout}
+
+
+def keep_awake():
+    """수집기가 떠 있는 동안 노트북이 유휴 절전에 들어가지 않게(Windows 전용). 프로세스가 끝나면
+    Windows가 알아서 푼다. 덮개를 닫아서 들어가는 절전은 막지 못한다."""
+    if os.name == "nt":
+        import ctypes
+        ctypes.windll.kernel32.SetThreadExecutionState(0x80000000 | 0x00000001)  # CONTINUOUS|SYSTEM_REQUIRED
 
 
 # ---------------------------------------------------------------------------
@@ -1015,14 +1053,15 @@ def select_target_games(cur, date_str, gmkey=None):
     is_ended=true인 경기는 이미 정산됐으므로 폴링 대상이 아니다."""
     if gmkey:
         cur.execute("""select gmkey, home_tcode, away_tcode, home_score, away_score,
-                              is_ended, game_date from games where gmkey=%s""", (gmkey,))
+                              is_ended, game_date, game_start from games where gmkey=%s""", (gmkey,))
     else:
         cur.execute("""select gmkey, home_tcode, away_tcode, home_score, away_score,
-                              is_ended, game_date
+                              is_ended, game_date, game_start
                        from games where game_date=%s and is_ended=false
                        order by game_start nulls last, gmkey""", (date_str,))
     return [{"gmkey": r[0], "home_tcode": r[1], "away_tcode": r[2], "home_score": r[3],
-             "away_score": r[4], "is_ended": r[5], "game_date": r[6]} for r in cur.fetchall()]
+             "away_score": r[4], "is_ended": r[5], "game_date": r[6], "game_start": r[7]}
+            for r in cur.fetchall()]
 
 
 def fetch_schedule_entries(date_str):
@@ -1135,9 +1174,9 @@ def poll_cycle(conn, ingestors, pending, snapshot_fn, schedule=None, reconcile=T
 
 def run(args):
     load_env_supabase()
-    log("승률 모델 로딩...")
-    import joblib
-    model = joblib.load(mge.MODEL_PATH)
+    # 모델은 폴링할 경기가 생겼을 때 읽는다 - 작업 스케줄러가 10분마다 띄우는데, 경기 없는
+    # 날까지 매번 sklearn을 올리면 한 번에 20초 넘게 걸린다.
+    model = None
 
     replay = None
     if args.dry_run_source:
@@ -1151,15 +1190,21 @@ def run(args):
     conn.autocommit = False
     ingestors, pending = {}, set()
     progress = {}   # gmkey -> (마지막으로 진전이 있었던 시각, 그때의 이벤트 수)
+    tipoffs = {}    # gmkey -> 예정 시각(epoch). 0이면 바로 폴링
     pinned = bool(args.gmkey or args.date or replay)
 
     def add_targets(cur, date_str):
         """대상 경기를 조회해서 아직 안 보던 경기를 ingestors/pending에 추가. 매 주기마다
         불려서 (a) 날짜가 넘어가면 새 날짜 경기를, (b) 당일 뒤늦게 편성/재개된 경기를 줍는다."""
+        nonlocal model
         games = select_target_games(cur, date_str, args.gmkey)
         fresh = [g for g in games if g["gmkey"] not in ingestors]
         if not fresh:
             return games, []
+        if model is None:
+            log("승률 모델 로딩...")
+            import joblib
+            model = joblib.load(mge.MODEL_PATH)
         pregame = load_pregame_context(cur, [g["gmkey"] for g in fresh])
         valid_pcodes = load_valid_pcodes(cur)
         now = time.time()
@@ -1174,7 +1219,13 @@ def run(args):
             ingestors[gk] = GameIngestor(gk, g["home_tcode"], g["away_tcode"], c,
                                          model, valid_pcodes)
             pending.add(gk)
-            progress[gk] = (now, -1)
+            # --gmkey/드라이런은 운용자가 '지금' 보겠다는 뜻이라 예정 시각을 보지 않는다.
+            tipoffs[gk] = 0.0 if (args.gmkey or replay) else tipoff_epoch(g["game_date"],
+                                                                          g["game_start"])
+            # 스톨 시계 시작점: 시작 전 경기는 예정 시각부터(경기 전 대기를 세지 않음), 이미
+            # 스코어가 있는 경기(수집기 재시작으로 다시 잡은 진행중 경기)는 지금부터.
+            started = g["home_score"] is not None
+            progress[gk] = (now if started or not tipoffs[gk] else tipoffs[gk], 0)
         return games, fresh
 
     try:
@@ -1208,10 +1259,25 @@ def run(args):
         log(f"대상 {len(games)}경기: {', '.join(sorted(pending))}")
         snapshot_fn = replay if replay else (
             lambda gk: fetch_snapshot(gk, raw_log=not args.no_raw_log))
-        began = time.time()
+        keep_awake()
+        # 수명 상한은 첫 경기를 폴링하기 시작한 때부터 잰다 - 13시에 떠서 22시 경기(12/31
+        # 농구영신)를 기다리면 뜬 시각 기준 12시간은 경기 도중 자정에 끝나버린다.
+        began = None
+        waiting_for = None
         while pending:
-            schedule = {} if replay else fetch_schedule_entries(date_str)
-            summaries = poll_cycle(conn, ingestors, pending, snapshot_fn, schedule)
+            now = time.time()
+            due = due_games(pending, tipoffs, now)
+            summaries = []
+            if due:
+                began = began or now
+                schedule = {} if replay else fetch_schedule_entries(date_str)
+                polled = set(due)
+                summaries = poll_cycle(conn, ingestors, polled, snapshot_fn, schedule)
+                pending -= due - polled   # poll_cycle은 넘겨받은 집합에서만 뺀다
+            elif waiting_for != min(tipoffs[gk] for gk in pending):
+                waiting_for = min(tipoffs[gk] for gk in pending)
+                log(f"다음 경기 {datetime.datetime.fromtimestamp(waiting_for, KST):%H:%M} - "
+                    f"{PREGAME_LEAD_SEC // 60}분 전부터 폴링(그때까지 대기)")
             if args.once:
                 log(f"--once - 1주기만 실행하고 종료(남은 경기 {len(pending)}건)")
                 return 0
@@ -1222,47 +1288,57 @@ def run(args):
             # (1) 진전 없는 경기 정리. 연기/취소된 경기는 문자중계가 영원히 비어 있어서
             #     detect_ended가 절대 True가 되지 않는다. 예전 구현은 그런 경기 하나 때문에
             #     `while pending`이 무한히 돌면서 다음 날 경기는 쳐다보지도 않았다.
-            now = time.time()
-            for s in summaries:
-                gk = s["gmkey"]
-                seen = s.get("events") or 0
-                last_ts, last_n = progress.get(gk, (now, -1))
-                if seen > last_n:
-                    progress[gk] = (now, seen)
-            for gk in sorted(pending):
-                last_ts, last_n = progress.get(gk, (now, -1))
-                if now - last_ts >= args.stall_timeout:
-                    log(f"  {gk}: {args.stall_timeout / 60:.0f}분 동안 새 이벤트 없음"
-                        f"(이벤트 {max(last_n, 0)}건) - 연기/취소/중계중단으로 보고 폴링 중단."
-                        f" is_ended는 건드리지 않는다(다음날 daily_batch가 정본을 넣는다).")
-                    pending.discard(gk)
+            for gk in sorted(drop_stalled(pending, progress, summaries, now, args.stall_timeout)):
+                log(f"  {gk}: {args.stall_timeout / 60:.0f}분 동안 새 이벤트 없음"
+                    f"(이벤트 {progress[gk][1]}건) - 연기/취소/중계중단으로 보고 폴링 중단."
+                    f" is_ended는 건드리지 않는다(다음날 daily_batch가 정본을 넣는다).")
+                pending.discard(gk)
             if not pending:
                 break
 
             # (2) 날짜 롤오버. --date/--gmkey/드라이런으로 고정된 실행은 그대로 두고,
-            #     기본 실행만 KST 날짜를 매 주기 다시 본다.
+            #     기본 실행만 KST 날짜를 매 주기 다시 본다. 이미 시작한 경기는 자정을 넘겨도
+            #     끝까지 따라간다(12/31 22:00 농구영신) - 내리는 건 시작도 안 한 경기뿐.
             if not pinned:
                 today = kst_today()
                 if today != date_str:
-                    log(f"KST 날짜가 {date_str} -> {today}로 바뀜. 이전 날짜의 미완 경기"
-                        f"{sorted(pending)}는 폴링 대상에서 내리고 오늘 경기로 넘어간다.")
-                    pending.clear()
+                    unstarted = {gk for gk in pending if progress[gk][1] == 0}
+                    log(f"KST 날짜가 {date_str} -> {today}로 바뀜. 시작 안 한 이전 날짜 경기"
+                        f"{sorted(unstarted)}는 내리고, 진행 중인 경기"
+                        f"{sorted(pending - unstarted)}는 끝까지 따라간다.")
+                    pending -= unstarted
                     date_str = today
-                with conn.cursor() as cur:
-                    _, fresh = add_targets(cur, date_str)
-                conn.commit()
+                # 조회 실패(네트워크·풀러 끊김)로 프로세스가 죽으면 그날 남은 경기를 통째로
+                # 놓친다 - 이번 주기만 건너뛰고 아래에서 재접속한다.
+                try:
+                    with conn.cursor() as cur:
+                        _, fresh = add_targets(cur, date_str)
+                    conn.commit()
+                except Exception as e:  # noqa: BLE001
+                    log(f"  대상 경기 재조회 실패({type(e).__name__}: {e}) - 다음 주기에 다시")
+                    fresh = []
                 if fresh:
                     log(f"신규 대상 {len(fresh)}경기 추가: "
                         f"{', '.join(g['gmkey'] for g in fresh)}")
 
             # (3) 수명 상한.
-            if now - began >= args.max_runtime:
+            if began and now - began >= args.max_runtime:
                 log(f"최대 실행시간 {args.max_runtime / 3600:.1f}시간 초과 - 수집기를 종료한다"
                     f"(남은 경기 {sorted(pending)}). 필요하면 다시 실행할 것.")
                 return 0
             if not pending:
                 break
             time.sleep(args.interval)
+
+            # (4) DB 재접속. 정산 서브프로세스가 길게 돌거나(최대 30분) 와이파이가 끊기면 Supabase
+            #     풀러가 연결을 닫는다. 예전엔 그 뒤 모든 주기가 실패하다 add_targets에서 죽었다.
+            if conn.closed:
+                log("DB 연결이 닫혀 있음 - 다시 연결")
+                try:
+                    conn = get_conn()
+                    conn.autocommit = False
+                except Exception as e:  # noqa: BLE001
+                    log(f"  재연결 실패({type(e).__name__}: {e}) - 다음 주기에 다시")
 
         log("오늘 대상 경기 전부 종료 - 수집기 종료.")
         return 0
