@@ -2,11 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getSeasonsWithWpaData, getWinContributionLeaderboard, type SortKey } from "@/lib/winContributionLeaderboard";
+import { curvePath, curvePos, getWinMoments, REGULATION_SEC, type BigPlay, type Comeback, type CurvePoint, type WeightPoint } from "@/lib/winMoments";
+import { teamBarStyle } from "@/lib/teamAccent";
 import styles from "./win-contribution.module.css";
 
-// wpa_leaderboard_template.html 포팅. 컬럼 순서/시맨틱 컬러(--pos/--neg)/explain-box 문구는
-// 템플릿 그대로, 데이터만 player_season_wpa 라이브 쿼리(lib/winContributionLeaderboard.ts)로
-// 유지. 템플릿과 다르게 판단한 부분은 이 파일 하단 주석/함수 옆 주석 참고.
+// "승부를 가른 순간"(2026-09-15 개편, 옛 "승리 기여도 리더보드").
+// 옛 화면은 선수 시즌 WPA 순위표였는데, 그 값은 시즌 득점과 r=0.991이라 사실상 득점 순위였다
+// (WPA가 넣은 슛에만 붙는다 - tools/rpc_win_moments.sql 머리 주석의 실측). 이 데이터가 확실히 말하는
+// '순간'을 앞에 둔다: 한 경기에서 승률을 가장 크게 움직인 장면, 이긴 팀이 거의 졌던 경기, 그리고 득점 대비
+// 무게(재현성이 약하다는 캡션과 함께, 순위 없이). 선수별 표는 맨 아래 접어 둔다.
+
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "games", label: "GP" },
   { key: "totalWpa", label: "WPA" },
@@ -15,48 +20,210 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "negWpa", label: "-WPA" },
 ];
 
-function fmtWpa(v: number, decimals = 2) {
-  return `${v > 0 ? "+" : ""}${v.toFixed(decimals)}`;
+const fmtWpa = (v: number, decimals = 2) => `${v > 0 ? "+" : ""}${v.toFixed(decimals)}`;
+const pctInt = (p: number) => `${Math.round(p * 100)}%`;
+/** 최저 승률은 10% 아래에서 소수 한 자리 - 1%와 4%는 같은 '한 자리'가 아니다. */
+const pctLow = (p: number) => (p < 0.1 ? `${(p * 100).toFixed(1)}%` : pctInt(p));
+const shortDate = (d: string) => `${d.slice(2, 4)}.${d.slice(5, 7)}.${d.slice(8, 10)}`;
+
+const CURVE_W = 300;
+const CURVE_H = 80;
+
+function Curve({ curve, elapsed, prob, tall }: { curve: CurvePoint[]; elapsed: number; prob: number; tall?: boolean }) {
+  const xMax = Math.max(REGULATION_SEC, curve.length ? curve[curve.length - 1][0] : 0);
+  return (
+    <div className={`${styles.curve} ${tall ? styles.curveTall : ""}`} aria-hidden="true">
+      <svg viewBox={`0 0 ${CURVE_W} ${CURVE_H}`} preserveAspectRatio="none">
+        {[600, 1200, 1800].map((t) => (
+          <line key={t} x1={(t / xMax) * CURVE_W} x2={(t / xMax) * CURVE_W} y1={0} y2={CURVE_H} className={styles.curveQuarter} vectorEffect="non-scaling-stroke" />
+        ))}
+        <line x1={0} x2={CURVE_W} y1={CURVE_H / 2} y2={CURVE_H / 2} className={styles.curveMid} vectorEffect="non-scaling-stroke" />
+        <path d={curvePath(curve, CURVE_W, CURVE_H)} className={styles.curveLine} vectorEffect="non-scaling-stroke" />
+      </svg>
+      <span className={styles.curveDot} style={curvePos(curve, elapsed, prob)} />
+    </div>
+  );
 }
 
-export default async function WinContributionPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ season?: string; sort?: string; dir?: string }>;
-}) {
+function resultLine(p: BigPlay) {
+  return `최종 ${p.finalTeam}-${p.finalOpp} ${p.won ? "승리" : "패배"}`;
+}
+
+function HeroPlay({ p }: { p: BigPlay }) {
+  return (
+    <article className={styles.hero} style={teamBarStyle(p.team.color)}>
+      <div className={styles.heroNum}>
+        <span className={styles.swing}>+{Math.round(p.wpa * 100)}</span>
+        <span className={styles.swingUnit}>%p</span>
+        <div className={styles.numLabel}>승률 상승</div>
+      </div>
+      <div className={styles.heroText}>
+        <div className={styles.kicker}>
+          {shortDate(p.gameDate)} · {p.period} {p.clock} · {p.shot}
+        </div>
+        <Link href={`/players/${p.pcode}`} className={styles.heroName}>
+          {p.playerName}
+        </Link>
+        <div className={styles.context}>
+          {p.team.name} {p.teamScore}-{p.oppScore} {p.opp.name}
+        </div>
+        <div className={styles.result}>
+          직전 승률 {pctInt(p.probBefore)} · {resultLine(p)}
+        </div>
+        <Link href={`/games/${p.gmkey}`} className={styles.gameLink}>
+          이 경기 보기
+        </Link>
+      </div>
+      <Curve curve={p.curve} elapsed={p.elapsed} prob={Math.min(1, p.probBefore + p.wpa)} tall />
+    </article>
+  );
+}
+
+function PlayCard({ p, rank }: { p: BigPlay; rank: number }) {
+  return (
+    <article className={styles.card} style={teamBarStyle(p.team.color)}>
+      <div className={styles.cardTop}>
+        <span className={styles.rank}>{rank}</span>
+        <span className={styles.cardSwing}>+{Math.round(p.wpa * 100)}%p</span>
+      </div>
+      <Link href={`/players/${p.pcode}`} className={styles.cardName}>
+        {p.playerName}
+      </Link>
+      <div className={styles.cardLine}>
+        {p.period} {p.clock} · {p.shot} · {p.team.name} {p.teamScore}-{p.oppScore} {p.opp.name}
+      </div>
+      <Curve curve={p.curve} elapsed={p.elapsed} prob={Math.min(1, p.probBefore + p.wpa)} />
+      <div className={styles.cardFoot}>
+        <span>
+          {shortDate(p.gameDate)} · 직전 {pctInt(p.probBefore)} · {resultLine(p)}
+        </span>
+        <Link href={`/games/${p.gmkey}`}>경기 보기</Link>
+      </div>
+    </article>
+  );
+}
+
+function ComebackCard({ c }: { c: Comeback }) {
+  const trailing = c.winnerScoreAtMin < c.loserScoreAtMin;
+  return (
+    <article className={styles.card} style={teamBarStyle(c.winner.color)}>
+      <div className={styles.cardTop}>
+        <span className={styles.lowProb}>{pctLow(c.minProb)}</span>
+        <span className={styles.numLabel}>이긴 팀의 최저 승률</span>
+      </div>
+      <div className={styles.cardName}>
+        {c.winner.name} {c.finalWinner}-{c.finalLoser} {c.loser.name}
+      </div>
+      <div className={styles.cardLine}>
+        {c.period} {c.clock}, {c.winnerScoreAtMin}-{c.loserScoreAtMin}
+        {trailing ? `로 ${c.loserScoreAtMin - c.winnerScoreAtMin}점 뒤질 때` : "일 때"}
+      </div>
+      <Curve curve={c.curve} elapsed={c.elapsed} prob={c.minProb} />
+      <div className={styles.cardFoot}>
+        <span>{shortDate(c.gameDate)}</span>
+        <Link href={`/games/${c.gmkey}`}>경기 보기</Link>
+      </div>
+    </article>
+  );
+}
+
+function WeightScatter({ players, perPoint, r }: { players: WeightPoint[]; perPoint: number; r: number }) {
+  const xMax = Math.ceil(Math.max(100, ...players.map((p) => p.pts)) / 100) * 100;
+  const yMax = Math.ceil(Math.max(1, ...players.map((p) => p.wpa)) / 2) * 2;
+  // 선 위/아래로 가장 멀리 떨어진 선수(득점 대비 비율)만 이름을 단다 - 순위가 아니라 읽을 거리.
+  const byRatio = players.filter((p) => p.pts >= 400).map((p) => ({ p, ratio: p.wpa / (p.pts * perPoint) - 1 })).sort((a, b) => b.ratio - a.ratio);
+  const labeled = new Set([...byRatio.slice(0, 3), ...byRatio.slice(-3)].map((x) => x.p.pcode));
+  const lineEnd = Math.min(yMax, xMax * perPoint);
+  return (
+    <div className={styles.scatterWrap}>
+      <div className={styles.yAxisLabel}>시즌 WPA 합계 ↑</div>
+      <div className={styles.scatter}>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          {[25, 50, 75].map((g) => (
+            <g key={g}>
+              <line x1={g} x2={g} y1={0} y2={100} className={styles.grid} vectorEffect="non-scaling-stroke" />
+              <line x1={0} x2={100} y1={g} y2={g} className={styles.grid} vectorEffect="non-scaling-stroke" />
+            </g>
+          ))}
+          <line x1={0} y1={100} x2={(lineEnd / perPoint / xMax) * 100} y2={100 - (lineEnd / yMax) * 100} className={styles.leagueLine} vectorEffect="non-scaling-stroke" />
+        </svg>
+        {players.map((p) => {
+          const left = (p.pts / xMax) * 100;
+          const bottom = (Math.max(0, p.wpa) / yMax) * 100;
+          const above = p.wpa >= p.pts * perPoint;
+          return (
+            <Link
+              key={p.pcode}
+              href={`/players/${p.pcode}`}
+              className={`${styles.dot} ${above ? styles.dotAbove : styles.dotBelow}`}
+              style={{ left: `${left}%`, bottom: `${bottom}%` }}
+              aria-label={`${p.playerName} ${p.team.name} · ${p.pts}점 · WPA ${p.wpa.toFixed(2)}`}
+              title={`${p.playerName} (${p.team.name}) · ${p.pts}점 · WPA ${p.wpa.toFixed(2)}`}
+            />
+          );
+        })}
+        {players
+          .filter((p) => labeled.has(p.pcode))
+          .map((p) => {
+            const left = (p.pts / xMax) * 100;
+            return (
+              <span
+                key={`l-${p.pcode}`}
+                className={`${styles.dotLabel} ${left > 70 ? styles.dotLabelLeft : ""}`}
+                style={{ left: `${left}%`, bottom: `${(Math.max(0, p.wpa) / yMax) * 100}%` }}
+              >
+                {p.playerName}
+              </span>
+            );
+          })}
+        <span className={styles.axisTick} style={{ left: "100%", bottom: 0 }}>
+          {xMax}점
+        </span>
+        <span className={`${styles.axisTick} ${styles.axisTickY}`} style={{ left: 0, bottom: "100%" }}>
+          {yMax}
+        </span>
+      </div>
+      <div className={styles.xAxisLabel}>시즌 득점 →</div>
+      <div className={styles.legend}>
+        <span>
+          <i className={styles.legendLine} /> 리그 평균 무게(1점당 WPA {perPoint.toFixed(4)})
+        </span>
+        <span>
+          <i className={`${styles.legendDot} ${styles.dotAbove}`} /> 선 위: 같은 득점을 더 큰 순간에
+        </span>
+        <span>
+          <i className={`${styles.legendDot} ${styles.dotBelow}`} /> 선 아래
+        </span>
+        <span className={styles.legendR}>득점과 WPA의 상관 r = {r.toFixed(2)}</span>
+      </div>
+    </div>
+  );
+}
+
+export default async function WinContributionPage({ searchParams }: { searchParams: Promise<{ season?: string; sort?: string; dir?: string }> }) {
   const { season, sort, dir } = await searchParams;
   const seasons = await getSeasonsWithWpaData();
-  const activeSeason = season ?? seasons[0];
+  const activeSeason = season && seasons.includes(season) ? season : seasons[0];
   const sortKey = (COLUMNS.find((c) => c.key === sort)?.key ?? "totalWpa") as SortKey;
   const ascending = dir === "asc";
 
-  const rows = await getWinContributionLeaderboard(activeSeason, sortKey, ascending);
-  // 템플릿 renderBars(): 정렬 기준과 무관하게 TOP10은 항상 totalWpa 내림차순.
-  const top10 = rows
-    .slice()
-    .sort((a, b) => b.totalWpa - a.totalWpa)
-    .slice(0, 10);
-  const maxAbs = Math.max(0.1, ...top10.map((r) => Math.abs(r.totalWpa)));
-
-  const sortLink = (key: SortKey) => {
-    const nextDir = sortKey === key && !ascending ? "asc" : "desc";
-    return `?season=${encodeURIComponent(activeSeason)}&sort=${key}&dir=${nextDir}`;
-  };
+  const [moments, rows] = await Promise.all([getWinMoments(activeSeason), getWinContributionLeaderboard(activeSeason, sortKey, ascending)]);
+  const [hero, ...restPlays] = moments.plays;
+  const sortLink = (key: SortKey) => `?season=${encodeURIComponent(activeSeason)}&sort=${key}&dir=${sortKey === key && !ascending ? "asc" : "desc"}#table`;
 
   return (
     <div className={styles.pageRoot}>
       <div className="wrap">
-        <div className={styles.headerRow}>
+        <header className={styles.headerRow}>
           <div>
-            <div className={`title ${styles.titleSize}`}>승리 기여도 리더보드</div>
-            <div className={`subtitle ${styles.subtitleWidth}`}>
-              Win Probability Added(WPA) - 이 선수의 플레이가 우리 팀 승률을 얼마나 끌어올렸는지 매 이벤트마다
-              계산해서 시즌 전체로 누적한 값. 라이브 승률 모델(HistGradientBoosting, 홀드아웃 정확도 74.7%)을
-              그대로 재사용.
-            </div>
+            <h1 className={`title ${styles.title}`}>승부를 가른 순간</h1>
+            <p className={`subtitle ${styles.lede}`}>
+              같은 3점도 언제 넣었느냐에 따라 무게가 다릅니다. {activeSeason} 정규시즌에서 경기 중 승률을 한 번에 가장 크게
+              움직인 장면과, 거의 진 경기를 뒤집은 역전을 모았습니다.
+            </p>
           </div>
           <form className={styles.seasonForm}>
-            <select name="season" defaultValue={activeSeason}>
+            <select name="season" defaultValue={activeSeason} aria-label="시즌">
               {seasons.map((s) => (
                 <option key={s} value={s}>
                   {s} 시즌
@@ -67,33 +234,66 @@ export default async function WinContributionPage({
               시즌 보기
             </button>
           </form>
-        </div>
+        </header>
 
-        <div className="panel">
-          <div className={`panel-title ${styles.panelTitle}`}>{activeSeason} 시즌 승리 기여도 TOP 10</div>
-          {top10.map((r, i) => {
-            const pct = Math.max(4, (Math.abs(r.totalWpa) / maxAbs) * 100);
-            const sign = r.totalWpa >= 0 ? styles.pos : styles.neg;
-            return (
-              <div className={styles.barRow} key={r.pcode}>
-                <div className={styles.barRank}>{i + 1}</div>
-                <div className={styles.barNameWrap}>
-                  <Link href={`/players/${r.pcode}`} className={styles.barName}>
-                    {r.playerName}
-                  </Link>
-                  <div className={styles.barTeam}>{r.teamName}</div>
-                </div>
-                <div className={styles.barTrack}>
-                  <div className={`${styles.barFill} ${sign}`} style={{ width: `${pct}%` }} />
-                </div>
-                <div className={`${styles.barVal} ${sign}`}>{fmtWpa(r.totalWpa)}</div>
-              </div>
-            );
-          })}
-        </div>
+        {hero && (
+          <section className={styles.section}>
+            <div className={styles.sectionHead}>
+              <h2 className={styles.sectionTitle}>시즌 최고의 한 방</h2>
+              <span className={styles.sectionNote}>한 경기에서 가장 큰 장면 하나씩 · 득점한 팀의 승률이 오른 폭</span>
+            </div>
+            <HeroPlay p={hero} />
+            <div className={styles.grid3}>
+              {restPlays.map((p, i) => (
+                <PlayCard key={p.gmkey} p={p} rank={i + 2} />
+              ))}
+            </div>
+            <p className={styles.note}>
+              곡선은 그 팀의 경기 중 승률(가운데 선 50%, 세로 줄은 쿼터), 금색 점이 그 장면입니다. 승률 모델은 점수와 남은 시간만 보기
+              때문에 경기 종료 버저 순간의 승률을 100%로 올리지 못합니다 - 곡선 끝은 실제 결과로 닫았습니다.
+            </p>
+          </section>
+        )}
 
-        <div className="panel">
-          <div className={`panel-title ${styles.panelTitle}`}>전체 순위 (열 제목을 클릭하면 정렬)</div>
+        {moments.comebacks.length > 0 && (
+          <section className={styles.section}>
+            <div className={styles.sectionHead}>
+              <h2 className={styles.sectionTitle}>가장 극적인 역전</h2>
+              <span className={styles.sectionNote}>이긴 팀의 경기 중 최저 승률이 낮았던 순</span>
+            </div>
+            <div className={styles.grid3}>
+              {moments.comebacks.map((c) => (
+                <ComebackCard key={c.gmkey} c={c} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {moments.weight.players.length > 0 && (
+          <section className={styles.section}>
+            <div className={styles.sectionHead}>
+              <h2 className={styles.sectionTitle}>득점의 무게</h2>
+              <span className={styles.sectionNote}>점 하나가 선수 한 명 · 시즌 200점 이상 {moments.weight.players.length}명</span>
+            </div>
+            <div className={styles.panelBox}>
+              <WeightScatter players={moments.weight.players} perPoint={moments.weight.perPoint} r={moments.weight.r} />
+              <ul className={styles.captions}>
+                <li>
+                  WPA는 넣은 슛에 거의 전부 붙습니다(실패한 슛·턴오버·리바운드는 승률 모델이 점수와 시간만 보기 때문에 거의 0). 그래서
+                  세로 위치는 득점과 함께 움직입니다(r = {moments.weight.r.toFixed(2)}).
+                </li>
+                <li>
+                  선에서 벗어난 만큼이 &ldquo;같은 득점을 얼마나 승부가 걸린 순간에 넣었나&rdquo;입니다. 다만 한 시즌을 홀·짝 경기로 나눠
+                  보면 이 차이는 약하게만 재현되고(r 0.36, 최근 3시즌), 소속 팀이 접전을 얼마나 치르는지에도 좌우됩니다 - 순위로 읽지
+                  마세요.
+                </li>
+              </ul>
+            </div>
+          </section>
+        )}
+
+        <details className={styles.tableDetails} id="table" open={Boolean(sort)}>
+          <summary className={styles.tableSummary}>선수별 WPA 표 전체 ({rows.length}명)</summary>
           <div className="table-scroll">
             <table className={`data-table ${styles.table}`}>
               <thead>
@@ -125,7 +325,7 @@ export default async function WinContributionPage({
                       <TeamBadge team={{ name: r.teamName, abbr: r.teamAbbr, color: r.teamColor, logoUrl: r.teamLogoUrl }} size={20} />
                     </td>
                     <td>{r.games}</td>
-                    <td className={r.totalWpa >= 0 ? styles.totalPos : styles.totalNeg}>{fmtWpa(r.totalWpa)}</td>
+                    <td className={styles.totalCell}>{fmtWpa(r.totalWpa)}</td>
                     <td>{fmtWpa(r.wpaPerGame, 3)}</td>
                     <td>{fmtWpa(r.posWpa)}</td>
                     <td>{fmtWpa(r.negWpa)}</td>
@@ -135,24 +335,19 @@ export default async function WinContributionPage({
             </table>
           </div>
           <div className={styles.explainBox}>
-            <b>WPA(Win Probability Added)</b>란 - 그 플레이 직전 승률과 직후 승률의 차이를 그 선수에게
-            귀속시킨 값. 원정팀 플레이는 부호를 뒤집어 &quot;자기 팀 입장에서 얼마나 도움이 됐는가&quot;로
-            통일했음. <span className={styles.term}>+WPA</span>는 승률을 끌어올린 플레이만 합산,{" "}
-            <span className={styles.term}>-WPA</span>는 끌어내린 플레이(턴오버, 실책성 파울 등 개인 귀속
-            가능한 것)만 합산한 값. 정규시즌 경기만 포함(플레이오프는 팀마다 경기수가 달라 같은 잣대로 순위
-            매기기 어려워 제외), 한 시즌 15개 이상 개인 귀속 플레이가 있는 선수만 표시.
+            <b>WPA(Win Probability Added)</b> - 플레이 직전과 직후의 승률 차이를 그 선수에게 붙인 값(원정팀은 부호를 뒤집어 자기 팀
+            기준). +WPA는 올린 플레이만, -WPA는 내린 플레이만 합산. 실측상 값은 거의 넣은 슛에만 붙어서 -WPA가 작고 합계는 득점과
+            함께 움직입니다. 정규시즌만 포함.
           </div>
-        </div>
+        </details>
 
-        <footer className="foot">
-          {activeSeason} 시즌 · {rows.length}명 · 시즌 WPA 집계에서 실시간 조회
-        </footer>
+        <footer className="foot">{activeSeason} 정규시즌 · 경기 이벤트 승률 모델 기준</footer>
       </div>
     </div>
   );
 }
 
 export const metadata: Metadata = {
-  title: "승리 기여도",
-  description: "경기 중 승률을 얼마나 움직였는지(WPA)로 본 선수 순위",
+  title: "승부를 가른 순간",
+  description: "경기 중 승률을 한 번에 가장 크게 움직인 장면, 이긴 팀이 거의 졌던 역전 경기, 득점의 무게",
 };

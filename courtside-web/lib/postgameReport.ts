@@ -99,7 +99,7 @@ export const QUARTER_ORDER = ["Q1", "Q2", "Q3", "Q4", "X1", "X2", "X3", "X4", "E
 export function quarterLenSec(q: string) {
   return q === "Q1" || q === "Q2" || q === "Q3" || q === "Q4" ? 600 : 300;
 }
-function cumulativeElapsed(q: string, m: number, s: number): number {
+export function cumulativeElapsed(q: string, m: number, s: number): number {
   const idx = QUARTER_ORDER.indexOf(q);
   let prior = 0;
   for (let i = 0; i < (idx === -1 ? QUARTER_ORDER.length : idx); i++) prior += quarterLenSec(QUARTER_ORDER[i]);

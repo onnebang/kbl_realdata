@@ -21,7 +21,7 @@ const ANALYSIS_LINKS = [
   { href: "/lineups", label: "선수별 조합" },
   { href: "/season-browser", label: "시즌 브라우저" },
   { href: "/leaderboards/season", label: "시즌 리더보드" },
-  { href: "/leaderboards/win-contribution", label: "승리 기여도" },
+  { href: "/leaderboards/win-contribution", label: "승부를 가른 순간" },
   { href: "/leaderboards/scoring-explorer", label: "슈팅 리포트" },
   { href: "/leaderboards/form-index", label: "폼 지수" },
   { href: "/leaderboards/custom-metric", label: "커스텀 지표" },

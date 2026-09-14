@@ -1,37 +1,23 @@
-/* wpa_leaderboard_template.html 포팅 - 이 페이지 전용 스코프. globals.css는 건드리지
-   않고, 템플릿에서 이 페이지만 쓰는 값(시맨틱 --pos/--neg 컬러, TOP10 바 차트 grid 폭,
-   패널 타이틀 모노 스타일, explain-box)을 이 클래스들로 별도 정의함. globals.css의
-   .wrap/.panel/.table-scroll/.data-table/.foot는 그대로 재사용(className으로 병기).
+/* "승부를 가른 순간" - 이 페이지 전용 스코프. globals.css의 .wrap/.title/.subtitle/.table-scroll/.data-table/.foot/
+   .btn-primary는 그대로 쓰고(className 병기), 장면 카드·곡선·산점도만 여기서 정의한다.
+   브랜드 규칙(globals.css 머리 계약): 팀 색은 글자가 아니라 막대(--tb-l/--tb-d, 3:1), 숫자 목소리는 Big Shoulders
+   (라틴·숫자만), 한글 표제는 Pretendard 800, 움직임 없음, 모서리는 담는 것 --r-card / 데이터 조각 --r-led. */
 
-   --pos/--neg는 팀 컬러(--home/--away)가 아니라 "WPA 양수=파랑, 음수=빨강"이라는 절대적
-   의미의 시맨틱 컬러 - 템플릿 :root 값 그대로. globals.css의 .wpa-bar-.../.wpa-pos/.wpa-neg는
-   form-index 등 다른 페이지와 공유하는 초록/주황 톤이라 여기서는 쓰지 않음. */
 .pageRoot {
-  --pos: #0b3d91;
-  --neg: #c8102e;
-}
-@media (prefers-color-scheme: dark) {
-  .pageRoot {
-    --pos: #5b8fd9;
-    --neg: #ff6b81;
-  }
 }
 
-/* 헤더: 타이틀+부제 좌측, 시즌 폼 우측 - 템플릿 .header-row 레이아웃 그대로.
-   (템플릿은 select 하나만 두고 onchange로 즉시 갱신하지만, 이 사이트는 시즌 변경 시
-   서버에서 새로 쿼리해야 해서 - 다른 리더보드 페이지들과 같은 이유로 - submit 버튼이
-   달린 폼을 씀. 레이아웃 위치만 템플릿처럼 헤더 우측으로 맞춤.) */
 .headerRow {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: flex-end;
+  gap: 12px 20px;
   flex-wrap: wrap;
 }
-.titleSize {
+.title {
   font-size: var(--fs-700);
 }
-.subtitleWidth {
+.lede {
+  max-width: var(--measure-read);
 }
 .seasonForm {
   display: flex;
@@ -39,93 +25,383 @@
   flex-shrink: 0;
 }
 
-/* 패널 제목이 한글 문장("...시즌 승리 기여도 TOP 10")이라 모노를 쓰지 않는다 - globals.css
-   .panel-title과 같은 서체·크기로 맞추고 여백만 이 페이지 값으로 유지. */
-.panelTitle {
-  font-family: "Pretendard", system-ui, sans-serif;
-  font-size: var(--fs-200);
+/* ── 구간 ── */
+.section {
+  margin-top: 34px;
+}
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-bottom: 12px;
+}
+.sectionTitle {
+  margin: 0;
+  font-size: var(--fs-500);
   font-weight: 800;
   letter-spacing: -0.02em;
-  margin-bottom: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+/* 중계 자막 탭 - 감독·선수 프로필과 같은 언어. 페이지 전체의 팀이 없어서 금색. */
+.sectionTitle::before {
+  content: "";
+  flex: none;
+  width: 12px;
+  height: 1.1em;
+  background: var(--gold);
+  clip-path: polygon(0 0, 100% 0, 50% 100%, 0 100%);
+}
+.sectionNote {
+  font-size: var(--fs-200);
+  color: var(--ink-faint);
+}
+.note {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink-faint);
+  max-width: 88ch;
 }
 
-/* TOP10 바 차트 - 템플릿 .bar-row grid 그대로: 26px(순위) 108px(이름) 1fr(바) 60px(값) */
-.barRow {
-  display: grid;
-  grid-template-columns: 26px 108px 1fr 60px;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 0;
+/* ── 승률 곡선(장면·역전 카드 공용) ── */
+.curve {
+  position: relative;
+  height: 64px;
+  margin-top: 10px;
 }
-/* 순위 숫자 = 스코어보드 목소리(tabular-nums · -0.01em). 숫자만 들어오는 자리다. */
-.barRank {
+.curveTall {
+  height: 132px;
+  margin-top: 0;
+}
+.curve svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.curveQuarter {
+  stroke: rgba(var(--line-rgb), 0.08);
+  stroke-width: 1;
+}
+.curveMid {
+  stroke: rgba(var(--line-rgb), 0.22);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.curveLine {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.curveDot {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* ── 가장 큰 한 방(히어로) - 이 페이지의 주인공 하나 ── */
+.hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.15fr);
+  align-items: center;
+  gap: 18px 28px;
+  padding: 22px 24px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-left: 6px solid var(--tb-l, var(--ink-faint));
+  border-radius: var(--r-card);
+}
+.heroNum {
+  line-height: 1;
+}
+.swing {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: var(--fs-300);
-  line-height: var(--lh-tight);
+  font-size: clamp(64px, 9vw, 104px);
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
+}
+.swingUnit {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: var(--fs-600);
+  margin-left: 2px;
+}
+.numLabel {
+  font-size: var(--fs-200);
+  font-weight: 600;
+  color: var(--ink-faint);
+  margin-top: 4px;
+}
+.heroText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kicker {
+  font-size: var(--fs-200);
+  font-weight: 600;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.heroName {
+  font-size: var(--fs-600);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.context {
+  font-size: var(--fs-400);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.result {
+  font-size: var(--fs-200);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.gameLink {
+  margin-top: 6px;
+  align-self: flex-start;
+  font-size: var(--fs-200);
+  font-weight: 700;
+  color: var(--ink);
+  border-bottom: 2px solid var(--gold);
+}
+
+/* ── 카드 격자(나머지 장면·역전) ── */
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 16px 12px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-left: 4px solid var(--tb-l, var(--ink-faint));
+  border-radius: var(--r-card);
+  min-width: 0;
+}
+.cardTop {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.rank {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: var(--fs-400);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.cardSwing,
+.lowProb {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: var(--fs-600);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.cardName {
+  font-size: var(--fs-400);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.cardLine {
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.cardFoot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.08);
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.cardFoot a {
+  flex: none;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  .hero,
+  .card {
+    border-left-color: var(--tb-d, var(--ink-faint));
+  }
+}
+
+/* ── 득점의 무게(산점도) ── */
+.panelBox {
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: var(--r-card);
+  padding: 16px 18px 14px;
+}
+.scatterWrap {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "y plot"
+    ". x"
+    "legend legend";
+  gap: 6px 10px;
+}
+.yAxisLabel {
+  grid-area: y;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 12.5px;
   color: var(--ink-faint);
   text-align: center;
 }
-.barNameWrap {
-  min-width: 0;
+.xAxisLabel {
+  grid-area: x;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  text-align: right;
 }
-.barName {
-  display: block;
+.scatter {
+  grid-area: plot;
+  position: relative;
+  aspect-ratio: 16 / 8;
+  max-width: 100%;
+  border-left: 1px solid rgba(var(--line-rgb), 0.3);
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.3);
+}
+.scatter svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.grid {
+  stroke: rgba(var(--line-rgb), 0.07);
+  stroke-width: 1;
+}
+.leagueLine {
+  stroke: var(--gold);
+  stroke-width: 2;
+}
+.dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: 0 0 -5px -5px;
+  border-radius: 50%;
+}
+/* 선 위/아래는 좋고 나쁨이 아니라 방향이라 의미색(pos/neg)이 아니라 잉크 농도로만 가른다. */
+.dotAbove {
+  background: var(--ink);
+}
+.dotBelow {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--ink-soft);
+}
+.dot:hover,
+.dot:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.dotLabel {
+  position: absolute;
+  transform: translate(9px, 50%);
   font-size: 12.5px;
   font-weight: 700;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  pointer-events: none;
+  text-shadow: 0 0 3px var(--surface), 0 0 3px var(--surface);
 }
-/* 팀 이름은 한글이라 Pretendard. */
-.barTeam {
-  font-family: "Pretendard", system-ui, sans-serif;
-  font-size: var(--fs-100);
+.dotLabelLeft {
+  transform: translate(calc(-100% - 9px), 50%);
+}
+.axisTick {
+  position: absolute;
+  transform: translate(-100%, calc(100% + 4px));
+  font-size: 12.5px;
   color: var(--ink-faint);
-}
-/* 미터는 데이터 조각이라 하드 엣지(--r-led). */
-.barTrack {
-  height: 20px;
-  border-radius: var(--r-led);
-  background: var(--surface-soft);
-  overflow: hidden;
-}
-.barFill {
-  height: 100%;
-  border-radius: var(--r-led);
-}
-/* 값도 스코어보드 목소리로 - fmtWpa()는 부호+숫자만 만든다(한글 폴백 없음). */
-.barVal {
-  font-family: "Big Shoulders Display", sans-serif;
-  font-size: var(--fs-300);
-  line-height: var(--lh-tight);
-  letter-spacing: -0.01em;
-  font-weight: 800;
-  text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.pos {
-  color: var(--pos);
+.axisTickY {
+  transform: translate(calc(-100% - 6px), 50%);
 }
-.neg {
-  color: var(--neg);
+.legend {
+  grid-area: legend;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
 }
-.barFill.pos {
-  background: var(--pos);
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
-.barFill.neg {
-  background: var(--neg);
+.legendLine {
+  display: inline-block;
+  width: 18px;
+  height: 2px;
+  background: var(--gold);
+}
+.legendDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.legendR {
+  font-variant-numeric: tabular-nums;
+}
+.captions {
+  margin: 12px 0 0;
+  padding-left: 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-soft);
 }
 
-/* 전체 테이블 - globals.css .data-table 위에 템플릿 고유 사이즈(폰트 12.5px, th 10.5px,
-   td 패딩 8px 6px)만 오버라이드. 팀 컬럼은 배지만(이름 텍스트 없음), WPA 컬럼만 +/-로 채색
-   (WPA/G, +WPA, -WPA는 템플릿에서 특별히 채색하지 않음). */
+/* ── 접어 둔 선수별 표 ── */
+.tableDetails {
+  margin-top: 34px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: var(--r-card);
+  padding: 12px 16px;
+}
+.tableSummary {
+  cursor: pointer;
+  font-size: var(--fs-300);
+  font-weight: 800;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
 .table {
   font-size: 12.5px;
 }
-/* 열 제목은 라벨이라 값(td 12.5px)보다 한 단계 아래로 - 라벨이 값과 같은 크기면 위계가 없다. */
 .table th {
   font-size: var(--fs-100);
   padding: 8px 6px;
@@ -133,17 +409,18 @@
 .table td {
   padding: 8px 6px;
 }
-/* 표 안 순위 셀도 스코어보드 목소리. 나머지 숫자 칸은 .data-table의 tabular-nums 그대로 둔다. */
 .rankCell {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
   font-size: var(--fs-300);
-  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
   width: 30px;
 }
 .playerCell {
+  font-weight: 700;
+}
+.totalCell {
   font-weight: 700;
 }
 .sortLink {
@@ -152,47 +429,45 @@
 .activeHeader {
   color: var(--ink);
 }
-/* 정렬 화살표 - opacity를 걷어냈다(알파를 씌우면 --ink-faint의 대비가 다시 무너진다). */
 .arrow {
   font-size: var(--fs-100);
   margin-left: 2px;
 }
-.totalPos {
-  color: var(--pos);
-  font-weight: 700;
-}
-.totalNeg {
-  color: var(--neg);
-  font-weight: 700;
-}
-
 .explainBox {
   margin-top: 14px;
-  font-size: var(--fs-100);
-  line-height: 1.8;
+  font-size: 12.5px;
+  line-height: 1.7;
   color: var(--ink-soft);
 }
 .explainBox b {
   color: var(--ink);
 }
-.term {
-  border-bottom: 1px dotted var(--ink-faint);
-}
 
-@media (max-width: 560px) {
-  .titleSize {
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .hero .curve {
+    grid-column: 1 / -1;
+  }
+  .grid3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .title {
     font-size: var(--fs-600);
   }
-  .barRow {
-    grid-template-columns: 20px 84px 1fr 54px;
-    gap: 6px;
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 18px 16px;
   }
-  .table th,
-  .table td {
-    padding: 6px 4px;
+  .grid3 {
+    grid-template-columns: minmax(0, 1fr);
   }
-  /* 표 행은 손가락으로 짚는 자리다(선수 칸이 링크) - 셀 height는 표 레이아웃에서 최소
-     높이로 동작하므로 이 한 줄이 행 전체를 44px로 올린다. */
+  .scatter {
+    aspect-ratio: 4 / 3;
+  }
   .table td {
     height: 44px;
   }
