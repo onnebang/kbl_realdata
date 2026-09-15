@@ -59,6 +59,7 @@ import { RECENT_RATE_PARAM, resolveRecentRate } from "@/lib/recentWindow";
 import { SynergyCombos } from "@/components/SynergyCombos";
 import { WinImpactPanel } from "@/components/WinImpact";
 import { getWinImpact } from "@/lib/winImpact";
+import { getFormIndexLeaderboard, per100Se, type FormIndexRow } from "@/lib/formIndex";
 import styles from "./player-profile.module.css";
 
 // "데이터 사이언스 + 데이터로 아름다움" 대개편(요청) - sportsjobs.online 레퍼런스의
@@ -499,7 +500,7 @@ export default async function PlayerPage({
   // seasonCombos(방금 추가), glance(제일 마지막 - glancePercentileP.then(...)).
   // 이 파도는 전부 선택적 패널이라 하나씩 soft() - null/빈 Map/failedCombos()는 각 패널이 이미
   // "없음"과 구분해서 그리는 값이다(글랜스만 카드 자리에 "불러오지 못함"을 따로 세운다).
-  const [boxTotals, percentile, wpaRank, wpaBySeason, seasonCombos, glance] = await Promise.all([
+  const [boxTotals, percentile, wpaRank, wpaBySeason, seasonCombos, glance, formRows] = await Promise.all([
     soft("seasonBoxTotals", shotSeason ? getPlayerSeasonBoxTotals(pcode, shotSeason) : Promise.resolve(null), null),
     percentileP,
     soft("seasonWpaRank", shotSeason ? getSeasonWpaRank(pcode, shotSeason) : Promise.resolve(null), null),
@@ -528,7 +529,11 @@ export default async function PlayerPage({
       ),
       null
     ),
+    // "슛 결정력"(/leaderboards/form-index) 미리보기용 - 이 선수의 시즌 전체(window=0) 100슛당
+    // 값 한 줄만 쓴다. 그 페이지와 같은 (season, 0) 키라 캐시를 공유한다(TTL.batchDaily).
+    soft<FormIndexRow[]>("formIndex", shotSeason ? getFormIndexLeaderboard(shotSeason, 0) : Promise.resolve([]), []),
   ]);
+  const formRow = formRows.find((r) => r.pcode === pcode) ?? null;
 
   // 시즌 의존 패널의 기준 칩은 전부 여기서 만든다(shared_design_language (2) - 다섯 어휘만 존재).
   const panelChip = (s: string | null): string | null => {
@@ -865,6 +870,23 @@ export default async function PlayerPage({
               )}%)`
             : "이 시즌 슛 데이터 없음"}
         </div>
+        {/* 이 패널이 이미 재는 것(자리별 기대 득점 vs 실제)을 100슛당·리그 전체 순위로 넓힌
+            페이지로 유도 - 요청("선수 페이지에도 슛 결정력 링크"). MIN_ATTEMPTS(15슛) 미만이면
+            그 페이지 자체 표본 기준에 안 걸려 formRow가 없다 - 그때는 카드를 안 낸다. */}
+        {formRow && (
+          <div className="related-row">
+            <Link href={`/leaderboards/form-index?season=${encodeURIComponent(shotSeason ?? "")}`} className="related-card">
+              <span className="related-kicker">슛 결정력</span>
+              <span className="related-main">
+                100슛당 {formRow.deltaPer100 > 0 ? "+" : ""}
+                {formRow.deltaPer100.toFixed(1)}
+              </span>
+              <span className="related-sub">
+                ± {(2 * per100Se(formRow.attempts)).toFixed(0)} 흔들림 폭 · {formRow.attempts}슛 기준 - 리그 전체 순위에서 보기
+              </span>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* ── 3. 슈팅 DNA - 존 구성비의 커리어 변화 ── */}
@@ -1014,6 +1036,17 @@ export default async function PlayerPage({
           seasonLabel={shotSeason ? (statChip ?? `${shortSeason(shotSeason)} 시즌`) : undefined}
           playerName={info.name}
         />
+        {/* 위 조합표는 요약(최고 조합 몇 개)이다 - 표본·오차·동료별 전체 표가 있는 선수별 조합
+            페이지로 유도(요청). 팀이 없으면(커리어 기록 없는 26-27 명단 선수 등) 카드를 안 낸다. */}
+        {headerTeam && shotSeason && (
+          <div className="related-row">
+            <Link href={`/lineups?season=${encodeURIComponent(shotSeason)}&team=${headerTeam.tcode}&player=${pcode}`} className="related-card">
+              <span className="related-kicker">선수별 조합</span>
+              <span className="related-main">{info.name}의 전체 동료 조합표 보기</span>
+              <span className="related-sub">같이 뛸 때 vs 빠졌을 때 - 동료별 득실 마진과 오차 폭까지</span>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* ── 6. 커리어 아크(시즌별 PPG 곡선)는 히어로 발치의 커리어 결 띠로 대체됨 ── */}
