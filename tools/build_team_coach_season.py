@@ -11,7 +11,7 @@ sync_upcoming_games.py가 경기를 다시 적재하면 감독 id가 또 비므�
 감독 출처(team_coach_season.source): KBL 등록 API(api.kbl.or.kr/players)에서 pos='AA'(감독)이면서
 playerLastCareerIf='A'(현역)인 행은 26-27 기준 5팀뿐이었다(KT 문경은·삼성 김상식·LG 조상현·KCC 이상민·
 정관장 유도훈. 삼성은 25-26 김효범에서 교체). 나머지는 사용자 제공 기사(현대모비스 양동근·가스공사 강혁·
-SK 전희철)와 25-26 유임 가정(소노 손창환·DB 김주성 - confirmed=false). 등록 API의 AA 행 29명은
+SK 전희철)와 사용자 확인(2026-09, 소노 손창환 유임 / DB는 김주성→이규섭 교체). 등록 API의 AA 행 29명은
 "감독으로 등록된 적 있는 사람 전체"라 그대로 쓰면 팀당 여러 명이 나온다.
 테이블은 RLS on + 정책 0 = 서버 전용.
 """

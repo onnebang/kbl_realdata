@@ -321,7 +321,8 @@ async function fetchCurrentTeams(): Promise<Map<number, { tcode: string; confirm
 }
 
 export function getCoachList(): Promise<CoachListRow[]> {
-  return cached(computeCoachList, ["coachList-v2", PRESEASON_SEASON], TTL.batchDaily, [TAG.build]);
+  // v3(2026-09-15): DB 원주 감독 교체(김주성→이규섭) + 소노·DB confirmed=true 반영 위해 캐시 무효화.
+  return cached(computeCoachList, ["coachList-v3", PRESEASON_SEASON], TTL.batchDaily, [TAG.build]);
 }
 
 async function computeCoachList(): Promise<CoachListRow[]> {
@@ -351,7 +352,7 @@ async function computeCoachList(): Promise<CoachListRow[]> {
 
 export function getCoachProfile(coachId: number): Promise<CoachProfile | null> {
   // 키의 v2 = 작전타임 필드 추가(2026-09-15). Data Cache는 배포를 넘어 살아 있어서, 모양이 바뀌면 키를 올려야 옛 객체가 안 나온다.
-  return cached(() => computeCoachProfile(coachId), ["coachProfile-v3", String(coachId), PRESEASON_SEASON], TTL.batchDaily, [TAG.build]);
+  return cached(() => computeCoachProfile(coachId), ["coachProfile-v4", String(coachId), PRESEASON_SEASON], TTL.batchDaily, [TAG.build]);
 }
 
 async function computeCoachProfile(coachId: number): Promise<CoachProfile | null> {
