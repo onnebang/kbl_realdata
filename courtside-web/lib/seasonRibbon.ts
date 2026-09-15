@@ -200,7 +200,15 @@ export function buildSeasonRibbonSvg(input: RibbonInput): { svg: string; stats: 
     const x = PAD_L + i * bw;
     if (i > 0) parts.push(`<line x1="${x.toFixed(1)}" y1="${plotTop - 6}" x2="${x.toFixed(1)}" y2="${plotBot}" stroke="rgba(var(--line-rgb),0.22)" stroke-width="1" stroke-dasharray="2 3"/>`);
     const label = `${parseInt(m, 10)}월`;
-    const lx = x + 3;
+    let lx = x + 3;
+    // 가시성 제보 - 넓은 화면에서 첫 달 라벨("10월")이 개막 D-N 라벨과 같은 줄에 겹쳐 찍혔다
+    // (좁은 화면 검사만 있었다). 넓은 화면 글자 기준으로도 겹치면 D-N 라벨 오른쪽으로 비켜 쓴다.
+    if (nextLabel) {
+      const wideHalf = rbTextW(nextLabel, 10) / 2 + 4;
+      const nL = cx(nextIdx) - wideHalf,
+        nR = cx(nextIdx) + wideHalf;
+      if (lx < nR && lx + rbTextW(label, 10) > nL) lx = nR + 2;
+    }
     if (lx < mEndWide) continue;
     mEndWide = lx + rbTextW(label, 10) + 4;
     const narrowW = rbTextW(label);
@@ -222,13 +230,18 @@ export function buildSeasonRibbonSvg(input: RibbonInput): { svg: string; stats: 
   for (let w = winStep; w < n; w += winStep) {
     const gy = yWins(w);
     parts.push(`<line x1="${PAD_L}" y1="${gy.toFixed(1)}" x2="${W - PAD_R}" y2="${gy.toFixed(1)}" stroke="rgba(var(--line-rgb),0.1)" stroke-width="0.6" stroke-dasharray="1 3"/>`);
+    parts.push(`<text x="${W - PAD_R + 4}" y="${(gy + 3).toFixed(1)}" class="rbb rbbWide" fill="rgba(var(--line-rgb),0.38)">${w}</text>`);
   }
   // 축 눈금(왼쪽 점수차·50% / 오른쪽 승수)은 좌우 여백(26·40단위) 안에 사는 글자라 넓은 화면
   // 전용이다: 좁은 화면 32단위에서는 "50%"만 60단위로 여백의 두 배를 넘어 플롯을 덮는다.
   // 좁은 화면에서는 눈금 대신 아래 두 헤드라인 숫자(기대 · 실제 승수)와 칸 툴팁·캡션이 남는다.
   parts.push(`<text x="2" y="${(y50 + 3).toFixed(1)}" class="rbb rbbWide" fill="rgba(var(--line-rgb),0.5)">50%</text>`);
-  parts.push(`<text x="2" y="${(yMargin(maxAbs) + 7).toFixed(1)}" class="rbb rbbWide" fill="rgba(var(--line-rgb),0.5)">+${maxAbs}</text>`);
-  parts.push(`<text x="2" y="${yMargin(-maxAbs).toFixed(1)}" class="rbb rbbWide" fill="rgba(var(--line-rgb),0.5)">-${maxAbs}</text>`);
+  // 점수차 눈금은 치른 경기가 있을 때만 - 개막 전(전 칸 고스트)엔 점수차 막대가 하나도 없어서 "±10"이
+  // 아무것도 가리키지 않고, 아래쪽 "-10"이 기대승 점선 옆에 붙어 그 선의 축처럼 읽혔다(가시성 제보).
+  if (played.length) {
+    parts.push(`<text x="2" y="${(yMargin(maxAbs) + 7).toFixed(1)}" class="rbb rbbWide" fill="rgba(var(--line-rgb),0.5)">+${maxAbs}</text>`);
+    parts.push(`<text x="2" y="${yMargin(-maxAbs).toFixed(1)}" class="rbb rbbWide" fill="rgba(var(--line-rgb),0.5)">-${maxAbs}</text>`);
+  }
   // 오른쪽 승수 축(누적선용)
   parts.push(`<text x="${W - PAD_R + 4}" y="${plotTop + 3}" class="rbb rbbWide" fill="rgba(var(--line-rgb),0.5)">${n}승</text>`);
   parts.push(`<text x="${W - PAD_R + 4}" y="${plotBot + 3}" class="rbb rbbWide" fill="rgba(var(--line-rgb),0.5)">0</text>`);
