@@ -2,6 +2,7 @@ import type { CareerGameRow } from "./playerProfile";
 import type { TeamMeta } from "./playerProfile";
 import { displayTeamName } from "./teamNames";
 import { shortSeason } from "./preseason";
+import { BASELINE_TO_RIM_M, FT_CIRCLE_R_M, KEY_LENGTH_M, KEY_WIDTH_M, THREE_PT_M } from "./court3d";
 
 // 선수 프로필 "득점 분석"(요청 - ESPN 르브론 제임스 커리어 득점 인포그래픽 참고: 팀별·시즌별·
 // 슛 위치별·상대팀 지역별 득점). 전부 이미 페이지가 들고 있는 careerRows(경기당 pts/fgm/tpm/ftm)
@@ -12,6 +13,9 @@ import { shortSeason } from "./preseason";
 const CB_STYLE =
   `<style>.cb{font-family:"IBM Plex Mono","Pretendard",monospace}` +
   `.cbN{font-family:"Pretendard",sans-serif;font-weight:800}` +
+  // 큰 숫자 전용(르브론 인포그래픽 참고 - 굵은 콘덴스트 디스플레이체). 이 사이트의 스코어보드
+  // 서체와 같다(globals.css "한글 글리프 없음" 계약) - 숫자에만 쓰고 한글엔 절대 쓰지 않는다.
+  `.cbBig{font-family:"Big Shoulders Display",sans-serif;font-weight:800;font-variant-numeric:tabular-nums}` +
   `@media(max-width:999px){.cb{font-size:12px}.cbN{font-size:13px}}` +
   `@media(max-width:619px){.cb{font-size:16px}.cbN{font-size:17px}}` +
   `@media(max-width:479px){.cb{font-size:22px}.cbN{font-size:23px}}</style>`;
@@ -89,7 +93,7 @@ export function buildTeamPieSvg(rows: TeamPtsRow[]): string {
     // 부채꼴이 넓을 때만(20도 이상) 안에 숫자를 적는다 - 좁으면 겹쳐서 못 읽는다(범례가 그 몫을 진다).
     if (sweep >= 20) {
       const [lx, ly] = polar(PIE_CX, PIE_CY, PIE_R * 0.62, angle + sweep / 2);
-      svg += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" class="cb" font-weight="800" font-size="15" fill="#fff" ${CB_HALO}>${r.pts.toLocaleString()}</text>`;
+      svg += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" class="cbBig" font-size="18" fill="#fff" ${CB_HALO}>${r.pts.toLocaleString()}</text>`;
     }
     angle += sweep;
   }
@@ -127,31 +131,51 @@ export function buildSeasonBarSvg(rows: SeasonPtsRow[]): string {
   return svg;
 }
 
-// ── 슛 위치별 득점(2점/3점/자유투) - 반코트 배경 위 세 자리 숫자 ──────────────────
+// ── 슛 위치별 득점(2점/3점/자유투) - 반코트 위 세 자리 숫자(르브론 인포그래픽 참고) ──────
+// 골대를 아래에 두고 위로 열리는 방향(그 인포그래픽과 같은 구도). 코트 선은 실제 치수
+// (lib/court3d.ts - 3D 코트와 같은 FIBA 상수)를 그대로 써서 비율이 맞다 - 예전 버전은 반지름을
+// 임의의 150px로 잡고 아크를 뷰박스 밖으로(위쪽) 그려서 2점/3점 구역 나눔이 안 보였다(제보:
+// "감각적으로 만들어줘" 겸 리뷰에서 발견).
+const ZONE_SCALE = 18; // px/m
 export function buildZoneSvg(z: ZonePts): string {
   const total = z.twoPt + z.threePt + z.ft;
   if (!total) return "";
   const W = 300,
-    H = 230;
-  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${CB_STYLE}`;
-  // 배경 = 3점 구역 색, 그 위에 3점 아크 안쪽을 2점 색으로 덮는다(르브론 인포그래픽과 같은 구성).
-  svg += `<rect x="0" y="0" width="${W}" height="${H}" fill="#d9976f" opacity="0.5"/>`;
+    H = 250;
+  const s = (m: number) => m * ZONE_SCALE;
   const hoopX = W / 2,
-    hoopY = 8,
-    R = 150;
-  svg += `<path d="M ${hoopX - R},${hoopY} A ${R},${R} 0 0 0 ${hoopX + R},${hoopY} L ${hoopX + R},${H} L ${hoopX - R},${H} Z" fill="#6f8bd9" opacity="0.5"/>`;
-  // 자유투 라인(대시) + 페인트존 - FT 득점의 시각적 자리.
-  const keyW = 74,
-    keyY = 118;
-  svg += `<line x1="${hoopX - keyW / 2}" y1="${keyY}" x2="${hoopX + keyW / 2}" y2="${keyY}" stroke="var(--ink)" stroke-width="2" stroke-dasharray="4 4" opacity="0.6"/>`;
-  svg += `<rect x="${hoopX - keyW / 2}" y="${keyY}" width="${keyW}" height="${H - keyY}" fill="none" stroke="var(--ink)" stroke-width="1.4" opacity="0.5"/>`;
-  svg += `<circle cx="${hoopX}" cy="${hoopY}" r="6" fill="var(--ink)"/>`;
-  const label = (x: number, y: number, val: number, sub: string, size = 20) =>
-    `<text x="${x}" y="${y}" text-anchor="middle" class="cbN" font-size="${size}" fill="var(--ink)" ${CB_HALO}>${val.toLocaleString()}</text>` +
-    `<text x="${x}" y="${y + 15}" text-anchor="middle" class="cb" font-size="10" fill="var(--ink-soft)" ${CB_HALO}>${esc(sub)}</text>`;
-  svg += label(70, 60, z.threePt, "3점 득점");
-  svg += label(hoopX, 92, z.ft, "자유투 득점", 16);
-  svg += label(hoopX, 195, z.twoPt, "2점 득점", 24);
+    hoopY = H - 10 - s(BASELINE_TO_RIM_M); // 베이스라인이 아래쪽 10px 여백에 오도록 역산.
+
+  // 3점 아크 - φ를 "골대에서 먼 쪽(위)"을 0으로 두고 베이스라인과 만나는 각까지만 sweep한다
+  // (3D 코트와 같은 유도 - components/Court3DScene.tsx 주석 참고). 두 발 다 베이스라인 높이라
+  // 아크 하나 + Z로 안쪽(2점) 영역이 통째로 닫힌다.
+  const R = s(THREE_PT_M);
+  const phiMax = Math.acos(Math.max(-1, Math.min(1, -BASELINE_TO_RIM_M / THREE_PT_M)));
+  const footX = Math.sin(phiMax) * R;
+  const baselineY = hoopY + s(BASELINE_TO_RIM_M);
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${CB_STYLE}`;
+  // 배경 전체 = 3점 구역 색, 아크 안쪽만 2점 색으로 덮는다.
+  svg += `<rect x="0" y="0" width="${W}" height="${H}" rx="10" fill="#d9976f" opacity="0.55"/>`;
+  svg += `<path d="M ${(hoopX - footX).toFixed(1)},${baselineY.toFixed(1)} A ${R.toFixed(1)},${R.toFixed(1)} 0 1 1 ${(hoopX + footX).toFixed(1)},${baselineY.toFixed(1)} Z" fill="#6f8bd9" opacity="0.6"/>`;
+
+  // 키(페인트존) + 자유투 서클 + 자유투 라인(대시, 초록 - 르브론 인포그래픽과 같은 포인트 컬러).
+  const keyW = s(KEY_WIDTH_M),
+    ftY = hoopY - s(KEY_LENGTH_M);
+  svg += `<rect x="${(hoopX - keyW / 2).toFixed(1)}" y="${ftY.toFixed(1)}" width="${keyW.toFixed(1)}" height="${(baselineY - ftY).toFixed(1)}" fill="none" stroke="var(--ink)" stroke-width="1.4" opacity="0.55"/>`;
+  svg += `<circle cx="${hoopX}" cy="${ftY.toFixed(1)}" r="${s(FT_CIRCLE_R_M).toFixed(1)}" fill="none" stroke="var(--ink)" stroke-width="1.4" opacity="0.4"/>`;
+  svg += `<line x1="${(hoopX - keyW / 2).toFixed(1)}" y1="${ftY.toFixed(1)}" x2="${(hoopX + keyW / 2).toFixed(1)}" y2="${ftY.toFixed(1)}" stroke="#2f9e57" stroke-width="2.5" stroke-dasharray="4 4"/>`;
+  // 백보드 + 림(주황 - 참고 이미지와 같은 포인트 컬러).
+  svg += `<rect x="${(hoopX - 16).toFixed(1)}" y="${(hoopY - 22).toFixed(1)}" width="32" height="4" fill="var(--ink)" opacity="0.5"/>`;
+  svg += `<circle cx="${hoopX}" cy="${hoopY.toFixed(1)}" r="6.5" fill="none" stroke="#ff5a1f" stroke-width="3"/>`;
+
+  const big = (x: number, y: number, val: number, sub: string, size: number, anchor: "middle" | "start" | "end" = "middle") =>
+    `<text x="${x}" y="${y}" text-anchor="${anchor}" class="cbBig" font-size="${size}" fill="var(--ink)" ${CB_HALO}>${val.toLocaleString()}</text>` +
+    `<text x="${x}" y="${y + size * 0.42}" text-anchor="${anchor}" class="cb" font-size="10" fill="var(--ink-soft)" ${CB_HALO}>${esc(sub)}</text>`;
+  // 3점 - 위쪽 넓은 자리(참고 이미지처럼 오른쪽 위 치우침), 2점 - 페인트존 위, 가장 크게.
+  svg += big(W - 16, 44, z.threePt, "3점 득점", 26, "end");
+  svg += big(hoopX, ftY - 14, z.ft, "자유투 득점", 15);
+  svg += big(hoopX, baselineY - s(KEY_LENGTH_M) * 0.42, z.twoPt, "2점 득점", 32);
   svg += `</svg>`;
   return svg;
 }

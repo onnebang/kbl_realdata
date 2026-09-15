@@ -75,10 +75,24 @@ export function buildKoreaMapSvg(rows: OpponentPtsRow[]): string {
   svg += `<style>.km{font-family:"Pretendard","IBM Plex Mono",sans-serif;font-size:9px}` +
     `@media(max-width:619px){.km{font-size:12px}}@media(max-width:479px){.km{font-size:15px}}</style>`;
   svg += `<path d="${LANDMASS}" fill="var(--surface-soft)" stroke="rgba(var(--line-rgb),0.3)" stroke-width="1.5"/>`;
+  // 원은 전부 그린다(겹쳐도 정보는 안 잃는다 - 서울·고양은 실제로 구단이 여럿이라 좌표가 같거나
+  // 가깝다). 라벨만 득점 큰 팀부터 놓고 겹치면 건너뛴다(제보: 라벨이 뭉쳐서 안 읽힘 - 겹침 회피는
+  // shotValueScatter.ts와 같은 기법).
   for (const r of rows) {
     const rad = rFor(r.pts);
     svg += `<circle cx="${r.x.toFixed(1)}" cy="${r.y.toFixed(1)}" r="${rad.toFixed(1)}" fill="${r.teamColor}" opacity="0.82" stroke="var(--surface)" stroke-width="1.5"><title>${esc(r.teamName)}(${esc(r.city)}) · ${r.pts.toLocaleString()}점</title></circle>`;
-    svg += `<text x="${r.x.toFixed(1)}" y="${(r.y + rad + 11).toFixed(1)}" text-anchor="middle" class="km" font-weight="700" fill="var(--ink)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">${esc(r.teamAbbr)} ${r.pts.toLocaleString()}</text>`;
+  }
+  const placed: [number, number, number, number][] = [];
+  for (const r of [...rows].sort((a, b) => b.pts - a.pts)) {
+    const rad = rFor(r.pts);
+    const label = `${r.teamAbbr} ${r.pts.toLocaleString()}`;
+    const w = label.length * 5.4 + 4; // 실측 폭 대신 간이 추정(이 프로젝트 다른 SVG 빌더도 각자 자기 폭 함수를 둔다).
+    const tx = r.x,
+      ty = r.y + rad + 11;
+    const box: [number, number, number, number] = [tx - w / 2, ty - 9, tx + w / 2, ty + 3];
+    if (placed.some((b) => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) continue;
+    placed.push(box);
+    svg += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" class="km" font-weight="700" fill="var(--ink)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">${esc(label)}</text>`;
   }
   svg += `</svg>`;
   return svg;
