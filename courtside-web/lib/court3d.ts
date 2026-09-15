@@ -1,4 +1,5 @@
 import { HOOP_RIGHT, mirrorShotX, SCALE_M_PER_UNIT } from "./zoneCompare";
+import { classifyShot } from "./formIndex";
 
 // 3D 코트 뷰(요청: "슛 지도가 그냥 디자인처럼 보인다 - 확장하면 3D로, 슛 색상을") 좌표 변환 +
 // 코트 치수. 서버(팀·선수 페이지)에서 원시 shot_log 행을 미터 단위 반코트 좌표로 미리 바꿔서
@@ -22,19 +23,25 @@ export const FT_CIRCLE_R_M = 1.8;
 export const HALF_WIDTH_M = 7.5; // 코트 중앙(사이드라인까지 절반)
 export const HALFCOURT_LINE_Z = 14 - BASELINE_TO_RIM_M; // 골대 기준 하프라인까지
 
-export type Court3DShot = { x: number; z: number; made: boolean };
+export type Court3DShot = { x: number; z: number; made: boolean; value: 2 | 3; season?: string };
 
 /**
  * z=0을 골대(림) 중심으로 둔다. z<0은 베이스라인 쪽(골대 뒤), z>0은 하프라인 쪽으로 멀어지는
  * 방향. x=0은 림과 같은 좌우 위치(코트 정중앙), 좌우로 ±HALF_WIDTH_M.
+ *
+ * season을 같이 넣으면(선수 커리어 뷰) 3D 코트가 "빌드업 재생"(요청 - ESPN 르브론 영상처럼
+ * 시즌이 넘어가며 득점이 쌓이는 연출)에서 시즌 단위로 묶어 순서대로 보여준다. 팀 페이지처럼
+ * season 없이 부르면 통째로 한 번에 보여준다(재생 없이).
  */
-export function toCourt3D(shots: { x: number; y: number; d: string; made: boolean }[]): Court3DShot[] {
+export function toCourt3D(shots: { x: number; y: number; d: string; made: boolean; season?: string }[]): Court3DShot[] {
   return shots.map((s) => {
     const mx = mirrorShotX(s.x, s.d);
     return {
       x: (s.y - HOOP_RIGHT[1]) * SCALE_M_PER_UNIT,
       z: (HOOP_RIGHT[0] - mx) * SCALE_M_PER_UNIT,
       made: s.made,
+      value: classifyShot(s.x, s.y, s.d).value as 2 | 3,
+      season: s.season,
     };
   });
 }

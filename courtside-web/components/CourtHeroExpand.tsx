@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import type { Court3DProgress } from "./Court3DScene";
 import type { Court3DShot } from "@/lib/court3d";
 import { WidgetBoundary } from "@/components/WidgetBoundary";
 import styles from "./court-hero-expand.module.css";
@@ -14,10 +15,12 @@ const Court3DScene = dynamic(() => import("./Court3DScene").then((m) => m.Court3
   loading: () => <div className={styles.loading}>코트 불러오는 중…</div>,
 });
 
+const fmtSeason = (s: string | null) => (s ? `${s.slice(2, 4)}-${s.slice(7, 9)}` : "");
+
 /**
- * 히어로 슛 지도(밀도 장/별자리)가 "그냥 배경 디자인"으로 보인다는 제보 - 확장 버튼을 누르면
- * 같은 슛 데이터를 진짜 3D 코트에 색으로 찍어 보여준다. 팀·선수 히어로 둘 다 이 컴포넌트를
- * 그대로 쓴다(props만 다름).
+ * 히어로 슛 지도(밀도 장/별자리)가 "그냥 배경 디자인"으로 보인다는 제보 + "이 영상 같은 느낌"
+ * (ESPN 르브론 제임스 커리어 득점 영상) - 확장 버튼을 누르면 같은 슛 데이터가 시즌 순으로
+ * 쌓이는 3D 코트가 한 번 재생되고, 끝나면 자유롭게 돌려볼 수 있다.
  */
 export function CourtHeroExpand({
   shots,
@@ -29,6 +32,8 @@ export function CourtHeroExpand({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [progress, setProgress] = useState<Court3DProgress | null>(null);
+  const [skipToken, setSkipToken] = useState(0);
 
   useEffect(() => {
     if (!open) return;
@@ -42,12 +47,20 @@ export function CourtHeroExpand({
   }, [open]);
 
   const madeN = shots.filter((s) => s.made).length;
+  const playing = progress != null && !progress.done;
 
   if (!shots.length) return null;
 
   return (
     <>
-      <button type="button" className={styles.trigger} onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className={styles.trigger}
+        onClick={() => {
+          setProgress(null);
+          setOpen(true);
+        }}
+      >
         {label}
       </button>
       {open && (
@@ -55,15 +68,34 @@ export function CourtHeroExpand({
           <div className={styles.panel} onClick={(e) => e.stopPropagation()}>
             <div className={styles.panelHead}>
               <div className={styles.panelTitle}>
-                슛 {shots.length.toLocaleString()}개 · 성공 {madeN.toLocaleString()}개({Math.round((madeN / shots.length) * 100)}%)
+                {playing ? (
+                  <>
+                    {progress?.label && <span className={styles.hudSeason}>{fmtSeason(progress.label)}</span>}
+                    필드골 {progress?.pts.toLocaleString()}점 쌓는 중…
+                  </>
+                ) : (
+                  <>
+                    슛 {shots.length.toLocaleString()}개 · 성공 {madeN.toLocaleString()}개({Math.round((madeN / shots.length) * 100)}%)
+                  </>
+                )}
               </div>
+              {playing && (
+                <button type="button" className={styles.skipBtn} onClick={() => setSkipToken((n) => n + 1)}>
+                  건너뛰기
+                </button>
+              )}
               <button type="button" className={styles.closeBtn} onClick={() => setOpen(false)} aria-label="닫기">
                 ✕
               </button>
             </div>
+            {playing && (
+              <div className={styles.hudBar}>
+                <div className={styles.hudBarFill} style={{ width: `${((progress?.shown ?? 0) / Math.max(1, progress?.total ?? 1)) * 100}%`, background: accentColor }} />
+              </div>
+            )}
             <div className={styles.canvasWrap}>
               <WidgetBoundary name="3D 코트">
-                <Court3DScene shots={shots} accentColor={accentColor} />
+                <Court3DScene shots={shots} accentColor={accentColor} onProgress={setProgress} skipToken={skipToken} />
               </WidgetBoundary>
             </div>
             <div className={styles.legend}>
@@ -73,7 +105,9 @@ export function CourtHeroExpand({
               <span>
                 <span className={styles.swatchRing} /> 실패
               </span>
-              <span className={styles.legendNote}>드래그로 회전 · 스크롤로 확대 - 자동으로는 움직이지 않습니다</span>
+              <span className={styles.legendNote}>
+                {playing ? "열 때 한 번, 시즌 순으로 쌓입니다" : "드래그로 회전 · 스크롤로 확대 - 이제부터는 자동으로 움직이지 않습니다"}
+              </span>
             </div>
           </div>
         </div>
