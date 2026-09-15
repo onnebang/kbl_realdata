@@ -115,13 +115,19 @@ function pearson(xs: number[], ys: number[]): number {
   return sxx && syy ? sxy / Math.sqrt(sxx * syy) : 0;
 }
 
-async function computeWinMoments(season: string): Promise<WinMoments> {
-  const [playRows, comebackRows, weightRows, teams] = await Promise.all([
-    rpc<PlayRow>("season_big_plays", { p_season: season, p_limit: 12 }),
-    rpc<ComebackRow>("season_comebacks", { p_season: season, p_limit: 6 }),
+/**
+ * tcode를 주면 리그 전체가 아니라 그 팀이 낀 경기만 본다(팀 페이지 "이 팀의 결정적 순간"용).
+ * season_scoring_weight는 team 인자가 없어 결과를 받은 뒤 걸러낸다 - 200점 문턱을 넘는 선수가
+ * 원래도 시즌당 90명 안팎이라 필터링 비용은 무시할 만하다.
+ */
+async function computeWinMoments(season: string, tcode?: string): Promise<WinMoments> {
+  const [playRows, comebackRows, weightRowsAll, teams] = await Promise.all([
+    rpc<PlayRow>("season_big_plays", { p_season: season, p_limit: 12, p_tcode: tcode ?? null }),
+    rpc<ComebackRow>("season_comebacks", { p_season: season, p_limit: 6, p_tcode: tcode ?? null }),
     rpc<WeightRow>("season_scoring_weight", { p_season: season, p_min_pts: 200 }),
     getAllTeams(),
   ]);
+  const weightRows = tcode ? weightRowsAll.filter((r) => r.tcode === tcode) : weightRowsAll;
   const gmkeys = [...new Set([...playRows.map((r) => r.gmkey), ...comebackRows.map((r) => r.gmkey)])];
   const seriesRows = gmkeys.length ? await rpc<SeriesRow>("game_winprob_series", { p_gmkeys: gmkeys }) : [];
   const seriesOf = (gmkey: string) => seriesRows.find((r) => r.gmkey === gmkey)?.points ?? [];
@@ -198,7 +204,81 @@ export const getWinMoments = cachedFn(computeWinMoments, {
   name: "winMoments-v2", // v2: 곡선이 응답 상한에 잘려 비던 캐시를 버린다
 
   ttl: TTL.batchDaily,
-  tags: (season) => [TAG.batch, TAG.season(String(season))],
+  tags: (season, tcode) => [TAG.batch, TAG.season(String(season)), ...(tcode ? [`team:${tcode}`] : [])],
+});
+
+/** WinContributionPage용 아주 짧은 요약(팀 필터 없을 때는 계산 자체를 안 한다). */
+export type TeamHighlight = { play: BigPlay | null; comeback: Comeback | null };
+
+/**
+ * 팀 페이지 "이 팀의 결정적 순간" 미리보기 전용 - season_scoring_weight·승률 곡선 시리즈를
+ * 아예 부르지 않는다(그 둘은 미리보기에 안 쓰인다). getWinMoments(season, tcode)는 표·산점도까지
+ * 계산하므로 팀 페이지엔 과하다.
+ */
+async function computeTeamHighlight(season: string, tcode: string): Promise<TeamHighlight> {
+  const [playRows, comebackRows, teams] = await Promise.all([
+    rpc<PlayRow>("season_big_plays", { p_season: season, p_limit: 1, p_tcode: tcode }),
+    rpc<ComebackRow>("season_comebacks", { p_season: season, p_limit: 1, p_tcode: tcode }),
+    getAllTeams(),
+  ]);
+  const r = playRows[0];
+  const c = comebackRows[0];
+  const play: BigPlay | null = r
+    ? (() => {
+        const isHome = r.tcode === r.home_tcode;
+        const oppCode = isHome ? r.away_tcode : r.home_tcode;
+        const finalTeam = isHome ? r.final_home : r.final_away;
+        const finalOpp = isHome ? r.final_away : r.final_home;
+        const won = finalTeam > finalOpp;
+        return {
+          gmkey: r.gmkey,
+          gameDate: r.game_date,
+          period: periodLabel(r.quarter),
+          clock: clockLabel(r.clock_min, r.clock_sec),
+          shot: SHOT_LABEL[r.action_code] ?? "플레이",
+          pcode: r.pcode,
+          playerName: r.player_name ?? r.pcode,
+          team: teamLite(teams, r.tcode, season),
+          opp: teamLite(teams, oppCode, season),
+          teamScore: isHome ? r.home_score : r.away_score,
+          oppScore: isHome ? r.away_score : r.home_score,
+          finalTeam,
+          finalOpp,
+          won,
+          wpa: r.wpa,
+          probBefore: Math.min(1, Math.max(0, r.prob_after - r.wpa)),
+          elapsed: cumulativeElapsed(r.quarter, r.clock_min, r.clock_sec),
+          curve: [],
+        };
+      })()
+    : null;
+  const comeback: Comeback | null = c
+    ? (() => {
+        const winnerHome = c.winner_tcode === c.home_tcode;
+        return {
+          gmkey: c.gmkey,
+          gameDate: c.game_date,
+          winner: teamLite(teams, c.winner_tcode, season),
+          loser: teamLite(teams, winnerHome ? c.away_tcode : c.home_tcode, season),
+          finalWinner: winnerHome ? c.final_home : c.final_away,
+          finalLoser: winnerHome ? c.final_away : c.final_home,
+          minProb: c.min_prob,
+          period: periodLabel(c.min_quarter),
+          clock: clockLabel(c.min_clock_min, c.min_clock_sec),
+          winnerScoreAtMin: winnerHome ? c.min_home_score : c.min_away_score,
+          loserScoreAtMin: winnerHome ? c.min_away_score : c.min_home_score,
+          elapsed: cumulativeElapsed(c.min_quarter, c.min_clock_min, c.min_clock_sec),
+          curve: [],
+        };
+      })()
+    : null;
+  return { play, comeback };
+}
+
+export const getTeamHighlight = cachedFn(computeTeamHighlight, {
+  name: "teamHighlight",
+  ttl: TTL.batchDaily,
+  tags: (season, tcode) => [TAG.batch, TAG.season(String(season)), `team:${tcode}`],
 });
 
 /** 곡선 SVG path(viewBox 0..w × 0..h, 위가 승률 100%). */
