@@ -777,7 +777,7 @@ export default async function GamePage({
             {/* 개막 전엔 "직전 경기"가 지난 시즌 경기라, 고정 제목이 카드 내용과 정면으로
                 어긋난다(실측 지적) - 그래서 제목도 카드와 같은 기준을 따른다. */}
             <div className="panel-title">
-              📋 스카우팅 인사이트 ({priorSeasonLabel ? `지난 시즌(${priorSeasonLabel}) 데이터 기반` : "직전 경기 · 시즌 데이터 기반"})
+              스카우팅 인사이트 ({priorSeasonLabel ? `지난 시즌(${priorSeasonLabel}) 데이터 기반` : "직전 경기 · 시즌 데이터 기반"})
             </div>
             {previewInsights.map((insight, i) => (
               <InsightCard
@@ -1085,7 +1085,7 @@ export default async function GamePage({
         <ActHeader num={3} title="경기후 AI코트사이드 리포트" />
         {reportSections.length > 0 && (
           <div className="panel">
-            <div className="panel-title">🏀 AI 코트사이드 리포트</div>
+            <div className="panel-title">AI 코트사이드 리포트</div>
             {reportSections.map((s) => (
               <div className="report-section" key={s.title}>
                 <div className="report-section-title">{s.title}</div>
@@ -1105,7 +1105,7 @@ export default async function GamePage({
             null 반환) - 참고 정보로만 카드가 남음. */}
         {previewInsights.length > 0 && insightGrades.length > 0 && (
           <div className="panel">
-            <div className="panel-title">🎯 예측 정확도 (프리뷰 인사이트 vs 실제 결과)</div>
+            <div className="panel-title">예측 정확도 (프리뷰 인사이트 vs 실제 결과)</div>
             {previewInsights.map((insight, i) => (
               <InsightCard
                 key={i}
