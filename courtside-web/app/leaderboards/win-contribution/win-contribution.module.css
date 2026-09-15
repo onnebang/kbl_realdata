@@ -25,6 +25,27 @@
   flex-shrink: 0;
 }
 
+/* 팀 페이지 카드를 타고 들어왔을 때(?team=)만 보이는 필터 표시줄. */
+.teamFilterBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-left: 4px solid var(--tb-l, var(--ink-faint));
+  border-radius: var(--r-card);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.teamFilterClear {
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--ink);
+  border-bottom: 2px solid var(--gold);
+}
+
 /* ── 구간 ── */
 .section {
   margin-top: 34px;
@@ -247,7 +268,8 @@
 
 @media (prefers-color-scheme: dark) {
   .hero,
-  .card {
+  .card,
+  .teamFilterBar {
     border-left-color: var(--tb-d, var(--ink-faint));
   }
 }

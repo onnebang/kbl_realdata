@@ -3,6 +3,7 @@ import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getSeasonsWithWpaData, getWinContributionLeaderboard, type SortKey } from "@/lib/winContributionLeaderboard";
 import { curvePath, curvePos, getWinMoments, REGULATION_SEC, type BigPlay, type Comeback, type CurvePoint, type WeightPoint } from "@/lib/winMoments";
+import { getAllTeams } from "@/lib/playerProfile";
 import { teamBarStyle } from "@/lib/teamAccent";
 import styles from "./win-contribution.module.css";
 
@@ -203,16 +204,29 @@ function WeightScatter({ players, perPoint, r }: { players: WeightPoint[]; perPo
   );
 }
 
-export default async function WinContributionPage({ searchParams }: { searchParams: Promise<{ season?: string; sort?: string; dir?: string }> }) {
-  const { season, sort, dir } = await searchParams;
-  const seasons = await getSeasonsWithWpaData();
+export default async function WinContributionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ season?: string; sort?: string; dir?: string; team?: string }>;
+}) {
+  const { season, sort, dir, team } = await searchParams;
+  const [seasons, teams] = await Promise.all([getSeasonsWithWpaData(), getAllTeams()]);
   const activeSeason = season && seasons.includes(season) ? season : seasons[0];
+  const activeTeam = team && teams.has(team) ? teams.get(team)! : null;
   const sortKey = (COLUMNS.find((c) => c.key === sort)?.key ?? "totalWpa") as SortKey;
   const ascending = dir === "asc";
 
-  const [moments, rows] = await Promise.all([getWinMoments(activeSeason), getWinContributionLeaderboard(activeSeason, sortKey, ascending)]);
+  // 팀 필터는 team_coach_season처럼 이미 있는 값을 다시 세는 게 아니라, 두 조회 모두 팀
+  // 단위로 다시 부른다(team 페이지에서 넘어온 링크는 "그 팀의 top-12"를 기대한다 - 리그
+  // top-12를 클라이언트에서 걸러내면 대부분 0~1개만 남는다. tools/rpc_win_moments_team_filter.sql).
+  const [moments, rows] = await Promise.all([
+    getWinMoments(activeSeason, activeTeam?.tcode),
+    getWinContributionLeaderboard(activeSeason, sortKey, ascending),
+  ]);
+  const teamRows = activeTeam ? rows.filter((r) => r.tcode === activeTeam.tcode) : rows;
   const [hero, ...restPlays] = moments.plays;
-  const sortLink = (key: SortKey) => `?season=${encodeURIComponent(activeSeason)}&sort=${key}&dir=${sortKey === key && !ascending ? "asc" : "desc"}#table`;
+  const sortLink = (key: SortKey) =>
+    `?season=${encodeURIComponent(activeSeason)}${activeTeam ? `&team=${activeTeam.tcode}` : ""}&sort=${key}&dir=${sortKey === key && !ascending ? "asc" : "desc"}#table`;
 
   return (
     <div className={styles.pageRoot}>
@@ -221,11 +235,12 @@ export default async function WinContributionPage({ searchParams }: { searchPara
           <div>
             <h1 className={`title ${styles.title}`}>승부를 가른 순간</h1>
             <p className={`subtitle ${styles.lede}`}>
-              같은 3점도 언제 넣었느냐에 따라 무게가 다릅니다. {activeSeason} 정규시즌에서 경기 중 승률을 한 번에 가장 크게
-              움직인 장면과, 거의 진 경기를 뒤집은 역전을 모았습니다.
+              같은 3점도 언제 넣었느냐에 따라 무게가 다릅니다. {activeSeason} 정규시즌{activeTeam ? ` ${activeTeam.name} 경기` : ""}에서
+              경기 중 승률을 한 번에 가장 크게 움직인 장면과, 거의 진 경기를 뒤집은 역전을 모았습니다.
             </p>
           </div>
           <form className={styles.seasonForm}>
+            {activeTeam && <input type="hidden" name="team" value={activeTeam.tcode} />}
             <select name="season" defaultValue={activeSeason} aria-label="시즌">
               {seasons.map((s) => (
                 <option key={s} value={s}>
@@ -239,10 +254,24 @@ export default async function WinContributionPage({ searchParams }: { searchPara
           </form>
         </header>
 
+        {/* 팀 페이지 "이 팀의 결정적 순간" 카드를 타고 들어온 경우 - 어떤 필터가 걸렸는지,
+            어떻게 풀지를 첫 화면에서 바로 보여준다. */}
+        {activeTeam && (
+          <div className={styles.teamFilterBar} style={teamBarStyle(activeTeam.color)}>
+            <TeamBadge team={{ name: activeTeam.name, abbr: activeTeam.abbr, color: activeTeam.color, logoUrl: activeTeam.logoUrl }} size={22} />
+            <span>
+              <Link href={`/teams/${activeTeam.tcode}?season=${encodeURIComponent(activeSeason)}`}>{activeTeam.name}</Link>의 장면만 보는 중
+            </span>
+            <Link href={`?season=${encodeURIComponent(activeSeason)}`} className={styles.teamFilterClear}>
+              전체 리그 보기
+            </Link>
+          </div>
+        )}
+
         {hero && (
           <section className={styles.section}>
             <div className={styles.sectionHead}>
-              <h2 className={styles.sectionTitle}>시즌 최고의 한 방</h2>
+              <h2 className={styles.sectionTitle}>{activeTeam ? `${activeTeam.name} 최고의 한 방` : "시즌 최고의 한 방"}</h2>
               <span className={styles.sectionNote}>한 경기에서 가장 큰 장면 하나씩 · 득점한 팀의 승률이 오른 폭</span>
             </div>
             <HeroPlay p={hero} />
@@ -261,7 +290,7 @@ export default async function WinContributionPage({ searchParams }: { searchPara
         {moments.comebacks.length > 0 && (
           <section className={styles.section}>
             <div className={styles.sectionHead}>
-              <h2 className={styles.sectionTitle}>가장 극적인 역전</h2>
+              <h2 className={styles.sectionTitle}>{activeTeam ? `${activeTeam.name}의 가장 극적인 역전` : "가장 극적인 역전"}</h2>
               <span className={styles.sectionNote}>이긴 팀의 경기 중 최저 승률이 낮았던 순</span>
             </div>
             <div className={styles.grid3}>
@@ -296,7 +325,9 @@ export default async function WinContributionPage({ searchParams }: { searchPara
         )}
 
         <details className={styles.tableDetails} id="table" open={Boolean(sort)}>
-          <summary className={styles.tableSummary}>선수별 WPA 표 전체 ({rows.length}명)</summary>
+          <summary className={styles.tableSummary}>
+            선수별 WPA 표{activeTeam ? ` · ${activeTeam.name}` : " 전체"} ({teamRows.length}명)
+          </summary>
           <div className="table-scroll">
             <table className={`data-table ${styles.table}`}>
               <thead>
@@ -318,7 +349,7 @@ export default async function WinContributionPage({ searchParams }: { searchPara
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => (
+                {teamRows.map((r, i) => (
                   <tr key={r.pcode}>
                     <td className={styles.rankCell}>{i + 1}</td>
                     <td className={styles.playerCell}>
