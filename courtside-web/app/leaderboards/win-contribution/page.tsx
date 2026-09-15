@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
+import { PlayerPhoto } from "@/components/PlayerPhoto";
 import { getSeasonsWithWpaData, getWinContributionLeaderboard, type SortKey } from "@/lib/winContributionLeaderboard";
 import { curvePath, curvePos, getWinMoments, REGULATION_SEC, type BigPlay, type Comeback, type CurvePoint, type WeightPoint } from "@/lib/winMoments";
 import { getAllTeams } from "@/lib/playerProfile";
@@ -53,6 +54,14 @@ function resultLine(p: BigPlay) {
 function HeroPlay({ p }: { p: BigPlay }) {
   return (
     <article className={styles.hero} style={teamBarStyle(p.team.color)}>
+      {/* 요청("팀 로고를 은은하게") - 장식이라 aria-hidden, 카드 배경에 아주 낮은 불투명도로만.
+          TeamBadge는 원형 클립·테두리·패딩이 있어(작은 배지용) 이 워터마크엔 맞지 않는다 - 로고를
+          그대로, TeamBadge.tsx와 같은 이유로 next/image 우회(외부 kbl.or.kr 호스팅, 배경 장식이라
+          최적화 이득 없음). */}
+      {p.team.logoUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={p.team.logoUrl} alt="" aria-hidden="true" className={styles.heroLogoWatermark} />
+      )}
       <div className={styles.heroNum}>
         <span className={styles.swing}>+{Math.round(p.wpa * 100)}</span>
         <span className={styles.swingUnit}>%p</span>
@@ -62,9 +71,16 @@ function HeroPlay({ p }: { p: BigPlay }) {
         <div className={styles.kicker}>
           {shortDate(p.gameDate)} · {p.period} {p.clock} · {p.shot}
         </div>
-        <Link href={`/players/${p.pcode}`} className={styles.heroName}>
-          {p.playerName}
-        </Link>
+        <div className={styles.heroPlayerRow}>
+          {p.photoUrl && (
+            <span className={styles.heroAvatar}>
+              <PlayerPhoto src={p.photoUrl} size={40} />
+            </span>
+          )}
+          <Link href={`/players/${p.pcode}`} className={styles.heroName}>
+            {p.playerName}
+          </Link>
+        </div>
         <div className={styles.context}>
           {p.team.name} {p.teamScore}-{p.oppScore} {p.opp.name}
         </div>
@@ -83,13 +99,24 @@ function HeroPlay({ p }: { p: BigPlay }) {
 function PlayCard({ p, rank }: { p: BigPlay; rank: number }) {
   return (
     <article className={styles.card} style={teamBarStyle(p.team.color)}>
+      {p.team.logoUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={p.team.logoUrl} alt="" aria-hidden="true" className={styles.cardLogoWatermark} />
+      )}
       <div className={styles.cardTop}>
         <span className={styles.rank}>{rank}</span>
         <span className={styles.cardSwing}>+{Math.round(p.wpa * 100)}%p</span>
       </div>
-      <Link href={`/players/${p.pcode}`} className={styles.cardName}>
-        {p.playerName}
-      </Link>
+      <div className={styles.cardNameRow}>
+        {p.photoUrl && (
+          <span className={styles.cardAvatar}>
+            <PlayerPhoto src={p.photoUrl} size={24} />
+          </span>
+        )}
+        <Link href={`/players/${p.pcode}`} className={styles.cardName}>
+          {p.playerName}
+        </Link>
+      </div>
       <div className={styles.cardLine}>
         {p.period} {p.clock} · {p.shot} · {p.team.name} {p.teamScore}-{p.oppScore} {p.opp.name}
       </div>
@@ -157,14 +184,31 @@ function WeightScatter({ players, perPoint, r }: { players: WeightPoint[]; perPo
           const left = (p.pts / xMax) * 100;
           const bottom = (Math.max(0, p.wpa) / yMax) * 100;
           const above = p.wpa >= p.pts * perPoint;
+          const label = `${p.playerName} (${p.team.name}) · ${p.pts}점 · WPA ${p.wpa.toFixed(2)}`;
+          // 요청("무리에서 떨어진 선수는 프로필 사진으로") - 이름표를 다는 선수(labeled)만, 그리고
+          // 사진이 있을 때만(773명 중 130명) 점 대신 원형 사진. 나머지는 기존 점 그대로.
+          if (labeled.has(p.pcode) && p.photoUrl) {
+            return (
+              <Link
+                key={p.pcode}
+                href={`/players/${p.pcode}`}
+                className={`${styles.dotPhoto} ${above ? styles.dotPhotoAbove : styles.dotPhotoBelow}`}
+                style={{ left: `${left}%`, bottom: `${bottom}%` }}
+                aria-label={label}
+                title={label}
+              >
+                <PlayerPhoto src={p.photoUrl} size={22} />
+              </Link>
+            );
+          }
           return (
             <Link
               key={p.pcode}
               href={`/players/${p.pcode}`}
               className={`${styles.dot} ${above ? styles.dotAbove : styles.dotBelow}`}
               style={{ left: `${left}%`, bottom: `${bottom}%` }}
-              aria-label={`${p.playerName} ${p.team.name} · ${p.pts}점 · WPA ${p.wpa.toFixed(2)}`}
-              title={`${p.playerName} (${p.team.name}) · ${p.pts}점 · WPA ${p.wpa.toFixed(2)}`}
+              aria-label={label}
+              title={label}
             />
           );
         })}
@@ -172,10 +216,12 @@ function WeightScatter({ players, perPoint, r }: { players: WeightPoint[]; perPo
           .filter((p) => labeled.has(p.pcode))
           .map((p) => {
             const left = (p.pts / xMax) * 100;
+            const isPhoto = Boolean(p.photoUrl);
+            const wideCls = isPhoto ? (left > 70 ? styles.dotLabelWideLeft : styles.dotLabelWide) : left > 70 ? styles.dotLabelLeft : "";
             return (
               <span
                 key={`l-${p.pcode}`}
-                className={`${styles.dotLabel} ${left > 70 ? styles.dotLabelLeft : ""} ${primary.has(p.pcode) ? "" : styles.dotLabelMinor}`}
+                className={`${styles.dotLabel} ${wideCls} ${primary.has(p.pcode) ? "" : styles.dotLabelMinor}`}
                 style={{ left: `${left}%`, bottom: `${(Math.max(0, p.wpa) / yMax) * 100}%` }}
               >
                 {p.playerName}

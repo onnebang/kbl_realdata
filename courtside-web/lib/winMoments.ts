@@ -8,7 +8,7 @@ import { displayTeamName } from "./teamNames";
 // 왜 순위표에서 장면 중심으로 바꿨는지(실측 수치)는 그 SQL 파일 머리 주석에 있다.
 // 요약: 선수 시즌 WPA 합계는 득점과 r=0.991이라 새 정보가 없고, 데이터가 확실히 말하는 건 '순간'이다.
 
-export type TeamLite = { tcode: string; name: string; abbr: string; color: string | null };
+export type TeamLite = { tcode: string; name: string; abbr: string; color: string | null; logoUrl: string | null };
 /** [경과초, 승률] - 승률은 그 카드 주인공 팀(한 방은 득점한 팀, 역전은 이긴 팀) 기준. */
 export type CurvePoint = [number, number];
 
@@ -20,6 +20,8 @@ export type BigPlay = {
   shot: string;
   pcode: string;
   playerName: string;
+  /** 요청("시즌 최고의 한 방에 선수 사진·팀 로고를 은은하게") - 없으면 카드가 사진 없이 그린다. */
+  photoUrl: string | null;
   team: TeamLite;
   opp: TeamLite;
   /** 그 플레이 직후 점수(팀 기준). */
@@ -52,7 +54,7 @@ export type Comeback = {
   curve: CurvePoint[];
 };
 
-export type WeightPoint = { pcode: string; playerName: string; team: TeamLite; games: number; pts: number; wpa: number };
+export type WeightPoint = { pcode: string; playerName: string; photoUrl: string | null; team: TeamLite; games: number; pts: number; wpa: number };
 
 export type WinMoments = {
   season: string;
@@ -70,7 +72,21 @@ const clockLabel = (m: number, s: number) => `${m}:${String(s).padStart(2, "0")}
 
 function teamLite(teams: Map<string, TeamMeta>, tcode: string, season: string): TeamLite {
   const t = teams.get(tcode);
-  return { tcode, name: displayTeamName(tcode, t?.name ?? tcode, season), abbr: t?.abbr ?? tcode, color: t?.color ?? null };
+  return { tcode, name: displayTeamName(tcode, t?.name ?? tcode, season), abbr: t?.abbr ?? tcode, color: t?.color ?? null, logoUrl: t?.logoUrl ?? null };
+}
+
+/** players.photo_url 배치 조회(773명 중 130명만 있음 - 실측). 이 파일 전용 - 같은 패턴이
+ * lib/wowy.ts·lib/lineupCombos.ts·lib/teamSeasonStats.ts에도 각자 있다(저장소 관례). */
+async function fetchPlayerPhotos(pcodes: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const uniq = [...new Set(pcodes)];
+  if (!uniq.length) return map;
+  const { data } = await supabase.from("players").select("pcode, photo_url").in("pcode", uniq);
+  for (const r of data ?? []) {
+    const url = r.photo_url as string | null;
+    if (url) map.set(r.pcode as string, url);
+  }
+  return map;
 }
 
 async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T[]> {
@@ -129,7 +145,10 @@ async function computeWinMoments(season: string, tcode?: string): Promise<WinMom
   ]);
   const weightRows = tcode ? weightRowsAll.filter((r) => r.tcode === tcode) : weightRowsAll;
   const gmkeys = [...new Set([...playRows.map((r) => r.gmkey), ...comebackRows.map((r) => r.gmkey)])];
-  const seriesRows = gmkeys.length ? await rpc<SeriesRow>("game_winprob_series", { p_gmkeys: gmkeys }) : [];
+  const [seriesRows, photos] = await Promise.all([
+    gmkeys.length ? rpc<SeriesRow>("game_winprob_series", { p_gmkeys: gmkeys }) : Promise.resolve<SeriesRow[]>([]),
+    fetchPlayerPhotos([...playRows.map((r) => r.pcode), ...weightRows.map((r) => r.pcode)]),
+  ]);
   const seriesOf = (gmkey: string) => seriesRows.find((r) => r.gmkey === gmkey)?.points ?? [];
 
   const plays: BigPlay[] = playRows.map((r) => {
@@ -146,6 +165,7 @@ async function computeWinMoments(season: string, tcode?: string): Promise<WinMom
       shot: SHOT_LABEL[r.action_code] ?? "플레이",
       pcode: r.pcode,
       playerName: r.player_name ?? r.pcode,
+      photoUrl: photos.get(r.pcode) ?? null,
       team: teamLite(teams, r.tcode, season),
       opp: teamLite(teams, oppCode, season),
       teamScore: isHome ? r.home_score : r.away_score,
@@ -182,6 +202,7 @@ async function computeWinMoments(season: string, tcode?: string): Promise<WinMom
   const players: WeightPoint[] = weightRows.map((r) => ({
     pcode: r.pcode,
     playerName: r.player_name ?? r.pcode,
+    photoUrl: photos.get(r.pcode) ?? null,
     team: teamLite(teams, r.tcode, season),
     games: r.games,
     pts: r.pts,
@@ -238,6 +259,7 @@ async function computeTeamHighlight(season: string, tcode: string): Promise<Team
           shot: SHOT_LABEL[r.action_code] ?? "플레이",
           pcode: r.pcode,
           playerName: r.player_name ?? r.pcode,
+          photoUrl: null, // 팀 페이지 미리보기 카드는 사진을 안 그린다 - 안 불러온다.
           team: teamLite(teams, r.tcode, season),
           opp: teamLite(teams, oppCode, season),
           teamScore: isHome ? r.home_score : r.away_score,
