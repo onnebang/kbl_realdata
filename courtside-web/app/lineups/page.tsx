@@ -116,11 +116,13 @@ function PlayerTile({
   photoUrl,
   href,
   active,
+  team,
 }: {
   p: WowyPickPlayer;
   photoUrl: string | null;
   href: string;
   active: boolean;
+  team?: string;
 }) {
   return (
     <Link href={href} className={`${styles.playerTile} ${active ? styles.playerTileActive : ""}`}>
@@ -132,7 +134,7 @@ function PlayerTile({
       <div className={styles.tileNameCell}>
         <div className={styles.tileName}>{p.name}</div>
         <div className={styles.tileSub}>
-          {[p.posLabel, `${p.gp}G`, `${fmtMin(p.minutes)}분`].filter(Boolean).join(" · ")}
+          {[team, p.posLabel, `${p.gp}G`, `${fmtMin(p.minutes)}분`].filter(Boolean).join(" · ")}
         </div>
       </div>
     </Link>
@@ -307,7 +309,20 @@ export default async function LineupsPage({
   const groups: WowyTeamGroup[] = picker?.groups ?? [];
   const teamCode = sp.team?.trim() || null;
   const group = teamCode ? groups.find((g) => g.tcode === teamCode) ?? null : null;
-  const photos = group ? await fetchPhotos(group.players.map((p) => p.pcode)) : new Map<string, string>();
+  // 첫 화면(구단·선수 미선택): 팀마다 그 시즌 최다 출전 선수 한 명을 바로가기로 세운다.
+  // 이미 읽은 picker 데이터라 추가 조회는 사진뿐이다.
+  const featured =
+    !teamCode && !playerCode
+      ? groups.flatMap((g) => {
+          const top = g.players.reduce<WowyPickPlayer | null>((a, b) => (!a || b.minutes > a.minutes ? b : a), null);
+          return top ? [{ g, p: top }] : [];
+        })
+      : [];
+  const photos = group
+    ? await fetchPhotos(group.players.map((p) => p.pcode))
+    : featured.length
+      ? await fetchPhotos(featured.map((x) => x.p.pcode))
+      : new Map<string, string>();
 
   // 커리어 범위에서는 lib/wowy.ts가 소속 팀을 비운다(여러 팀을 거쳤을 수 있으므로).
   // 그럴 때 배지는 "이 시즌 로스터에서 골랐다"는 사실만 표시한다.
@@ -424,10 +439,26 @@ export default async function LineupsPage({
               {season} 시즌에는 이 구단의 {WOWY_SUBJECT_MIN_MINUTES}분 이상 출전 선수가 없습니다.
             </div>
           ) : (
-            <div className={styles.note}>
-              위 구단 칩을 누르면 그 시즌 {WOWY_SUBJECT_MIN_MINUTES}분 이상 뛴 선수가 나옵니다. 선수를 고르면 그 선수 기준의
-              조합 표가 열립니다.
-            </div>
+            <>
+              <div className={styles.note}>
+                위 구단 칩을 누르면 그 시즌 {WOWY_SUBJECT_MIN_MINUTES}분 이상 뛴 선수가 나옵니다. 바로 보려면 아래 팀별 최다
+                출전 선수를 누르세요.
+              </div>
+              {featured.length > 0 && (
+                <div className={styles.playerGrid}>
+                  {featured.map(({ g, p }) => (
+                    <PlayerTile
+                      key={p.pcode}
+                      p={p}
+                      team={g.abbr}
+                      photoUrl={photos.get(p.pcode) ?? null}
+                      href={hrefFor({ season, team: g.tcode, player: p.pcode, k: groupSize })}
+                      active={false}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </details>
       )}
