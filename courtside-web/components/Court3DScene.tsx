@@ -11,6 +11,8 @@ import {
   HALF_WIDTH_M,
   KEY_LENGTH_M,
   KEY_WIDTH_M,
+  RENDER_HALF_WIDTH_M,
+  RENDER_MAX_Z,
   RIM_HEIGHT_M,
   RIM_RADIUS_M,
   THREE_PT_M,
@@ -68,14 +70,17 @@ export function Court3DScene({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
-    // ── 코트 바닥 ──
-    const halfLen = HALFCOURT_LINE_Z + BASELINE_TO_RIM_M;
+    // ── 코트 바닥 - 실제 코트 치수(HALF_WIDTH_M/HALFCOURT_LINE_Z)보다 조금 넓게 깐다.
+    // 실측(2026-09-15 제보): 하프라인 근처(~16m 이내)에서 성공한 슛이 있어 그 자리에도 바닥이
+    // 있어야 "레이아웃 밖"으로 안 보인다(RENDER_MAX_Z 정의부 주석 참고). 코트 선 자체는 실제
+    // 위치 그대로 그린다 - 넓어지는 건 바닥뿐이다. ──
+    const halfLen = RENDER_MAX_Z + BASELINE_TO_RIM_M;
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(HALF_WIDTH_M * 2, halfLen),
+      new THREE.PlaneGeometry(RENDER_HALF_WIDTH_M * 2, halfLen),
       new THREE.MeshStandardMaterial({ color: 0xc9975f, roughness: 0.9 })
     );
     floor.rotation.x = -Math.PI / 2;
-    floor.position.z = (HALFCOURT_LINE_Z - BASELINE_TO_RIM_M) / 2;
+    floor.position.z = (RENDER_MAX_Z - BASELINE_TO_RIM_M) / 2;
     scene.add(floor);
 
     // ── 코트 선 ──
@@ -103,12 +108,15 @@ export function Court3DScene({
         return [Math.sin(a) * r, cz + Math.cos(a) * r];
       });
     addLoop(circlePts(FT_CIRCLE_R_M, baseZ + KEY_LENGTH_M));
+    // 3점 아크 - 제보(2026-09-15): "반원이 잘못 그려져 있다". 예전 코드는 각을 cos=x축·sin=z축로
+    // 잡아서 골대 정면(z=+R, 아크 꼭짓점)이 아니라 골대 옆(z=0)을 정점으로 그렸고, 골대 뒤(z<0,
+    // 베이스라인 너머)까지 그렸다. 각 φ를 z축(하프라인 방향, 아크 꼭짓점) 기준으로 잡고, φ의
+    // 범위를 "베이스라인과 만나는 각"까지만 둔다 - 코너 3점이 자연히 베이스라인에서 끊긴다.
+    const arcPhiMax = Math.acos(Math.max(-1, Math.min(1, baseZ / THREE_PT_M)));
     const arcPts: [number, number][] = [];
     for (let i = 0; i <= 48; i++) {
-      const a = -Math.PI / 2 + (i / 48) * Math.PI;
-      const px = Math.cos(a) * THREE_PT_M;
-      if (Math.abs(px) > HALF_WIDTH_M - 0.2) continue;
-      arcPts.push([px, Math.sin(a) * THREE_PT_M]);
+      const phi = -arcPhiMax + (i / 48) * (2 * arcPhiMax);
+      arcPts.push([Math.sin(phi) * THREE_PT_M, Math.cos(phi) * THREE_PT_M]);
     }
     addLine(arcPts);
 
