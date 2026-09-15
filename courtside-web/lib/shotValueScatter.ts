@@ -18,6 +18,7 @@ export { MIN_SAMPLE };
 export type ScatterPlayerRow = {
   pcode: string;
   name: string;
+  photoUrl: string | null;
   tcode: string;
   teamAbbr: string;
   teamColor: string;
@@ -96,10 +97,12 @@ async function computeShotValueScatterData(seasonName: string): Promise<ShotValu
   if (!pcodes.length) return { season: seasonName, players: [], avgPsa: 0, avgMoreyPct: 0, tsaMin: 0, tsaMax: 0 };
 
   const [{ data: players }, { data: teams }] = await Promise.all([
-    supabase.from("players").select("pcode, name").in("pcode", pcodes),
+    supabase.from("players").select("pcode, name, photo_url").in("pcode", pcodes),
     supabase.from("teams").select("tcode, abbr, color"),
   ]);
   const nameByPcode = new Map((players ?? []).map((p) => [p.pcode as string, p.name as string]));
+  // 요청("무리에서 떨어진 선수는 프로필 사진으로") - 773명 중 130명만 있음(실측), 없으면 기존 원 그대로.
+  const photoByPcode = new Map((players ?? []).map((p) => [p.pcode as string, p.photo_url as string | null]));
   const teamByTcode = new Map((teams ?? []).map((t) => [t.tcode as string, t as { abbr: string; color: string }]));
 
   const rows: ScatterPlayerRow[] = [];
@@ -134,6 +137,7 @@ async function computeShotValueScatterData(seasonName: string): Promise<ShotValu
     rows.push({
       pcode,
       name: nameByPcode.get(pcode) ?? pcode,
+      photoUrl: photoByPcode.get(pcode) ?? null,
       tcode,
       teamAbbr: team?.abbr ?? tcode,
       teamColor: team?.color ?? "#888888",
@@ -338,6 +342,21 @@ export function buildShotValueScatterSvg(data: ShotValueScatterData): string {
     .slice(0, FORCE_VOLUME_LABELS)
     .forEach((p) => labelSet.add(p.pcode));
 
+  // 요청("무리에서 떨어져 있는 선수들(공간 널널한 곳)은 프로필 사진으로") - 라벨 대상
+  // 전부가 아니라 평균에서 가장 멀리 떨어진(dists 상위) 몇 명만, 그리고 사진이 있을 때만
+  // (773명 중 130명 - 대부분은 원래대로 색점). 거리 상위 6명 중 사진 있는 선수 최대 4명.
+  const byPcode = new Map(players.map((p) => [p.pcode, p]));
+  const PHOTO_OUTLIER_LOOKAHEAD = 6;
+  const PHOTO_OUTLIER_MAX = 4;
+  const photoOutliers = new Set(
+    dists
+      .slice(0, PHOTO_OUTLIER_LOOKAHEAD)
+      .map((d) => byPcode.get(d.pcode))
+      .filter((p): p is ScatterPlayerRow => Boolean(p?.photoUrl))
+      .slice(0, PHOTO_OUTLIER_MAX)
+      .map((p) => p.pcode)
+  );
+
   // 점(선수) - TSA 큰 것부터 그려야 작은 점이 큰 버블에 완전히 묻히지 않고 위에 겹쳐 보임.
   // 이름표도 이 순서로 자리를 잡아(표본 큰 선수 우선) 앞서 놓인 이름표와 겹치면 건너뛴다
   // (careerStrip.ts의 lastLabelEnd 패턴을 2차원으로 - 겹치면 크기가 아니라 개수를 줄인다).
@@ -349,16 +368,28 @@ export function buildShotValueScatterSvg(data: ShotValueScatterData): string {
     const r = scatterBubbleRadius(p.tsa, tsaMin, tsaMax);
     const color = SCATTER_TIER_COLOR[scatterTier(p, avgMoreyPct, avgPsa)];
     const title = `${esc(p.name)} (${esc(p.teamAbbr)}) · PSA ${p.psa.toFixed(2)} · Morey ${Math.round(p.moreyPct * 100)}% · TSA ${Math.round(p.tsa)}`;
+    const isPhoto = photoOutliers.has(p.pcode);
+    // 사진 버블은 실제 인코딩 반지름이 너무 작으면 얼굴을 못 알아본다 - 최소 16으로 올린다.
+    // 이 최대 4명만 예외라 "버블 크기 = TSA" 규칙이 전체적으로는 깨지지 않는다.
+    const dr = isPhoto ? Math.max(r, 16) : r;
 
     svg += `<a href="/players/${encodeURIComponent(p.pcode)}">`;
-    svg += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${color}" opacity="0.78" stroke="var(--surface)" stroke-width="1"><title>${title}</title></circle>`;
+    if (isPhoto) {
+      // 사진 + 판정 색 고리(색이 원래 하던 "위/아래 사분면" 의미를 그대로 이어받는다).
+      const clipId = `svsclip-${p.pcode}`;
+      svg += `<clipPath id="${clipId}"><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(dr - 1).toFixed(1)}"/></clipPath>`;
+      svg += `<image href="${esc(p.photoUrl!)}" x="${(cx - dr).toFixed(1)}" y="${(cy - dr).toFixed(1)}" width="${(dr * 2).toFixed(1)}" height="${(dr * 2).toFixed(1)}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})"><title>${title}</title></image>`;
+      svg += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${dr.toFixed(1)}" fill="none" stroke="${color}" stroke-width="2.5"/>`;
+    } else {
+      svg += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${color}" opacity="0.78" stroke="var(--surface)" stroke-width="1"><title>${title}</title></circle>`;
+    }
 
     // 이름표는 넓은 화면(10단위 = 12.9px) 전용 - 좁은 화면은 300px 폭에 3글자 이름 14개를
     // 12px로 놓을 자리 자체가 없다(툴팁 + 호출부 캡션이 그 몫을 진다). 겹침 검사도 10단위로.
     if (labelSet.has(p.pcode)) {
       const w = svsTextW(p.name, 10);
-      const above = cy - r - 6 > PAD_T + 8;
-      const ly = above ? cy - r - 5 : cy + r + 11;
+      const above = cy - dr - 6 > PAD_T + 8;
+      const ly = above ? cy - dr - 5 : cy + dr + 11;
       const lx = Math.min(Math.max(cx, PAD_L + w / 2), PAD_L + PLOT_W - w / 2);
       const box: [number, number, number, number] = [lx - w / 2 - 2, ly - 10, lx + w / 2 + 2, ly + 3];
       if (!placed.some((b) => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) {
