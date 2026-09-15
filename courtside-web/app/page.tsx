@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { Fragment, type CSSProperties } from "react";
 import { CourtsideHero } from "@/components/CourtsideHero";
 import { TeamBadge } from "@/components/TeamBadge";
 import { teamBarStyle, teamInkStyle } from "@/lib/teamAccent";
@@ -28,6 +28,18 @@ export const maxDuration = 60;
 function fmtDate(d: string) {
   const [y, m, day] = d.split("-");
   return `${y.slice(2)}.${m}.${day}`;
+}
+
+// 제보: "날짜가 잘 안 보인다" - 카드 하나당 12.5px 회색 글자 하나뿐이라 하루에 여러 경기가
+// 있어도 날짜가 카드 수만큼 반복될 뿐 눈에 띄는 구분이 없었다. 카드 자체(폭 계산이 촘촘히
+// 맞춰진 9열 그리드)는 그대로 두고, 날짜가 바뀔 때만 그 위에 굵은 헤더 한 줄을 끼워 넣는다
+// (달력 그리드는 하루 1~3경기뿐인 이 목록에 과하다 - 30경기/페이지면 보통 열흘 안팎이라
+// 헤더로도 하루 단위가 충분히 갈린다).
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
+function fmtDateHeader(d: string) {
+  const [y, m, day] = d.split("-").map(Number);
+  const wd = WEEKDAYS[new Date(y, m - 1, day).getDay()];
+  return `${y}년 ${m}월 ${day}일 (${wd})`;
 }
 
 // 보조 조회 전용 soft 폴백(감사 지적: MVP·태그·승률 중 하나만 실패해도 랜딩 전체가 error.tsx가
@@ -138,7 +150,11 @@ export default async function HomePage({
         {games.length === 0 && (
           <div className="empty-note">이 조건에 맞는 경기가 없습니다. 시즌이나 팀을 바꿔 보세요.</div>
         )}
-        {games.map((g) => {
+        {games.map((g, i) => {
+          // 같은 날짜 경기가 몇 개인지는 헤더 옆 카운트로 쓴다(정렬이 game_date순이라
+          // 같은 날짜는 항상 붙어 있다 - lib/homeGames.ts).
+          const showDateHeader = i === 0 || games[i - 1].game_date !== g.game_date;
+          const dayCount = showDateHeader ? games.filter((x) => x.game_date === g.game_date).length : 0;
           // 상태(예정/진행중/종료)는 lib/gameStatus.ts 단일 정의로 판정 - 경기 페이지와
           // 같은 규칙. 예정: 배지/스코어 없이 "예정"+시각, 진행중: LIVE 배지+진행 스코어,
           // 종료: 기존 그대로.
@@ -152,7 +168,14 @@ export default async function HomePage({
           // 화살표는 붙이지 않는다 - 링크라는 사실은 이미 자리와 색이 말한다.
           const detailLabel = status === "scheduled" ? "미리보기" : status === "live" ? "라이브 보기" : "경기 상세보기";
           return (
-            <div key={g.gmkey} className="game-card">
+            <Fragment key={g.gmkey}>
+              {showDateHeader && (
+                <div className="game-date-header">
+                  <span className="game-date-header-main">{fmtDateHeader(g.game_date)}</span>
+                  <span className="game-date-header-count">{dayCount}경기</span>
+                </div>
+              )}
+              <div className="game-card">
               <div className="game-card-row">
                 <span className="game-card-date">{fmtDate(g.game_date)}</span>
 
@@ -270,7 +293,8 @@ export default async function HomePage({
                   </span>
                 )}
               </div>
-            </div>
+              </div>
+            </Fragment>
           );
         })}
       </div>
@@ -310,6 +334,27 @@ export default async function HomePage({
           **지금 보고 있는 페이지**의 라이브 경기라, 라이브가 없는 2페이지 이후에서는
           30초마다 아무것도 오가지 않는다. */}
       {liveGmkeys.length > 0 && <HomeLiveRefresher />}
+
+      {/* 요청: "경기 목록에 시즌 브라우저와 시즌 리더를 노출시켜서 자연스럽게 유도" - 목록을
+          다 보고 난 자리(페이지네이션 바로 다음)에 다음 볼거리 세 장을 둔다. 시즌을 유지해서
+          "지금 보던 그 시즌"으로 바로 넘어가게 한다. */}
+      <div className="related-row">
+        <Link href={`/season-browser?season=${encodeURIComponent(activeSeason)}`} className="related-card">
+          <span className="related-kicker">시즌 브라우저</span>
+          <span className="related-main">{activeSeason} 팀·선수 기록 한눈에</span>
+          <span className="related-sub">경기별 박스스코어를 팀·선수 단위로 훑어보기</span>
+        </Link>
+        <Link href={`/leaderboards/season?season=${encodeURIComponent(activeSeason)}`} className="related-card">
+          <span className="related-kicker">시즌 리더보드</span>
+          <span className="related-main">부문별 순위 보기</span>
+          <span className="related-sub">득점·리바운드부터 4팩터까지 {activeSeason} 랭킹</span>
+        </Link>
+        <Link href={`/leaderboards/win-contribution?season=${encodeURIComponent(activeSeason)}`} className="related-card">
+          <span className="related-kicker">승부를 가른 순간</span>
+          <span className="related-main">시즌 최고의 한 방·역전 모음</span>
+          <span className="related-sub">경기 중 승률을 가장 크게 움직인 장면들</span>
+        </Link>
+      </div>
 
       <footer className="foot">
         {activeSeason} 시즌 · 전체 {total}경기 중{" "}
