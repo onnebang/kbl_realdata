@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { cache, type ReactNode } from "react";
+import { cache, type CSSProperties, type ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
 import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBox } from "@/lib/postgameReport";
@@ -1140,6 +1140,25 @@ export default async function GamePage({
           )}
         </div>
       </div>
+      )}
+
+      {/* 요청: "경기 페이지에 라인업 조합 링크도 붙여줘" - 이 경기 자체의 온/오프 넷레이팅(위
+          "코트 위" 패널)과 달리 시즌 전체 표본으로 본 선수별 조합(WOWY)이다. 팀만 채워서 넘긴다
+          - 특정 선수를 고정하면 그 선수가 시즌 출전 기준(WOWY_SUBJECT_MIN_MINUTES)에 못 미쳐
+          빈 화면이 될 수 있어(이적·교체선수 등), 로스터 고르기부터 시작하게 둔다. */}
+      {game.home_team && game.away_team && (
+        <div className="related-row">
+          <Link href={`/lineups?season=${encodeURIComponent(game.season_name)}&team=${game.home_team.tcode}`} className="related-card" style={{ "--team": game.home_team.color } as CSSProperties}>
+            <span className="related-kicker">선수별 조합</span>
+            <span className="related-main">{game.home_team.name} 조합 보기</span>
+            <span className="related-sub">이 시즌 누구와 같이 뛸 때 팀 마진이 어떻게 달라지는지</span>
+          </Link>
+          <Link href={`/lineups?season=${encodeURIComponent(game.season_name)}&team=${game.away_team.tcode}`} className="related-card" style={{ "--team": game.away_team.color } as CSSProperties}>
+            <span className="related-kicker">선수별 조합</span>
+            <span className="related-main">{game.away_team.name} 조합 보기</span>
+            <span className="related-sub">이 시즌 누구와 같이 뛸 때 팀 마진이 어떻게 달라지는지</span>
+          </Link>
+        </div>
       )}
 
       <footer className="foot">실시간 조회 · {gmkey}</footer>
