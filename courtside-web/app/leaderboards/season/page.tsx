@@ -276,6 +276,17 @@ export default async function SeasonLeadersPage({
                     {boards.map((b) => (
                       <LeaderCard key={b.key} board={b} logos={logos} />
                     ))}
+                    {grp === "고급" && (
+                      // 옛 WPA 카드 자리. 선수 시즌 WPA 합계는 득점과 r=0.991이라 득점 카드와 같은 순위였다.
+                      <Link href={`/leaderboards/win-contribution?season=${encodeURIComponent(data.seasonName)}`} className={`${styles.card} ${styles.pointerCard}`}>
+                        <span className={styles.cardTitle}>WPA는 여기로 옮겼습니다</span>
+                        <span className={styles.pointerText}>
+                          선수 시즌 WPA 합계는 득점과 거의 같은 순위(상관 0.99)라 순위표 대신, 경기 승률을 가장 크게 움직인 장면과 역전
+                          경기로 보여 줍니다.
+                        </span>
+                        <span className={styles.pointerLink}>승부를 가른 순간 보기</span>
+                      </Link>
+                    )}
                   </div>
                 </section>
               );
@@ -284,8 +295,7 @@ export default async function SeasonLeadersPage({
           <div className={styles.foot}>
             <p>
               <strong>표본</strong> {shortSeason(data.seasonName)} 정규시즌만 집계합니다(플레이오프
-              제외). 팀마다 경기 수가 다른 플레이오프를 섞으면 같은 잣대로 순위를 매길 수 없고,
-              WPA의 원천 테이블이 애초에 정규시즌 전용이라 부문마다 표본이 달라지는 것을 막았습니다.
+              제외). 팀마다 경기 수가 다른 플레이오프를 섞으면 같은 잣대로 순위를 매길 수 없기 때문입니다.
             </p>
             <p>
               <strong>출전 경기</strong> 엔트리만 들고 0분을 뛴 경기는 출전으로 세지 않습니다. 그래서
@@ -294,7 +304,7 @@ export default async function SeasonLeadersPage({
             <p>
               <strong>자격</strong> 평균·성공률 부문은 {LEADER_QUALIFY.gp}경기 <em>또는</em>{" "}
               {LEADER_QUALIFY.min}분 이상. 성공률은 여기에 최소 시도(팀 {data.teamGames}경기 기준)를
-              더 요구합니다. 누적 부문(3P 성공, WPA)에는 자격 기준이 없습니다.
+              더 요구합니다. 누적 부문(3P 성공)에는 자격 기준이 없습니다.
             </p>
             <p>
               <strong>동률</strong> 순위는 반올림 전 원값으로 매깁니다. 화면의 소수 1자리가 같아
@@ -303,8 +313,7 @@ export default async function SeasonLeadersPage({
             </p>
             <p>
               {data.seasonName} 정규시즌 {data.teamGames}경기 기준 · 출전 {data.playersN}명 중 자격
-              통과 {data.qualifiedN}명 · 부문당 최대 {data.topN}명 · 경기별 선수 기록과 시즌 WPA
-              집계에서 실시간 조회
+              통과 {data.qualifiedN}명 · 부문당 최대 {data.topN}명 · 경기별 선수 기록에서 집계
             </p>
           </div>
         </>

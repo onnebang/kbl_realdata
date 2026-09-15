@@ -44,7 +44,7 @@ export type LeaderCategoryKey =
   | "pts" | "reb" | "ast" | "stl" | "blk"
   | "tpm"
   | "tpPct" | "fgPct" | "ftPct"
-  | "mpg" | "per" | "tsPct" | "usgPct" | "wpa";
+  | "mpg" | "per" | "tsPct" | "usgPct";
 
 export type LeaderGroup = "기본" | "슈팅" | "고급";
 
@@ -76,7 +76,8 @@ export const LEADER_CATEGORIES: LeaderCategoryDef[] = [
   { key: "per", label: "PER", unit: "", group: "고급", rate: true, note: "경기별 per의 출전 시간 가중 평균(짧게 뛴 경기가 과대 반영되지 않게)" },
   { key: "tsPct", label: "TS%", unit: "%", group: "고급", rate: true, note: "득점 / (2 × (fga + tpa + 0.44×fta))" },
   { key: "usgPct", label: "USG%", unit: "%", group: "고급", rate: true, note: "경기별 usage_rtg의 출전 시간 가중 평균" },
-  { key: "wpa", label: "WPA", unit: "", group: "고급", rate: false, note: "player_season_wpa.total_wpa(시즌 누적 승리확률 기여) - 원천이 정규시즌 전용" },
+  // WPA 카드는 뺐다(2026-09-15): 선수 시즌 WPA 합계는 득점과 r=0.991이라 득점 카드와 같은 순위였다(WPA가 넣은 슛에만
+  // 붙는다 - tools/rpc_win_moments.sql). 페이지가 "승부를 가른 순간"으로 가는 안내 카드를 대신 둔다.
 ];
 
 export type LeaderRow = {
@@ -271,7 +272,7 @@ const fmtPct = (v: number) => v.toFixed(1);
 const fmtInt = (v: number) => Math.round(v).toLocaleString();
 
 type Extractor = {
-  value: (a: SeasonPlayerAgg, wpa: number | null) => number | null;
+  value: (a: SeasonPlayerAgg) => number | null;
   display: (v: number) => string;
   /** 값 옆 표본 문구. 없으면 "N경기 · M분". */
   sample?: (a: SeasonPlayerAgg) => string;
@@ -320,7 +321,6 @@ const EXTRACT: Record<LeaderCategoryKey, Extractor> = {
     }),
   },
   usgPct: { value: (a) => (a.minutes > 0 ? a.usgW : null), display: fmtPct },
-  wpa: { value: (_a, wpa) => wpa, display: fmt2, sample: (a) => `${a.gp}경기 · ${Math.round(a.minutes).toLocaleString()}분` },
 };
 
 /**
@@ -341,7 +341,7 @@ export async function getSeasonLeaderboards(
   const catKey = opts?.categories?.length ? [...opts.categories].sort().join(",") : "all";
   return cached(
     () => computeSeasonLeaderboards(seasonName, opts),
-    ["seasonLeaderboards", seasonName, String(opts?.topN ?? "d"), catKey],
+    ["seasonLeaderboards-v2", seasonName, String(opts?.topN ?? "d"), catKey], // v2: WPA 카드 제거
     TTL.batchDaily,
     [TAG.batch, TAG.season(seasonName)]
   );
@@ -376,17 +376,6 @@ async function computeSeasonLeaderboards(
       ? `팀 ${teamGamesMin}경기 기준`
       : `팀별 일정이 ${teamGamesMin}~${teamGamesMax}경기라 최소 일정 ${teamGamesMin}경기 기준`;
 
-  // WPA만 원천이 다르다(사전 집계 테이블). 시즌 한 개 = 최대 200행 남짓이라 페이지네이션 불필요하지만
-  // 관례대로 안전하게 range로 끝까지 받는다.
-  const needWpa = wanted.some((c) => c.key === "wpa");
-  const wpaByPcode = new Map<string, number>();
-  if (needWpa) {
-    const wrows = await fetchAllPagesBounded<{ pcode: string; total_wpa: number | string | null }>((from, to) =>
-      supabase.from("player_season_wpa").select("pcode, total_wpa", { count: "exact" }).eq("season_name", seasonName).range(from, to)
-    );
-    for (const w of wrows) wpaByPcode.set(w.pcode, num(w.total_wpa));
-  }
-
   const names = new Map<string, string>();
   for (const part of chunk(aggs.map((a) => a.pcode), 200)) {
     const { data } = await supabase.from("players").select("pcode, name").in("pcode", part);
@@ -410,10 +399,8 @@ async function computeSeasonLeaderboards(
       pool = pool.filter((a) => att.of(a) >= att.need);
       qualifyBits.push(`${att.label} ${att.need.toLocaleString()}개 이상(${teamGamesBasis})`);
     }
-    if (def.key === "wpa") pool = pool.filter((a) => wpaByPcode.has(a.pcode));
-
     const scored = pool
-      .map((a) => ({ a, v: ex.value(a, wpaByPcode.get(a.pcode) ?? null) }))
+      .map((a) => ({ a, v: ex.value(a) }))
       .filter((x): x is { a: SeasonPlayerAgg; v: number } => x.v != null && Number.isFinite(x.v));
     if (!scored.length) continue;
     scored.sort((x, y) => y.v - x.v || y.a.minutes - x.a.minutes);

@@ -132,6 +132,23 @@
   display: flex;
   flex-direction: column;
 }
+/* 옛 WPA 카드 자리의 안내 카드 - 순위가 없어 조용하게. */
+.pointerCard {
+  gap: 8px;
+  border-top-color: rgba(var(--line-rgb), 0.24);
+  color: var(--ink);
+}
+.pointerText {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.pointerLink {
+  align-self: flex-start;
+  font-size: 13px;
+  font-weight: 700;
+  border-bottom: 2px solid var(--gold);
+}
 .cardHead {
   display: flex;
   align-items: baseline;
