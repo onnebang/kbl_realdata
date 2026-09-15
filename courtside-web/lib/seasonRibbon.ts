@@ -215,6 +215,14 @@ export function buildSeasonRibbonSvg(input: RibbonInput): { svg: string; stats: 
   parts.push(`<line x1="${PAD_L}" y1="${zeroY.toFixed(1)}" x2="${W - PAD_R}" y2="${zeroY.toFixed(1)}" stroke="rgba(var(--line-rgb),0.35)" stroke-width="1"/>`);
   const y50 = zeroY - 0.5 * halfUp;
   parts.push(`<line x1="${PAD_L}" y1="${y50.toFixed(1)}" x2="${W - PAD_R}" y2="${y50.toFixed(1)}" stroke="rgba(var(--line-rgb),0.18)" stroke-width="0.6" stroke-dasharray="2 4"/>`);
+  // 가시성 제보 - 승수 누적선(점선·골드)이 막대 축(점수차·확률)과 완전히 다른 축이라 붕 떠
+  // 보였다. 오른쪽 "N승/0" 두 글자만으로는 그 사이 값을 가늠할 기준이 없어서, 승수 격자선을
+  // 옅게 깔아 준다 - 텍스트가 아니라 선이라 좁은 화면에서도 넘치지 않는다(rbbWide 문턱 없음).
+  const winStep = Math.max(5, Math.round(n / 6 / 5) * 5);
+  for (let w = winStep; w < n; w += winStep) {
+    const gy = yWins(w);
+    parts.push(`<line x1="${PAD_L}" y1="${gy.toFixed(1)}" x2="${W - PAD_R}" y2="${gy.toFixed(1)}" stroke="rgba(var(--line-rgb),0.1)" stroke-width="0.6" stroke-dasharray="1 3"/>`);
+  }
   // 축 눈금(왼쪽 점수차·50% / 오른쪽 승수)은 좌우 여백(26·40단위) 안에 사는 글자라 넓은 화면
   // 전용이다: 좁은 화면 32단위에서는 "50%"만 60단위로 여백의 두 배를 넘어 플롯을 덮는다.
   // 좁은 화면에서는 눈금 대신 아래 두 헤드라인 숫자(기대 · 실제 승수)와 칸 툴팁·캡션이 남는다.
@@ -304,12 +312,15 @@ export function buildSeasonRibbonSvg(input: RibbonInput): { svg: string; stats: 
           `<rect x="${barX.toFixed(1)}" y="${yTop.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="none" stroke="rgba(var(--line-rgb),0.3)" stroke-width="1" stroke-dasharray="2 2"/>`
         );
       } else if (s.isHome) {
+        // 가시성 제보(개막 전 = 전 칸이 고스트라 페이지 전체가 옅은 하늘색 일색이었다) - 채움·테두리를
+        // 한 단계씩 진하게. "채움 = 사실(치른 승리, opacity .92)" / "고스트 = 아직 없는 것"의 구분은
+        // 그대로 남는다(여전히 반투명이고 치른 칸보다 확연히 옅다).
         inner.push(
-          `<rect x="${barX.toFixed(1)}" y="${yTop.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${teamColor}" opacity="0.26" stroke="${teamColor}" stroke-opacity="0.55" stroke-width="0.8"/>`
+          `<rect x="${barX.toFixed(1)}" y="${yTop.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${teamColor}" opacity="0.42" stroke="${teamColor}" stroke-opacity="0.8" stroke-width="1.1"/>`
         );
       } else {
         inner.push(
-          `<rect x="${barX.toFixed(1)}" y="${yTop.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="none" stroke="${teamColor}" stroke-opacity="0.85" stroke-width="1"/>`
+          `<rect x="${barX.toFixed(1)}" y="${yTop.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="none" stroke="${teamColor}" stroke-opacity="0.95" stroke-width="1.4"/>`
         );
       }
       if (s.status === "live") {
@@ -363,8 +374,8 @@ export function buildSeasonRibbonSvg(input: RibbonInput): { svg: string; stats: 
   const expY = Math.min(Math.max(lastExpY, plotTop + 12), plotBot - 6) + 3;
   const expLeft = W - 2 - rbTextW(expLabel);
   if (expPts.length > 1) {
-    parts.push(`<polyline points="${expPts.join(" ")}" fill="none" stroke="rgba(var(--line-rgb),0.6)" stroke-width="1.4" stroke-dasharray="3 3"/>`);
-    parts.push(`<text x="${W - 2}" y="${expY.toFixed(1)}" text-anchor="end" class="rbb" fill="rgba(var(--line-rgb),0.7)" ${RB_HALO}>${expLabel}</text>`);
+    parts.push(`<polyline points="${expPts.join(" ")}" fill="none" stroke="rgba(var(--line-rgb),0.78)" stroke-width="1.9" stroke-dasharray="4 3"/>`);
+    parts.push(`<text x="${W - 2}" y="${expY.toFixed(1)}" text-anchor="end" class="rbb" font-weight="700" fill="rgba(var(--line-rgb),0.9)" ${RB_HALO}>${expLabel}</text>`);
   }
   if (actualPts.length > 1) {
     parts.push(`<polyline points="${actualPts.join(" ")}" fill="none" stroke="var(--gold)" stroke-width="1.8" opacity="0.95"/>`);
