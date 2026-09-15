@@ -69,6 +69,17 @@ export type FormIndexRow = {
 };
 export type FormSortKey = "delta" | "deltaPer100" | "deltaPerGame" | "actualPts" | "expectedPts" | "attempts" | "games";
 
+/**
+ * 표본 흔들림 폭(2026-09-15 실측). 슛 한 개의 (실제 − 기대) 득점 표준편차 1.165점(25-26 정규시즌 35,866슛) →
+ * 100슛당 값의 표준오차 = 116.5 / √시도. 30슛이면 ±21, 1,000슛이면 ±3.7.
+ * 그리고 "최근 폼"의 예측력: 직전 5경기 100슛당 값과 다음 5경기의 상관 0.10, 시즌 나머지 경기와 다음 5경기의 상관 0.25
+ * (23-24~25-26, 선수 124명·1,445쌍, 5경기 20슛 이상). 최근 몇 경기의 '핫·콜드'는 대부분 표본 흔들림이다.
+ */
+export const SHOT_DELTA_SD = 1.165;
+export const FORM_EVIDENCE = { rPrev5Next5: 0.1, rSeasonNext5: 0.25, pairs: 1445, players: 124 } as const;
+/** 100슛당 델타의 표준오차. */
+export const per100Se = (attempts: number) => (attempts > 0 ? (100 * SHOT_DELTA_SD) / Math.sqrt(attempts) : Infinity);
+
 /** 창 선택지 - 0은 시즌 전체. RPC form_index_season(p_season, p_window)의 p_window로 그대로 간다. */
 export const FORM_WINDOWS = [1, 3, 5, 10, 0] as const;
 export type FormWindow = (typeof FORM_WINDOWS)[number];

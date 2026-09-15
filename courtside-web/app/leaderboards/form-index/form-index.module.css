@@ -61,6 +61,7 @@
 /* "폼 지수" - 순한글 제목이라 Big Shoulders Display(한글 글리프 없음)를 걸면 경고 없이
    sans-serif로 폴백한다(이 저장소가 여러 번 밟은 버그). 한글 표제 = Pretendard 800 + -0.02em. */
 .title {
+  margin: 0;
   font-family: "Pretendard", system-ui, sans-serif;
   font-weight: 800;
   font-size: var(--fs-700);
@@ -187,6 +188,30 @@
   line-height: var(--lh-tight);
   text-align: right;
   white-space: nowrap;
+}
+
+/* ± 흔들림 폭(2SE) - 값 옆에 작게. 값이 폭 안이면 방향색(hot/cold)을 빼고 회색으로 - 운과 구분되지 않는다. */
+.bandNote {
+  margin-left: 5px;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-faint);
+}
+.withinBand {
+  color: var(--ink-faint);
+}
+.panelLead {
+  margin: 0 0 14px;
+  font-size: var(--fs-200);
+  line-height: 1.6;
+  color: var(--ink-soft);
+  max-width: 88ch;
+}
+.panelNote {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-faint);
 }
 
 .tableScroll {
