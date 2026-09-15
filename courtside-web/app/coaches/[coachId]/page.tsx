@@ -462,6 +462,26 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
         </section>
       )}
 
+      {/* 요청("팀 자세히보기 안에 감독을 자연스럽게 유도")의 반대 방향 - 감독 페이지에서도
+          그 팀 프로필·팀의 결정적 순간으로 되돌아가는 카드를 둔다. 현 소속 팀이 있을 때만. */}
+      {currentTeam && (
+        <div className="related-row" style={{ "--team": currentTeam.color ?? undefined } as CSSProperties}>
+          <Link href={`/teams/${currentTeam.tcode}?season=${encodeURIComponent(currentTeam.seasonName)}`} className="related-card">
+            <span className="related-kicker">팀</span>
+            <span className="related-main">{currentTeam.name} 프로필 보기</span>
+            <span className="related-sub">로스터·4팩터·일정까지 팀 전체 데이터</span>
+          </Link>
+          <Link
+            href={`/leaderboards/win-contribution?season=${encodeURIComponent(currentTeam.seasonName)}&team=${currentTeam.tcode}`}
+            className="related-card"
+          >
+            <span className="related-kicker">이 팀의 결정적 순간</span>
+            <span className="related-main">{currentTeam.name} 최고의 한 방·역전 보기</span>
+            <span className="related-sub">경기 중 승률을 가장 크게 움직인 장면들</span>
+          </Link>
+        </div>
+      )}
+
       {/* (f) 준비 중 */}
       <div className={styles.measuring}>{MEASURING_NOTE}</div>
     </div>
