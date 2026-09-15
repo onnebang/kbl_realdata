@@ -80,7 +80,7 @@ export function buildKoreaMapSvg(rows: OpponentPtsRow[]): string {
   // shotValueScatter.ts와 같은 기법).
   for (const r of rows) {
     const rad = rFor(r.pts);
-    svg += `<circle cx="${r.x.toFixed(1)}" cy="${r.y.toFixed(1)}" r="${rad.toFixed(1)}" fill="${r.teamColor}" opacity="0.82" stroke="var(--surface)" stroke-width="1.5"><title>${esc(r.teamName)}(${esc(r.city)}) · ${r.pts.toLocaleString()}점</title></circle>`;
+    svg += `<circle cx="${r.x.toFixed(1)}" cy="${r.y.toFixed(1)}" r="${rad.toFixed(1)}" fill="${r.teamColor}" opacity="0.92" stroke="var(--surface)" stroke-width="2"><title>${esc(r.teamName)}(${esc(r.city)}) · ${r.pts.toLocaleString()}점</title></circle>`;
   }
   const placed: [number, number, number, number][] = [];
   for (const r of [...rows].sort((a, b) => b.pts - a.pts)) {

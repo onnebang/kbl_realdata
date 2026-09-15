@@ -30,18 +30,22 @@ import {
 // 끝난 뒤 사용자가 드래그할 때만(무한 requestAnimationFrame 루프 없음, OrbitControls
 // 'change' 이벤트에서만 다시 그림).
 export type Court3DProgress = { shown: number; total: number; pts: number; totalPts: number; label: string | null; done: boolean };
+export type Court3DGroupBy = "season" | "team" | "quarter";
 
 export function Court3DScene({
   shots,
   accentColor,
   onProgress,
   skipToken,
+  groupBy = "season",
 }: {
   shots: Court3DShot[];
   accentColor: string;
   onProgress?: (p: Court3DProgress) => void;
   /** 이 값이 바뀔 때마다(부모의 "건너뛰기" 클릭) 빌드업을 즉시 끝까지 채운다. */
   skipToken?: number;
+  /** 빌드업 순서를 묶을 기준(팀별/시즌별/쿼터별 탭) - 해당 필드가 없는 슛이면 균등 10조각으로 대체. */
+  groupBy?: Court3DGroupBy;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onProgressRef = useRef(onProgress);
@@ -70,21 +74,63 @@ export function Court3DScene({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
+    // ── 배경 - "가상 공간이니만큼" 실제 체육관 대신 스페이스 잼풍 에너지 아레나로(요청:
+    // "경기장 디자인이 안 이뻐서... 스페이스 잼처럼 이쁘게 꾸며줘"). CSS(court-hero-expand
+    // .module.css의 canvasWrap 라디얼 그라데이션)가 뒤에서 밤하늘을 깔아주므로 renderer는
+    // alpha:true 그대로 두고, three 쪽엔 별과 악센트 컬러 글로우만 얹는다. ──
+    const accent = new THREE.Color(accentColor);
+    const starGeo = new THREE.BufferGeometry();
+    const starN = 500;
+    const starPos = new Float32Array(starN * 3);
+    for (let i = 0; i < starN; i++) {
+      const r = 22 + Math.random() * 22;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 1.4 - 0.4); // 위쪽으로 치우치게(바닥 아래는 안 보임)
+      starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      starPos[i * 3 + 1] = Math.abs(r * Math.cos(phi));
+      starPos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+    }
+    starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+    const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.14, transparent: true, opacity: 0.8, sizeAttenuation: true });
+    const stars = new THREE.Points(starGeo, starMat);
+    scene.add(stars);
+
     // ── 코트 바닥 - 실제 코트 치수(HALF_WIDTH_M/HALFCOURT_LINE_Z)보다 조금 넓게 깐다.
     // 실측(2026-09-15 제보): 하프라인 근처(~16m 이내)에서 성공한 슛이 있어 그 자리에도 바닥이
     // 있어야 "레이아웃 밖"으로 안 보인다(RENDER_MAX_Z 정의부 주석 참고). 코트 선 자체는 실제
-    // 위치 그대로 그린다 - 넓어지는 건 바닥뿐이다. ──
+    // 위치 그대로 그린다 - 넓어지는 건 바닥뿐이다. 색은 나무 바닥 대신 팀 컬러가 은은히 배어
+    // 나오는 짙은 유리 바닥(카메라를 자유롭게 풀어준 만큼 아래에서도 봐야 해서 DoubleSide). ──
     const halfLen = RENDER_MAX_Z + BASELINE_TO_RIM_M;
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(RENDER_HALF_WIDTH_M * 2, halfLen),
-      new THREE.MeshStandardMaterial({ color: 0xc9975f, roughness: 0.9 })
+      new THREE.MeshStandardMaterial({ color: 0x0a0d18, roughness: 0.35, metalness: 0.5, emissive: accent, emissiveIntensity: 0.08, side: THREE.DoubleSide })
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.z = (RENDER_MAX_Z - BASELINE_TO_RIM_M) / 2;
     scene.add(floor);
 
-    // ── 코트 선 ──
-    const lineMat = new THREE.LineBasicMaterial({ color: 0xf5f0e6 });
+    // ── 림 아래 에너지 글로우 - 캔버스 라디얼 그라데이션을 가산 블렌딩으로 얹어 "포털" 느낌. ──
+    const glowCanvas = document.createElement("canvas");
+    glowCanvas.width = glowCanvas.height = 128;
+    const gctx = glowCanvas.getContext("2d")!;
+    const rgb = `${Math.round(accent.r * 255)}, ${Math.round(accent.g * 255)}, ${Math.round(accent.b * 255)}`;
+    const grad = gctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grad.addColorStop(0, `rgba(${rgb}, 0.55)`);
+    grad.addColorStop(0.5, `rgba(${rgb}, 0.16)`);
+    grad.addColorStop(1, `rgba(${rgb}, 0)`);
+    gctx.fillStyle = grad;
+    gctx.fillRect(0, 0, 128, 128);
+    const glowTex = new THREE.CanvasTexture(glowCanvas);
+    const glow = new THREE.Mesh(
+      new THREE.PlaneGeometry(9, 9),
+      new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    glow.rotation.x = -Math.PI / 2;
+    glow.position.set(0, 0.006, KEY_LENGTH_M * 0.35 - BASELINE_TO_RIM_M);
+    scene.add(glow);
+
+    // ── 코트 선 - 팀 컬러 네온으로(가상 공간이니 실제 라인 컬러를 고집할 이유가 없다). ──
+    const lineMat = new THREE.LineBasicMaterial({ color: accent });
     const y = 0.01;
     const addLine = (pts: [number, number][]) =>
       scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(([x, z]) => new THREE.Vector3(x, y, z))), lineMat));
@@ -120,11 +166,17 @@ export function Court3DScene({
     }
     addLine(arcPts);
 
-    // ── 골대 ──
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(RIM_RADIUS_M, 0.02, 8, 24), new THREE.MeshStandardMaterial({ color: 0xff5a1f }));
+    // ── 골대 - 림 색은 농구 정체성 유지(주황), 발광만 살짝 얹어 "에너지 링" 느낌. ──
+    const rim = new THREE.Mesh(
+      new THREE.TorusGeometry(RIM_RADIUS_M, 0.02, 8, 24),
+      new THREE.MeshStandardMaterial({ color: 0xff5a1f, emissive: 0xff5a1f, emissiveIntensity: 0.5 })
+    );
     rim.rotation.x = Math.PI / 2;
     rim.position.set(0, RIM_HEIGHT_M, 0);
     scene.add(rim);
+    const rimGlow = new THREE.PointLight(accent, 1.4, 6);
+    rimGlow.position.set(0, RIM_HEIGHT_M, 0);
+    scene.add(rimGlow);
     const backboard = new THREE.Mesh(
       new THREE.BoxGeometry(1.8, 1.05, 0.03),
       new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })
@@ -135,10 +187,11 @@ export function Court3DScene({
     pole.position.set(0, (RIM_HEIGHT_M + 0.6) / 2, -1.4);
     scene.add(pole);
 
-    // ── 슛 마커 - 시즌(있으면) 순으로 정렬해 빌드업 순서를 만든다. ──
-    const bySeason = (a: Court3DShot, b: Court3DShot) => (a.season ?? "").localeCompare(b.season ?? "");
-    const made = shots.filter((s) => s.made).sort(bySeason);
-    const missed = shots.filter((s) => !s.made).sort(bySeason);
+    // ── 슛 마커 - groupBy 기준(팀/시즌/쿼터, 있으면) 순으로 정렬해 빌드업 순서를 만든다. ──
+    const groupField = (s: Court3DShot) => (groupBy === "team" ? s.team : groupBy === "quarter" ? s.quarter : s.season) ?? "";
+    const byGroup = (a: Court3DShot, b: Court3DShot) => groupField(a).localeCompare(groupField(b));
+    const made = shots.filter((s) => s.made).sort(byGroup);
+    const missed = shots.filter((s) => !s.made).sort(byGroup);
     const totalPts = made.reduce((s, m) => s + m.value, 0);
 
     const madeMesh = new THREE.InstancedMesh(
@@ -159,21 +212,24 @@ export function Court3DScene({
     if (made.length) scene.add(madeMesh);
     if (missed.length) scene.add(missedMesh);
 
-    // ── 조명 ──
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.1));
+    // ── 조명 - 바닥이 어두운 유리라 하늘쪽은 밝게, 바닥쪽 바운스는 어둡게(에너지 링/림 글로우가
+    // 도드라지도록). ──
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x11121c, 1.1));
     const sun = new THREE.DirectionalLight(0xffffff, 0.8);
     sun.position.set(6, 10, 6);
     scene.add(sun);
 
-    // ── 카메라 · 컨트롤(빌드업 동안은 꺼둔다 - 재생이 끝나야 손으로 돌릴 수 있다) ──
+    // ── 카메라 · 컨트롤(빌드업 동안은 꺼둔다 - 재생이 끝나야 손으로 돌릴 수 있다). 요청("카메라
+    // 이동이 조금 더 자유롭게") - 위/아래(폴라각)와 줌 범위를 넓힌다. 바닥을 DoubleSide로 해둬서
+    // 아래쪽까지 내려가도 구멍이 안 뚫려 보인다. ──
     const target = new THREE.Vector3(0, 1, HALFCOURT_LINE_Z * 0.35);
     camera.position.set(0, 9, -6);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.copy(target);
     controls.enableDamping = false;
-    controls.minDistance = 4;
-    controls.maxDistance = 26;
-    controls.maxPolarAngle = Math.PI / 2 - 0.03;
+    controls.minDistance = 2.5;
+    controls.maxDistance = 42;
+    controls.maxPolarAngle = Math.PI - 0.05;
     controls.enabled = false;
     controls.update();
 
@@ -190,13 +246,13 @@ export function Court3DScene({
     });
     ro.observe(container);
 
-    // ── 빌드업 재생 - shots에 season이 하나라도 있으면 시즌 단위, 없으면 균등 10조각. ──
-    const hasSeason = shots.some((s) => s.season);
-    const batchKeys = hasSeason
-      ? Array.from(new Set(made.concat(missed).map((s) => s.season ?? ""))).sort((a, b) => a.localeCompare(b))
+    // ── 빌드업 재생 - shots에 groupBy 필드가 하나라도 있으면 그 단위, 없으면 균등 10조각. ──
+    const hasGroup = shots.some((s) => groupField(s));
+    const batchKeys = hasGroup
+      ? Array.from(new Set(made.concat(missed).map(groupField))).sort((a, b) => a.localeCompare(b))
       : Array.from({ length: Math.min(10, Math.max(1, shots.length)) }, (_, i) => String(i));
-    const chunkSize = hasSeason ? 0 : Math.ceil(Math.max(1, shots.length) / batchKeys.length);
-    const inBatch = (s: Court3DShot, idxInArr: number, key: string) => (hasSeason ? (s.season ?? "") === key : Math.floor(idxInArr / chunkSize) === Number(key));
+    const chunkSize = hasGroup ? 0 : Math.ceil(Math.max(1, shots.length) / batchKeys.length);
+    const inBatch = (s: Court3DShot, idxInArr: number, key: string) => (hasGroup ? groupField(s) === key : Math.floor(idxInArr / chunkSize) === Number(key));
 
     let madeShown = 0,
       missedShown = 0,
@@ -238,7 +294,7 @@ export function Court3DScene({
         total: totalShots,
         pts,
         totalPts,
-        label: hasSeason ? key : null,
+        label: hasGroup ? key : null,
         done: false,
       });
       batchIdx++;
@@ -260,17 +316,19 @@ export function Court3DScene({
       controls.removeEventListener("change", render);
       controls.dispose();
       scene.traverse((obj) => {
-        if (obj instanceof THREE.Mesh || obj instanceof THREE.Line) {
+        if (obj instanceof THREE.Mesh || obj instanceof THREE.Line || obj instanceof THREE.Points) {
           obj.geometry.dispose();
           const mat = obj.material;
           (Array.isArray(mat) ? mat : [mat]).forEach((mm) => mm.dispose());
         }
       });
+      glowTex.dispose();
       renderer.dispose();
       container.removeChild(renderer.domElement);
     };
-    // shots/accentColor는 모달이 열릴 때마다 이 컴포넌트가 새로 마운트되므로 고정값으로 취급한다
-    // (빈 배열 - 매 렌더마다 씬을 다시 짓지 않는다). onProgress/skipToken은 ref로 최신값을 받는다.
+    // shots/accentColor/groupBy는 모달이 열릴 때마다(또는 탭 전환으로 key가 바뀔 때마다) 이
+    // 컴포넌트가 새로 마운트되므로 고정값으로 취급한다(빈 배열 - 매 렌더마다 씬을 다시 짓지
+    // 않는다). onProgress/skipToken은 ref로 최신값을 받는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

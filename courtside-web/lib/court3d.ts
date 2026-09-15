@@ -32,7 +32,7 @@ export const HALFCOURT_LINE_Z = 14 - BASELINE_TO_RIM_M; // 골대 기준 하프�
 export const RENDER_MAX_Z = 16;
 export const RENDER_HALF_WIDTH_M = 8.5;
 
-export type Court3DShot = { x: number; z: number; made: boolean; value: 2 | 3; season?: string };
+export type Court3DShot = { x: number; z: number; made: boolean; value: 2 | 3; season?: string; team?: string; quarter?: string };
 
 /**
  * z=0을 골대(림) 중심으로 둔다. z<0은 베이스라인 쪽(골대 뒤), z>0은 하프라인 쪽으로 멀어지는
@@ -42,7 +42,9 @@ export type Court3DShot = { x: number; z: number; made: boolean; value: 2 | 3; s
  * 시즌이 넘어가며 득점이 쌓이는 연출)에서 시즌 단위로 묶어 순서대로 보여준다. 팀 페이지처럼
  * season 없이 부르면 통째로 한 번에 보여준다(재생 없이).
  */
-export function toCourt3D(shots: { x: number; y: number; d: string; made: boolean; season?: string }[]): Court3DShot[] {
+export function toCourt3D(
+  shots: { x: number; y: number; d: string; made: boolean; season?: string; tcode?: string; quarter?: string }[]
+): Court3DShot[] {
   const out: Court3DShot[] = [];
   for (const s of shots) {
     const mx = mirrorShotX(s.x, s.d);
@@ -50,7 +52,7 @@ export function toCourt3D(shots: { x: number; y: number; d: string; made: boolea
     const z = (HOOP_RIGHT[0] - mx) * SCALE_M_PER_UNIT;
     // 코트 밖 좌표 오류로 보이는 소수만 뺀다(RENDER_MAX_Z 주석 참고) - 대부분은 그대로 남는다.
     if (z > RENDER_MAX_Z || z < -BASELINE_TO_RIM_M - 1.5 || Math.abs(x) > RENDER_HALF_WIDTH_M) continue;
-    out.push({ x, z, made: s.made, value: classifyShot(s.x, s.y, s.d).value as 2 | 3, season: s.season });
+    out.push({ x, z, made: s.made, value: classifyShot(s.x, s.y, s.d).value as 2 | 3, season: s.season, team: s.tcode, quarter: s.quarter });
   }
   return out;
 }

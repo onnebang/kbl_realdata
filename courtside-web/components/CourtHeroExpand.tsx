@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import type { Court3DProgress } from "./Court3DScene";
+import type { Court3DGroupBy, Court3DProgress } from "./Court3DScene";
 import type { Court3DShot } from "@/lib/court3d";
 import { WidgetBoundary } from "@/components/WidgetBoundary";
 import styles from "./court-hero-expand.module.css";
@@ -22,18 +22,30 @@ const fmtSeason = (s: string | null) => (s ? `${s.slice(2, 4)}-${s.slice(7, 9)}`
  * (ESPN 르브론 제임스 커리어 득점 영상) - 확장 버튼을 누르면 같은 슛 데이터가 시즌 순으로
  * 쌓이는 3D 코트가 한 번 재생되고, 끝나면 자유롭게 돌려볼 수 있다.
  */
+const GROUP_LABEL: Record<Court3DGroupBy, string> = { team: "팀별", season: "시즌별", quarter: "쿼터별" };
+
 export function CourtHeroExpand({
   shots,
   accentColor,
   label = "이 슛 지도를 3D로 보기",
+  teamNameByTcode,
 }: {
   shots: Court3DShot[];
   accentColor: string;
   label?: string;
+  /** "팀별" 탭 HUD에 tcode 대신 팀 이름을 보여주기 위한 매핑(없으면 tcode 그대로). */
+  teamNameByTcode?: Map<string, string>;
 }) {
   const [open, setOpen] = useState(false);
   const [progress, setProgress] = useState<Court3DProgress | null>(null);
   const [skipToken, setSkipToken] = useState(0);
+
+  // 탭은 해당 기준으로 실제로 갈릴 게 있을 때만 보여준다(예: 팀 페이지 슛은 tcode가 전부
+  // 같아서 "팀별" 탭이 무의미함).
+  const dims = (["team", "season", "quarter"] as const).filter(
+    (k) => new Set(shots.map((s) => s[k]).filter(Boolean)).size > 1
+  );
+  const [groupBy, setGroupBy] = useState<Court3DGroupBy>(() => (dims.includes("season") ? "season" : (dims[0] ?? "season")));
 
   useEffect(() => {
     if (!open) return;
@@ -50,6 +62,16 @@ export function CourtHeroExpand({
   const playing = progress != null && !progress.done;
 
   if (!shots.length) return null;
+
+  const fmtLabel = (raw: string) =>
+    groupBy === "season" ? fmtSeason(raw) : groupBy === "team" ? (teamNameByTcode?.get(raw) ?? raw) : raw;
+
+  const switchGroup = (g: Court3DGroupBy) => {
+    if (g === groupBy) return;
+    setGroupBy(g);
+    setProgress(null);
+    setSkipToken(0);
+  };
 
   return (
     <>
@@ -70,7 +92,7 @@ export function CourtHeroExpand({
               <div className={styles.panelTitle}>
                 {playing ? (
                   <>
-                    {progress?.label && <span className={styles.hudSeason}>{fmtSeason(progress.label)}</span>}
+                    {progress?.label && <span className={styles.hudSeason}>{fmtLabel(progress.label)}</span>}
                     필드골 {progress?.pts.toLocaleString()}점 쌓는 중…
                   </>
                 ) : (
@@ -88,6 +110,20 @@ export function CourtHeroExpand({
                 ✕
               </button>
             </div>
+            {dims.length > 1 && (
+              <div className={styles.tabs}>
+                {dims.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className={d === groupBy ? styles.tabActive : styles.tab}
+                    onClick={() => switchGroup(d)}
+                  >
+                    {GROUP_LABEL[d]}
+                  </button>
+                ))}
+              </div>
+            )}
             {playing && (
               <div className={styles.hudBar}>
                 <div className={styles.hudBarFill} style={{ width: `${((progress?.shown ?? 0) / Math.max(1, progress?.total ?? 1)) * 100}%`, background: accentColor }} />
@@ -95,7 +131,7 @@ export function CourtHeroExpand({
             )}
             <div className={styles.canvasWrap}>
               <WidgetBoundary name="3D 코트">
-                <Court3DScene shots={shots} accentColor={accentColor} onProgress={setProgress} skipToken={skipToken} />
+                <Court3DScene key={groupBy} shots={shots} accentColor={accentColor} onProgress={setProgress} skipToken={skipToken} groupBy={groupBy} />
               </WidgetBoundary>
             </div>
             <div className={styles.legend}>
@@ -106,7 +142,7 @@ export function CourtHeroExpand({
                 <span className={styles.swatchRing} /> 실패
               </span>
               <span className={styles.legendNote}>
-                {playing ? "열 때 한 번, 시즌 순으로 쌓입니다" : "드래그로 회전 · 스크롤로 확대 - 이제부터는 자동으로 움직이지 않습니다"}
+                {playing ? `열 때 한 번, ${GROUP_LABEL[groupBy]} 순으로 쌓입니다` : "드래그로 회전 · 스크롤로 확대 - 이제부터는 자동으로 움직이지 않습니다"}
               </span>
             </div>
           </div>

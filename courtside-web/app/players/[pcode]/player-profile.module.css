@@ -536,18 +536,49 @@
   gap: 10px;
 }
 
-/* ── 득점 분석(팀별·시즌별·슛 위치별·상대 연고지별) - 4칸이 자기 폭만큼 차지, 좁으면 쌓임. */
+/* ── 득점 분석(팀별·시즌별·슛 위치별·상대 연고지별) - 4칸이 자기 폭만큼 차지, 좁으면 쌓임.
+   레퍼런스(ESPN "38,388 POINTS" 르브론 커리어 인포그래픽) 재현 - 카드마다 모눈종이 질감(이
+   사이트 히어로 .player-hero와 같은 그리드 배경 관례) 위에 "총점 // 구분" 캡션을 얹고, 큰
+   숫자는 전부 Big Shoulders Display(숫자만 - 한글 금지 규칙은 .scoringLegendName에서 유지). */
 .scoringGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
   align-items: start;
 }
+.scoringCard {
+  background: var(--surface-soft);
+  background-image: linear-gradient(rgba(var(--line-rgb), 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--line-rgb), 0.06) 1px, transparent 1px);
+  background-size: 16px 16px;
+  border: 1px solid rgba(var(--line-rgb), 0.12);
+  border-radius: var(--r-inset);
+  padding: 14px 14px 12px;
+}
+.scoringCardHead {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.scoringEyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-style: italic;
+  font-size: 11px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.scoringEyebrow::after {
+  content: "//";
+  margin-left: 6px;
+  font-style: normal;
+  color: rgba(var(--line-rgb), 0.35);
+}
 .scoringSubTitle {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--ink-soft);
-  margin-bottom: 6px;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 .scoringChart {
   width: 100%;
@@ -559,18 +590,26 @@
 }
 .scoringLegend {
   list-style: none;
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 12.5px;
   color: var(--ink-soft);
 }
 .scoringLegend li {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+.scoringLegendPts {
+  margin-left: auto;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 .miniStatCard {
   background: var(--surface-soft);

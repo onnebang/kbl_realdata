@@ -12,7 +12,7 @@ import { buildDensityFieldSvg } from "./shotDensityField";
 // ── 커리어 슛 전체(히어로 별자리 + 슈팅 DNA + 슛 임팩트 리포트가 공유) ──────────────
 // 한 선수의 커리어 슛은 최대 7천여 건(워니 7,215 실측) - scoringExplorer.ts의 병렬
 // 페이지네이션을 재사용해 한 번만 받고, 시즌별 필터는 전부 JS에서(요청 1회로 3개 섹션 공급).
-export type CareerShot = { x: number; y: number; d: string; made: boolean; season: string };
+export type CareerShot = { x: number; y: number; d: string; made: boolean; season: string; tcode: string; quarter: string };
 
 /** 커리어 슛 로그 - 선수 상세에서 가장 행이 많은 조회 중 하나. */
 export const getCareerShots = cachedFn(computeCareerShots, {
@@ -22,18 +22,26 @@ export const getCareerShots = cachedFn(computeCareerShots, {
 });
 
 async function computeCareerShots(pcode: string): Promise<CareerShot[]> {
-  type Row = { x: number; y: number; d: string; made: boolean; games: { season_name: string } | { season_name: string }[] };
+  type Row = {
+    x: number;
+    y: number;
+    d: string;
+    made: boolean;
+    tcode: string;
+    quarter: string;
+    games: { season_name: string } | { season_name: string }[];
+  };
   const rows = await fetchAllPagesBounded<Row>(
     (from, to) =>
       supabase
         .from("shot_log")
-        .select("x, y, d, made, games!inner(season_name)", { count: "exact" })
+        .select("x, y, d, made, tcode, quarter, games!inner(season_name)", { count: "exact" })
         .eq("pcode", pcode)
         .range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: unknown; count: number | null }>
   );
   return rows.map((r) => {
     const g = Array.isArray(r.games) ? r.games[0] : r.games;
-    return { x: r.x, y: r.y, d: r.d, made: r.made, season: g.season_name };
+    return { x: r.x, y: r.y, d: r.d, made: r.made, tcode: r.tcode, quarter: r.quarter, season: g.season_name };
   });
 }
 

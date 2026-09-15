@@ -745,7 +745,12 @@ export default async function PlayerPage({
           {heroSeason && heroChip && <div className={styles.heroBasis}>{heroChip}</div>}
           {/* 요청("슛 지도가 그냥 디자인처럼 보인다 - 확장하면 3D로") - 위 밀도 지도와 같은
               커리어 전체 슛 표본을 3D 코트에 색으로 찍는다. */}
-          <CourtHeroExpand shots={toCourt3D(careerShots)} accentColor={teamColor} label={`커리어 슛 ${careerShots.length.toLocaleString()}개 3D로 보기`} />
+          <CourtHeroExpand
+            shots={toCourt3D(careerShots)}
+            accentColor={teamColor}
+            label={`커리어 슛 ${careerShots.length.toLocaleString()}개 3D로 보기`}
+            teamNameByTcode={new Map([...teamByTcode].map(([tc, t]) => [tc, t.name]))}
+          />
         </div>
         {/* ── 히어로 발치: 커리어 결 띠 ──────────────────────────────────────────────────
             칸 하나 = 하룻밤, 왼쪽부터 날짜순. 높이 = 그날 득점, 색 = 그날의 소속팀(이적하면 띠
@@ -954,30 +959,43 @@ export default async function PlayerPage({
           <div className={styles.panelTitle}>득점 분석 · 커리어 {careerPts.toLocaleString()}점</div>
           <div className={styles.scoringGrid}>
             {teamPtsRows.length > 1 && (
-              <div>
-                <div className={styles.scoringSubTitle}>팀별</div>
+              <div className={styles.scoringCard}>
+                <div className={styles.scoringCardHead}>
+                  <span className={styles.scoringEyebrow}>{careerPts.toLocaleString()}점</span>
+                  <span className={styles.scoringSubTitle}>팀별</span>
+                </div>
                 <div className={styles.scoringChart} dangerouslySetInnerHTML={{ __html: teamPieSvg }} />
                 <ul className={styles.scoringLegend}>
                   {teamPtsRows.map((t) => (
                     <li key={t.tcode}>
                       <TeamBadge team={{ name: t.teamName, abbr: t.teamAbbr, color: t.teamColor, logoUrl: teamByTcode.get(t.tcode)?.logoUrl ?? null }} size={16} />
-                      {t.teamName} {t.pts.toLocaleString()}점
+                      {t.teamName}
+                      <span className={styles.scoringLegendPts}>{t.pts.toLocaleString()}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             )}
-            <div>
-              <div className={styles.scoringSubTitle}>시즌별</div>
+            <div className={styles.scoringCard}>
+              <div className={styles.scoringCardHead}>
+                <span className={styles.scoringEyebrow}>{careerPts.toLocaleString()}점</span>
+                <span className={styles.scoringSubTitle}>시즌별</span>
+              </div>
               <div className={styles.scoringChart} dangerouslySetInnerHTML={{ __html: seasonBarSvg }} />
             </div>
-            <div>
-              <div className={styles.scoringSubTitle}>슛 위치별</div>
+            <div className={styles.scoringCard}>
+              <div className={styles.scoringCardHead}>
+                <span className={styles.scoringEyebrow}>{careerPts.toLocaleString()}점</span>
+                <span className={styles.scoringSubTitle}>슛 위치별</span>
+              </div>
               <div className={styles.scoringChart} dangerouslySetInnerHTML={{ __html: zoneSvg }} />
             </div>
             {koreaMapSvg && (
-              <div>
-                <div className={styles.scoringSubTitle}>상대 연고지별</div>
+              <div className={styles.scoringCard}>
+                <div className={styles.scoringCardHead}>
+                  <span className={styles.scoringEyebrow}>{careerPts.toLocaleString()}점</span>
+                  <span className={styles.scoringSubTitle}>상대 연고지별</span>
+                </div>
                 <div className={styles.scoringChart} dangerouslySetInnerHTML={{ __html: koreaMapSvg }} />
               </div>
             )}
