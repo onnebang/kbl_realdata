@@ -63,6 +63,8 @@ import {
 } from "@/lib/teamPageData";
 import { accentFor, teamInkPair } from "@/lib/teamAccent";
 import { normalizePos } from "@/lib/playerStatus";
+import { getTeamCoachLink } from "@/lib/coachPage";
+import { getTeamHighlight, type TeamHighlight } from "@/lib/winMoments";
 
 // 팀 프로필 "데이터 사이언스 + 데이터로 아름다움" 대개편(요청) - 선수 프로필과 같은 디자인
 // 언어: 히어로 배경 아트 = 이 팀의 이 시즌 슛 전체를 팀 컬러 별자리로(선수판은 커리어,
@@ -649,6 +651,8 @@ export default async function TeamPage({
     rosterChanges,
     seasonStats,
     teamLeaders,
+    coachLink,
+    highlight,
   ] = await Promise.all([
       getTeamSeasonFixturesCached(tcode, factSeason),
       estSeason !== factSeason ? getTeamSeasonFixturesCached(tcode, estSeason) : Promise.resolve<TeamFixture[]>([]),
@@ -669,6 +673,12 @@ export default async function TeamPage({
         : soft(tcode, "rosterChanges", getTeamRosterChanges(factSeason, tcode), null),
       soft(tcode, "seasonStats", getTeamSeasonStats(estSeason), null),
       soft(tcode, "teamLeaders", getTeamLeaders(tcode, estSeason), null),
+      // 감독은 사실 시즌(factSeason) 기준 - 프리시즌엔 이게 실제 현재 감독이고, estSeason(지난
+      // 완료 시즌)을 쓰면 교체된 감독이 남아 있는 팀에서 옛 이름이 나온다(예: DB 김주성→이규섭).
+      soft(tcode, "coachLink", getTeamCoachLink(tcode, factSeason), null),
+      // 결정적 순간은 실제로 치른 시즌(estSeason)에서 찾는다 - 개막 전엔 factSeason에 경기가
+      // 없어 always empty가 된다.
+      soft(tcode, "teamHighlight", getTeamHighlight(estSeason, tcode), { play: null, comeback: null } as TeamHighlight),
     ]);
   const statRow = seasonStats?.byTcode[tcode] ?? null;
 
@@ -825,6 +835,44 @@ export default async function TeamPage({
 
       {/* ── 0-1. 로스터 변화(개막 전에만 - 아래 조회가 null이면 렌더 안 함) ── */}
       {rosterChanges && <RosterChangesPanel rc={rosterChanges} abbrOf={(t) => (t ? (oppByTcode.get(t)?.abbr ?? t) : null)} />}
+
+      {/* ── 0-2. 감독 · 이 팀의 결정적 순간 - 요청("감독·승부를 가른 순간을 팀 페이지로
+          자연스럽게 유도"): 각 페이지의 전체 데이터를 다시 그리지 않고, 클릭하면 그 페이지로
+          넘어가는 미리보기 카드 두 장만 둔다. 둘 다 없으면(감독 미배정 + 완료 경기 0) 패널
+          자체를 렌더하지 않는다. */}
+      {(coachLink || highlight.play || highlight.comeback) && (
+        <div className={styles.panel}>
+          <PanelTitle title="감독 · 이 팀의 결정적 순간" />
+          <div className="related-row">
+            {coachLink && (
+              <Link href={coachLink.href} className="related-card">
+                <span className="related-kicker">감독</span>
+                <span className="related-main">{coachLink.name}</span>
+                <span className="related-sub">
+                  {seasonShort(factSeason)} {record} · 작전타임 성향 · 커리어 전적 보기
+                </span>
+              </Link>
+            )}
+            {(highlight.play || highlight.comeback) && (
+              <Link href={`/leaderboards/win-contribution?season=${encodeURIComponent(estSeason)}&team=${tcode}`} className="related-card">
+                <span className="related-kicker">이 팀의 결정적 순간</span>
+                {highlight.play && (
+                  <span className="related-main">
+                    {highlight.play.playerName} {highlight.play.shot} · 승률 +{Math.round(highlight.play.wpa * 100)}%p
+                  </span>
+                )}
+                {highlight.comeback && (
+                  <span className="related-sub">
+                    {highlight.comeback.period} {highlight.comeback.clock} 최저 승률{" "}
+                    {Math.round(highlight.comeback.minProb * 100)}%에서 뒤집은 승리 포함
+                  </span>
+                )}
+                <span className="related-sub">{seasonShort(estSeason)} 시즌 장면 더 보기</span>
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── 1. 4팩터 vs 리그(추정 - estSeason) ── */}
       <div className={styles.panel}>

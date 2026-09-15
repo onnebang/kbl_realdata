@@ -444,6 +444,29 @@ select {
   color: var(--ink-faint);
 }
 
+/* 날짜 구간 헤더(제보: "날짜가 잘 안 보인다") - 카드 안 .game-card-date(12.5px 회색)는
+   그대로 두고, 날짜가 바뀔 때만 이 헤더를 목록 사이에 끼워 하루 단위를 굵게 갈라준다. */
+.game-date-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 18px 2px 2px;
+}
+.game-date-header:first-child {
+  margin-top: 2px;
+}
+.game-date-header-main {
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.game-date-header-count {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
 /* 팀 색은 글자색이 아니라 모서리다. 실측: teams.color를 글자색으로 쓰면 13개 팀 전부
    한쪽 테마에서 WCAG 미달이다(다크 KCC 1.05 · 오리온스 1.03 · KT 1.16 = 사실상 안 보임).
    중계 화면에서 팀 정체성은 색깔 글씨가 아니라 이름 옆의 색 띠다 - 글자는 --ink 계열로
@@ -972,6 +995,48 @@ table.data-table td:nth-child(2) {
   font-size: 12.5px;
   padding: 30px 10px;
   text-align: center;
+}
+
+/* 다른 페이지로 넘겨주는 미리보기 카드(요청: "페이지끼리 자연스럽게 유도해서 더 오래 남게").
+   season-leaders의 .pointerCard에서 시작한 모양을 전역으로 올렸다 - 홈·팀 페이지 등 여러
+   라우트가 같은 카드를 쓴다. 카드 통째로 링크, 팀 색이 있으면 윗변 3px에 그 색(--team,
+   없으면 --gold), 화살표는 붙이지 않는다(자리와 색이 이미 링크라고 말한다). */
+.related-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.related-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-top: 3px solid var(--team, var(--gold));
+  border-radius: var(--r-card);
+  padding: 12px 14px;
+  color: var(--ink);
+}
+.related-card:hover {
+  border-color: var(--team, var(--gold));
+}
+.related-kicker {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
+}
+.related-main {
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.related-sub {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
 }
 
 /* AI 코트사이드 리포트(courtside_template.html의 postgameReport/pregameInsights를 그대로
