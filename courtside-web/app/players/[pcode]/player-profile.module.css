@@ -535,6 +535,43 @@
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
 }
+
+/* ── 득점 분석(팀별·시즌별·슛 위치별·상대 연고지별) - 4칸이 자기 폭만큼 차지, 좁으면 쌓임. */
+.scoringGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.scoringSubTitle {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+.scoringChart {
+  width: 100%;
+}
+.scoringChart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.scoringLegend {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.scoringLegend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .miniStatCard {
   background: var(--surface-soft);
   border-radius: var(--r-inset);

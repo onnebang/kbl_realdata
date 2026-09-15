@@ -62,6 +62,8 @@ import { getWinImpact } from "@/lib/winImpact";
 import { getFormIndexLeaderboard, per100Se, type FormIndexRow } from "@/lib/formIndex";
 import { toCourt3D } from "@/lib/court3d";
 import { CourtHeroExpand } from "@/components/CourtHeroExpand";
+import { aggregateByTeam, aggregateBySeason, aggregateZones, buildTeamPieSvg, buildSeasonBarSvg, buildZoneSvg } from "@/lib/scoringBreakdown";
+import { aggregateByOpponent, buildKoreaMapSvg } from "@/lib/koreaMap";
 import styles from "./player-profile.module.css";
 
 // "데이터 사이언스 + 데이터로 아름다움" 대개편(요청) - sportsjobs.online 레퍼런스의
@@ -582,6 +584,16 @@ export default async function PlayerPage({
   const dnaMix = computeShootingDna(careerShots);
   const constellationSvg = buildConstellationSvg(careerShots);
   const teamColor = headerTeam?.color ?? "#d9640a";
+
+  // 득점 분석(요청 - ESPN 르브론 제임스 득점 인포그래픽) - careerRows 하나로 전부 집계.
+  // 팀명은 현재 연고 기준(PRESEASON_SEASON)으로 통일 - "그 경기 당시 이름"이 아니라
+  // "지금 이 팀을 뭐라고 부르나"(displayTeamName의 나머지 페이지와 같은 태도).
+  const careerPts = careerRows.reduce((s, r) => s + r.pts, 0);
+  const teamPtsRows = aggregateByTeam(careerRows, teamByTcode, PRESEASON_SEASON);
+  const teamPieSvg = teamPtsRows.length > 1 ? buildTeamPieSvg(teamPtsRows) : "";
+  const seasonBarSvg = buildSeasonBarSvg(aggregateBySeason(careerRows));
+  const zoneSvg = buildZoneSvg(aggregateZones(careerRows));
+  const koreaMapSvg = buildKoreaMapSvg(aggregateByOpponent(careerRows, teamByTcode, PRESEASON_SEASON));
   const onOff = onOffMap.get(pcode) ?? null;
 
   // ── 커리어 결 띠 ─────────────────────────────────────────────────────────────────────
@@ -934,6 +946,48 @@ export default async function PlayerPage({
           <div className="empty-note">{emptyState("none")}</div>
         )}
       </div>
+
+      {/* ── 3-1. 득점 분석(커리어) - 요청(ESPN 르브론 제임스 득점 인포그래픽 참고: 팀별·시즌별·
+          슛 위치별·상대 연고지별). careerRows 하나에서 전부 집계 - 새 조회 없음. */}
+      {careerPts > 0 && (
+        <div className={styles.panel}>
+          <div className={styles.panelTitle}>득점 분석 · 커리어 {careerPts.toLocaleString()}점</div>
+          <div className={styles.scoringGrid}>
+            {teamPtsRows.length > 1 && (
+              <div>
+                <div className={styles.scoringSubTitle}>팀별</div>
+                <div className={styles.scoringChart} dangerouslySetInnerHTML={{ __html: teamPieSvg }} />
+                <ul className={styles.scoringLegend}>
+                  {teamPtsRows.map((t) => (
+                    <li key={t.tcode}>
+                      <TeamBadge team={{ name: t.teamName, abbr: t.teamAbbr, color: t.teamColor, logoUrl: teamByTcode.get(t.tcode)?.logoUrl ?? null }} size={16} />
+                      {t.teamName} {t.pts.toLocaleString()}점
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div>
+              <div className={styles.scoringSubTitle}>시즌별</div>
+              <div className={styles.scoringChart} dangerouslySetInnerHTML={{ __html: seasonBarSvg }} />
+            </div>
+            <div>
+              <div className={styles.scoringSubTitle}>슛 위치별</div>
+              <div className={styles.scoringChart} dangerouslySetInnerHTML={{ __html: zoneSvg }} />
+            </div>
+            {koreaMapSvg && (
+              <div>
+                <div className={styles.scoringSubTitle}>상대 연고지별</div>
+                <div className={styles.scoringChart} dangerouslySetInnerHTML={{ __html: koreaMapSvg }} />
+              </div>
+            )}
+          </div>
+          <div className={styles.pctNote}>
+            시즌별 막대는 최신 시즌만 강조합니다. 상대 연고지 지도는 구단 현재 연고 도시 기준 약식 지도로,
+            실제 해안선이 아니라 상대 위치 참고용입니다(원 크기 = 그 팀 상대 누적 득점).
+          </div>
+        </div>
+      )}
 
       {/* ── 4. 클러치 프로필(커리어) ── */}
       <div className={styles.panel}>
