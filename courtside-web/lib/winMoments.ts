@@ -222,7 +222,7 @@ async function computeWinMoments(season: string, tcode?: string): Promise<WinMom
 }
 
 export const getWinMoments = cachedFn(computeWinMoments, {
-  name: "winMoments-v2", // v2: 곡선이 응답 상한에 잘려 비던 캐시를 버린다
+  name: "winMoments-v3", // v2: 곡선이 응답 상한에 잘려 비던 캐시를 버린다 / v3: team.logoUrl·photoUrl 필드 추가
 
   ttl: TTL.batchDaily,
   tags: (season, tcode) => [TAG.batch, TAG.season(String(season)), ...(tcode ? [`team:${tcode}`] : [])],
@@ -298,7 +298,7 @@ async function computeTeamHighlight(season: string, tcode: string): Promise<Team
 }
 
 export const getTeamHighlight = cachedFn(computeTeamHighlight, {
-  name: "teamHighlight",
+  name: "teamHighlight-v2", // v2: BigPlay에 photoUrl 필드 추가(캐시 도형 변경)
   ttl: TTL.batchDaily,
   tags: (season, tcode) => [TAG.batch, TAG.season(String(season)), `team:${tcode}`],
 });

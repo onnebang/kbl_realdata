@@ -409,7 +409,7 @@ export function buildShotValueScatterSvg(data: ShotValueScatterData): string {
  * 반환 ShotValueScatterData는 숫자·문자열·배열뿐이라 직렬화가 안전하다.
  */
 export const getShotValueScatterData = cachedFn(computeShotValueScatterData, {
-  name: "shotValueScatter",
+  name: "shotValueScatter-v2", // v2: ScatterPlayerRow에 photoUrl 필드 추가(캐시 도형 변경)
   ttl: TTL.batchDaily,
   tags: (season) => [TAG.batch, TAG.season(String(season))],
 });
