@@ -16,7 +16,7 @@ export const COURT_Y: [number, number] = [27, 384];
 // 골대를 다 그려야 해서 추가 - 기존엔 항상 오른쪽 골대로 미러링해서 그리는 반코트 뷰만
 // 있었음(mirrorShotX). COURT_X[1]에서 HOOP_RIGHT까지의 여백을 그대로 반대쪽에 대칭 적용.
 export const HOOP_LEFT: [number, number] = [COURT_X[0] + (COURT_X[1] - HOOP_RIGHT[0]), HOOP_RIGHT[1]];
-const SCALE_M_PER_UNIT = 0.0413;
+export const SCALE_M_PER_UNIT = 0.0413;
 const ZONE_BOUNDS_M: [string, number, number, string][] = [
   ["rim", 0, 1.2, "림"],
   ["close", 1.2, 3.0, "근거리"],

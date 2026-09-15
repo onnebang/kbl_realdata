@@ -65,6 +65,8 @@ import { accentFor, teamInkPair } from "@/lib/teamAccent";
 import { normalizePos } from "@/lib/playerStatus";
 import { getTeamCoachLink } from "@/lib/coachPage";
 import { getTeamHighlight, type TeamHighlight } from "@/lib/winMoments";
+import { toCourt3D } from "@/lib/court3d";
+import { CourtHeroExpand } from "@/components/CourtHeroExpand";
 
 // 팀 프로필 "데이터 사이언스 + 데이터로 아름다움" 대개편(요청) - 선수 프로필과 같은 디자인
 // 언어: 히어로 배경 아트 = 이 팀의 이 시즌 슛 전체를 팀 컬러 별자리로(선수판은 커리어,
@@ -810,6 +812,9 @@ export default async function TeamPage({
               </div>
             ))}
           </div>
+          {/* 요청("슛 지도가 그냥 디자인처럼 보인다 - 확장하면 3D로") - 히어로 배경과 같은
+              슛 표본을 그대로 3D 코트에 찍는다. shots가 비어 있으면(개막 전 등) 버튼 자체가 안 뜬다. */}
+          <CourtHeroExpand shots={toCourt3D(shots)} accentColor={accent} label={`${seasonShort(shotSeason)} 슛 ${shots.length.toLocaleString()}개 3D로 보기`} />
         </div>
       </section>
 

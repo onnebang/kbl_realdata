@@ -60,6 +60,8 @@ import { SynergyCombos } from "@/components/SynergyCombos";
 import { WinImpactPanel } from "@/components/WinImpact";
 import { getWinImpact } from "@/lib/winImpact";
 import { getFormIndexLeaderboard, per100Se, type FormIndexRow } from "@/lib/formIndex";
+import { toCourt3D } from "@/lib/court3d";
+import { CourtHeroExpand } from "@/components/CourtHeroExpand";
 import styles from "./player-profile.module.css";
 
 // "데이터 사이언스 + 데이터로 아름다움" 대개편(요청) - sportsjobs.online 레퍼런스의
@@ -729,6 +731,9 @@ export default async function PlayerPage({
             </div>
           )}
           {heroSeason && heroChip && <div className={styles.heroBasis}>{heroChip}</div>}
+          {/* 요청("슛 지도가 그냥 디자인처럼 보인다 - 확장하면 3D로") - 위 밀도 지도와 같은
+              커리어 전체 슛 표본을 3D 코트에 색으로 찍는다. */}
+          <CourtHeroExpand shots={toCourt3D(careerShots)} accentColor={teamColor} label={`커리어 슛 ${careerShots.length.toLocaleString()}개 3D로 보기`} />
         </div>
         {/* ── 히어로 발치: 커리어 결 띠 ──────────────────────────────────────────────────
             칸 하나 = 하룻밤, 왼쪽부터 날짜순. 높이 = 그날 득점, 색 = 그날의 소속팀(이적하면 띠
