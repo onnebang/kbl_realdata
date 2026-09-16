@@ -92,12 +92,55 @@ def compute_ovr(target_season='2024-2025'):
     global_df['raw_def_norm'] = 40 + ((global_df['raw_def'] - def_min) / (def_max - def_min)) * 59
     global_df['raw_ovr'] = (global_df['raw_off_norm'] * 0.55) + (global_df['raw_def_norm'] * 0.45)
 
-    # 보정 로직 (경기수 곡선 회귀)
-    league_avg = 70.0
+    # 선수별로 시간순(과거 -> 최신)으로 정렬하여 EMA 계산
+    global_df = global_df.sort_values(by=['pcode', 'season_name'])
+
+    prior_ovr = pd.Series(index=global_df.index, dtype=float)
+    prior_off = pd.Series(index=global_df.index, dtype=float)
+    prior_def = pd.Series(index=global_df.index, dtype=float)
+
+    for pcode, group in global_df.groupby('pcode'):
+        # 리그 신인/첫 시즌은 평균(70.0)에서 시작
+        ema_ovr = 70.0
+        ema_off = 70.0
+        ema_def = 70.0
+        
+        g_prior_ovr = []
+        g_prior_off = []
+        g_prior_def = []
+        
+        for idx, row in group.iterrows():
+            g_prior_ovr.append(ema_ovr)
+            g_prior_off.append(ema_off)
+            g_prior_def.append(ema_def)
+            
+            conf = confidence(row['g'])
+            season_perf_ovr = row['raw_ovr'] * conf + ema_ovr * (1 - conf)
+            season_perf_off = row['raw_off_norm'] * conf + ema_off * (1 - conf)
+            season_perf_def = row['raw_def_norm'] * conf + ema_def * (1 - conf)
+            
+            if len(g_prior_ovr) == 1:
+                ema_ovr = season_perf_ovr
+                ema_off = season_perf_off
+                ema_def = season_perf_def
+            else:
+                ema_ovr = ema_ovr * 0.5 + season_perf_ovr * 0.5
+                ema_off = ema_off * 0.5 + season_perf_off * 0.5
+                ema_def = ema_def * 0.5 + season_perf_def * 0.5
+
+        prior_ovr.loc[group.index] = g_prior_ovr
+        prior_off.loc[group.index] = g_prior_off
+        prior_def.loc[group.index] = g_prior_def
+
+    global_df['prior_ovr'] = prior_ovr
+    global_df['prior_off'] = prior_off
+    global_df['prior_def'] = prior_def
+
+    # 보정 로직 (경기수 곡선 회귀) - 리그 평균 대신 개별 EMA Prior 사용
     global_df['conf'] = global_df['g'].apply(confidence)
-    global_df['ovr_adj'] = global_df['raw_ovr'] * global_df['conf'] + league_avg * (1 - global_df['conf'])
-    global_df['off_adj'] = global_df['raw_off_norm'] * global_df['conf'] + league_avg * (1 - global_df['conf'])
-    global_df['def_adj'] = global_df['raw_def_norm'] * global_df['conf'] + league_avg * (1 - global_df['conf'])
+    global_df['ovr_adj'] = global_df['raw_ovr'] * global_df['conf'] + global_df['prior_ovr'] * (1 - global_df['conf'])
+    global_df['off_adj'] = global_df['raw_off_norm'] * global_df['conf'] + global_df['prior_off'] * (1 - global_df['conf'])
+    global_df['def_adj'] = global_df['raw_def_norm'] * global_df['conf'] + global_df['prior_def'] * (1 - global_df['conf'])
 
     # 2. kbl540의 앵커 매핑 방식 (Piecewise-linear based on historical quantiles)
     # 전체 역사적 분포에서 등수를 구함

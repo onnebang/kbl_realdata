@@ -707,12 +707,12 @@ export default async function PlayerPage({
         <div className={styles.heroScrim} style={{ background: "linear-gradient(to right, #0a0a0a 40%, transparent 100%)" }} />
         
         {/* 분할 레이아웃 적용 */}
-        <div className={styles.heroContent} style={{ position: "relative", zIndex: 10, display: 'flex', flexDirection: 'column', gap: '3rem', width: '100%' }}>
+        <div className={styles.heroContent}>
           
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3rem', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%' }}>
+          <div className={styles.heroSplit}>
             
             {/* 왼쪽: 기존 선수 메타 정보 (타이포그래피 위주) */}
-            <div style={{ flex: '1 1 400px' }}>
+            <div className={styles.heroTextSide}>
               <div className={styles.heroKicker} style={{ letterSpacing: '0.2em', color: 'var(--hero-team)', fontWeight: 800, marginBottom: '1rem' }}>COURTSIDE PLAYER PROFILE</div>
               <h1 className={styles.heroName} style={{ fontSize: '5rem', lineHeight: 0.9, textShadow: '2px 2px 0 var(--hero-team), 4px 4px 0 rgba(0,0,0,0.5)', textTransform: 'uppercase', fontStyle: 'italic' }}>{info.ename || info.name}</h1>
               <h2 style={{ fontSize: '2rem', color: '#fff', marginTop: '0.5rem', opacity: 0.9 }}>{info.name}</h2>
@@ -763,7 +763,7 @@ export default async function PlayerPage({
             {/* 오른쪽: 2K 스타일 선수 카드 - CourtsidePlayerCard는 photoUrl이 필수(string)라
                 사진 없는 선수는 카드 자체를 건너뛴다(플레이스홀더 이미지가 따로 없음). */}
             {latestOvr && info.photoUrl && (
-              <div style={{ flexShrink: 0, transform: 'scale(1.1)', transformOrigin: 'top right', zIndex: 20 }}>
+              <div className={styles.heroCardSide}>
                 <CourtsidePlayerCard
                   name={info.name}
                   ename={info.ename || "KBL PLAYER"}
