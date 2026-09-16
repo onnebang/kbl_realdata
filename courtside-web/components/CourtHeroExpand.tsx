@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import type { Court3DGroupBy, Court3DProgress } from "./Court3DScene";
 import type { Court3DShot } from "@/lib/court3d";
@@ -49,7 +49,14 @@ export function CourtHeroExpand({
   const [filterStr, setFilterStr] = useState<string>("all");
 
   const [filterType, filterVal] = filterStr === "all" ? ["all", ""] : filterStr.split(":");
-  const filteredShots = filterStr === "all" ? shots : shots.filter((s) => s[filterType as keyof Court3DShot] === filterVal);
+  // useMemo로 참조를 고정한다: Court3DScene의 재구성 effect가 [shots, ...]를 의존성으로 보는데,
+  // 여기서 매 렌더마다 새 배열을 만들면(재생 중엔 onProgress → setProgress → 리렌더가 계속 도는데)
+  // 그때마다 "새 shots"로 인식돼 재생이 처음부터 무한 재시작된다(시즌/쿼터 필터 선택 시 재생이
+  // 멈춘 것처럼 보였던 원인 - "전체 보기"는 필터링을 안 해 원본 참조를 그대로 써서 안 걸렸다).
+  const filteredShots = useMemo(
+    () => (filterStr === "all" ? shots : shots.filter((s) => s[filterType as keyof Court3DShot] === filterVal)),
+    [shots, filterStr] // eslint-disable-line react-hooks/exhaustive-deps -- filterType/filterVal은 filterStr에서 파생됨
+  );
   // 전체보기일 때는 시즌별 재생, 필터링일 때는 그냥 한번에 렌더링되게 groupBy 제거
   const effectiveGroupBy = filterStr === "all" ? "season" : undefined;
 
