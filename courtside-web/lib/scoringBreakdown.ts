@@ -157,9 +157,10 @@ export function buildSeasonBarSvg(rows: SeasonPtsRow[], totalPts?: number): stri
     const bx = padL + i * bw + (bw - barW) / 2;
     const by = padT + plotH - barH;
 
-    // 사진 3처럼 커리어 하이 시즌은 와인/골드(#8e2a37)로 강렬하게 하이라이트, 일반 시즌은 차콜(#20252e)
-    const fill = r.isCareerHigh ? "#912635" : "var(--ink)";
-    const stroke = r.isCareerHigh ? "#bf3b4e" : "transparent";
+    // 커리어 하이 시즌은 사이트의 하이라이트 토큰(--home, .wtoggleActive/curSeason과 같은 강조색)으로
+    // 강렬하게 하이라이트, 일반 시즌은 본문 잉크색(--ink) - ESPN 와인레드 단독 팔레트를 쓰지 않는다.
+    const fill = r.isCareerHigh ? "var(--home)" : "var(--ink)";
+    const stroke = r.isCareerHigh ? "var(--home)" : "transparent";
 
     svg += `<g class="seasonBarGroup">`;
     svg += `<title>${r.seasonName} 시즌 · ${r.pts.toLocaleString()}점 (평균 ${r.ppg.toFixed(1)}점 / ${r.games}경기)</title>`;
@@ -170,9 +171,9 @@ export function buildSeasonBarSvg(rows: SeasonPtsRow[], totalPts?: number): stri
       const tagX = bx + barW / 2;
       const tagY = by - 14;
       svg += `<g transform="translate(${tagX.toFixed(1)}, ${tagY.toFixed(1)})">`;
-      svg += `<rect x="-56" y="-14" width="112" height="18" rx="4" fill="#912635" stroke="#fff" stroke-width="1"/>`;
+      svg += `<rect x="-56" y="-14" width="112" height="18" rx="4" fill="var(--home)" stroke="#fff" stroke-width="1"/>`;
       svg += `<text x="0" y="-1" text-anchor="middle" font-family="Big Shoulders Display" font-size="11" font-weight="800" fill="#fff" letter-spacing="0.05em">CAREER HIGH · ${r.pts}P</text>`;
-      svg += `<polygon points="-4,4 4,4 0,8" fill="#912635"/>`;
+      svg += `<polygon points="-4,4 4,4 0,8" fill="var(--home)"/>`;
       svg += `</g>`;
     } else if (barW >= 24) {
       // 일반 막대 위 득점 수치 (막대가 충분히 넓을 때)
@@ -183,7 +184,7 @@ export function buildSeasonBarSvg(rows: SeasonPtsRow[], totalPts?: number): stri
     const lx = bx + barW / 2;
     const ly = padT + plotH + 16;
     const label = shortSeason(r.seasonName);
-    svg += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" transform="rotate(45, ${lx.toFixed(1)}, ${ly.toFixed(1)})" text-anchor="start" class="axisText" font-weight="${r.isCareerHigh ? "700" : "400"}" fill="${r.isCareerHigh ? "#912635" : "var(--ink-soft)"}">${label}</text>`;
+    svg += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" transform="rotate(45, ${lx.toFixed(1)}, ${ly.toFixed(1)})" text-anchor="start" class="axisText" font-weight="${r.isCareerHigh ? "700" : "400"}" fill="${r.isCareerHigh ? "var(--home)" : "var(--ink-soft)"}">${label}</text>`;
 
     svg += `</g>`;
   });
@@ -238,11 +239,12 @@ export function buildZoneSvg(z: ZonePts, totalPts?: number): string {
 
   svg += `<g clip-path="url(#courtClip)">`;
 
-  // 1. 배경: 살구/테라코타 벽돌색 (3점 구역)
-  svg += `<rect x="${courtX}" y="${courtY}" width="${courtW}" height="${courtH}" fill="#c77b6d" opacity="0.95"/>`;
+  // 1. 배경: 3점 구역 - "슈팅 DNA" 패널과 같은 3점 데이터색(--dna-three)을 재사용해 이 페이지의
+  //    기존 슛존 색 체계에 편입시킨다(전용 테라코타 팔레트를 새로 만들지 않음).
+  svg += `<rect x="${courtX}" y="${courtY}" width="${courtW}" height="${courtH}" fill="var(--dna-three)" opacity="0.55"/>`;
 
-  // 2. 2점 구역 (3점 아크 안쪽): 슬레이트 블루 (#7b8fc7)
-  svg += `<path d="M ${hoopX - footX},${baseLineY} A ${arcR},${arcR} 0 0 1 ${hoopX + footX},${baseLineY} Z" fill="#7b8fc7" stroke="#4a5675" stroke-width="2.5" opacity="0.95"/>`;
+  // 2. 2점 구역 (3점 아크 안쪽): 슈팅 DNA의 근거리 데이터색(--dna-close) 재사용
+  svg += `<path d="M ${hoopX - footX},${baseLineY} A ${arcR},${arcR} 0 0 1 ${hoopX + footX},${baseLineY} Z" fill="var(--dna-close)" stroke="rgba(var(--line-rgb), 0.4)" stroke-width="2.5" opacity="0.6"/>`;
 
   // 3. 페인트존 (Key Area)
   const keyX = hoopX - keyW / 2;
@@ -260,8 +262,8 @@ export function buildZoneSvg(z: ZonePts, totalPts?: number): string {
   svg += `<path d="M ${keyX},${ftY} A ${ftR},${ftR} 0 0 1 ${keyX + keyW},${ftY}" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.75"/>`;
   svg += `<path d="M ${keyX},${ftY} A ${ftR},${ftR} 0 0 0 ${keyX + keyW},${ftY}" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="6 6" opacity="0.6"/>`;
 
-  // 5. 자유투 라인 (형광 연두/초록 하이라이트 선 - 사진 5 포인트 컬러!)
-  svg += `<line x1="${keyX}" y1="${ftY}" x2="${keyX + keyW}" y2="${ftY}" stroke="#34c759" stroke-width="4.5" stroke-linecap="round"/>`;
+  // 5. 자유투 라인 (강조 하이라이트 선) - 슈팅 DNA의 롱2 데이터색(--dna-long, 초록 계열) 재사용
+  svg += `<line x1="${keyX}" y1="${ftY}" x2="${keyX + keyW}" y2="${ftY}" stroke="var(--dna-long)" stroke-width="4.5" stroke-linecap="round"/>`;
 
   // 6. 제한 구역 (Restricted Area Arc)
   svg += `<path d="M ${hoopX - 42},${hoopY} A 42,42 0 0 1 ${hoopX + 42},${hoopY}" fill="none" stroke="#ffffff" stroke-width="1.8" opacity="0.7"/>`;
@@ -276,29 +278,29 @@ export function buildZoneSvg(z: ZonePts, totalPts?: number): string {
   svg += `<line x1="${hoopX + 4}" y1="${hoopY}" x2="${hoopX}" y2="${hoopY + 14}" stroke="#ffffff" stroke-width="1" opacity="0.7"/>`;
 
   // 8. 코트 외곽선 테두리
-  svg += `<rect x="${courtX}" y="${courtY}" width="${courtW}" height="${courtH}" rx="8" fill="none" stroke="#444444" stroke-width="3"/>`;
+  svg += `<rect x="${courtX}" y="${courtY}" width="${courtW}" height="${courtH}" rx="8" fill="none" stroke="rgba(var(--line-rgb), 0.5)" stroke-width="3"/>`;
   svg += `</g>`;
 
-  // ── 득점 수치 및 라벨 (사진 5 1:1 재현) ──────────────────────────────
+  // ── 득점 수치 및 라벨 - 코트 바깥(캔버스 배경) 위라 본문 잉크색 토큰을 그대로 쓴다 ──────
   // 1) 2점 득점 (좌측 2점 구역)
   svg += `<g transform="translate(${courtX + 85}, 240)">`;
-  svg += `<text x="0" y="0" text-anchor="middle" class="cbBig" font-size="38" fill="#111111">${z.twoPt.toLocaleString()}</text>`;
-  svg += `<text x="0" y="22" text-anchor="middle" class="cbBig" font-size="15" fill="#222222" letter-spacing="0.05em">POINTS FROM 2-POINTERS</text>`;
-  svg += `<text x="0" y="40" text-anchor="middle" class="cbMono" font-size="12" font-weight="700" fill="#333333">(${twoPct}%)</text>`;
+  svg += `<text x="0" y="0" text-anchor="middle" class="cbBig" font-size="38" fill="var(--ink)">${z.twoPt.toLocaleString()}</text>`;
+  svg += `<text x="0" y="22" text-anchor="middle" class="cbBig" font-size="15" fill="var(--ink-soft)" letter-spacing="0.05em">POINTS FROM 2-POINTERS</text>`;
+  svg += `<text x="0" y="40" text-anchor="middle" class="cbMono" font-size="12" font-weight="700" fill="var(--ink-soft)">(${twoPct}%)</text>`;
   svg += `</g>`;
 
   // 2) 자유투 득점 (중앙 상단 자유투 라인 바로 위)
   svg += `<g transform="translate(${hoopX}, 138)">`;
-  svg += `<text x="0" y="0" text-anchor="middle" class="cbBig" font-size="30" fill="#111111">${z.ft.toLocaleString()}</text>`;
-  svg += `<text x="0" y="18" text-anchor="middle" class="cbBig" font-size="13" fill="#222222" letter-spacing="0.05em">POINTS FROM FREE THROWS</text>`;
-  svg += `<text x="0" y="32" text-anchor="middle" class="cbMono" font-size="11" font-weight="700" fill="#2e7d32">(${ftPct}%)</text>`;
+  svg += `<text x="0" y="0" text-anchor="middle" class="cbBig" font-size="30" fill="var(--ink)">${z.ft.toLocaleString()}</text>`;
+  svg += `<text x="0" y="18" text-anchor="middle" class="cbBig" font-size="13" fill="var(--ink-soft)" letter-spacing="0.05em">POINTS FROM FREE THROWS</text>`;
+  svg += `<text x="0" y="32" text-anchor="middle" class="cbMono" font-size="11" font-weight="700" fill="var(--dna-long)">(${ftPct}%)</text>`;
   svg += `</g>`;
 
   // 3) 3점 득점 (우측 상단 3점 구역)
   svg += `<g transform="translate(${courtX + courtW - 95}, 125)">`;
-  svg += `<text x="0" y="0" text-anchor="middle" class="cbBig" font-size="34" fill="#111111">${z.threePt.toLocaleString()}</text>`;
-  svg += `<text x="0" y="20" text-anchor="middle" class="cbBig" font-size="14" fill="#222222" letter-spacing="0.05em">POINTS FROM 3-POINTERS</text>`;
-  svg += `<text x="0" y="36" text-anchor="middle" class="cbMono" font-size="12" font-weight="700" fill="#333333">(${threePct}%)</text>`;
+  svg += `<text x="0" y="0" text-anchor="middle" class="cbBig" font-size="34" fill="var(--ink)">${z.threePt.toLocaleString()}</text>`;
+  svg += `<text x="0" y="20" text-anchor="middle" class="cbBig" font-size="14" fill="var(--ink-soft)" letter-spacing="0.05em">POINTS FROM 3-POINTERS</text>`;
+  svg += `<text x="0" y="36" text-anchor="middle" class="cbMono" font-size="12" font-weight="700" fill="var(--ink-soft)">(${threePct}%)</text>`;
   svg += `</g>`;
 
   svg += `</svg>`;
@@ -424,7 +426,7 @@ export function buildDetailed5ZoneSvg(stats: Zone5Stats[], totalPts: number): st
     svg += `<g transform="translate(230, 20)">`;
     svg += `<text x="0" y="0" class="cbBig" font-size="18" fill="var(--ink)">${st.pts.toLocaleString()}점 <tspan font-size="12" fill="var(--ink-soft)">(${st.share.toFixed(1)}%)</tspan></text>`;
     svg += `<rect x="0" y="10" width="220" height="8" rx="4" fill="rgba(var(--line-rgb), 0.1)"/>`;
-    svg += `<rect x="0" y="10" width="${shareW}" height="8" rx="4" fill="#912635"/>`;
+    svg += `<rect x="0" y="10" width="${shareW}" height="8" rx="4" fill="var(--home)"/>`;
     svg += `</g>`;
 
     // 시도 및 성공률 (FG%)

@@ -98,17 +98,19 @@
   font-weight: 700;
   padding: 7px 14px;
   border-radius: 6px;
-  background: #912635; /* ESPN 와인 레드 */
+  /* 사이트의 하이라이트 토큰(--home) 재사용 - 이 페이지 다른 곳에서 온 적 없는 ESPN 와인 레드
+     단독 팔레트를 쓰지 않는다. --home-soft/color-mix는 .wtoggleActive/hero 점 색과 같은 관례. */
+  background: var(--home);
   color: #ffffff;
-  border: 1px solid #a83243;
+  border: 1px solid color-mix(in srgb, var(--home) 80%, black 20%);
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
   white-space: nowrap;
 }
 
 .downloadBtn:hover {
-  background: #a32c3d;
-  box-shadow: 0 2px 10px rgba(145, 38, 53, 0.35);
+  background: color-mix(in srgb, var(--home) 88%, white 12%);
+  box-shadow: 0 2px 10px var(--home-soft);
   transform: translateY(-1px);
 }
 
