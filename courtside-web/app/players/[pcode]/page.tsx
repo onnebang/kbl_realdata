@@ -714,9 +714,11 @@ export default async function PlayerPage({
             {/* 왼쪽: 기존 선수 메타 정보 (타이포그래피 위주) */}
             <div className={styles.heroTextSide}>
               <div className={styles.heroKicker} style={{ letterSpacing: '0.2em', color: 'var(--hero-team)', fontWeight: 800, marginBottom: '1rem' }}>COURTSIDE PLAYER PROFILE</div>
-              <h1 className={styles.heroName} style={{ fontSize: '5rem', lineHeight: 0.9, textShadow: '2px 2px 0 var(--hero-team), 4px 4px 0 rgba(0,0,0,0.5)', textTransform: 'uppercase', fontStyle: 'italic' }}>{info.ename || info.name}</h1>
-              <h2 style={{ fontSize: '2rem', color: '#fff', marginTop: '0.5rem', opacity: 0.9 }}>{info.name}</h2>
-              <div className={styles.heroMeta} style={{ marginTop: '1.5rem', fontSize: '1.2rem' }}>
+              {/* clamp() - 영문명이 길면(예: "LEE JUNG HYUN") 고정 5rem이 좁은 화면에서 넘치거나
+                  줄바꿈이 깨졌다(감사 피드백: "카드 밑에 이름 영역이 제대로 안 나옴"). */}
+              <h1 className={styles.heroName} style={{ fontSize: 'clamp(2.2rem, 9vw, 5rem)', lineHeight: 0.9, textShadow: '2px 2px 0 var(--hero-team), 4px 4px 0 rgba(0,0,0,0.5)', textTransform: 'uppercase', fontStyle: 'italic' }}>{info.ename || info.name}</h1>
+              <h2 style={{ fontSize: 'clamp(1.3rem, 5vw, 2rem)', color: '#fff', marginTop: '0.5rem', opacity: 0.9 }}>{info.name}</h2>
+              <div className={styles.heroMeta} style={{ marginTop: '1.5rem', fontSize: 'clamp(0.9rem, 3vw, 1.2rem)' }}>
                 <TeamBadge team={headerTeam} size={28} />
                 <span>{status.teamName ?? "-"}</span>
                 <span className={styles.heroMetaDot}>·</span>
@@ -744,7 +746,7 @@ export default async function PlayerPage({
                     ] as const
                   ).map(([label, val]) => (
                     <div className={styles.heroStat} key={label}>
-                      <div className={styles.heroStatVal} style={{ fontSize: '2.2rem', color: '#fff' }}>{val}</div>
+                      <div className={styles.heroStatVal} style={{ fontSize: 'clamp(1.5rem, 5vw, 2.2rem)', color: '#fff' }}>{val}</div>
                       <div className={styles.heroStatLabel}>
                         {label} · {shortSeason(heroSeason.seasonName)}
                       </div>
@@ -752,7 +754,7 @@ export default async function PlayerPage({
                   ))}
                   {heroWpa && (
                     <div className={styles.heroStat}>
-                      <div className={styles.heroStatVal} style={{ fontSize: '2.2rem', color: '#fff' }}>{signed(heroWpa.totalWpa)}</div>
+                      <div className={styles.heroStatVal} style={{ fontSize: 'clamp(1.5rem, 5vw, 2.2rem)', color: '#fff' }}>{signed(heroWpa.totalWpa)}</div>
                       <div className={styles.heroStatLabel}>WPA · {shortSeason(heroWpa.seasonName)}</div>
                     </div>
                   )}
