@@ -39,8 +39,8 @@ export function CourtHeroExpand({
   const [open, setOpen] = useState(false);
   const [progress, setProgress] = useState<Court3DProgress | null>(null);
   const [skipToken, setSkipToken] = useState(0);
-  const [showArcs, setShowArcs] = useState(true);
-
+  const [showMadeArcs, setShowMadeArcs] = useState(true);
+  const [showMissedArcs, setShowMissedArcs] = useState(false);
   // 탭은 해당 기준으로 실제로 갈릴 게 있을 때만 보여준다(예: 팀 페이지 슛은 tcode가 전부
   // 같아서 "팀별" 탭이 무의미함).
   const dims = (["team", "season", "quarter"] as const).filter(
@@ -125,10 +125,14 @@ export function CourtHeroExpand({
                     </button>
                   ))}
                 </div>
-                <div style={{ marginLeft: 'auto' }}>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={showArcs} onChange={(e) => setShowArcs(e.target.checked)} />
-                    슛 궤적 라인 켜기
+                    <input type="checkbox" checked={showMadeArcs} onChange={(e) => setShowMadeArcs(e.target.checked)} />
+                    성공 궤적
+                  </label>
+                  <label style={{ fontSize: '12px', color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={showMissedArcs} onChange={(e) => setShowMissedArcs(e.target.checked)} />
+                    실패 궤적
                   </label>
                 </div>
               </div>
@@ -140,7 +144,7 @@ export function CourtHeroExpand({
             )}
             <div className={styles.canvasWrap}>
               <WidgetBoundary name="3D 코트">
-                <Court3DScene key={groupBy} shots={shots} accentColor={accentColor} onProgress={setProgress} skipToken={skipToken} groupBy={groupBy} showArcs={showArcs} />
+                <Court3DScene key={groupBy} shots={shots} accentColor={accentColor} onProgress={setProgress} skipToken={skipToken} groupBy={groupBy} showMadeArcs={showMadeArcs} showMissedArcs={showMissedArcs} />
               </WidgetBoundary>
             </div>
             <div className={styles.legend}>

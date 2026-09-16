@@ -47,13 +47,16 @@ export function Court3DScene({
   onProgress,
   skipToken,
   groupBy = "season",
+  showMadeArcs,
+  showMissedArcs,
 }: {
   shots: Court3DShot[];
   accentColor: string;
   onProgress?: (p: Court3DProgress) => void;
   skipToken?: number;
   groupBy?: Court3DGroupBy;
-  showArcs?: boolean;
+  showMadeArcs?: boolean;
+  showMissedArcs?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onProgressRef = useRef(onProgress);
@@ -61,8 +64,12 @@ export function Court3DScene({
     onProgressRef.current = onProgress;
   });
   const skipRequestedRef = useRef(false);
-  const showArcsRef = useRef(showArcs ?? true);
-  useEffect(() => { showArcsRef.current = showArcs ?? true; }, [showArcs]);
+  const showMadeRef = useRef(showMadeArcs ?? true);
+  const showMissedRef = useRef(showMissedArcs ?? false);
+  useEffect(() => { 
+    showMadeRef.current = showMadeArcs ?? true; 
+    showMissedRef.current = showMissedArcs ?? false; 
+  }, [showMadeArcs, showMissedArcs]);
 
   useEffect(() => {
     if (skipToken) skipRequestedRef.current = true;
@@ -436,9 +443,12 @@ export function Court3DScene({
         hudSprite.position.y = 7.5 + Math.sin(time) * 0.2;
         needsRender = true;
       }
-      if (madeArcs.visible !== showArcsRef.current) {
-        madeArcs.visible = showArcsRef.current;
-        missedArcs.visible = showArcsRef.current;
+      if (madeArcs.visible !== showMadeRef.current) {
+        madeArcs.visible = showMadeRef.current;
+        needsRender = true;
+      }
+      if (missedArcs.visible !== showMissedRef.current) {
+        missedArcs.visible = showMissedRef.current;
         needsRender = true;
       }
 
