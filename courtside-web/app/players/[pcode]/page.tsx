@@ -62,7 +62,17 @@ import { getWinImpact } from "@/lib/winImpact";
 import { getFormIndexLeaderboard, per100Se, type FormIndexRow } from "@/lib/formIndex";
 import { toCourt3D } from "@/lib/court3d";
 import { CourtHeroExpand } from "@/components/CourtHeroExpand";
-import { aggregateByTeam, aggregateBySeason, aggregateZones, buildTeamPieSvg, buildSeasonBarSvg, buildZoneSvg } from "@/lib/scoringBreakdown";
+import ScoringInfographicStudio from "@/components/ScoringInfographicStudio";
+import {
+  aggregateByTeam,
+  aggregateBySeason,
+  aggregateZones,
+  computeDetailed5Zones,
+  buildDetailed5ZoneSvg,
+  buildTeamPieSvg,
+  buildSeasonBarSvg,
+  buildZoneSvg,
+} from "@/lib/scoringBreakdown";
 import { aggregateByOpponent, buildKoreaMapSvg } from "@/lib/koreaMap";
 import styles from "./player-profile.module.css";
 
@@ -590,10 +600,13 @@ export default async function PlayerPage({
   // "지금 이 팀을 뭐라고 부르나"(displayTeamName의 나머지 페이지와 같은 태도).
   const careerPts = careerRows.reduce((s, r) => s + r.pts, 0);
   const teamPtsRows = aggregateByTeam(careerRows, teamByTcode, PRESEASON_SEASON);
-  const teamPieSvg = teamPtsRows.length > 1 ? buildTeamPieSvg(teamPtsRows) : "";
-  const seasonBarSvg = buildSeasonBarSvg(aggregateBySeason(careerRows));
-  const zoneSvg = buildZoneSvg(aggregateZones(careerRows));
-  const koreaMapSvg = buildKoreaMapSvg(aggregateByOpponent(careerRows, teamByTcode, PRESEASON_SEASON));
+  const teamPieSvg = teamPtsRows.length > 0 ? buildTeamPieSvg(teamPtsRows, careerPts) : "";
+  const seasonBarSvg = buildSeasonBarSvg(aggregateBySeason(careerRows), careerPts);
+  const zoneStats = aggregateZones(careerRows);
+  const zoneSvg = buildZoneSvg(zoneStats, careerPts);
+  const detailed5Zones = computeDetailed5Zones(careerShots, zoneStats, careerPts);
+  const detailed5ZoneSvg = buildDetailed5ZoneSvg(detailed5Zones, careerPts);
+  const koreaMapSvg = buildKoreaMapSvg(aggregateByOpponent(careerRows, teamByTcode, PRESEASON_SEASON), careerPts);
   const onOff = onOffMap.get(pcode) ?? null;
 
   // ── 커리어 결 띠 ─────────────────────────────────────────────────────────────────────
@@ -952,59 +965,20 @@ export default async function PlayerPage({
         )}
       </div>
 
-      {/* ── 3-1. 득점 분석(커리어) - 요청(ESPN 르브론 제임스 득점 인포그래픽 참고: 팀별·시즌별·
-          슛 위치별·상대 연고지별). careerRows 하나에서 전부 집계 - 새 조회 없음. */}
+      {/* ── 3-1. 득점 분석(커리어) - ESPN 르브론 제임스 득점 인포그래픽 스튜디오 (시즌별·슛위치별·상대연고지별·팀별) */}
       {careerPts > 0 && (
         <div className={styles.panel}>
           <div className={styles.panelTitle}>득점 분석 · 커리어 {careerPts.toLocaleString()}점</div>
-          <div className={styles.scoringGrid}>
-            {teamPtsRows.length > 1 && (
-              <div className={styles.scoringCard}>
-                <div className={styles.scoringCardHead}>
-                  <span className={styles.scoringEyebrow}>{careerPts.toLocaleString()}점</span>
-                  <span className={styles.scoringSubTitle}>팀별</span>
-                </div>
-                <div className={styles.scoringChart} dangerouslySetInnerHTML={{ __html: teamPieSvg }} />
-                <ul className={styles.scoringLegend}>
-                  {teamPtsRows.map((t) => (
-                    <li key={t.tcode}>
-                      <TeamBadge team={{ name: t.teamName, abbr: t.teamAbbr, color: t.teamColor, logoUrl: teamByTcode.get(t.tcode)?.logoUrl ?? null }} size={16} />
-                      {t.teamName}
-                      <span className={styles.scoringLegendPts}>{t.pts.toLocaleString()}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <div className={styles.scoringCard}>
-              <div className={styles.scoringCardHead}>
-                <span className={styles.scoringEyebrow}>{careerPts.toLocaleString()}점</span>
-                <span className={styles.scoringSubTitle}>시즌별</span>
-              </div>
-              <div className={styles.scoringChart} dangerouslySetInnerHTML={{ __html: seasonBarSvg }} />
-            </div>
-            <div className={styles.scoringCard}>
-              <div className={styles.scoringCardHead}>
-                <span className={styles.scoringEyebrow}>{careerPts.toLocaleString()}점</span>
-                <span className={styles.scoringSubTitle}>슛 위치별</span>
-              </div>
-              <div className={styles.scoringChart} dangerouslySetInnerHTML={{ __html: zoneSvg }} />
-            </div>
-            {koreaMapSvg && (
-              <div className={styles.scoringCard}>
-                <div className={styles.scoringCardHead}>
-                  <span className={styles.scoringEyebrow}>{careerPts.toLocaleString()}점</span>
-                  <span className={styles.scoringSubTitle}>상대 연고지별</span>
-                </div>
-                <div className={styles.scoringChart} dangerouslySetInnerHTML={{ __html: koreaMapSvg }} />
-              </div>
-            )}
-          </div>
-          <div className={styles.pctNote}>
-            시즌별 막대는 최신 시즌만 강조합니다. 상대 연고지 지도는 구단 현재 연고 도시 기준 약식 지도로,
-            실제 해안선이 아니라 상대 위치 참고용입니다(원 크기 = 그 팀 상대 누적 득점, 라벨은 겹치면
-            큰 원부터 남깁니다 - 원은 전부 그려져 있습니다).
-          </div>
+          <ScoringInfographicStudio
+            playerName={info.name}
+            careerPts={careerPts}
+            seasonBarSvg={seasonBarSvg}
+            zoneSvg={zoneSvg}
+            detailed5ZoneSvg={detailed5ZoneSvg}
+            koreaMapSvg={koreaMapSvg}
+            teamPieSvg={teamPieSvg}
+            hasTeamBreakdown={teamPtsRows.length > 0}
+          />
         </div>
       )}
 

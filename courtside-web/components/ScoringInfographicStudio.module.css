@@ -1,0 +1,183 @@
+/* ── ESPN 르브론 제임스 스타일 득점 인포그래픽 스튜디오 ── */
+
+.studioContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+/* 1. 상단 툴바 */
+.studioToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 2px;
+}
+
+.tabGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tabBtn {
+  font-family: "IBM Plex Mono", "Pretendard", monospace;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tabBtn:hover {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: rgba(var(--line-rgb), 0.3);
+}
+
+.tabActive {
+  background: var(--ink) !important;
+  color: var(--surface) !important;
+  border-color: var(--ink) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.actionGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.subToggleGroup {
+  display: flex;
+  align-items: center;
+  background: var(--surface-soft);
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+}
+
+.toggleBtn {
+  font-family: "Pretendard", sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toggleActive {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.downloadBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: "Pretendard", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: 6px;
+  background: #912635; /* ESPN 와인 레드 */
+  color: #ffffff;
+  border: 1px solid #a83243;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.downloadBtn:hover {
+  background: #a32c3d;
+  box-shadow: 0 2px 10px rgba(145, 38, 53, 0.35);
+  transform: translateY(-1px);
+}
+
+.downloadBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 2. 16:9 와이드 시네마틱 캔버스 */
+.canvasFrame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--surface-soft);
+  background-image: 
+    radial-gradient(circle at 50% 50%, rgba(var(--line-rgb), 0.04) 0%, rgba(var(--line-rgb), 0.08) 100%),
+    linear-gradient(rgba(var(--line-rgb), 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--line-rgb), 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 24px 24px, 24px 24px;
+  border: 1px solid rgba(var(--line-rgb), 0.18);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.svgViewer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.svgViewer svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* 3. 하단 컨텍스트 가이드 */
+.footnoteRow {
+  font-size: 12px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+  padding: 0 4px;
+}
+
+.footnoteRow strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* 반응형 모바일 */
+@media (max-width: 768px) {
+  .studioToolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .actionGroup {
+    margin-left: 0;
+    justify-content: space-between;
+    width: 100%;
+  }
+  .canvasFrame {
+    aspect-ratio: auto;
+    min-height: 360px;
+  }
+}
