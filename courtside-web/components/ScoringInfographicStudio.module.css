@@ -258,6 +258,18 @@
     flex-direction: column;
     align-items: stretch;
   }
+  /* 4개 필터 버튼이 좁은 화면에서 줄바꿈되면 세로로 쌓여 차트가 폴드 아래로 밀려남 -
+     가로 스크롤 칩 목록으로 전환해 한 줄 높이를 유지한다. */
+  .tabGroup {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .tabGroup::-webkit-scrollbar {
+    display: none;
+  }
   .actionGroup {
     margin-left: 0;
     justify-content: space-between;
