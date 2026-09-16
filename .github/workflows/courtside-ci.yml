@@ -1,13 +1,16 @@
 # 코트사이드 웹 코드 검사 - 타입 검사 + lint. 빌드는 Vercel이 배포 때 한다(여기서 돌리면 DB 키 없이
 # 빌드해야 해서 실제 배포와 조건이 달라진다). 배포가 끝난 뒤의 확인은 courtside-smoke.yml.
+#
+# paths 제한을 없앴다(2026-09-16) - main 브랜치 보호 규칙이 이 "check" job을 필수 상태 체크로
+# 요구하는데, path-filtered 트리거는 그 경로 밖만 건드린 PR/푸시에서 이 워크플로우 자체가 안 돌아
+# GitHub가 "체크 결과를 영원히 기다리는" 상태로 머지를 막는다(Actions의 흔한 함정). 항상 돌게 해서
+# 이 문제를 원천 차단한다 - 어차피 이 저장소에서 CI가 필요한 코드는 courtside-web뿐이라 비용도 작다.
 name: courtside-ci
 
 on:
   push:
     branches: [main]
-    paths: ["courtside-web/**", ".github/workflows/courtside-ci.yml"]
   pull_request:
-    paths: ["courtside-web/**", ".github/workflows/courtside-ci.yml"]
 
 jobs:
   check:
