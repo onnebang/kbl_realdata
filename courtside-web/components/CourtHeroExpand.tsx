@@ -49,7 +49,7 @@ export function CourtHeroExpand({
   const [filterStr, setFilterStr] = useState<string>("all");
 
   const [filterType, filterVal] = filterStr === "all" ? ["all", ""] : filterStr.split(":");
-  const filteredShots = filterStr === "all" ? shots : shots.filter((s) => (s as any)[filterType] === filterVal);
+  const filteredShots = filterStr === "all" ? shots : shots.filter((s) => s[filterType as keyof Court3DShot] === filterVal);
   // 전체보기일 때는 시즌별 재생, 필터링일 때는 그냥 한번에 렌더링되게 groupBy 제거
   const effectiveGroupBy = filterStr === "all" ? "season" : undefined;
 
