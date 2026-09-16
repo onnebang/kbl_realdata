@@ -98,15 +98,19 @@ export function Court3DScene({
     // ── 코트 바닥 - 실제 코트 치수(HALF_WIDTH_M/HALFCOURT_LINE_Z)보다 조금 넓게 깐다.
     // 실측(2026-09-15 제보): 하프라인 근처(~16m 이내)에서 성공한 슛이 있어 그 자리에도 바닥이
     // 있어야 "레이아웃 밖"으로 안 보인다(RENDER_MAX_Z 정의부 주석 참고). 코트 선 자체는 실제
-    // 위치 그대로 그린다 - 넓어지는 건 바닥뿐이다. 색은 나무 바닥 대신 팀 컬러가 은은히 배어
-    // 나오는 짙은 유리 바닥(카메라를 자유롭게 풀어준 만큼 아래에서도 봐야 해서 DoubleSide). ──
+    // 위치 그대로 그린다 - 넓어지는 건 바닥뿐이다. 제보(2026-09-16): "바닥을 어둡게 해놔서
+    // 제대로 안 보인다" - metalness가 높으면 envMap 없이는 대부분 검게 죽는다는 걸 놓쳤다.
+    // metalness 0(완전 디퓨즈) + 밝은 보라 베이스로 바꾸고, 라이팅도 같이 밝힌다(아래 조명
+    // 섹션). 카메라를 자유롭게 풀어준 만큼 아래에서도 봐야 해서 DoubleSide. ──
     const halfLen = RENDER_MAX_Z + BASELINE_TO_RIM_M;
+    const courtMidZ = (RENDER_MAX_Z - BASELINE_TO_RIM_M) / 2;
+    const floorColor = new THREE.Color(0x2a2258).lerp(accent, 0.3);
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(RENDER_HALF_WIDTH_M * 2, halfLen),
-      new THREE.MeshStandardMaterial({ color: 0x0a0d18, roughness: 0.35, metalness: 0.5, emissive: accent, emissiveIntensity: 0.08, side: THREE.DoubleSide })
+      new THREE.MeshStandardMaterial({ color: floorColor, roughness: 0.6, metalness: 0, emissive: accent, emissiveIntensity: 0.22, side: THREE.DoubleSide })
     );
     floor.rotation.x = -Math.PI / 2;
-    floor.position.z = (RENDER_MAX_Z - BASELINE_TO_RIM_M) / 2;
+    floor.position.z = courtMidZ;
     scene.add(floor);
 
     // ── 림 아래 에너지 글로우 - 캔버스 라디얼 그라데이션을 가산 블렌딩으로 얹어 "포털" 느낌. ──
@@ -129,8 +133,10 @@ export function Court3DScene({
     glow.position.set(0, 0.006, KEY_LENGTH_M * 0.35 - BASELINE_TO_RIM_M);
     scene.add(glow);
 
-    // ── 코트 선 - 팀 컬러 네온으로(가상 공간이니 실제 라인 컬러를 고집할 이유가 없다). ──
-    const lineMat = new THREE.LineBasicMaterial({ color: accent });
+    // ── 코트 선 - 팀 컬러 네온으로(가상 공간이니 실제 라인 컬러를 고집할 이유가 없다). 흰색을
+    // 섞어 밝혀야 팀 컬러가 어둡거나 바닥색과 비슷할 때도 바닥 위에서 묻히지 않는다. ──
+    const lineColor = accent.clone().lerp(new THREE.Color(0xffffff), 0.5);
+    const lineMat = new THREE.LineBasicMaterial({ color: lineColor });
     const y = 0.01;
     const addLine = (pts: [number, number][]) =>
       scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(([x, z]) => new THREE.Vector3(x, y, z))), lineMat));
@@ -187,6 +193,66 @@ export function Court3DScene({
     pole.position.set(0, (RIM_HEIGHT_M + 0.6) / 2, -1.4);
     scene.add(pole);
 
+    // ── 관중석 - 요청("스페이스잼같은 경기장 느낌, 관중석, 벤치, 코트까지"). 사이드라인 밖에
+    // 계단식 단(段) 몇 겹 + 그 위에 색색깔 관중 점(InstancedMesh 하나로 저비용 대량 처리). ──
+    const tierN = 3,
+      tierW = 1.5,
+      tierH = 0.55;
+    const tierMat = new THREE.MeshStandardMaterial({ color: 0x14101f, roughness: 0.9 });
+    for (const side of [1, -1] as const) {
+      for (let t = 0; t < tierN; t++) {
+        const riser = new THREE.Mesh(new THREE.BoxGeometry(tierW, tierH, halfLen), tierMat);
+        riser.position.set(side * (RENDER_HALF_WIDTH_M + 0.4 + tierW / 2 + t * tierW), tierH / 2 + t * tierH, courtMidZ);
+        scene.add(riser);
+      }
+    }
+    const crowdColors = [0xff5a8a, 0x5ad1ff, 0xffe15a, 0x8a5aff, 0x5aff9e, 0xff9a5a, 0xff5a5a, 0x5affe0];
+    const crowdPerTier = 30;
+    const crowdMesh = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(0.15, 6, 5),
+      new THREE.MeshStandardMaterial({ roughness: 0.5 }),
+      tierN * 2 * crowdPerTier
+    );
+    let ci = 0;
+    const cc = new THREE.Color();
+    const crowdM = new THREE.Matrix4();
+    for (const side of [1, -1] as const) {
+      for (let t = 0; t < tierN; t++) {
+        const cx = side * (RENDER_HALF_WIDTH_M + 0.4 + tierW / 2 + t * tierW);
+        const cy = tierH * (t + 1) + 0.15;
+        for (let k = 0; k < crowdPerTier; k++) {
+          const cz = -BASELINE_TO_RIM_M + Math.random() * halfLen;
+          crowdM.makeTranslation(cx + (Math.random() - 0.5) * tierW * 0.7, cy, cz);
+          crowdMesh.setMatrixAt(ci, crowdM);
+          crowdMesh.setColorAt(ci, cc.setHex(crowdColors[(ci * 7) % crowdColors.length]));
+          ci++;
+        }
+      }
+    }
+    if (crowdMesh.instanceColor) crowdMesh.instanceColor.needsUpdate = true;
+    scene.add(crowdMesh);
+
+    // ── 벤치 - 한쪽 사이드라인 옆, 베이스라인 근처. ──
+    const bench = new THREE.Mesh(
+      new THREE.BoxGeometry(0.55, 0.5, 3.4),
+      new THREE.MeshStandardMaterial({ color: 0x181b28, roughness: 0.7, emissive: accent, emissiveIntensity: 0.08 })
+    );
+    bench.position.set(HALF_WIDTH_M + 0.55, 0.25, baseZ + 2);
+    scene.add(bench);
+
+    // ── 천장 에너지 링 - 코트 위에 떠 있는 커다란 네온 원(레퍼런스의 "천장에 매달린 스코어보드
+    // 링" 대체 - 텍스처 없이 순수 발광 지오메트리라 가볍다). ──
+    const halo = new THREE.Mesh(
+      new THREE.TorusGeometry(2.4, 0.07, 8, 48),
+      new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 1.3 })
+    );
+    halo.rotation.x = Math.PI / 2;
+    halo.position.set(0, 8, courtMidZ);
+    scene.add(halo);
+    const haloLight = new THREE.PointLight(accent, 1.0, 22);
+    haloLight.position.copy(halo.position);
+    scene.add(haloLight);
+
     // ── 슛 마커 - groupBy 기준(팀/시즌/쿼터, 있으면) 순으로 정렬해 빌드업 순서를 만든다. ──
     const groupField = (s: Court3DShot) => (groupBy === "team" ? s.team : groupBy === "quarter" ? s.quarter : s.season) ?? "";
     const byGroup = (a: Court3DShot, b: Court3DShot) => groupField(a).localeCompare(groupField(b));
@@ -201,7 +267,7 @@ export function Court3DScene({
     );
     const missedMesh = new THREE.InstancedMesh(
       new THREE.SphereGeometry(0.11, 8, 6),
-      new THREE.MeshBasicMaterial({ color: 0x9aa0ac, wireframe: true, transparent: true, opacity: 0.55 }),
+      new THREE.MeshBasicMaterial({ color: 0xe7eaf2, wireframe: true, transparent: true, opacity: 0.75 }),
       Math.max(1, missed.length)
     );
     const m = new THREE.Matrix4();
@@ -212,12 +278,15 @@ export function Court3DScene({
     if (made.length) scene.add(madeMesh);
     if (missed.length) scene.add(missedMesh);
 
-    // ── 조명 - 바닥이 어두운 유리라 하늘쪽은 밝게, 바닥쪽 바운스는 어둡게(에너지 링/림 글로우가
-    // 도드라지도록). ──
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x11121c, 1.1));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+    // ── 조명 - 제보(2026-09-16 "바닥이 안 보인다")로 전체를 밝게 다시 잡는다. 하늘·바닥 바운스
+    // 둘 다 밝혀 어디서 봐도 코트가 죽지 않게 하고, 코트 중앙 위에 경기장 조명 하나를 더 얹는다. ──
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x3a3f66, 1.5));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.0);
     sun.position.set(6, 10, 6);
     scene.add(sun);
+    const arenaLight = new THREE.PointLight(0xffffff, 1.1, 40);
+    arenaLight.position.set(0, 9, (RENDER_MAX_Z - BASELINE_TO_RIM_M) / 2);
+    scene.add(arenaLight);
 
     // ── 카메라 · 컨트롤(빌드업 동안은 꺼둔다 - 재생이 끝나야 손으로 돌릴 수 있다). 요청("카메라
     // 이동이 조금 더 자유롭게") - 위/아래(폴라각)와 줌 범위를 넓힌다. 바닥을 DoubleSide로 해둬서
