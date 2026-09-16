@@ -781,7 +781,7 @@ export default async function PlayerPage({
           
           {/* 하단: OVR 트렌드 차트 (보라색/팀컬러 영역 차트) */}
           {ovrHistory.length > 0 && (
-            <div style={{ width: '100%', marginTop: '2rem' }}>
+            <div style={{ width: '100%', marginTop: '1rem' }}>
               <OvrTrendChart history={ovrHistory} teamColor={teamColor} />
             </div>
           )}

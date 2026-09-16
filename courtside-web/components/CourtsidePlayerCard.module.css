@@ -90,17 +90,19 @@
 
 .photoWrap {
   position: absolute;
-  bottom: 18%;
+  top: 15%;
+  bottom: 16%;
   left: 50%;
   transform: translateX(-50%);
-  width: 90%;
-  height: 62%;
+  width: 92%;
   z-index: 5;
   pointer-events: none;
 }
 .photo {
   object-fit: cover;
-  object-position: center bottom;
+  /* KBL 공식 사진은 상반신 위주 세로 컷이라 "bottom" 기준으로 자르면 인물 비율상 머리 쪽이
+     밀려 잘린다(감사에서 스크린샷으로 확인). "top"이면 남는 여백은 허리 아래에서만 줄어든다. */
+  object-position: center top;
   filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.5));
 }
 

@@ -184,17 +184,19 @@
 }
 
 @media (max-width: 800px) {
+  /* 요청: "모바일에서 좀 더 한 화면에 들어오도록" - 카드/텍스트 사이 여백을 줄여서 스크롤을
+     덜 해도 카드+이름+스탯이 한 화면에 더 많이 잡히게. */
   .heroContent {
-    gap: 2rem;
+    gap: 1.25rem;
     padding: 20px 16px 20px;
   }
   .heroSplit {
     flex-direction: column-reverse; /* 모바일에서는 카드가 위로, 텍스트가 아래로 */
     align-items: center;
-    gap: 2rem;
+    gap: 1.25rem;
   }
   .heroCardSide {
-    max-width: 280px;
+    max-width: 260px;
   }
   .heroTextSide {
     flex: 1 1 100%;

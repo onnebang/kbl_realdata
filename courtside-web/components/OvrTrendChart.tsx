@@ -19,8 +19,11 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
   // 차트 스케일링 설정
   const WIDTH = 1000;
   const HEIGHT = 260;
-  const PADDING_TOP = 40;
-  const PADDING_BOTTOM = 60;
+  // 축 라벨이 회전 없이 가로로 짧게만 찍혀서(formatSeason) 60px짜리 하단 여백은 과했다 -
+  // 줄여서 꺾은선 자체가 상자를 더 채우게(감사 피드백: "추이가 잘 안 보임"의 절반은 라벨/점
+  // 대비 문제였지만 나머지 절반은 그래프가 상자 안에서 너무 작게 그려지던 것).
+  const PADDING_TOP = 28;
+  const PADDING_BOTTOM = 42;
   const PADDING_X = 50;
 
   const MIN_OVR = 40;

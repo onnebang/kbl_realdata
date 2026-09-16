@@ -1,21 +1,27 @@
 .container {
   width: 100%;
-  margin-top: 2rem;
+  /* 카드 바로 밑에 붙는 "같은 패키지"로 보이게: 카드와 같은 반경 토큰 + 팀 컬러 테두리로
+     연결감을 주고(감사 피드백: 둘이 따로 노는 상자처럼 보였음), 여백도 줄여서 빈 공간 없이
+     내용이 바로 보이게 한다. */
   background-color: #0d0d0d;
-  border-radius: 12px;
-  padding: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--r-card);
+  padding: 1.25rem 1.25rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--chart-color, #542582) 35%, transparent);
 }
 
 .header {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .title {
-  font-family: var(--font-bangers), "Impact", sans-serif;
-  font-size: 2.5rem;
+  /* 원래 var(--font-bangers)를 썼는데 이 변수가 어디에도 정의돼 있지 않아(감사에서 발견)
+     Impact 시스템 폰트로 조용히 폴백하고 있었다 - 사이트가 실제로 로드하는 굵은 제목용
+     서체(다른 모든 패널 제목·히어로 이름과 같은 것)로 교체. */
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.75rem;
+  font-weight: 800;
   font-style: italic;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   color: var(--chart-color, #eab308);
   margin: 0;
   line-height: 1;
@@ -23,9 +29,9 @@
 }
 
 .subtitle {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: #a0a0a0;
-  margin-top: 0.5rem;
+  margin-top: 0.4rem;
   font-weight: 500;
   letter-spacing: 0.02em;
 }
@@ -71,7 +77,9 @@
 }
 
 .yAxisLabel {
-  fill: #666;
+  /* #666 on #0d0d0d 배경은 명암비 3.4:1 - 작은 글자(11px) 기준 WCAG AA(4.5:1) 미달이라
+     실제로 잘 안 보였다(감사 피드백). rgba(255,255,255,0.55)는 같은 배경에서 6:1대. */
+  fill: rgba(255, 255, 255, 0.55);
   font-size: 11px;
   font-family: "IBM Plex Mono", monospace;
   text-anchor: end;
@@ -79,7 +87,7 @@
 }
 
 .xAxisLabel {
-  fill: #666;
+  fill: rgba(255, 255, 255, 0.55);
   font-size: 11px;
   font-family: "IBM Plex Mono", monospace;
   text-anchor: middle;
@@ -100,9 +108,11 @@
 }
 
 .dataPoint {
-  fill: #1a1a1a;
+  /* 어두운 칠(#1a1a1a)에 색 테두리만 있으니 초록 영역 채우기 위에서 거의 안 보였다(감사
+     피드백: "추이가 잘 안 보임") - 밝은 채움으로 바꿔서 배경이 뭐든 점 자체가 도드라지게. */
+  fill: #ffffff;
   stroke: var(--chart-color);
-  stroke-width: 2;
+  stroke-width: 2.5;
   transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -154,4 +164,13 @@
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 0.875rem 0.875rem 0.75rem;
+  }
+  .title {
+    font-size: 1.4rem;
+  }
 }
