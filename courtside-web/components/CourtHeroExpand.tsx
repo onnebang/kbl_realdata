@@ -46,7 +46,13 @@ export function CourtHeroExpand({
   const dims = (["team", "season", "quarter"] as const).filter(
     (k) => new Set(shots.map((s) => s[k]).filter(Boolean)).size > 1
   );
-  const [groupBy, setGroupBy] = useState<Court3DGroupBy>(() => (dims.includes("season") ? "season" : (dims[0] ?? "season")));
+  const [filterStr, setFilterStr] = useState<string>("all");
+
+  const [filterType, filterVal] = filterStr === "all" ? ["all", ""] : filterStr.split(":");
+  const filteredShots = filterStr === "all" ? shots : shots.filter((s) => (s as any)[filterType] === filterVal);
+  // 전체보기일 때는 시즌별 재생, 필터링일 때는 그냥 한번에 렌더링되게 groupBy 제거
+  const effectiveGroupBy = filterStr === "all" ? "season" : undefined;
+
 
   useEffect(() => {
     if (!open) return;
@@ -65,11 +71,11 @@ export function CourtHeroExpand({
   if (!shots.length) return null;
 
   const fmtLabel = (raw: string) =>
-    groupBy === "season" ? fmtSeason(raw) : groupBy === "team" ? (teamNameByTcode?.get(raw) ?? raw) : raw;
+    effectiveGroupBy === "season" ? fmtSeason(raw) : effectiveGroupBy === "team" ? (teamNameByTcode?.get(raw) ?? raw) : raw;
 
-  const switchGroup = (g: Court3DGroupBy) => {
-    if (g === groupBy) return;
-    setGroupBy(g);
+  const handleFilterChange = (val: string) => {
+    if (val === filterStr) return;
+    setFilterStr(val);
     setProgress(null);
     setSkipToken(0);
   };
@@ -113,17 +119,35 @@ export function CourtHeroExpand({
             </div>
             {true && (
               <div className={styles.tabs}>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  {dims.map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      className={d === groupBy ? styles.tabActive : styles.tab}
-                      onClick={() => switchGroup(d)}
-                    >
-                      {GROUP_LABEL[d]}
-                    </button>
-                  ))}
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <select 
+                    value={filterStr} 
+                    onChange={(e) => handleFilterChange(e.target.value)}
+                    style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'var(--surface)', color: 'var(--ink)', fontSize: '12px', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="all">전체 보기 (시즌별 재생)</option>
+                    {dims.includes("season") && (
+                      <optgroup label="시즌 선택">
+                        {Array.from(new Set(shots.map(s => s.season).filter(Boolean))).sort().reverse().map(s => (
+                          <option key={`season:${s}`} value={`season:${s}`}>{fmtSeason(s)} 시즌</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {dims.includes("quarter") && (
+                      <optgroup label="쿼터 선택">
+                        {Array.from(new Set(shots.map(s => s.quarter).filter(Boolean))).sort().map(s => (
+                          <option key={`quarter:${s}`} value={`quarter:${s}`}>{s}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {dims.includes("team") && (
+                      <optgroup label="팀 선택">
+                        {Array.from(new Set(shots.map(s => s.team).filter(Boolean))).sort().map(s => (
+                          <option key={`team:${s}`} value={`team:${s}`}>{teamNameByTcode?.get(s) ?? s}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
                 </div>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
@@ -144,7 +168,7 @@ export function CourtHeroExpand({
             )}
             <div className={styles.canvasWrap}>
               <WidgetBoundary name="3D 코트">
-                <Court3DScene key={groupBy} shots={shots} accentColor={accentColor} onProgress={setProgress} skipToken={skipToken} groupBy={groupBy} showMadeArcs={showMadeArcs} showMissedArcs={showMissedArcs} />
+                <Court3DScene key={filterStr} shots={filteredShots} accentColor={accentColor} onProgress={setProgress} skipToken={skipToken} groupBy={effectiveGroupBy} showMadeArcs={showMadeArcs} showMissedArcs={showMissedArcs} />
               </WidgetBoundary>
             </div>
             <div className={styles.legend}>
@@ -155,7 +179,7 @@ export function CourtHeroExpand({
                 <span className={styles.swatchRing} /> 실패
               </span>
               <span className={styles.legendNote}>
-                {playing ? `열 때 한 번, ${GROUP_LABEL[groupBy]} 순으로 쌓입니다` : "드래그로 회전 · 스크롤로 확대 - 이제부터는 자동으로 움직이지 않습니다"}
+                {playing ? `열 때 한 번, ${effectiveGroupBy ? GROUP_LABEL[effectiveGroupBy] : "순서대로"} 쌓입니다` : "드래그로 회전 · 스크롤로 확대 - 이제부터는 자동으로 움직이지 않습니다"}
               </span>
             </div>
           </div>
