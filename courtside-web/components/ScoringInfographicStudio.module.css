@@ -266,6 +266,12 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     padding-bottom: 2px;
+    /* min-width:0 없이는 stretch로 받은 부모 폭 대신 내용물(4개 버튼 텍스트) 최소 폭만큼
+       늘어나 overflow-x가 자기 박스 안이 아니라 페이지 자체를 가로로 넘치게 만든다 -
+       app/globals.css의 .nav-main 패턴과 동일한 안전장치. */
+    min-width: 0;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
   }
   .tabGroup::-webkit-scrollbar {
     display: none;
