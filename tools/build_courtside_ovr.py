@@ -9,8 +9,12 @@ OUT_PATH = '../data/courtside_ovr.json'
 
 def age_curve(age):
     """
-    kleague38에서 착안한 나이 곡선 팩터.
-    농구는 25~30세가 최전성기, 33세 이후 완만한 하강으로 설정.
+    kleague38에서 착안한 나이 곡선 팩터. 농구는 25~30세가 최전성기, 33세 이후 완만한 하강으로 설정.
+
+    2026-09-16 확인: 현재 compute_ovr()에서 이 함수를 호출하는 곳이 없다(죽은 코드) - players
+    테이블에 생년월일이 없어서(pcode/name/ename/photo_url뿐) 애초에 age를 구할 방법이 없었다.
+    공백-복귀 시즌 보정은 대신 시즌 공백 감지 방식(아래 return_trust)으로 구현했다. 나중에
+    생년월일 데이터가 들어오면 이 함수를 실제로 연결해 나이 기반 보정으로 바꿀 수 있다.
     """
     if pd.isna(age) or age is None:
         return 1.0
@@ -141,6 +145,75 @@ def compute_ovr(target_season='2024-2025'):
     global_df['ovr_adj'] = global_df['raw_ovr'] * global_df['conf'] + global_df['prior_ovr'] * (1 - global_df['conf'])
     global_df['off_adj'] = global_df['raw_off_norm'] * global_df['conf'] + global_df['prior_off'] * (1 - global_df['conf'])
     global_df['def_adj'] = global_df['raw_def_norm'] * global_df['conf'] + global_df['prior_def'] * (1 - global_df['conf'])
+
+    # ── 공백(군 복무·부상 등) 복귀 시즌 보정 ────────────────────────────────────────
+    # 제보: "80 -> 53 -> 81" 같은 복귀 시즌 급락이 실제 흐름과 안 맞음. 원인은
+    # confidence(g)가 20경기에서 이미 1.0으로 포화돼서, 복귀 시즌에 그 정도만 뛰어도
+    # (재적응기라 원래 기량보다 낮게 나오는 게 정상인데도) 위 EMA 보정을 사실상 건너뛰고
+    # 그 시즌 raw 값을 그대로 반영해버리는 것 - 표본 크기와 "복귀 직후라 신뢰하면 안 됨"은
+    # 서로 다른 문제인데 confidence() 하나로 뭉뚱그려져 있었다.
+    #
+    # kleague38/tools/apply_age_curve.py의 방식(선수 개인의 커리어 피크에 앵커링하고,
+    # 신뢰도가 낮을수록 그 피크 쪽으로 세게 당김 - 리그 평균이나 하락하는 이동평균이 아니라
+    # "이 선수라면 원래 이 정도"인 개인 기준)을 참고했다. 다만 그쪽은 생년월일 기반 나이
+    # 곡선을 쓰는데 이 DB의 players 테이블엔 생년월일이 없다(pcode/name/ename/photo_url뿐,
+    # 2026-09-16 확인) - 나이 대신 "시즌 문자열 공백"을 궤적의 근거로 쓴다: 공백 직전
+    # 신뢰도 높은(conf>=0.7) 시즌들 중 최고 기록을 그 선수의 피크로 잡고, 공백 후 첫
+    # 1~2시즌은 그 피크 쪽으로 당긴 뒤 3번째 시즌부터 기존 EMA 신뢰도로 되돌린다. 공백이
+    # 길수록(2시즌 이상 = 병역 등) 더 세게 당긴다.
+    def parse_start_year(season_name):
+        try:
+            return int(str(season_name).split('-')[0])
+        except (ValueError, IndexError):
+            return None
+
+    def return_trust(seasons_since_gap, gap_len):
+        """공백 이후 몇 시즌째인지에 따른 신뢰도. gap_len<=0(공백 없음)이면 항상 1.0 -
+        기존 EMA 신뢰도(conf)를 그대로 쓴다는 뜻."""
+        if gap_len <= 0:
+            return 1.0
+        base = 0.35 if gap_len >= 2 else 0.55
+        return min(1.0, base + 0.3 * seasons_since_gap)
+
+    corrected_ovr = global_df['ovr_adj'].copy()
+    corrected_off = global_df['off_adj'].copy()
+    corrected_def = global_df['def_adj'].copy()
+
+    for pcode, group in global_df.groupby('pcode'):
+        group = group.sort_values('season_name')
+        prev_year = None
+        last_gap_len = 0
+        seasons_since_gap = 99  # 공백을 겪은 적 없으면 큰 값 -> return_trust가 1.0 반환
+        peak_ovr = peak_off = peak_def = None
+        for idx, row in group.iterrows():
+            year = parse_start_year(row['season_name'])
+            if prev_year is not None and year is not None:
+                gap_len = max(0, year - prev_year - 1)
+                if gap_len > 0:
+                    last_gap_len = gap_len
+                    seasons_since_gap = 0
+                else:
+                    seasons_since_gap = min(seasons_since_gap + 1, 99)
+            if year is not None:
+                prev_year = year
+
+            trust = return_trust(seasons_since_gap, last_gap_len)
+            if trust < 1.0 and peak_ovr is not None:
+                corrected_ovr.loc[idx] = row['ovr_adj'] * trust + peak_ovr * (1 - trust)
+                corrected_off.loc[idx] = row['off_adj'] * trust + peak_off * (1 - trust)
+                corrected_def.loc[idx] = row['def_adj'] * trust + peak_def * (1 - trust)
+
+            # 표본이 확실한(conf>=0.7) 시즌만 향후 피크 후보로 - 확정된(보정 반영된) 값을 씀.
+            if row['conf'] >= 0.7:
+                cand = corrected_ovr.loc[idx]
+                if peak_ovr is None or cand > peak_ovr:
+                    peak_ovr = cand
+                    peak_off = corrected_off.loc[idx]
+                    peak_def = corrected_def.loc[idx]
+
+    global_df['ovr_adj'] = corrected_ovr
+    global_df['off_adj'] = corrected_off
+    global_df['def_adj'] = corrected_def
 
     # 2. kbl540의 앵커 매핑 방식 (Piecewise-linear based on historical quantiles)
     # 전체 역사적 분포에서 등수를 구함
