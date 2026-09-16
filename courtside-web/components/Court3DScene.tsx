@@ -53,6 +53,7 @@ export function Court3DScene({
   onProgress?: (p: Court3DProgress) => void;
   skipToken?: number;
   groupBy?: Court3DGroupBy;
+  showArcs?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onProgressRef = useRef(onProgress);
@@ -60,6 +61,8 @@ export function Court3DScene({
     onProgressRef.current = onProgress;
   });
   const skipRequestedRef = useRef(false);
+  const showArcsRef = useRef(showArcs ?? true);
+  useEffect(() => { showArcsRef.current = showArcs ?? true; }, [showArcs]);
 
   useEffect(() => {
     if (skipToken) skipRequestedRef.current = true;
@@ -431,6 +434,11 @@ export function Court3DScene({
       if (hudSprite) {
         const time = Date.now() * 0.002;
         hudSprite.position.y = 7.5 + Math.sin(time) * 0.2;
+        needsRender = true;
+      }
+      if (madeArcs.visible !== showArcsRef.current) {
+        madeArcs.visible = showArcsRef.current;
+        missedArcs.visible = showArcsRef.current;
         needsRender = true;
       }
 

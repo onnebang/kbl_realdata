@@ -238,11 +238,11 @@ export function buildKoreaMapSvg(rows: OpponentPtsRow[], totalPts?: number): str
     // 버블 라벨 (버블이 충분히 클 때 버블 내부에 글자 표시, 아니면 바로 밑/옆)
     const label = `${r.teamAbbr} ${r.pts}`;
     if (rad >= 15) {
-      svg += `<text x="${bx.toFixed(1)}" y="${(by - 2).toFixed(1)}" text-anchor="middle" class="mapBubbleText" fill="#fff" paint-order="stroke" stroke="#000" stroke-width="2.5">${esc(r.teamAbbr)}</text>`;
-      svg += `<text x="${bx.toFixed(1)}" y="${(by + 11).toFixed(1)}" text-anchor="middle" font-family="Big Shoulders Display" font-size="12" font-weight="800" fill="#fff" paint-order="stroke" stroke="#000" stroke-width="2.5">${r.pts}</text>`;
+      svg += `<text x="${bx.toFixed(1)}" y="${(by - 2).toFixed(1)}" text-anchor="middle" font-family="Pretendard, sans-serif" font-size="10" font-weight="800" fill="#ffffff">${esc(r.teamAbbr)}</text>`;
+      svg += `<text x="${bx.toFixed(1)}" y="${(by + 11).toFixed(1)}" text-anchor="middle" font-family="Big Shoulders Display" font-size="12" font-weight="800" fill="#ffffff">${r.pts}</text>`;
     } else {
       const ty = by + rad + 11;
-      svg += `<text x="${bx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" class="mapBubbleText" fill="var(--ink)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">${esc(label)}</text>`;
+      svg += `<text x="${bx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" font-family="Pretendard, sans-serif" font-size="10" font-weight="800" fill="var(--ink)">${esc(label)}</text>`;
     }
     svg += `</g>`;
   }

@@ -39,6 +39,7 @@ export function CourtHeroExpand({
   const [open, setOpen] = useState(false);
   const [progress, setProgress] = useState<Court3DProgress | null>(null);
   const [skipToken, setSkipToken] = useState(0);
+  const [showArcs, setShowArcs] = useState(true);
 
   // 탭은 해당 기준으로 실제로 갈릴 게 있을 때만 보여준다(예: 팀 페이지 슛은 tcode가 전부
   // 같아서 "팀별" 탭이 무의미함).
@@ -110,18 +111,26 @@ export function CourtHeroExpand({
                 ✕
               </button>
             </div>
-            {dims.length > 1 && (
+            {true && (
               <div className={styles.tabs}>
-                {dims.map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    className={d === groupBy ? styles.tabActive : styles.tab}
-                    onClick={() => switchGroup(d)}
-                  >
-                    {GROUP_LABEL[d]}
-                  </button>
-                ))}
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {dims.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      className={d === groupBy ? styles.tabActive : styles.tab}
+                      onClick={() => switchGroup(d)}
+                    >
+                      {GROUP_LABEL[d]}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ marginLeft: 'auto' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={showArcs} onChange={(e) => setShowArcs(e.target.checked)} />
+                    슛 궤적 라인 켜기
+                  </label>
+                </div>
               </div>
             )}
             {playing && (
@@ -131,7 +140,7 @@ export function CourtHeroExpand({
             )}
             <div className={styles.canvasWrap}>
               <WidgetBoundary name="3D 코트">
-                <Court3DScene key={groupBy} shots={shots} accentColor={accentColor} onProgress={setProgress} skipToken={skipToken} groupBy={groupBy} />
+                <Court3DScene key={groupBy} shots={shots} accentColor={accentColor} onProgress={setProgress} skipToken={skipToken} groupBy={groupBy} showArcs={showArcs} />
               </WidgetBoundary>
             </div>
             <div className={styles.legend}>

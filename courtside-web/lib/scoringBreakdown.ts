@@ -500,10 +500,17 @@ export function buildTeamPieSvg(rows: TeamPtsRow[], totalPts?: number): string {
     const ix2 = cx + innerR * Math.cos(rad1);
     const iy2 = cy + innerR * Math.sin(rad1);
 
-    const large = sweep > 180 ? 1 : 0;
+    const isFull = sweep >= 359.9;
+    const large = sweep > 180 && !isFull ? 1 : 0;
 
     // 도넛 조각
-    svg += `<path d="M ${x1.toFixed(1)},${y1.toFixed(1)} A ${R},${R} 0 ${large} 1 ${x2.toFixed(1)},${y2.toFixed(1)} L ${ix1.toFixed(1)},${iy1.toFixed(1)} A ${innerR},${innerR} 0 ${large} 0 ${ix2.toFixed(1)},${iy2.toFixed(1)} Z" fill="${r.teamColor}" stroke="var(--surface)" stroke-width="3">`;
+    if (isFull) {
+      const mX = cx - R;
+      const imX = cx - innerR;
+      svg += `<path d="M ${cx + R},${cy} A ${R},${R} 0 1 1 ${mX},${cy} A ${R},${R} 0 1 1 ${cx + R},${cy} M ${cx + innerR},${cy} A ${innerR},${innerR} 0 1 0 ${imX},${cy} A ${innerR},${innerR} 0 1 0 ${cx + innerR},${cy} Z" fill="${r.teamColor}" stroke="var(--surface)" stroke-width="3">`;
+    } else {
+      svg += `<path d="M ${x1.toFixed(1)},${y1.toFixed(1)} A ${R},${R} 0 ${large} 1 ${x2.toFixed(1)},${y2.toFixed(1)} L ${ix1.toFixed(1)},${iy1.toFixed(1)} A ${innerR},${innerR} 0 ${large} 0 ${ix2.toFixed(1)},${iy2.toFixed(1)} Z" fill="${r.teamColor}" stroke="var(--surface)" stroke-width="3">`;
+    }
     svg += `<title>${esc(r.teamName)} · ${r.pts.toLocaleString()}점 (${((r.pts / total) * 100).toFixed(1)}%)</title>`;
     svg += `</path>`;
 
@@ -511,8 +518,8 @@ export function buildTeamPieSvg(rows: TeamPtsRow[], totalPts?: number): string {
     if (sweep >= 25) {
       const midRad = ((angle + sweep / 2 - 90) * Math.PI) / 180;
       const lx = cx + (R * 0.72) * Math.cos(midRad);
-      const ly = cy + (R * 0.72) * Math.cos(midRad);
-      svg += `<text x="${lx.toFixed(1)}" y="${(ly + 4).toFixed(1)}" text-anchor="middle" class="cbBig" font-size="16" fill="#ffffff" paint-order="stroke" stroke="#000000" stroke-width="2.5">${r.pts.toLocaleString()}P</text>`;
+      const ly = cy + (R * 0.72) * Math.sin(midRad);
+      svg += `<text x="${lx.toFixed(1)}" y="${(ly + 5).toFixed(1)}" text-anchor="middle" class="cbBig" font-size="16" fill="#ffffff">${r.pts.toLocaleString()}P</text>`;
     }
 
     angle += sweep;
