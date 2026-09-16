@@ -257,6 +257,8 @@
   .studioToolbar {
     flex-direction: column;
     align-items: stretch;
+    max-width: 100%;
+    overflow: hidden;
   }
   /* 4개 필터 버튼이 좁은 화면에서 줄바꿈되면 세로로 쌓여 차트가 폴드 아래로 밀려남 -
      가로 스크롤 칩 목록으로 전환해 한 줄 높이를 유지한다. */
@@ -266,10 +268,8 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     padding-bottom: 2px;
-    /* min-width:0 없이는 stretch로 받은 부모 폭 대신 내용물(4개 버튼 텍스트) 최소 폭만큼
-       늘어나 overflow-x가 자기 박스 안이 아니라 페이지 자체를 가로로 넘치게 만든다 -
-       app/globals.css의 .nav-main 패턴과 동일한 안전장치. */
     min-width: 0;
+    max-width: 100%; /* 부모(패널) 너비를 뚫고 나가는 현상 완전 차단 */
     -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
     mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
   }
@@ -280,10 +280,22 @@
     margin-left: 0;
     justify-content: space-between;
     width: 100%;
+    max-width: 100%;
   }
   .canvasFrame {
     aspect-ratio: auto;
-    min-height: 360px;
+    min-height: 280px;
+    /* 모바일에서 차트가 쌀알만하게 축소되는 것 방지 -> 가로 스크롤 허용 */
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start; /* 스크롤 시 왼쪽부터 보이게 */
+  }
+  .svgViewer {
+    /* 모바일에서도 최소 650px 이상을 유지하여 글씨가 찌그러지지 않고 읽히게 함 */
+    min-width: 650px;
+    height: auto; 
+    aspect-ratio: 16 / 9;
   }
 }
 
