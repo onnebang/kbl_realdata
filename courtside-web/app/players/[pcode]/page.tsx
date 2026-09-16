@@ -74,6 +74,9 @@ import {
   buildZoneSvg,
 } from "@/lib/scoringBreakdown";
 import { aggregateByOpponent, buildKoreaMapSvg } from "@/lib/koreaMap";
+import { getPlayerOvrHistory } from "@/lib/ovr";
+import CourtsidePlayerCard from "@/components/CourtsidePlayerCard";
+import OvrTrendChart from "@/components/OvrTrendChart";
 import styles from "./player-profile.module.css";
 
 // "데이터 사이언스 + 데이터로 아름다움" 대개편(요청) - sportsjobs.online 레퍼런스의
@@ -608,6 +611,11 @@ export default async function PlayerPage({
   const detailed5ZoneSvg = buildDetailed5ZoneSvg(detailed5Zones, careerPts);
   const koreaMapSvg = buildKoreaMapSvg(aggregateByOpponent(careerRows, teamByTcode, PRESEASON_SEASON), careerPts);
   const onOff = onOffMap.get(pcode) ?? null;
+  
+  // OVR 히스토리 데이터 
+  const ovrHistory = getPlayerOvrHistory(pcode);
+  // 가장 최신(마지막) OVR 기록 (Courtside 카드용)
+  const latestOvr = ovrHistory.length > 0 ? ovrHistory[ovrHistory.length - 1] : null;
 
   // ── 커리어 결 띠 ─────────────────────────────────────────────────────────────────────
   // 팀 색은 원본(teams.color)을 그대로 넘긴다 - 빌더 안에서 lib/teamAccent.ts accentFor를 태운다
@@ -692,111 +700,91 @@ export default async function PlayerPage({
         ← 경기 목록
       </Link>
 
-      {/* ── 히어로: 커리어 슛 별자리 포스터(위임적 다크 - 모든 색을 직접 칠함) ── */}
-      <section className={styles.hero} style={{ "--hero-team": teamColor } as CSSProperties}>
-        <svg className={styles.heroArt} viewBox="345 27 375 357" preserveAspectRatio="xMidYMid slice" aria-hidden dangerouslySetInnerHTML={{ __html: constellationSvg }} />
-        <div className={styles.heroScrim} />
-        {status.backNum && <div className={styles.heroNum}>{status.backNum}</div>}
-        <div className={styles.heroContent}>
-          <div className={styles.heroKicker}>COURTSIDE PLAYER PROFILE</div>
-          <h1 className={styles.heroName}>{info.name}</h1>
-          <div className={styles.heroMeta}>
-            <TeamBadge team={headerTeam} size={22} />
-            <span>{status.teamName ?? "-"}</span>
-            <span className={styles.heroMetaDot}>·</span>
-            {/* 포지션은 G/F/C 정규화 값만(game_player_stats.pos 원문 'FD'/'GD' 노출 금지 - playerStatus.normalizePos). */}
-            <span>{status.pos ?? "-"}</span>
-            {status.backNum && (
-              <>
+      {/* ── 인포그래픽 포스터 스타일 Hero (Courtside Player Card + 헥스빈 아트) ── */}
+      <section className={styles.hero} style={{ "--hero-team": teamColor, display: "flex", flexDirection: "column", gap: "2rem", overflow: "visible" } as CSSProperties}>
+        {/* 오른쪽 배경 비주얼 (헥스빈/별자리 아트) - 크기 및 위치 조정 */}
+        <svg className={styles.heroArt} viewBox="345 27 375 357" preserveAspectRatio="xMidYMid slice" aria-hidden dangerouslySetInnerHTML={{ __html: constellationSvg }} style={{ right: 0, left: "auto", width: "50%", opacity: 0.8 }} />
+        <div className={styles.heroScrim} style={{ background: "linear-gradient(to right, #0a0a0a 40%, transparent 100%)" }} />
+        
+        {/* 분할 레이아웃 적용 */}
+        <div className={styles.heroContent} style={{ position: "relative", zIndex: 10, display: 'flex', flexDirection: 'column', gap: '3rem', width: '100%' }}>
+          
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3rem', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%' }}>
+            
+            {/* 왼쪽: 기존 선수 메타 정보 (타이포그래피 위주) */}
+            <div style={{ flex: '1 1 400px' }}>
+              <div className={styles.heroKicker} style={{ letterSpacing: '0.2em', color: 'var(--hero-team)', fontWeight: 800, marginBottom: '1rem' }}>COURTSIDE PLAYER PROFILE</div>
+              <h1 className={styles.heroName} style={{ fontSize: '5rem', lineHeight: 0.9, textShadow: '2px 2px 0 var(--hero-team), 4px 4px 0 rgba(0,0,0,0.5)', textTransform: 'uppercase', fontStyle: 'italic' }}>{info.ename || info.name}</h1>
+              <h2 style={{ fontSize: '2rem', color: '#fff', marginTop: '0.5rem', opacity: 0.9 }}>{info.name}</h2>
+              <div className={styles.heroMeta} style={{ marginTop: '1.5rem', fontSize: '1.2rem' }}>
+                <TeamBadge team={headerTeam} size={28} />
+                <span>{status.teamName ?? "-"}</span>
                 <span className={styles.heroMetaDot}>·</span>
-                {/* 외국인 행은 season_roster.back_num이 NULL이라 같은 팀이면 마지막 경기 번호를 시즌
-                    라벨과 함께 쓴다(팀이 바뀌면 playerStatus가 null로 돌려줘 여기까지 오지 않음). */}
-                <span>
-                  {status.backNumAsLastSeason && status.backNumSeason ? `${shortSeason(status.backNumSeason)} ` : ""}#
-                  {status.backNum}
-                </span>
-              </>
-            )}
-            <span className={styles.heroMetaDot}>·</span>
-            <span>커리어 {careerGp}경기</span>
-            <span className={styles.heroMetaDot}>·</span>
-            {/* 히어로 배경은 점 구름이 아니라 밀도 장(lib/shotDensityField.ts) - 밝기는 "시도 밀도"이지
-                성공률이 아니다. 표본 수와 함께 그 사실을 캡션에 남긴다. */}
-            <span>슛 {careerShots.length.toLocaleString()}개의 밀도 지도 · 밝을수록 시도가 많은 자리</span>
-          </div>
-          {heroSeason && (
-            <div className={styles.heroStatRow}>
-              {(
-                [
-                  ["PPG", heroSeason.ppg.toFixed(1)],
-                  ["RPG", heroSeason.rpg.toFixed(1)],
-                  ["APG", heroSeason.apg.toFixed(1)],
-                  ["TS%", heroSeason.tsPct != null ? `${(heroSeason.tsPct * 100).toFixed(1)}` : "-"],
-                ] as const
-              ).map(([label, val]) => (
-                <div className={styles.heroStat} key={label}>
-                  <div className={styles.heroStatVal}>{val}</div>
-                  <div className={styles.heroStatLabel}>
-                    {label} · {shortSeason(heroSeason.seasonName)}
-                  </div>
-                  {/* 값 + 표본 + 기준 시즌(thesis (3)) - 타일 하나가 53경기인지 3경기인지 보이게. */}
-                  <div className={styles.heroStatSample}>정규+PO {heroSeason.gpReg + heroSeason.gpPo}경기</div>
-                </div>
-              ))}
-              {heroWpa && (
-                <div className={styles.heroStat}>
-                  <div className={styles.heroStatVal}>{signed(heroWpa.totalWpa)}</div>
-                  <div className={styles.heroStatLabel}>WPA · {shortSeason(heroWpa.seasonName)}</div>
-                  {/* player_season_wpa.games는 정규시즌 GP(워니 25-26 50 vs 정규+PO 53 - 검증) → '정규' 라벨 필수. */}
-                  <div className={styles.heroStatSample}>
-                    정규 {heroWpa.games}경기 · 리그 {heroWpa.rank}위/{heroWpa.outOf}
-                  </div>
+                <span>{status.pos ?? "-"}</span>
+                {status.backNum && (
+                  <>
+                    <span className={styles.heroMetaDot}>·</span>
+                    <span style={{ color: 'var(--hero-team)', fontWeight: 'bold' }}>
+                      {status.backNumAsLastSeason && status.backNumSeason ? `${shortSeason(status.backNumSeason)} ` : ""}#{status.backNum}
+                    </span>
+                  </>
+                )}
+                <span className={styles.heroMetaDot}>·</span>
+                <span>커리어 {careerGp}경기</span>
+              </div>
+              
+              {heroSeason && (
+                <div className={styles.heroStatRow} style={{ marginTop: '2.5rem', background: 'rgba(0,0,0,0.4)', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  {(
+                    [
+                      ["PPG", heroSeason.ppg.toFixed(1)],
+                      ["RPG", heroSeason.rpg.toFixed(1)],
+                      ["APG", heroSeason.apg.toFixed(1)],
+                      ["TS%", heroSeason.tsPct != null ? `${(heroSeason.tsPct * 100).toFixed(1)}` : "-"],
+                    ] as const
+                  ).map(([label, val]) => (
+                    <div className={styles.heroStat} key={label}>
+                      <div className={styles.heroStatVal} style={{ fontSize: '2.2rem', color: '#fff' }}>{val}</div>
+                      <div className={styles.heroStatLabel}>
+                        {label} · {shortSeason(heroSeason.seasonName)}
+                      </div>
+                    </div>
+                  ))}
+                  {heroWpa && (
+                    <div className={styles.heroStat}>
+                      <div className={styles.heroStatVal} style={{ fontSize: '2.2rem', color: '#fff' }}>{signed(heroWpa.totalWpa)}</div>
+                      <div className={styles.heroStatLabel}>WPA · {shortSeason(heroWpa.seasonName)}</div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-          {heroSeason && heroChip && <div className={styles.heroBasis}>{heroChip}</div>}
-          {/* 요청("슛 지도가 그냥 디자인처럼 보인다 - 확장하면 3D로") - 위 밀도 지도와 같은
-              커리어 전체 슛 표본을 3D 코트에 색으로 찍는다. */}
-          <CourtHeroExpand
-            shots={toCourt3D(careerShots)}
-            accentColor={teamColor}
-            label={`커리어 슛 ${careerShots.length.toLocaleString()}개 3D로 보기`}
-            teamNameByTcode={new Map([...teamByTcode].map(([tc, t]) => [tc, t.name]))}
-          />
-        </div>
-        {/* ── 히어로 발치: 커리어 결 띠 ──────────────────────────────────────────────────
-            칸 하나 = 하룻밤, 왼쪽부터 날짜순. 높이 = 그날 득점, 색 = 그날의 소속팀(이적하면 띠
-            중간에서 색이 바뀐다), 빈칸 = 등록 기간 안의 결장. SVG는 조각 문자열이라 뷰박스는
-            반드시 빌더가 준 값을 쓴다(칸이 많으면 800보다 넓어진다 - 김선형 1297.2). */}
-        {heroStrip && (
-          <div className={styles.heroFoot}>
-            <svg
-              className={styles.heroFootSvg}
-              viewBox={heroStrip.viewBox}
-              preserveAspectRatio="xMidYMid meet"
-              dangerouslySetInnerHTML={{ __html: heroStrip.svg }}
-            />
-            {/* 모바일: 시즌별 행(최신 시즌이 위 - 스크롤 없이 지금 시즌이 먼저). 행 높이는 CSS가 고정하고
-                xMinYMid meet이라 모든 행이 같은 배율로 그려진다(짧은 시즌은 짧게). */}
-            {heroRows && (
-              <div className={styles.heroFootRows}>
-                {[...heroRows.rows].reverse().map((r) => (
-                  <svg
-                    key={r.seasonName}
-                    className={styles.heroFootRow}
-                    viewBox={r.result.viewBox}
-                    preserveAspectRatio="xMinYMid meet"
-                    dangerouslySetInnerHTML={{ __html: r.result.svg }}
-                  />
-                ))}
-                <div className={styles.heroFootNote}>{heroRows.note} · 최신 시즌이 위</div>
+
+            {/* 오른쪽: 2K 스타일 선수 카드 */}
+            {latestOvr && (
+              <div style={{ flexShrink: 0, transform: 'scale(1.1)', transformOrigin: 'top right', zIndex: 20 }}>
+                <CourtsidePlayerCard
+                  name={info.name}
+                  ename={info.ename || "KBL PLAYER"}
+                  team={status.teamName || "KBL"}
+                  number={status.backNum ? parseInt(status.backNum, 10) : 0}
+                  ovr={latestOvr.OVR}
+                  offOvr={latestOvr.OFF}
+                  defOvr={latestOvr.DEF}
+                  photoUrl={info.photoUrl}
+                />
               </div>
             )}
-            <div className={styles.heroFootCaption}>{heroStrip.caption}</div>
-            <div className={styles.heroFootNote}>{heroStrip.note}</div>
           </div>
-        )}
+          
+          {/* 하단: OVR 트렌드 차트 (보라색/팀컬러 영역 차트) */}
+          {ovrHistory.length > 0 && (
+            <div style={{ width: '100%', marginTop: '2rem' }}>
+              <OvrTrendChart history={ovrHistory} teamColor={teamColor} />
+            </div>
+          )}
+
+        </div>
       </section>
 
       {/* ── 0. 한눈 카드 - 히어로 바로 아래, 기존 패널 전부보다 위 ──────────────────────

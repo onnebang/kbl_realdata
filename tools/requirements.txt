@@ -1,0 +1,12 @@
+# tools/*.py 90여개 스크립트가 실제로 임포트하는 서드파티 패키지 목록.
+# 실제 운용 환경은 저장소 밖(D:\영상작업\축구\개발\.venv, Python 3.11.1)에 있고 이 파일로
+# 강제되지 않음 — 새 환경을 세팅하거나 재현할 때 기준으로 쓸 것. 버전은
+# tools/python_runtime.py에 기록된 운용 venv 기준(numpy 2.4 / sklearn 1.9.0).
+# stdlib만 쓰는 스크립트(fetch_kbl_data.py 등)는 설치 불필요.
+
+numpy>=2.4,<3
+scikit-learn==1.9.0
+xgboost
+joblib
+psycopg2-binary
+pillow

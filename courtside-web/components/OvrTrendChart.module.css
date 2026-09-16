@@ -1,0 +1,157 @@
+.container {
+  width: 100%;
+  margin-top: 2rem;
+  background-color: #0d0d0d;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.header {
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  font-family: var(--font-bangers), "Impact", sans-serif;
+  font-size: 2.5rem;
+  font-style: italic;
+  letter-spacing: 0.05em;
+  color: var(--chart-color, #eab308);
+  margin: 0;
+  line-height: 1;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: #a0a0a0;
+  margin-top: 0.5rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.chartWrapper {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.svgChart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.empty {
+  padding: 3rem;
+  text-align: center;
+  color: #666;
+  background: #111;
+  border-radius: 8px;
+  border: 1px dashed #333;
+}
+
+/* 차트 요소들 */
+.areaPath {
+  transition: opacity 0.3s ease;
+}
+
+.linePath {
+  fill: none;
+  stroke: var(--chart-color);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.gridLine {
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.yAxisLabel {
+  fill: #666;
+  font-size: 11px;
+  font-family: "IBM Plex Mono", monospace;
+  text-anchor: end;
+  font-weight: 600;
+}
+
+.xAxisLabel {
+  fill: #666;
+  font-size: 11px;
+  font-family: "IBM Plex Mono", monospace;
+  text-anchor: middle;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.xAxisLabelActive {
+  fill: var(--chart-color);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.guideLine {
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+
+.dataPoint {
+  fill: #1a1a1a;
+  stroke: var(--chart-color);
+  stroke-width: 2;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.dataPointActive {
+  fill: var(--chart-color);
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+/* 툴팁 */
+.tooltipGroup {
+  pointer-events: none;
+  animation: fadeIn 0.15s ease forwards;
+}
+
+.tooltipBg {
+  fill: rgba(20, 20, 20, 0.95);
+  stroke: var(--chart-color);
+  stroke-width: 1.5;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+}
+
+.tooltipTitle {
+  fill: #a0a0a0;
+  font-size: 10px;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: bold;
+}
+
+.tooltipValue {
+  fill: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: var(--font-bangers), "Impact", sans-serif;
+  letter-spacing: 1px;
+}
+
+.tooltipHighlight {
+  fill: var(--chart-color);
+  font-size: 18px;
+}
+
+.tooltipSub {
+  fill: #888888;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
