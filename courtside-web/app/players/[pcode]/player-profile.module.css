@@ -172,9 +172,14 @@
 }
 
 .heroCardSide {
-  flex-shrink: 0;
-  transform: scale(0.9); /* 전체적으로 1.1에서 0.9로 카드 축소 */
-  transform-origin: top right;
+  /* CourtsidePlayerCard.module.css의 .card가 container query 단위(cqw)로 스스로 반응형이라
+     (width: min(340px, 100%)) 여기서 transform: scale()로 억지로 축소할 필요가 없다 - 예전
+     방식은 transform이 레이아웃 폭을 안 줄여서(시각적으로만 작아 보임) 좁은 화면에서 카드가
+     실제로는 원래 폭(400px)만큼 자리를 차지해 가로 스크롤을 유발했다(감사에서 발견).
+     max-width만 주면 flex 아이템이 필요한 만큼 줄어들고 카드 자체가 그 폭에 맞춰 비율대로 작아진다. */
+  flex-shrink: 1;
+  max-width: 340px;
+  width: 100%;
   z-index: 20;
 }
 
@@ -189,8 +194,7 @@
     gap: 2rem;
   }
   .heroCardSide {
-    transform: scale(0.85); /* 모바일에서는 더 작게 */
-    transform-origin: top center;
+    max-width: 280px;
   }
   .heroTextSide {
     flex: 1 1 100%;

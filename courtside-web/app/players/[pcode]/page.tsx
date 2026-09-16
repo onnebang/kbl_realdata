@@ -766,8 +766,9 @@ export default async function PlayerPage({
               <div className={styles.heroCardSide}>
                 <CourtsidePlayerCard
                   name={info.name}
-                  ename={info.ename || "KBL PLAYER"}
-                  team={status.teamName || "KBL"}
+                  ename={info.ename || undefined}
+                  team={headerTeam?.abbr ?? "KBL"}
+                  teamColor={teamColor}
                   number={status.backNum ? parseInt(status.backNum, 10) : 0}
                   ovr={latestOvr.OVR}
                   offOvr={latestOvr.OFF}
