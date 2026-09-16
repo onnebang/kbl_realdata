@@ -562,7 +562,7 @@
   margin-bottom: 10px;
 }
 .scoringEyebrow {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "IBM Plex Mono", "Pretendard", monospace;
   font-style: italic;
   font-size: 11px;
   color: var(--ink-faint);

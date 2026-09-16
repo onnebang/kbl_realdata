@@ -194,15 +194,22 @@ export function Court3DScene({
     scene.add(pole);
 
     // ── 관중석 - 요청("스페이스잼같은 경기장 느낌, 관중석, 벤치, 코트까지"). 사이드라인 밖에
-    // 계단식 단(段) 몇 겹 + 그 위에 색색깔 관중 점(InstancedMesh 하나로 저비용 대량 처리). ──
+    // 계단식 단(段) 몇 겹 + 그 위에 색색깔 관중 점(InstancedMesh 하나로 저비용 대량 처리).
+    // 제보(2026-09-16 "카메라를 돌릴 때 관중석이 걸린다"): OrbitControls는 충돌 검사가 없어
+    // 카메라가 관중석 상자 반경(예전 값: 코트 가장자리+0.4~5.9m)에 걸치면 그 자리에서 orbit하다
+    // 그대로 관중석 속을 뚫고 지나간다. 기본 카메라 반경(약 11.7m)이 하필 그 안에 들어 있었던 게
+    // 원인 - 관중석을 "코트를 보기 위한 정상적인 orbit 반경"(대략 20m 안쪽)보다 훨씬 밖으로
+    // 밀어내 카메라가 평소 쓰는 거리에서는 아예 닿지 않게 한다(STAND_GAP 10.5m로 확대). ──
     const tierN = 3,
       tierW = 1.5,
-      tierH = 0.55;
+      tierH = 0.55,
+      STAND_GAP = 10.5;
+    const standX = (t: number) => RENDER_HALF_WIDTH_M + STAND_GAP + tierW / 2 + t * tierW;
     const tierMat = new THREE.MeshStandardMaterial({ color: 0x14101f, roughness: 0.9 });
     for (const side of [1, -1] as const) {
       for (let t = 0; t < tierN; t++) {
         const riser = new THREE.Mesh(new THREE.BoxGeometry(tierW, tierH, halfLen), tierMat);
-        riser.position.set(side * (RENDER_HALF_WIDTH_M + 0.4 + tierW / 2 + t * tierW), tierH / 2 + t * tierH, courtMidZ);
+        riser.position.set(side * standX(t), tierH / 2 + t * tierH, courtMidZ);
         scene.add(riser);
       }
     }
@@ -218,7 +225,7 @@ export function Court3DScene({
     const crowdM = new THREE.Matrix4();
     for (const side of [1, -1] as const) {
       for (let t = 0; t < tierN; t++) {
-        const cx = side * (RENDER_HALF_WIDTH_M + 0.4 + tierW / 2 + t * tierW);
+        const cx = side * standX(t);
         const cy = tierH * (t + 1) + 0.15;
         for (let k = 0; k < crowdPerTier; k++) {
           const cz = -BASELINE_TO_RIM_M + Math.random() * halfLen;
@@ -289,16 +296,17 @@ export function Court3DScene({
     scene.add(arenaLight);
 
     // ── 카메라 · 컨트롤(빌드업 동안은 꺼둔다 - 재생이 끝나야 손으로 돌릴 수 있다). 요청("카메라
-    // 이동이 조금 더 자유롭게") - 위/아래(폴라각)와 줌 범위를 넓힌다. 바닥을 DoubleSide로 해둬서
-    // 아래쪽까지 내려가도 구멍이 안 뚫려 보인다. ──
+    // 이동이 자유롭게") - 위/아래(폴라각)와 줌 범위를 더 넓힌다. 바닥을 DoubleSide로 해둬서
+    // 아래쪽까지 내려가도 구멍이 안 뚫려 보인다. 관중석은 위에서 STAND_GAP만큼 밀어내 놔서 이
+    // 범위 안에서 자유롭게 돌려도 더는 관중석 상자를 뚫고 지나가지 않는다. ──
     const target = new THREE.Vector3(0, 1, HALFCOURT_LINE_Z * 0.35);
     camera.position.set(0, 9, -6);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.copy(target);
     controls.enableDamping = false;
-    controls.minDistance = 2.5;
-    controls.maxDistance = 42;
-    controls.maxPolarAngle = Math.PI - 0.05;
+    controls.minDistance = 1.5;
+    controls.maxDistance = 60;
+    controls.maxPolarAngle = Math.PI - 0.02;
     controls.enabled = false;
     controls.update();
 
