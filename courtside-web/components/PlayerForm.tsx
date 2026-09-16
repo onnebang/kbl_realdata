@@ -349,7 +349,7 @@ function buildSparkSvg(points: SparkPoint[], opts: { uid: string; digits: number
   // 카드당 이 rect 하나뿐이고, no-preference 안에서만 존재한다.
   const style =
     `<style>@media (prefers-reduced-motion: no-preference){` +
-    `.pfw-${uid}{transform-box:view-box;transform-origin:0 0;animation:pfw-${uid} .9s cubic-bezier(.22,.61,.36,1) both}` +
+    `.pfw-${uid}{transform-box:view-box;transform-origin:0 0;animation:pfw-${uid} .28s cubic-bezier(.22,.61,.36,1) both}` +
     `@keyframes pfw-${uid}{from{transform:scaleX(0)}to{transform:scaleX(1)}}}` +
     `</style>`;
 
@@ -684,7 +684,7 @@ export function PlayerFormPanel({
                   (dim ? " · 표본 하한 미달" : ""),
               };
             });
-            const spark = buildSparkSvg(points, { uid: `${form.pcode}-${key}-${unit}`, digits: def.digits, pct });
+            const spark = buildSparkSvg(points, { uid: `${form.pcode}-${key}`, digits: def.digits, pct });
             const last = seasons[seasons.length - 1];
             const lastV = rateValue(last, key, unit);
             const lastD = deltaValue(last, key, unit);

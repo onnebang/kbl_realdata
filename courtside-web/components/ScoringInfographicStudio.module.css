@@ -35,7 +35,7 @@
   color: var(--ink-soft);
   border: 1px solid rgba(var(--line-rgb), 0.16);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
 }
 
@@ -79,7 +79,7 @@
   background: transparent;
   color: var(--ink-soft);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .toggleActive {
@@ -102,7 +102,7 @@
   color: #ffffff;
   border: 1px solid #a83243;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
   white-space: nowrap;
 }
 

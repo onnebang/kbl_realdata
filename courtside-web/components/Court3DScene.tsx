@@ -66,6 +66,7 @@ export function Court3DScene({
   const skipRequestedRef = useRef(false);
   const showMadeRef = useRef(showMadeArcs ?? true);
   const showMissedRef = useRef(showMissedArcs ?? false);
+  const rebuildRef = useRef<((shots: Court3DShot[], groupBy: Court3DGroupBy, accentColor: string) => void) | null>(null);
   useEffect(() => { 
     showMadeRef.current = showMadeArcs ?? true; 
     showMissedRef.current = showMissedArcs ?? false; 
@@ -188,70 +189,6 @@ export function Court3DScene({
     haloLight.position.copy(halo.position);
     scene.add(haloLight);
 
-    // ── 슛 마커 & 궤적 데이터 준비 ──
-    const groupField = (s: Court3DShot) => (groupBy === "team" ? s.team : groupBy === "quarter" ? s.quarter : s.season) ?? "";
-    const byGroup = (a: Court3DShot, b: Court3DShot) => groupField(a).localeCompare(groupField(b));
-    const made = shots.filter((s) => s.made).sort(byGroup);
-    const missed = shots.filter((s) => !s.made).sort(byGroup);
-    const totalPts = made.reduce((s, m) => s + m.value, 0);
-
-    // 바닥 슛 스팟 (InstancedMesh 유지 - 위치 표시용)
-    const madeSpotMesh = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.12, 10, 8),
-      new THREE.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 0.5 }),
-      Math.max(1, made.length)
-    );
-    const missedSpotMesh = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.09, 8, 6),
-      new THREE.MeshBasicMaterial({ color: 0xe7eaf2, wireframe: true, transparent: true, opacity: 0.4 }),
-      Math.max(1, missed.length)
-    );
-    const m = new THREE.Matrix4();
-    made.forEach((s, i) => madeSpotMesh.setMatrixAt(i, m.makeTranslation(s.x, 0.12, s.z)));
-    missed.forEach((s, i) => missedSpotMesh.setMatrixAt(i, m.makeTranslation(s.x, 0.09, s.z)));
-    madeSpotMesh.count = 0;
-    missedSpotMesh.count = 0;
-    if (made.length) scene.add(madeSpotMesh);
-    if (missed.length) scene.add(missedSpotMesh);
-
-    // 슛 궤적 (LineSegments) - 퍼포먼스와 정교한 라인 렌더링을 위해 단일 BufferGeometry 사용
-    const segmentsPerArc = 16;
-    const ptsPerArc = segmentsPerArc * 2; 
-
-    // 성공 궤적
-    const madeArcPositions = new Float32Array(Math.max(1, made.length) * ptsPerArc * 3);
-    const madeArcColors = new Float32Array(Math.max(1, made.length) * ptsPerArc * 3);
-    made.forEach((s, i) => {
-      const v = createArcVertices(s.x, s.z, RIM_HEIGHT_M, segmentsPerArc);
-      madeArcPositions.set(v, i * ptsPerArc * 3);
-      // 3점슛이면 끝부분 색상을 밝게, 2점이면 악센트 컬러 (그라데이션)
-      for (let j=0; j<ptsPerArc; j++) {
-        const ratio = j / ptsPerArc; // 0 (바닥) -> 1 (림)
-        const c = s.value === 3 ? accent.clone().lerp(new THREE.Color(0xffffff), ratio) : accent;
-        madeArcColors.set([c.r, c.g, c.b], i * ptsPerArc * 3 + j * 3);
-      }
-    });
-    const madeArcGeo = new THREE.BufferGeometry();
-    madeArcGeo.setAttribute('position', new THREE.BufferAttribute(madeArcPositions, 3));
-    madeArcGeo.setAttribute('color', new THREE.BufferAttribute(madeArcColors, 3));
-    madeArcGeo.setDrawRange(0, 0);
-    const madeArcMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
-    const madeArcs = new THREE.LineSegments(madeArcGeo, madeArcMat);
-    scene.add(madeArcs);
-
-    // 실패 궤적 (조금 더 투명하게)
-    const missedArcPositions = new Float32Array(Math.max(1, missed.length) * ptsPerArc * 3);
-    missed.forEach((s, i) => {
-      const v = createArcVertices(s.x, s.z, RIM_HEIGHT_M, segmentsPerArc);
-      missedArcPositions.set(v, i * ptsPerArc * 3);
-    });
-    const missedArcGeo = new THREE.BufferGeometry();
-    missedArcGeo.setAttribute('position', new THREE.BufferAttribute(missedArcPositions, 3));
-    missedArcGeo.setDrawRange(0, 0);
-    const missedArcMat = new THREE.LineBasicMaterial({ color: 0x666a7a, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending });
-    const missedArcs = new THREE.LineSegments(missedArcGeo, missedArcMat);
-    scene.add(missedArcs);
-
     // ── 3D 부유 텍스트 (홀로그램 UI) ──
     // Canvas를 텍스처로 만들어 Sprite로 장착. 텍스트 내용이 바뀔 때마다 업데이트.
     const hudCanvas = document.createElement("canvas");
@@ -311,8 +248,11 @@ export function Court3DScene({
 
     // ── 카메라 및 컨트롤 ──
     const target = new THREE.Vector3(0, 1.5, HALFCOURT_LINE_Z * 0.35);
+    // 카메라 시네마틱 패닝 변수 (필터 변경 시 rebuildShots가 여기로 리셋)
+    const camStart = new THREE.Vector3(-14, 4, -4);
+    const camEnd = new THREE.Vector3(0, 11, -12); // 정면 하이앵글로 마무리
     // 시네마틱 앵글 시작점 (코너 쪽 로우앵글)
-    camera.position.set(-14, 4, -4);
+    camera.position.copy(camStart);
     camera.lookAt(target);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -338,129 +278,233 @@ export function Court3DScene({
     });
     ro.observe(container);
 
-    // ── 빌드업 재생 ──
-    const hasGroup = shots.some((s) => groupField(s));
-    const batchKeys = hasGroup
-      ? Array.from(new Set(made.concat(missed).map(groupField))).sort((a, b) => a.localeCompare(b))
-      : Array.from({ length: Math.min(10, Math.max(1, shots.length)) }, (_, i) => String(i));
-    const chunkSize = hasGroup ? 0 : Math.ceil(Math.max(1, shots.length) / batchKeys.length);
-    const inBatch = (s: Court3DShot, idxInArr: number, key: string) => (hasGroup ? groupField(s) === key : Math.floor(idxInArr / chunkSize) === Number(key));
+    // ── 슛 마커/궤적/빌드업 재생 (필터·그룹핑·색상 변경 시 rebuildShots가 재구성) ──
+    let arcMeshes: {
+      madeSpotMesh: THREE.InstancedMesh;
+      missedSpotMesh: THREE.InstancedMesh;
+      madeArcGeo: THREE.BufferGeometry;
+      missedArcGeo: THREE.BufferGeometry;
+      madeArcs: THREE.LineSegments;
+      missedArcs: THREE.LineSegments;
+    } | null = null;
+    let playback: { cancelled: boolean } | null = null;
 
-    let madeShown = 0,
-      missedShown = 0,
-      batchIdx = 0;
-    const totalShots = made.length + missed.length;
-    // 시네마틱 여유를 위해 틱 시간을 좀 더 길게 (스무스한 진행)
-    const tickMs = Math.min(800, Math.max(150, 5000 / Math.max(1, batchKeys.length)));
-
-    let ptsCounter = 0;
-
-    // 카메라 시네마틱 패닝 변수
-    const camStart = new THREE.Vector3(-14, 4, -4);
-    const camEnd = new THREE.Vector3(0, 11, -12); // 정면 하이앵글로 마무리
-    const totalTicks = batchKeys.length;
-
-    function finishInstant() {
+    function rebuildShots(nextShots: Court3DShot[], nextGroupBy: Court3DGroupBy, nextAccentColor: string) {
       if (disposed) return;
-      madeSpotMesh.count = made.length;
-      missedSpotMesh.count = missed.length;
-      madeArcGeo.setDrawRange(0, made.length * ptsPerArc);
-      missedArcGeo.setDrawRange(0, missed.length * ptsPerArc);
-      
-      // HUD 최종 업데이트
-      update3DHud("CAREER", totalPts.toLocaleString());
-      
-      // 카메라 위치 최종
-      camera.position.copy(camEnd);
-      
-      render();
-      controls.enabled = true;
-      controls.update();
-      onProgressRef.current?.({ shown: totalShots, total: totalShots, pts: totalPts, totalPts, label: null, done: true });
-    }
+      if (playback) playback.cancelled = true;
+      const myPlayback = { cancelled: false };
+      playback = myPlayback;
 
-    function tick() {
-      if (disposed) return;
-      if (skipRequestedRef.current) {
-        finishInstant();
-        return;
+      if (arcMeshes) {
+        const old = arcMeshes;
+        [old.madeSpotMesh, old.missedSpotMesh, old.madeArcs, old.missedArcs].forEach((obj) => {
+          scene.remove(obj);
+          obj.geometry.dispose();
+          const mat = obj.material;
+          (Array.isArray(mat) ? mat : [mat]).forEach((mm) => mm.dispose());
+        });
+        arcMeshes = null;
       }
-      if (batchIdx >= batchKeys.length) {
-        finishInstant();
-        return;
-      }
-      const key = batchKeys[batchIdx];
-      while (madeShown < made.length && inBatch(made[madeShown], madeShown, key)) madeShown++;
-      while (missedShown < missed.length && inBatch(missed[missedShown], missedShown, key)) missedShown++;
-      
-      madeSpotMesh.count = madeShown;
-      missedSpotMesh.count = missedShown;
-      madeArcGeo.setDrawRange(0, madeShown * ptsPerArc);
-      missedArcGeo.setDrawRange(0, missedShown * ptsPerArc);
-      
-      let pts = 0;
-      for (let i = 0; i < madeShown; i++) pts += made[i].value;
-      ptsCounter = pts;
 
-      // 카메라 부드러운 패닝
-      const progressRatio = batchKeys.length > 1 ? batchIdx / (batchKeys.length - 1) : 1;
-      camera.position.lerpVectors(camStart, camEnd, progressRatio);
-      controls.update();
+      const groupField = (s: Court3DShot) => (nextGroupBy === "team" ? s.team : nextGroupBy === "quarter" ? s.quarter : s.season) ?? "";
+      const byGroup = (a: Court3DShot, b: Court3DShot) => groupField(a).localeCompare(groupField(b));
+      const made = nextShots.filter((s) => s.made).sort(byGroup);
+      const missed = nextShots.filter((s) => !s.made).sort(byGroup);
+      const totalPts = made.reduce((s, mm) => s + mm.value, 0);
 
-      // 3D HUD 업데이트
-      update3DHud(hasGroup ? key : null, ptsCounter.toLocaleString());
+      // 바닥 슛 스팟 (InstancedMesh 유지 - 위치 표시용)
+      const madeSpotMesh = new THREE.InstancedMesh(
+        new THREE.SphereGeometry(0.12, 10, 8),
+        new THREE.MeshStandardMaterial({ color: nextAccentColor, emissive: nextAccentColor, emissiveIntensity: 0.5 }),
+        Math.max(1, made.length)
+      );
+      const missedSpotMesh = new THREE.InstancedMesh(
+        new THREE.SphereGeometry(0.09, 8, 6),
+        new THREE.MeshBasicMaterial({ color: 0xe7eaf2, wireframe: true, transparent: true, opacity: 0.4 }),
+        Math.max(1, missed.length)
+      );
+      const m = new THREE.Matrix4();
+      made.forEach((s, i) => madeSpotMesh.setMatrixAt(i, m.makeTranslation(s.x, 0.12, s.z)));
+      missed.forEach((s, i) => missedSpotMesh.setMatrixAt(i, m.makeTranslation(s.x, 0.09, s.z)));
+      madeSpotMesh.count = 0;
+      missedSpotMesh.count = 0;
+      if (made.length) scene.add(madeSpotMesh);
+      if (missed.length) scene.add(missedSpotMesh);
 
-      render();
-      onProgressRef.current?.({
-        shown: madeShown + missedShown,
-        total: totalShots,
-        pts,
-        totalPts,
-        label: hasGroup ? key : null,
-        done: false,
+      // 슛 궤적 (LineSegments) - 퍼포먼스와 정교한 라인 렌더링을 위해 단일 BufferGeometry 사용
+      const segmentsPerArc = 16;
+      const ptsPerArc = segmentsPerArc * 2;
+      const shotAccent = new THREE.Color(nextAccentColor);
+
+      // 성공 궤적
+      const madeArcPositions = new Float32Array(Math.max(1, made.length) * ptsPerArc * 3);
+      const madeArcColors = new Float32Array(Math.max(1, made.length) * ptsPerArc * 3);
+      made.forEach((s, i) => {
+        const v = createArcVertices(s.x, s.z, RIM_HEIGHT_M, segmentsPerArc);
+        madeArcPositions.set(v, i * ptsPerArc * 3);
+        // 3점슛이면 끝부분 색상을 밝게, 2점이면 악센트 컬러 (그라데이션)
+        for (let j = 0; j < ptsPerArc; j++) {
+          const ratio = j / ptsPerArc; // 0 (바닥) -> 1 (림)
+          const c = s.value === 3 ? shotAccent.clone().lerp(new THREE.Color(0xffffff), ratio) : shotAccent;
+          madeArcColors.set([c.r, c.g, c.b], i * ptsPerArc * 3 + j * 3);
+        }
       });
-      batchIdx++;
-      window.setTimeout(tick, tickMs);
+      const madeArcGeo = new THREE.BufferGeometry();
+      madeArcGeo.setAttribute('position', new THREE.BufferAttribute(madeArcPositions, 3));
+      madeArcGeo.setAttribute('color', new THREE.BufferAttribute(madeArcColors, 3));
+      madeArcGeo.setDrawRange(0, 0);
+      const madeArcMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+      const madeArcs = new THREE.LineSegments(madeArcGeo, madeArcMat);
+      madeArcs.visible = showMadeRef.current;
+      scene.add(madeArcs);
+
+      // 실패 궤적 (조금 더 투명하게)
+      const missedArcPositions = new Float32Array(Math.max(1, missed.length) * ptsPerArc * 3);
+      missed.forEach((s, i) => {
+        const v = createArcVertices(s.x, s.z, RIM_HEIGHT_M, segmentsPerArc);
+        missedArcPositions.set(v, i * ptsPerArc * 3);
+      });
+      const missedArcGeo = new THREE.BufferGeometry();
+      missedArcGeo.setAttribute('position', new THREE.BufferAttribute(missedArcPositions, 3));
+      missedArcGeo.setDrawRange(0, 0);
+      const missedArcMat = new THREE.LineBasicMaterial({ color: 0x666a7a, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending });
+      const missedArcs = new THREE.LineSegments(missedArcGeo, missedArcMat);
+      missedArcs.visible = showMissedRef.current;
+      scene.add(missedArcs);
+
+      arcMeshes = { madeSpotMesh, missedSpotMesh, madeArcGeo, missedArcGeo, madeArcs, missedArcs };
+
+      // 카메라를 시네마틱 시작 위치로 리셋하고 즉시 한 프레임 렌더 (필터 전환 시 이전 프레임이 안 남게)
+      camera.position.copy(camStart);
+      camera.lookAt(target);
+      controls.enabled = false; // 재생 중엔 끔
+      controls.update();
+      render();
+
+      // ── 빌드업 재생 ──
+      const hasGroup = nextShots.some((s) => groupField(s));
+      const batchKeys = hasGroup
+        ? Array.from(new Set(made.concat(missed).map(groupField))).sort((a, b) => a.localeCompare(b))
+        : Array.from({ length: Math.min(10, Math.max(1, nextShots.length)) }, (_, i) => String(i));
+      const chunkSize = hasGroup ? 0 : Math.ceil(Math.max(1, nextShots.length) / batchKeys.length);
+      const inBatch = (s: Court3DShot, idxInArr: number, key: string) => (hasGroup ? groupField(s) === key : Math.floor(idxInArr / chunkSize) === Number(key));
+
+      let madeShown = 0,
+        missedShown = 0,
+        batchIdx = 0;
+      const totalShots = made.length + missed.length;
+      // 시네마틱 여유를 위해 틱 시간을 좀 더 길게 (스무스한 진행)
+      const tickMs = Math.min(800, Math.max(150, 5000 / Math.max(1, batchKeys.length)));
+
+      let ptsCounter = 0;
+
+      function finishInstant() {
+        if (disposed || myPlayback.cancelled) return;
+        madeSpotMesh.count = made.length;
+        missedSpotMesh.count = missed.length;
+        madeArcGeo.setDrawRange(0, made.length * ptsPerArc);
+        missedArcGeo.setDrawRange(0, missed.length * ptsPerArc);
+
+        // HUD 최종 업데이트
+        update3DHud("CAREER", totalPts.toLocaleString());
+
+        // 카메라 위치 최종
+        camera.position.copy(camEnd);
+
+        render();
+        controls.enabled = true;
+        controls.update();
+        onProgressRef.current?.({ shown: totalShots, total: totalShots, pts: totalPts, totalPts, label: null, done: true });
+      }
+
+      function tick() {
+        if (disposed || myPlayback.cancelled) return;
+        if (skipRequestedRef.current) {
+          finishInstant();
+          return;
+        }
+        if (batchIdx >= batchKeys.length) {
+          finishInstant();
+          return;
+        }
+        const key = batchKeys[batchIdx];
+        while (madeShown < made.length && inBatch(made[madeShown], madeShown, key)) madeShown++;
+        while (missedShown < missed.length && inBatch(missed[missedShown], missedShown, key)) missedShown++;
+
+        madeSpotMesh.count = madeShown;
+        missedSpotMesh.count = missedShown;
+        madeArcGeo.setDrawRange(0, madeShown * ptsPerArc);
+        missedArcGeo.setDrawRange(0, missedShown * ptsPerArc);
+
+        let pts = 0;
+        for (let i = 0; i < madeShown; i++) pts += made[i].value;
+        ptsCounter = pts;
+
+        // 카메라 부드러운 패닝
+        const progressRatio = batchKeys.length > 1 ? batchIdx / (batchKeys.length - 1) : 1;
+        camera.position.lerpVectors(camStart, camEnd, progressRatio);
+        controls.update();
+
+        // 3D HUD 업데이트
+        update3DHud(hasGroup ? key : null, ptsCounter.toLocaleString());
+
+        render();
+        onProgressRef.current?.({
+          shown: madeShown + missedShown,
+          total: totalShots,
+          pts,
+          totalPts,
+          label: hasGroup ? key : null,
+          done: false,
+        });
+        batchIdx++;
+        if (!myPlayback.cancelled) window.setTimeout(tick, tickMs);
+      }
+
+      skipRequestedRef.current = false;
+      if (totalShots > 0) {
+        window.setTimeout(tick, 300);
+      } else {
+        finishInstant();
+      }
     }
 
-    let cleanupTimer: (() => void) | undefined;
-    if (totalShots > 0) {
-      const t = window.setTimeout(tick, 300);
-      cleanupTimer = () => window.clearTimeout(t);
-    } else {
-      finishInstant();
-    }
+    rebuildRef.current = rebuildShots;
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     // 애니메이션 루프 (HUD 및 controls damping을 위해)
     let reqId: number;
     const animate = () => {
       reqId = requestAnimationFrame(animate);
       let needsRender = false;
-      
-      // HUD 살짝 둥둥 떠다니는 애니메이션
-      if (hudSprite) {
+
+      // HUD 살짝 둥둥 떠다니는 애니메이션 (reduced motion에선 고정)
+      if (hudSprite && !prefersReducedMotion) {
         const time = Date.now() * 0.002;
         hudSprite.position.y = 7.5 + Math.sin(time) * 0.2;
         needsRender = true;
       }
-      if (madeArcs.visible !== showMadeRef.current) {
-        madeArcs.visible = showMadeRef.current;
-        needsRender = true;
-      }
-      if (missedArcs.visible !== showMissedRef.current) {
-        missedArcs.visible = showMissedRef.current;
-        needsRender = true;
+      if (arcMeshes) {
+        if (arcMeshes.madeArcs.visible !== showMadeRef.current) {
+          arcMeshes.madeArcs.visible = showMadeRef.current;
+          needsRender = true;
+        }
+        if (arcMeshes.missedArcs.visible !== showMissedRef.current) {
+          arcMeshes.missedArcs.visible = showMissedRef.current;
+          needsRender = true;
+        }
       }
 
       if (controls.enabled && controls.update()) needsRender = true;
-      
+
       if (needsRender) render();
     };
     animate();
 
     return () => {
       disposed = true;
-      cleanupTimer?.();
+      if (playback) playback.cancelled = true;
       cancelAnimationFrame(reqId);
       ro.disconnect();
       controls.removeEventListener("change", render);
@@ -477,6 +521,10 @@ export function Court3DScene({
       container.removeChild(renderer.domElement);
     };
   }, []);
+
+  useEffect(() => {
+    rebuildRef.current?.(shots, groupBy, accentColor);
+  }, [shots, groupBy, accentColor]);
 
   return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
 }

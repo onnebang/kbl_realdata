@@ -128,21 +128,21 @@ export function CourtHeroExpand({
                     <option value="all">전체 보기 (시즌별 재생)</option>
                     {dims.includes("season") && (
                       <optgroup label="시즌 선택">
-                        {Array.from(new Set(shots.map(s => s.season).filter(Boolean))).sort().reverse().map(s => (
+                        {Array.from(new Set(shots.map(s => s.season).filter((x): x is string => Boolean(x)))).sort().reverse().map(s => (
                           <option key={`season:${s}`} value={`season:${s}`}>{fmtSeason(s)} 시즌</option>
                         ))}
                       </optgroup>
                     )}
                     {dims.includes("quarter") && (
                       <optgroup label="쿼터 선택">
-                        {Array.from(new Set(shots.map(s => s.quarter).filter(Boolean))).sort().map(s => (
+                        {Array.from(new Set(shots.map(s => s.quarter).filter((x): x is string => Boolean(x)))).sort().map(s => (
                           <option key={`quarter:${s}`} value={`quarter:${s}`}>{s}</option>
                         ))}
                       </optgroup>
                     )}
                     {dims.includes("team") && (
                       <optgroup label="팀 선택">
-                        {Array.from(new Set(shots.map(s => s.team).filter(Boolean))).sort().map(s => (
+                        {Array.from(new Set(shots.map(s => s.team).filter((x): x is string => Boolean(x)))).sort().map(s => (
                           <option key={`team:${s}`} value={`team:${s}`}>{teamNameByTcode?.get(s) ?? s}</option>
                         ))}
                       </optgroup>
@@ -163,12 +163,12 @@ export function CourtHeroExpand({
             )}
             {playing && (
               <div className={styles.hudBar}>
-                <div className={styles.hudBarFill} style={{ width: `${((progress?.shown ?? 0) / Math.max(1, progress?.total ?? 1)) * 100}%`, background: accentColor }} />
+                <div className={styles.hudBarFill} style={{ transform: `scaleX(${(progress?.shown ?? 0) / Math.max(1, progress?.total ?? 1)})`, background: accentColor }} />
               </div>
             )}
             <div className={styles.canvasWrap}>
               <WidgetBoundary name="3D 코트">
-                <Court3DScene key={filterStr} shots={filteredShots} accentColor={accentColor} onProgress={setProgress} skipToken={skipToken} groupBy={effectiveGroupBy} showMadeArcs={showMadeArcs} showMissedArcs={showMissedArcs} />
+                <Court3DScene shots={filteredShots} accentColor={accentColor} onProgress={setProgress} skipToken={skipToken} groupBy={effectiveGroupBy} showMadeArcs={showMadeArcs} showMissedArcs={showMissedArcs} />
               </WidgetBoundary>
             </div>
             <div className={styles.legend}>
