@@ -1,5 +1,4 @@
-import fs from "fs";
-import path from "path";
+import rawHistory from "./courtside_ovr_history.json";
 
 export interface OvrSeasonRecord {
   pcode: string;
@@ -10,21 +9,9 @@ export interface OvrSeasonRecord {
   DEF: number;
 }
 
-// 메모리 캐싱
-let ovrHistoryCache: OvrSeasonRecord[] | null = null;
-
 export function getOvrHistoryCache(): OvrSeasonRecord[] {
-  if (ovrHistoryCache) return ovrHistoryCache;
-  
-  try {
-    const filePath = path.join(process.cwd(), "..", "data", "courtside_ovr_history.json");
-    const data = fs.readFileSync(filePath, "utf-8");
-    ovrHistoryCache = JSON.parse(data) as OvrSeasonRecord[];
-    return ovrHistoryCache;
-  } catch (err) {
-    console.error("Failed to load courtside_ovr_history.json:", err);
-    return [];
-  }
+  // 웹팩(Next.js)에서 import한 JSON은 자동으로 캐싱되고 번들에 포함됩니다.
+  return rawHistory as OvrSeasonRecord[];
 }
 
 /**

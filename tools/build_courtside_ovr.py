@@ -173,7 +173,7 @@ def compute_ovr(target_season='2024-2025'):
             "DEF": int(row['DEF'])
         })
 
-    OUT_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'courtside_ovr_history.json')
+    OUT_PATH = os.path.join(os.path.dirname(__file__), '..', 'courtside-web', 'lib', 'courtside_ovr_history.json')
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     with open(OUT_PATH, 'w', encoding='utf-8') as f:
         json.dump(out_data, f, ensure_ascii=False, indent=2)
