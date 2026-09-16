@@ -760,8 +760,9 @@ export default async function PlayerPage({
               )}
             </div>
 
-            {/* 오른쪽: 2K 스타일 선수 카드 */}
-            {latestOvr && (
+            {/* 오른쪽: 2K 스타일 선수 카드 - CourtsidePlayerCard는 photoUrl이 필수(string)라
+                사진 없는 선수는 카드 자체를 건너뛴다(플레이스홀더 이미지가 따로 없음). */}
+            {latestOvr && info.photoUrl && (
               <div style={{ flexShrink: 0, transform: 'scale(1.1)', transformOrigin: 'top right', zIndex: 20 }}>
                 <CourtsidePlayerCard
                   name={info.name}
