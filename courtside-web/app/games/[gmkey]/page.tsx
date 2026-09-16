@@ -19,6 +19,7 @@ import { TeamBadge } from "@/components/TeamBadge";
 import GameReplay from "@/components/GameReplay";
 import { InsightCard } from "@/components/InsightCard";
 import { deriveGameStatus } from "@/lib/gameStatus";
+import { cached, cachedMap, gameTtl, TTL, TAG } from "@/lib/cachePolicy";
 import LiveGameProvider from "@/components/LiveGameProvider";
 import LiveScore from "@/components/LiveScore";
 import { WidgetBoundary } from "@/components/WidgetBoundary";
@@ -130,38 +131,50 @@ const getGame = cache(async (gmkey: string): Promise<GameInfo | null> => {
   return game;
 });
 
-async function getTeamStats(gmkey: string) {
-  const { data } = await supabase
-    .from("game_team_stats")
-    .select("tcode, score, reb, ast, stl, blk, turnovers, fouls, fgm, fga, tpm, tpa, ftm, fta")
-    .eq("gmkey", gmkey);
-  return (data ?? []) as TeamStatRow[];
+// ttl은 호출부가 deriveGameStatus(game)으로 구한 gameTtl()을 그대로 넘긴다(예정/진행중/종료
+// 게이팅과 동일한 단일 기준 - lib/cachePolicy.ts 주석: 종료 경기는 정산 끝나면 불변, 라이브는
+// 캐시 금지). 감사 지적: 이 파일의 7개 조회 함수만 캐시 없이 매 요청 Supabase를 그대로 쳤음.
+async function getTeamStats(gmkey: string, ttl: number) {
+  const load = async () => {
+    const { data } = await supabase
+      .from("game_team_stats")
+      .select("tcode, score, reb, ast, stl, blk, turnovers, fouls, fgm, fga, tpm, tpa, ftm, fta")
+      .eq("gmkey", gmkey);
+    return (data ?? []) as TeamStatRow[];
+  };
+  return cached(load, ["gamePage:teamStats", gmkey], ttl, [TAG.game(gmkey)]);
 }
 
-async function getPlayerStats(gmkey: string) {
+async function getPlayerStats(gmkey: string, ttl: number) {
   // player:players(name, photo_url) - 새 포제션 피드(components/GameReplay.tsx의
   // PlayerPhoto)가 득점자/어시스트/스틸-블록-리바운드 카드에 선수 사진을 보여주려면
   // photo_url이 이 경기 로스터 전체에 필요함. lib/playerProfile.ts의 getPlayerInfo가
   // 이미 players.photo_url을 쓰는 것과 같은 필드 - 선수별로 따로 조회(N+1)하는 대신 이미
   // 있는 이 쿼리(경기당 한 번, 로스터 전체 포함)에 열만 얹어서 해결. back_num도 사진이
   // 없는 선수의 폴백 표시(#등번호)에 필요해서 같이 받음.
-  const { data } = await supabase
-    .from("game_player_stats")
-    .select(
-      "pcode, tcode, pts, reb, ast, stl, blk, turnovers, fouls, is_starter, min_played, fgm, fga, tpm, tpa, ftm, fta, back_num, usage_rtg, pos, player:players(name, photo_url)"
-    )
-    .eq("gmkey", gmkey)
-    .order("pts", { ascending: false });
-  return (data ?? []) as unknown as PlayerStatRow[];
+  const load = async () => {
+    const { data } = await supabase
+      .from("game_player_stats")
+      .select(
+        "pcode, tcode, pts, reb, ast, stl, blk, turnovers, fouls, is_starter, min_played, fgm, fga, tpm, tpa, ftm, fta, back_num, usage_rtg, pos, player:players(name, photo_url)"
+      )
+      .eq("gmkey", gmkey)
+      .order("pts", { ascending: false });
+    return (data ?? []) as unknown as PlayerStatRow[];
+  };
+  return cached(load, ["gamePage:playerStats", gmkey], ttl, [TAG.game(gmkey)]);
 }
 
-async function getEvents(gmkey: string) {
-  const { data } = await supabase
-    .from("game_events")
-    .select("event_order, quarter, clock_min, clock_sec, action_code, pcode, tcode, home_score, away_score, home_win_prob, wpa_home, objective_prob")
-    .eq("gmkey", gmkey)
-    .order("event_order", { ascending: true });
-  return (data ?? []) as EventRow[];
+async function getEvents(gmkey: string, ttl: number) {
+  const load = async () => {
+    const { data } = await supabase
+      .from("game_events")
+      .select("event_order, quarter, clock_min, clock_sec, action_code, pcode, tcode, home_score, away_score, home_win_prob, wpa_home, objective_prob")
+      .eq("gmkey", gmkey)
+      .order("event_order", { ascending: true });
+    return (data ?? []) as EventRow[];
+  };
+  return cached(load, ["gamePage:events", gmkey], ttl, [TAG.game(gmkey)]);
 }
 
 // action_codes(30여 개, 가벼움) 통째로 가져와 code->label 맵 - courtside_template.html의
@@ -178,14 +191,22 @@ async function getPlayerNames(pcodes: string[]): Promise<Map<string, string>> {
   return new Map((data ?? []).map((r) => [r.pcode as string, r.name as string]));
 }
 
+// action_codes는 30여 개짜리 준-상수 테이블(lib/playerProfile.ts getAllTeams와 같은 부류) -
+// 경기 상태와 무관하게 항상 TTL.reference로 덮는다.
 async function getActionLabels(): Promise<Map<string, string>> {
-  const { data } = await supabase.from("action_codes").select("code, label");
-  return new Map((data ?? []).map((r) => [r.code as string, r.label as string]));
+  const load = async () => {
+    const { data } = await supabase.from("action_codes").select("code, label");
+    return new Map((data ?? []).map((r) => [r.code as string, r.label as string]));
+  };
+  return cachedMap(load, ["gamePage:actionLabels"], TTL.reference, [TAG.batch]);
 }
 
-async function getPregameFeatures(gmkey: string): Promise<PregameFeatures | null> {
-  const { data } = await supabase.from("pregame_features").select("*").eq("gmkey", gmkey).maybeSingle();
-  return (data as PregameFeatures) ?? null;
+async function getPregameFeatures(gmkey: string, ttl: number): Promise<PregameFeatures | null> {
+  const load = async () => {
+    const { data } = await supabase.from("pregame_features").select("*").eq("gmkey", gmkey).maybeSingle();
+    return (data as PregameFeatures) ?? null;
+  };
+  return cached(load, ["gamePage:pregameFeatures", gmkey], ttl, [TAG.game(gmkey)]);
 }
 
 // GameReplay(인터랙티브 리플레이)가 "현재 쿼터까지" 슛만 필터링하는 데 quarter가 필요해서
@@ -197,13 +218,16 @@ async function getPregameFeatures(gmkey: string): Promise<PregameFeatures | null
 // 매칭(lib/possessionFeed.ts의 buildShotToEventIndex)이 (선수,쿼터) 안에서 슛 순서를
 // 명시적으로 정렬하는 데 씀 - .order()로 실어서 findShotForScoreRow가 기대는 "쿼리 반환
 // 순서 = 슛 시간 순서"와 동일한 순서를 명시적으로 보장(ShotWithMeta 주석 참고).
-async function getShots(gmkey: string): Promise<(ShotRow & { quarter: string; pcode: string | null; shot_order: number })[]> {
-  const { data } = await supabase
-    .from("shot_log")
-    .select("x, y, d, made, tcode, quarter, pcode, shot_order")
-    .eq("gmkey", gmkey)
-    .order("shot_order", { ascending: true });
-  return (data ?? []) as (ShotRow & { quarter: string; pcode: string | null; shot_order: number })[];
+async function getShots(gmkey: string, ttl: number): Promise<(ShotRow & { quarter: string; pcode: string | null; shot_order: number })[]> {
+  const load = async () => {
+    const { data } = await supabase
+      .from("shot_log")
+      .select("x, y, d, made, tcode, quarter, pcode, shot_order")
+      .eq("gmkey", gmkey)
+      .order("shot_order", { ascending: true });
+    return (data ?? []) as (ShotRow & { quarter: string; pcode: string | null; shot_order: number })[];
+  };
+  return cached(load, ["gamePage:shots", gmkey], ttl, [TAG.game(gmkey)]);
 }
 
 // 프리뷰 인사이트(lib/matchupInsights.ts) - "직전 경기 전체(양 팀)"를 이 경기와 정확히 같은
@@ -278,7 +302,8 @@ async function buildPriorGameData(
   seasonName: string | null = null // 그 직전 경기가 열린 시즌(개막 전엔 지난 시즌 - 문구에 명시하기 위해)
 ): Promise<PriorGameData | null> {
   if (!gmkey || !gameDate || !priorHomeTcode || !priorAwayTcode) return null;
-  const [pStats, pEvents] = await Promise.all([getPlayerStats(gmkey), getEvents(gmkey)]);
+  // "직전 경기"는 정의상 이미 끝난 경기다(이 경기보다 과거) - 항상 TTL.final로 캐시한다.
+  const [pStats, pEvents] = await Promise.all([getPlayerStats(gmkey, TTL.final), getEvents(gmkey, TTL.final)]);
   if (!pStats.length || !pEvents.length) return null;
   const { box, derivedEvents, players, minutesByPcode, usageByPcode, posByPcode } = buildGameData(pStats, pEvents, actionLabels);
   return { gmkey, gameDate, seasonName: seasonName ?? undefined, homeTcode: priorHomeTcode, awayTcode: priorAwayTcode, box, events: derivedEvents, players, minutesByPcode, usageByPcode, posByPcode };
@@ -461,16 +486,20 @@ export default async function GamePage({
   // 예정/진행중/종료 판정 - 홈 목록과 같은 단일 정의(lib/gameStatus.ts). 이 아래의 3막
   // 게이팅은 전부 이 status만 봄(예전의 home_score != null 개별 체크 대신).
   const status = deriveGameStatus(game);
+  // 예정/진행중/종료 게이팅과 동일한 기준으로 캐시 TTL도 결정(gameTtl: 라이브 0=통과,
+  // 종료 86400s=불변, 예정 600s). 감사 지적: 이 페이지만 캐시가 없어 종료 경기도 매번
+  // Supabase를 그대로 쳤음 - box-score API 라우트가 이미 쓰는 패턴을 그대로 가져옴.
+  const ttl = gameTtl(status);
 
   // 본체(팀스탯·박스스코어·이벤트·액션라벨)는 그대로 던진다 - 없으면 그릴 화면이 없다.
   // 프리뷰 지표와 슛 로그는 패널 재료라 실패해도 그 패널만 빈다.
   const [teamStats, playerStats, events, pregameFeatures, actionLabels, shots] = await Promise.all([
-    getTeamStats(gmkey),
-    getPlayerStats(gmkey),
-    getEvents(gmkey),
-    soft("pregameFeatures", getPregameFeatures(gmkey), null),
+    getTeamStats(gmkey, ttl),
+    getPlayerStats(gmkey, ttl),
+    getEvents(gmkey, ttl),
+    soft("pregameFeatures", getPregameFeatures(gmkey, ttl), null),
     getActionLabels(),
-    soft("shots", getShots(gmkey), []),
+    soft("shots", getShots(gmkey, ttl), []),
   ]);
 
   const homeTeam = teamStats.find((t) => t.tcode === game.home_team?.tcode);
