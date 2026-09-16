@@ -28,3 +28,4 @@ jobs:
       - run: npx next typegen
       - run: npx tsc --noEmit
       - run: npx eslint .
+      - run: npm test
