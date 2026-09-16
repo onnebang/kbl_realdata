@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import styles from "./ScoringInfographicStudio.module.css";
 
 type TabKey = "season" | "location" | "opponent" | "team";
@@ -29,7 +29,20 @@ export default function ScoringInfographicStudio({
   const [activeTab, setActiveTab] = useState<TabKey>("season");
   const [zoneMode, setZoneMode] = useState<"classic" | "detailed">("classic");
   const [isExporting, setIsExporting] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // 확대 보기가 열려 있는 동안 Esc로 닫고 배경 스크롤을 막는다 (court-hero-expand의 모달과 동일 관례).
+  useEffect(() => {
+    if (!isExpanded) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setIsExpanded(false);
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [isExpanded]);
 
   // 현재 활성 탭에 대응하는 SVG 추출
   let activeSvg = seasonBarSvg;
@@ -125,6 +138,7 @@ export default function ScoringInfographicStudio({
   };
 
   return (
+    <>
     <div className={styles.studioContainer} ref={containerRef}>
       {/* 1. 상단 제어 바 (탭 전환 + 정밀분석 토글 + 다운로드 버튼) */}
       <div className={styles.studioToolbar}>
@@ -183,6 +197,21 @@ export default function ScoringInfographicStudio({
 
           <button
             type="button"
+            className={styles.expandBtn}
+            onClick={() => setIsExpanded(true)}
+            title="크게 확대해서 보기"
+            aria-label="크게 확대해서 보기"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 3h6v6" />
+              <path d="M9 21H3v-6" />
+              <path d="M21 3l-7 7" />
+              <path d="M3 21l7-7" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
             className={styles.downloadBtn}
             onClick={handleExportPng}
             disabled={isExporting}
@@ -235,5 +264,28 @@ export default function ScoringInfographicStudio({
         )}
       </div>
     </div>
+
+    {/* 4. 확대 보기 - 모바일처럼 카드 폭이 좁아 라벨/숫자가 작아질 때 화면 대부분을 채우는
+        큰 패널로 같은 그림을 다시 그린다(court-hero-expand의 모달과 같은 관례). */}
+    {isExpanded && (
+      <div
+        className={styles.expandOverlay}
+        onClick={() => setIsExpanded(false)}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${tabNameKo} 득점 분석 확대 보기`}
+      >
+        <div className={styles.expandPanel} onClick={(e) => e.stopPropagation()}>
+          <div className={styles.expandHead}>
+            <span>{tabNameKo} 득점 분석</span>
+            <button type="button" className={styles.expandClose} onClick={() => setIsExpanded(false)} aria-label="닫기">
+              ✕
+            </button>
+          </div>
+          <div className={styles.expandCanvas} dangerouslySetInnerHTML={{ __html: activeSvg }} />
+        </div>
+      </div>
+    )}
+    </>
   );
 }

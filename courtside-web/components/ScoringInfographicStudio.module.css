@@ -118,6 +118,28 @@
   transform: none;
 }
 
+/* 확대 보기 버튼 - 다운로드(ESPN 와인 레드, 주 액션)와 구분되는 중립 고스트 버튼.
+   .tabBtn과 같은 톤을 쓰되 아이콘 전용이라 정사각형 패딩. */
+.expandBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+}
+.expandBtn:hover {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: rgba(var(--line-rgb), 0.3);
+}
+
 /* 2. 16:9 와이드 시네마틱 캔버스 */
 .canvasFrame {
   position: relative;
@@ -165,6 +187,69 @@
   font-weight: 700;
 }
 
+/* 4. 확대 보기 오버레이 - court-hero-expand.module.css의 .overlay/.panel 컨벤션과 동일
+   (배경 rgba(8,9,12,.72), z-index 200, 모바일 480px 이하 풀블리드). 작은 카드 안에서
+   16:9로 축소된 SVG를 뷰포트 대부분을 채우는 큰 패널로 다시 그려서, 안에 박힌 라벨/숫자
+   글자의 실제 화면 픽셀 크기를 키운다(SVG 좌표계 자체는 그대로 - 컨테이너만 커진다). */
+.expandOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 9, 12, 0.72);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.expandPanel {
+  width: min(1200px, 100%);
+  height: min(800px, 92vh);
+  background: var(--surface);
+  border-radius: var(--r-card);
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.expandHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.12);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.expandClose {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 15px;
+  cursor: pointer;
+}
+.expandClose:hover {
+  background: var(--surface-soft);
+}
+.expandCanvas {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.expandCanvas svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 /* 반응형 모바일 */
 @media (max-width: 768px) {
   .studioToolbar {
@@ -179,5 +264,19 @@
   .canvasFrame {
     aspect-ratio: auto;
     min-height: 360px;
+  }
+}
+
+@media (max-width: 480px) {
+  .expandOverlay {
+    padding: 0;
+  }
+  .expandPanel {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+  .expandCanvas {
+    padding: 10px;
   }
 }
