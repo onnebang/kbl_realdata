@@ -3,9 +3,9 @@
 import { useState, type ReactNode } from "react";
 import styles from "./PlayerHeroTabs.module.css";
 
-// 데스크톱에서는 이 컴포넌트가 사실상 투명하다(CSS가 탭바를 숨기고 패널 셋을 전부 보여준다) -
-// 탭 전환은 min-width 641px 미만에서만 실제로 동작한다. 그래서 여기 로직은 "필터링"이지
-// "감추기"가 아니다: 데이터가 없는 패널(예: OVR 이력 없음)은 처음부터 탭 목록에서 빠진다.
+// 모바일·데스크톱 모두 탭으로 전환(요청: "PC 화면에서도 나눠주고"). 데이터가 없는 패널
+// (예: OVR 이력 없음)은 처음부터 탭 목록에서 빠진다 - 그래서 여기 로직은 "필터링"이지
+// "감추기"가 아니다. 탭이 하나뿐이면 탭바 자체를 안 그린다(전환할 게 없으므로).
 const LABELS = { ovr: "시즌 오버롤", awards: "수상 내역", trophy: "업적 · 트로피" } as const;
 type TabId = keyof typeof LABELS;
 

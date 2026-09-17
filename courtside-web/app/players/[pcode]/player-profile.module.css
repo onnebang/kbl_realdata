@@ -205,8 +205,12 @@
   .heroMeta {
     justify-content: center;
   }
+  .heroStatBlock {
+    margin-top: 1.5rem;
+    padding: 1rem 0.75rem 1.1rem;
+  }
   .heroStatRow {
-    justify-content: center;
+    column-gap: 6px;
   }
 }
 .heroKicker {
@@ -236,37 +240,55 @@
 .heroMetaDot {
   color: var(--hero-ink-faint);
 }
-.heroStatRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 26px;
-  margin-top: 20px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(244, 245, 248, 0.14);
+/* 다섯 스탯을 감싸는 카드 - 예전엔 이 배경/여백/테두리가 page.tsx 인라인 스타일이었다.
+   인라인 스타일은 미디어쿼리로 못 덮어써서(specificity가 항상 이김) 모바일 전용 여백 조정이
+   불가능했다 - 그래서 카드 껍데기를 전부 여기로 옮긴다. */
+.heroStatBlock {
+  margin-top: 2.5rem;
+  padding: 1.25rem 1.5rem 1.4rem;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
-/* 타일 하나(값 + 라벨 + 표본 줄). page.tsx가 참조하는데 정의가 없어서 표본 줄이 값에
-   달라붙어 있었다 - 세로 스택으로 묶고 줄바꿈을 막는다(검증 지적). */
+.heroStatCaption {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--hero-ink-faint);
+  margin-bottom: 12px;
+}
+/* 제보: "5개 항목이 3+2로 어색하게 쪼개짐" - flex-wrap은 칸 하나가 자기 내용(값+라벨) 폭만큼
+   넓으면 통째로 다음 줄로 밀어버린다. 5칸 고정 그리드로 바꾸면 폭이 좁아져도 항상 한 줄 다섯
+   칸이고, 안 맞는 내용은(라벨) 칸 안에서 줄바꿈한다 - 칸 자체가 다음 줄로 밀리지 않는다. */
+.heroStatRow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: 10px;
+}
 .heroStat {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  white-space: nowrap;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
 }
-/* 화면의 주인공 숫자 - 스코어보드 규칙(globals.css .scoreboard와 같은 다섯 선언). */
+/* 화면의 주인공 숫자 - 스코어보드 규칙(globals.css .scoreboard와 같은 다섯 선언).
+   제보: "인간 눈에 안 보임" - 라벨에서 "· 25-26"을 캡션 한 줄로 옮겨 칸마다 남는 폭을
+   값 쪽에 더 쓸 수 있게 됐다(아래 480px 블록에서 더 키움). */
 .heroStatVal {
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: var(--fs-700);
+  font-size: clamp(1.6rem, 4.4vw, 2.2rem);
   line-height: var(--lh-tight);
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
+  color: #fff;
 }
 .heroStatLabel {
   font-family: "IBM Plex Mono", monospace;
-  font-size: var(--fs-100);
+  font-size: 13px;
   letter-spacing: 0.02em;
   color: var(--hero-ink-faint);
-  margin-top: 4px;
 }
 /* 표본 줄 - 값 · 기준 시즌 아래 세 번째 줄("정규+PO 53경기" / "정규 50경기 · 리그 2위/177").
    히어로는 두 테마 모두 다크라 색을 직접 칠한다(--hero-* 토큰). */
@@ -1027,13 +1049,19 @@
    숫자·레이아웃은 건드리지 않고 **라벨과 캡션만** 키운다. */
 @media (max-width: 480px) {
   .sl,
-  .panelNote,
-  .heroStatLabel {
+  .panelNote {
     font-size: var(--fs-200);
     line-height: 1.7;
   }
-  /* .pctLabel/.pctValue/.pctNote는 여기서 손대지 않는다 - 셋 다 이미 바닥(12px) 위에 있고,
+  /* .heroStatLabel은 이미 위에서 13px 고정 - 이 블록에서 따로 손댈 게 없다(중복 선언 정리).
+     .pctLabel/.pctValue/.pctNote는 여기서 손대지 않는다 - 셋 다 이미 바닥(12px) 위에 있고,
      모바일에서만 크기를 올리면 라벨·주석이 다시 값(.pctValue 13)과 같아진다. */
+  .heroStatRow {
+    column-gap: 4px;
+  }
+  .heroStatBlock {
+    padding: 0.9rem 0.5rem 1rem;
+  }
   .statGrid {
     gap: 8px;
   }

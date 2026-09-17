@@ -740,28 +740,32 @@ export default async function PlayerPage({
               </div>
               
               {heroSeason && (
-                <div className={styles.heroStatRow} style={{ marginTop: '2.5rem', background: 'rgba(0,0,0,0.4)', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  {(
-                    [
-                      ["PPG", heroSeason.ppg.toFixed(1)],
-                      ["RPG", heroSeason.rpg.toFixed(1)],
-                      ["APG", heroSeason.apg.toFixed(1)],
-                      ["TS%", heroSeason.tsPct != null ? `${(heroSeason.tsPct * 100).toFixed(1)}` : "-"],
-                    ] as const
-                  ).map(([label, val]) => (
-                    <div className={styles.heroStat} key={label}>
-                      <div className={styles.heroStatVal} style={{ fontSize: 'clamp(1.5rem, 5vw, 2.2rem)', color: '#fff' }}>{val}</div>
-                      <div className={styles.heroStatLabel}>
-                        {label} · {shortSeason(heroSeason.seasonName)}
+                <div className={styles.heroStatBlock}>
+                  {/* heroWpa는 항상 heroSeason과 같은 시즌(wpaBySeason.get(heroSeasonName)) -
+                      다섯 칸마다 "· 25-26"을 반복하는 대신 캡션 한 줄로 뺐다. 반복을 지우니
+                      라벨이 짧아져(PPG/RPG/...) 좁은 화면에서도 다섯 칸이 한 줄에 들어간다. */}
+                  <div className={styles.heroStatCaption}>{heroChip ?? `${shortSeason(heroSeason.seasonName)} 시즌`} 기준</div>
+                  <div className={styles.heroStatRow}>
+                    {(
+                      [
+                        ["PPG", heroSeason.ppg.toFixed(1)],
+                        ["RPG", heroSeason.rpg.toFixed(1)],
+                        ["APG", heroSeason.apg.toFixed(1)],
+                        ["TS%", heroSeason.tsPct != null ? `${(heroSeason.tsPct * 100).toFixed(1)}` : "-"],
+                      ] as const
+                    ).map(([label, val]) => (
+                      <div className={styles.heroStat} key={label}>
+                        <div className={styles.heroStatVal}>{val}</div>
+                        <div className={styles.heroStatLabel}>{label}</div>
                       </div>
-                    </div>
-                  ))}
-                  {heroWpa && (
-                    <div className={styles.heroStat}>
-                      <div className={styles.heroStatVal} style={{ fontSize: 'clamp(1.5rem, 5vw, 2.2rem)', color: '#fff' }}>{signed(heroWpa.totalWpa)}</div>
-                      <div className={styles.heroStatLabel}>WPA · {shortSeason(heroWpa.seasonName)}</div>
-                    </div>
-                  )}
+                    ))}
+                    {heroWpa && (
+                      <div className={styles.heroStat}>
+                        <div className={styles.heroStatVal}>{signed(heroWpa.totalWpa)}</div>
+                        <div className={styles.heroStatLabel}>WPA</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

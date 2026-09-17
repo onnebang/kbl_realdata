@@ -4,7 +4,13 @@
 }
 
 .tabBar {
-  display: none;
+  display: flex;
+  gap: 6px;
+  margin-bottom: 1rem;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
 }
 
 .tab {
@@ -12,46 +18,29 @@
   border: none;
   cursor: pointer;
   font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  flex: 1;
+  padding: 10px 6px;
+  border-radius: 9px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.tab:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.tabActive {
+  background: var(--hero-team, #d9640a);
+  color: #fff;
 }
 
 .panelActive {
 }
 
-/* 620px 경계는 이 페이지 히어로 발치 띠(player-profile.module.css의 minVp: 621)와 같은
-   기준 - "히어로가 좁아서 행으로 접히는" 지점과 "탭으로 접히는" 지점을 맞춘다. */
-@media (max-width: 620px) {
-  .tabBar {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 1rem;
-    padding: 4px;
-    background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-  }
-
-  .tab {
-    flex: 1;
-    padding: 10px 6px;
-    border-radius: 9px;
-    background: transparent;
-    color: rgba(255, 255, 255, 0.55);
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    transition: background-color 0.15s ease, color 0.15s ease;
-  }
-
-  .tab:hover {
-    color: rgba(255, 255, 255, 0.85);
-  }
-
-  .tabActive {
-    background: var(--hero-team, #d9640a);
-    color: #fff;
-  }
-
-  .panelHidden {
-    display: none;
-  }
+.panelHidden {
+  display: none;
 }
