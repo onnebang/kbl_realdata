@@ -30,10 +30,27 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
   const PADDING_BOTTOM = 42;
   const PADDING_X = 50;
 
-  const MIN_OVR = 40;
-  const MAX_OVR = 99;
+  // 고정 40-99 범위(리그 전체 스케일)는 한 선수의 실제 등락(보통 한 자리~10대 초반)을
+  // 59점짜리 축에 욱여넣어 선이 거의 평평해 보였다(제보: "모바일에서 차이가 거의 안 보임" -
+  // 실은 모바일만의 문제가 아니라 축 자체가 이 선수의 변동폭보다 훨씬 넓었던 것). 그 선수의
+  // 실제 최저~최고를 기준으로 축을 맞춰서(+여유), 변동이 작을수록 더 확대해서 보여준다.
+  const values = history.map((r) => r.OVR);
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const pad = Math.max(4, (rawMax - rawMin) * 0.25);
+  let MIN_OVR = Math.max(30, Math.floor((rawMin - pad) / 5) * 5);
+  let MAX_OVR = Math.min(99, Math.ceil((rawMax + pad) / 5) * 5);
+  // 변동이 거의 없는 선수(예: 커리어 내내 OVR 70 고정)까지 확대하면 축이 5점짜리가 되어
+  // 오히려 사소한 잡음을 큰 등락처럼 과장한다 - 최소 폭 15점은 유지.
+  if (MAX_OVR - MIN_OVR < 15) {
+    const mid = (MAX_OVR + MIN_OVR) / 2;
+    MIN_OVR = Math.max(30, Math.round(mid - 7.5));
+    MAX_OVR = Math.min(99, MIN_OVR + 15);
+  }
 
   const yRange = MAX_OVR - MIN_OVR;
+  // 눈금 4개 - 축 범위가 선수마다 달라지므로(위 동적 계산) 예전처럼 40/60/80/99를 박아둘 수 없다.
+  const gridVals = Array.from(new Set([MIN_OVR, Math.round(MIN_OVR + yRange / 3), Math.round(MIN_OVR + (yRange * 2) / 3), MAX_OVR]));
   const innerHeight = HEIGHT - PADDING_TOP - PADDING_BOTTOM;
   const innerWidth = WIDTH - PADDING_X * 2;
 
@@ -99,7 +116,7 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
           </defs>
 
           {/* 배경 눈금선 (Grid) */}
-          {[40, 60, 80, 99].map((val) => (
+          {gridVals.map((val) => (
             <g key={val}>
               <line
                 x1={PADDING_X - 10}

@@ -79,6 +79,8 @@ import CourtsidePlayerCard from "@/components/CourtsidePlayerCard";
 import OvrTrendChart from "@/components/OvrTrendChart";
 import AchievementTrophyRoom from "@/components/AchievementTrophyRoom";
 import PlayerAwards from "@/components/PlayerAwards";
+import PlayerHeroTabs from "@/components/PlayerHeroTabs";
+import { getPlayerAwards } from "@/lib/awards";
 import styles from "./player-profile.module.css";
 
 // "데이터 사이언스 + 데이터로 아름다움" 대개편(요청) - sportsjobs.online 레퍼런스의
@@ -782,18 +784,18 @@ export default async function PlayerPage({
             )}
           </div>
           
-          {/* 하단: OVR 트렌드 차트 (보라색/팀컬러 영역 차트) */}
-          {ovrHistory.length > 0 && (
-            <div style={{ width: '100%', marginTop: '1rem' }}>
-              <OvrTrendChart history={ovrHistory} teamColor={teamColor} />
-            </div>
-          )}
-
-          {/* 🏅 커리어 수상 및 기록 */}
-          <PlayerAwards pcode={pcode} />
-
-          {/* 🏆 업적 트로피 룸 */}
-          <AchievementTrophyRoom pcode={pcode} />
+          {/* 시즌 오버롤 · 수상 내역 · 업적 트로피 룸 - 데스크톱은 예전처럼 세 패널이 그대로
+              쌓이지만(styles.hero 폭이 넉넉해 스크롤 부담이 작다), 좁은 화면에서는 이 셋이
+              카드 셋이 아니라 "다른 정체성의 위젯 세 개가 우연히 이어붙은 것"처럼 읽혔다
+              (제보: "느낌이 달라가지고 혼자 동떨어져있는 느낌"). 색은 이미 맞췄으니(팀 컬러
+              스레딩) 남은 건 구조 - 탭 하나로 묶어 "우리가 고른 세 가지 보기"로 읽히게 한다.
+              PlayerHeroTabs.module.css가 이 필터링을 min-width 641px 위로는 되돌린다(탭바
+              숨김 + 전 패널 표시) - 데스크톱 미관은 그대로. */}
+          <PlayerHeroTabs
+            ovrTrend={ovrHistory.length > 0 ? <OvrTrendChart history={ovrHistory} teamColor={teamColor} /> : null}
+            awards={getPlayerAwards(pcode).length > 0 ? <PlayerAwards pcode={pcode} /> : null}
+            trophyRoom={<AchievementTrophyRoom pcode={pcode} />}
+          />
 
         </div>
       </section>
