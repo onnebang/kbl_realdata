@@ -88,6 +88,40 @@
   line-height: 1.1;
 }
 
+.archetype {
+  margin-top: 2px;
+  font-size: 3cqw;
+  font-weight: 700;
+  color: #ffd700;
+  text-shadow: 0 0 5px rgba(255, 215, 0, 0.4);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.badgeRow {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.badge {
+  width: 5cqw;
+  height: 5cqw;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3cqw;
+  background: #333;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.badgeGold { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; border-color: #fff; box-shadow: 0 0 4px #ffd700; }
+.badgeSilver { background: linear-gradient(135deg, #e0e0e0, #808080); color: #000; }
+.badgeBronze { background: linear-gradient(135deg, #cd7f32, #8b4513); }
+.badgeHof { background: linear-gradient(135deg, #9932cc, #4b0082); color: #fff; box-shadow: 0 0 6px #9932cc; border-color: #fff; }
+
 .photoWrap {
   position: absolute;
   top: 15%;

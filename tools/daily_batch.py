@@ -51,7 +51,7 @@ import sys
 import fetch_kbl_data as fkd
 from python_runtime import resolve_python
 
-CATEGORIES = {"R", "PO", "CU", "AS"}  # 시즌 개막 후엔 정규+플옵+컵+올스타까지 (D리그/오픈매치 제외)
+CATEGORIES = {"R", "PO", "CP", "CU", "AS"}  # 시즌 개막 후엔 정규+플옵+챔프전+컵+올스타까지 (D리그/오픈매치 제외)
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 

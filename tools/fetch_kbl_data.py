@@ -141,7 +141,7 @@ def fetch_one_game(gmkey, force=False):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seasons", default=None, help="쉼표구분 seasonCode 목록, 예: 43,45,47 (생략 시 날짜범위만으로 필터)")
-    ap.add_argument("--categories", default="R,PO", help="쉼표구분 seasonCategory 목록 (기본 R,PO)")
+    ap.add_argument("--categories", default="R,PO,CP", help="쉼표구분 seasonCategory 목록 (기본 R,PO,CP)")
     ap.add_argument("--from-date", default="20200901")
     ap.add_argument("--to-date", default=time.strftime("%Y%m%d"))
     ap.add_argument("--limit", type=int, default=None, help="테스트용: 앞에서 N경기만 처리")

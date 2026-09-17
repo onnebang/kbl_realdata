@@ -1,0 +1,80 @@
+.trophyRoom {
+  margin-top: 32px;
+  background: var(--surface-2, #1a1a1a);
+  border-radius: var(--r-card, 16px);
+  padding: 24px;
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin-bottom: 20px;
+  color: #fff;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.trophyCard {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255,255,255,0.05);
+  transition: transform 0.2s;
+}
+
+.trophyCard:hover {
+  transform: translateY(-2px);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.unlocked {
+  border-color: rgba(255, 215, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.1);
+}
+
+.locked {
+  opacity: 0.5;
+  filter: grayscale(100%);
+}
+
+.iconBox {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #333;
+  margin-right: 16px;
+  font-size: 24px;
+}
+
+.unlocked .iconBox {
+  background: linear-gradient(135deg, #ffd700, #b8860b);
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+}
+
+.achName {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 4px 0;
+}
+
+.achDesc {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.6);
+  margin: 0;
+}

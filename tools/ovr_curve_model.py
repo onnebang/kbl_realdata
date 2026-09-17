@@ -37,25 +37,34 @@ class OvrCurveModel:
     growth_max_bonus: float = 0.10   # growth_lo세일 때 최대 +10% 보너스(잠재력 1.0 기준)
     decline_rate: float = 0.025      # 하락기 매년 복리로 -2.5%(등급별 저항력 적용 전 기준값)
 
-    # 3) 등급별 하락 저항력 - (이 peak 이상이면, 하락률 저항 비율, 부진시 peak쪽 견인 비율).
-    #    peak 기준 내림차순으로 처음 맞는 구간을 쓴다. 맨 아래 (0, 0.0, 0.0)은 등급표 밖 -
-    #    저항력 0(=순수 에이징+실측 그대로), 즉 명성 방어가 전혀 없다.
+    # 3) 등급별 하락 저항력 - (이 peak 이상이면, 하락률 저항 비율, 부진시 peak쪽 견인 비율,
+    #    peak 대비 최소 유지 비율(하한선)). peak 기준 내림차순으로 처음 맞는 구간을 쓴다.
+    #    맨 아래 (0, 0,0,0)은 등급표 밖 - 저항력·하한선 전부 0, 순수 에이징+실측 그대로.
+    #
+    # KBL은 NBA보다 리그 규모가 작아 전체 백분위 앵커 자체가 91~99=상위 1% 수준으로 압축돼
+    # 있다(build_courtside_ovr.py의 anchors 참고) - "90 이상"을 최상위 등급 기준으로 쓰면
+    # 국내 레전드급 선수(예: 이정현 - 커리어 피크가 86~87)가 전부 중위 등급으로 밀려나
+    # 부진 시즌 하나에 벤치 선수보다 낮은 값까지 떨어지는 문제가 생겼다(유저 제보). 기준을
+    # 85로 낮추고, 블렌드만으로는 부족해 "peak의 X% 밑으로는 절대 못 감"이라는 하한선을
+    # 추가한다 - 실제로 리그를 아는 사람이 봤을 때 "이 선수가 벤치보다 못하다"는 결과가
+    # 나오지 않게 하는 최종 안전장치.
     tiers: tuple = (
-        (90.0, 0.65, 0.50),   # MVP/레전드급 - 르브론·커리·듀란트: 부상/부진에도 거의 안 떨어짐
-        (85.0, 0.35, 0.25),   # 올스타급 - 하든·웨스트브룩처럼 스탯이 진짜 무너지면 결국 뚫림
-        (78.0, 0.10, 0.05),   # 준수한 주전급 - 반스·아담스: 방어력 거의 없이 스탯에 정직
-        (0.0, 0.0, 0.0),      # 그 외 - 토마스·히버트: 나이+부진 겹치면 브레이크 없이 폭락
+        (85.0, 0.70, 0.55, 0.80),   # 레전드/MVP급 - 르브론, 커리급의 극한의 명성 방어
+        (78.0, 0.35, 0.25, 0.60),   # 준수한 주전급 - 중간 정도 보호
+        (70.0, 0.15, 0.10, 0.45),   # 로테이션급 - 약한 보호
+        (0.0, 0.0, 0.0, 0.0),       # 그 외 - 보호 없음, 실측 그대로
     )
 
     ovr_floor: float = 40.0
     ovr_ceiling: float = 99.0
 
-    def _tier_for(self, career_peak: float) -> tuple[float, float]:
-        """career_peak(지금까지의 최고 calculated_ovr)에 맞는 (하락 저항력, 부진 방어력) 반환."""
-        for min_peak, aging_resistance, perf_buffer in self.tiers:
+    def _tier_for(self, career_peak: float) -> tuple[float, float, float]:
+        """career_peak(지금까지의 최고 calculated_ovr)에 맞는
+        (하락 저항력, 부진 방어력, peak 대비 최소 유지 비율) 반환."""
+        for min_peak, aging_resistance, perf_buffer, min_retention in self.tiers:
             if career_peak >= min_peak:
-                return aging_resistance, perf_buffer
-        return 0.0, 0.0
+                return aging_resistance, perf_buffer, min_retention
+        return 0.0, 0.0, 0.0
 
     def _weighted_recent(self, raws: list[float]) -> float:
         """raws[-1]이 당해 시즌. 최근 self.weights 길이만큼(기본 3시즌) 가중평균."""
@@ -80,7 +89,8 @@ class OvrCurveModel:
         각 항목에 calculated_ovr을 채운 새 리스트를 반환한다(원본은 건드리지 않음)."""
         out = []
         raw_history: list[float] = []
-        career_peak = 0.0
+        career_peak = 0.0   # 하한선 기준값(스무딩까지 거친 calculated_ovr의 역대 최고치)
+        raw_peak = 0.0      # 등급 판정 기준값(그 시즌 raw_performance 자체의 역대 최고치)
 
         for row in seasons:
             age = row["age"]
@@ -88,10 +98,14 @@ class OvrCurveModel:
             potential = row.get("potential", 1.0)
             raw_history.append(raw)
 
-            # 등급은 "지금까지 증명한 최고치"로 매 시즌 다시 정한다 - 반스처럼 계속 낮으면
-            # 영영 승급이 없고, 반대로 새 커리어 하이를 찍으면 다음 시즌부터 더 두꺼운
-            # 방어력을 받는다(2K가 시즌 중 실시간으로 등급을 재산정하는 것과 같은 효과).
-            aging_resistance, perf_buffer = self._tier_for(career_peak)
+            # 등급은 "실제로 증명한 한 시즌 최고 활약(raw_peak)"으로 정한다 - calculated_ovr
+            # 기준으로 등급을 매기면, 3시즌 가중평균이 그 시즌 raw 정점 자체를 이미 깎아놔서
+            # (예: 87점 시즌 직전 두 시즌이 78·84였다면 스무딩 값은 84.3까지만 올라감) 정작
+            # 커리어 하이를 찍은 선수가 등급표 문턱을 못 넘는 모순이 생긴다(유저 제보 사례
+            # 재현 중 발견) - 등급 "자격"은 raw 성적으로, 등급이 정해진 뒤의 방어 "기준값"은
+            # 그래도 스무딩된 career_peak을 쓴다(한 시즌 반짝만으로 방어선 자체가 부풀지 않게).
+            raw_peak = max(raw_peak, raw)
+            aging_resistance, perf_buffer, min_retention = self._tier_for(raw_peak)
 
             smoothed = self._weighted_recent(raw_history)
 
@@ -99,8 +113,16 @@ class OvrCurveModel:
                 mult = self._age_multiplier(age, potential)
                 value = smoothed * mult
             else:
-                # 하락기: 등급이 높을수록 decline_rate 자체를 깎아서 적용, 매년 복리
-                rate = self.decline_rate * (1 - aging_resistance)
+                # 하락기: 플레이 스타일(슈터/피지컬)에 따라 하락 가속도를 다르게 설정
+                base_decline = self.decline_rate
+                play_style = row.get("play_style", "balanced")
+                if play_style == "shooter":
+                    base_decline *= 0.6  # 40% 완만한 하락 (커리/레지 밀러형)
+                elif play_style == "athletic":
+                    base_decline *= 1.4  # 40% 가파른 하락 (웨스트브룩/아이제아형)
+
+                # 등급이 높을수록 base_decline 자체를 깎아서 적용, 매년 복리
+                rate = base_decline * (1 - aging_resistance)
                 years_past_peak = age - self.peak_hi
                 value = smoothed * ((1 - rate) ** years_past_peak)
 
@@ -109,6 +131,11 @@ class OvrCurveModel:
             # 아무 효과가 없어 실측 그대로 반영된다 - 하나의 식으로 등급 차이를 통일했다.
             if value < career_peak:
                 value = value * (1 - perf_buffer) + career_peak * perf_buffer
+
+            # 하한선: 블렌드까지 거치고도 등급에 맞는 최소 유지선(peak * min_retention) 밑이면
+            # 거기서 끊는다 - "이 정도 레전드가 벤치 선수보다 못하다"는 결과를 최종적으로 막는
+            # 안전장치(유저 제보: 이정현 커리어 피크 87인데 부진 시즌 하나로 58까지 떨어짐).
+            value = max(value, career_peak * min_retention)
 
             value = max(self.ovr_floor, min(self.ovr_ceiling, value))
 
@@ -170,9 +197,9 @@ def demo():
     """등급표가 실제로 갈리는지 두 선수로 대조 확인한다.
 
     1) 르브론 제임스풍(legend): 18세 성장기 -> 20대 초중반 전성기 진입 -> 한 시즌
-       부진(부상 등) -> 90 돌파(최상위 등급 확정) -> 30대 하락기에서도 완만하게만
+       부진(부상 등) -> 85 돌파(최상위 등급 확정) -> 30대 하락기에서도 완만하게만
        떨어지는지 검증.
-    2) 아이제아 토마스풍(flash_then_crash): 짧게 반짝했지만 78을 못 넘겨 등급표 맨
+    2) 아이제아 토마스풍(flash_then_crash): 짧게 반짝했지만 70을 못 넘겨 등급표 맨
        아래 칸(저항력 0)에 머무는 선수 - 나이+부진이 겹치면 브레이크 없이 그대로
        떨어져야 한다(=calculated_ovr이 raw를 거의 그대로 따라가야 함).
     """
@@ -199,29 +226,29 @@ def demo():
     ]
 
     crash_data = [
-        {"season": "10/11", "age": 18, "raw_performance": 50},
-        {"season": "11/12", "age": 19, "raw_performance": 58},
-        {"season": "12/13", "age": 20, "raw_performance": 65},
-        {"season": "13/14", "age": 21, "raw_performance": 70},
-        {"season": "14/15", "age": 22, "raw_performance": 72},
-        {"season": "15/16", "age": 23, "raw_performance": 74},
-        {"season": "16/17", "age": 24, "raw_performance": 75},
-        {"season": "17/18", "age": 25, "raw_performance": 76},   # 커리어 하이(76) - 78 미만이라 등급표 최하단 유지
-        {"season": "18/19", "age": 26, "raw_performance": 74},
-        {"season": "19/20", "age": 27, "raw_performance": 70},
-        {"season": "20/21", "age": 28, "raw_performance": 65},
-        {"season": "21/22", "age": 29, "raw_performance": 60},
-        {"season": "22/23", "age": 30, "raw_performance": 55},
-        {"season": "23/24", "age": 31, "raw_performance": 48},
-        {"season": "24/25", "age": 32, "raw_performance": 42},
+        {"season": "10/11", "age": 18, "raw_performance": 45},
+        {"season": "11/12", "age": 19, "raw_performance": 52},
+        {"season": "12/13", "age": 20, "raw_performance": 58},
+        {"season": "13/14", "age": 21, "raw_performance": 62},
+        {"season": "14/15", "age": 22, "raw_performance": 65},
+        {"season": "15/16", "age": 23, "raw_performance": 67},
+        {"season": "16/17", "age": 24, "raw_performance": 68},
+        {"season": "17/18", "age": 25, "raw_performance": 69},   # 커리어 하이(69) - 70 미만이라 등급표 최하단 유지
+        {"season": "18/19", "age": 26, "raw_performance": 67},
+        {"season": "19/20", "age": 27, "raw_performance": 63},
+        {"season": "20/21", "age": 28, "raw_performance": 58},
+        {"season": "21/22", "age": 29, "raw_performance": 53},
+        {"season": "22/23", "age": 30, "raw_performance": 48},
+        {"season": "23/24", "age": 31, "raw_performance": 42},
+        {"season": "24/25", "age": 32, "raw_performance": 36},
     ]
 
     model = OvrCurveModel()
     legend_result = model.process_player(legend_data)
     crash_result = model.process_player(crash_data)
 
-    _print_table("Legend tier (peak >= 90)", legend_result)
-    _print_table("No-buffer tier (peak < 78)", crash_result)
+    _print_table("Legend tier (peak >= 85)", legend_result)
+    _print_table("No-buffer tier (peak < 70)", crash_result)
 
     # 검증 1: 최상위 등급 - 부진 시즌 방어 + 완만한 하락기
     idx_slump = next(i for i, r in enumerate(legend_result) if r["age"] == 24)
@@ -247,9 +274,32 @@ def demo():
     print(f"\n검증 통과: 최상위 등급 방어(피크 대비 -{legend_drop_pct:.1%}) vs "
           f"방어 없는 등급(피크 대비 -{crash_drop_pct:.1%}) 차이 확인됨")
 
+    # 검증 4: 실사례 재현(유저 제보) - 커리어 피크 87인 베테랑이 거의 못 뛴 마지막 시즌
+    # (raw 40 근처, 실제 이정현의 2025-26 시즌처럼 경기수는 있어도 득점이 거의 없는 경우)을
+    # 하나 겪어도, 하한선 덕에 로테이션급(70) 밑으로는 안 떨어져야 한다.
+    veteran_data = [
+        {"season": "y1", "age": 20, "raw_performance": 65},
+        {"season": "y2", "age": 22, "raw_performance": 78},
+        {"season": "y3", "age": 24, "raw_performance": 84},
+        {"season": "y4", "age": 26, "raw_performance": 87},   # 커리어 하이
+        {"season": "y5", "age": 28, "raw_performance": 82},
+        {"season": "y6", "age": 30, "raw_performance": 79},
+        {"season": "y7", "age": 32, "raw_performance": 74},
+        {"season": "y8", "age": 34, "raw_performance": 70},
+        {"season": "y9", "age": 36, "raw_performance": 40},   # 거의 못 뛴 마지막 시즌
+    ]
+    veteran_result = model.process_player(veteran_data)
+    _print_table("Veteran floor test (peak 87 -> near-invisible final season)", veteran_result)
+    last_veteran = veteran_result[-1]["calculated_ovr"]
+    assert last_veteran >= 70 * 0.9, (
+        f"베테랑 하한선이 로테이션급보다도 낮게 나옴(제보 재현 실패): {last_veteran}"
+    )
+    print(f"검증 통과: 피크 87 베테랑이 최악의 시즌에도 {last_veteran}까지만 하락(하한선 동작)")
+
     fig = plot_tier_comparison({
-        "Legend tier (peak >= 90)": legend_result,
-        "No-buffer tier (peak < 78)": crash_result,
+        "Legend tier (peak >= 85)": legend_result,
+        "No-buffer tier (peak < 70)": crash_result,
+        "Veteran floor (peak 87)": veteran_result,
     })
     fig.savefig("ovr_curve_demo.png", dpi=120)
     print("차트 저장: ovr_curve_demo.png")

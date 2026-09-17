@@ -22,7 +22,14 @@ interface CourtsidePlayerCardProps {
   ovr: number;
   offOvr: number;
   defOvr: number;
-  photoUrl: string;
+  photoUrl?: string | null;
+  archetype?: string;
+  badges?: {
+    finishing: number;
+    shooting: number;
+    playmaking: number;
+    defense: number;
+  };
 }
 
 function tierClass(rating: number): string {
@@ -30,6 +37,14 @@ function tierClass(rating: number): string {
   if (rating >= 85) return styles.tierSilver;
   if (rating >= 75) return styles.tierBronze;
   return styles.tierDefault;
+}
+
+function badgeClass(level: number): string {
+  if (level >= 4) return styles.badgeHof;
+  if (level === 3) return styles.badgeGold;
+  if (level === 2) return styles.badgeSilver;
+  if (level === 1) return styles.badgeBronze;
+  return "";
 }
 
 export default function CourtsidePlayerCard({
@@ -42,6 +57,8 @@ export default function CourtsidePlayerCard({
   offOvr,
   defOvr,
   photoUrl,
+  archetype,
+  badges,
 }: CourtsidePlayerCardProps) {
   const displayEname = ename || name;
   const [enameFirst, ...enameRestParts] = displayEname.split(" ");
@@ -62,12 +79,21 @@ export default function CourtsidePlayerCard({
         <div className={styles.nameBlock}>
           <span className={styles.nameFirst}>{enameFirst}</span>
           <span className={styles.nameLast}>{enameRest}</span>
+          {archetype && <span className={styles.archetype}>{archetype}</span>}
+          {badges && (
+            <div className={styles.badgeRow}>
+              {badges.finishing > 0 && <span className={`${styles.badge} ${badgeClass(badges.finishing)}`} title="Finishing">F</span>}
+              {badges.shooting > 0 && <span className={`${styles.badge} ${badgeClass(badges.shooting)}`} title="Shooting">S</span>}
+              {badges.playmaking > 0 && <span className={`${styles.badge} ${badgeClass(badges.playmaking)}`} title="Playmaking">P</span>}
+              {badges.defense > 0 && <span className={`${styles.badge} ${badgeClass(badges.defense)}`} title="Defense">D</span>}
+            </div>
+          )}
         </div>
       </div>
 
       <div className={styles.photoWrap}>
         <Image
-          src={photoUrl}
+          src={photoUrl || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"}
           alt={name}
           fill
           sizes="(max-width: 800px) 260px, 340px"

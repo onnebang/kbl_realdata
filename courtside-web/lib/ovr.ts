@@ -4,9 +4,18 @@ export interface OvrSeasonRecord {
   pcode: string;
   name: string;
   season: string;
+  team?: string;
+  position?: string;
   OVR: number;
   OFF: number;
   DEF: number;
+  archetype?: string;
+  badges?: {
+    finishing: number;
+    shooting: number;
+    playmaking: number;
+    defense: number;
+  };
 }
 
 export function getOvrHistoryCache(): OvrSeasonRecord[] {

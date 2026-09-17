@@ -41,6 +41,39 @@ def load_birth_years():
     return years
 
 
+def load_nationalities():
+    path = os.path.join(os.path.dirname(__file__), KBL540_PLAYERS_PATH)
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding='utf-8') as f:
+        cards = json.load(f)
+    nats = {}
+    for c in cards:
+        pcode = c.get('pcode')
+        nat = c.get('nationality')
+        if pcode and nat:
+            nats[pcode] = nat
+    return nats
+
+
+
+def load_teams_and_positions():
+    path = os.path.join(os.path.dirname(__file__), KBL540_PLAYERS_PATH)
+    if not os.path.exists(path):
+        return {}, {}
+    with open(path, encoding='utf-8') as f:
+        cards = json.load(f)
+    teams = {}
+    positions = {}
+    for c in cards:
+        pcode = c.get('pcode')
+        team = c.get('team_name_current')
+        pos = c.get('position')
+        if pcode:
+            if team: teams[pcode] = team
+            if pos: positions[pcode] = pos
+    return teams, positions
+
 def parse_start_year(season_name):
     try:
         return int(str(season_name).split('-')[0])
@@ -118,70 +151,30 @@ def compute_ovr(target_season='2024-2025'):
     global_df['raw_off'] = (global_df['pts'] * 2.5) + (global_df['ast'] * 1.5) + (global_df['ts_pct'] * 10) + (global_df['per'] * 1.2)
     global_df['raw_def'] = (global_df['reb'] * 1.8) + (global_df['stl'] * 3.0) + (global_df['blk'] * 3.5) + (global_df['net_rtg'] * 0.5)
 
-    # 정규화 (Min-Max Scaling based on GLOBAL min/max)
-    off_min, off_max = global_df['raw_off'].min(), global_df['raw_off'].max()
-    def_min, def_max = global_df['raw_def'].min(), global_df['raw_def'].max()
+    # ── 1. 1차 매핑: 백분위 기반으로 2K 스케일 (45~99) 부여 ──
+    # 원본 스탯(raw_ovr)을 구한 뒤, 국내 선수에게 버프를 주고 전체 줄을 세워 스케일링합니다.
+    global_df['raw_ovr'] = (global_df['raw_off'] * 0.55) + (global_df['raw_def'] * 0.45)
+    
+    # 국내 선수 보정 (Domestic Buff)
+    nats = load_nationalities()
+    global_df['nationality'] = global_df['pcode'].map(nats)
+    # 국적이 대한민국이거나 널(신인 등 못 불러왔지만 보통 국내)이면 15% 가중치
+    is_domestic = global_df['nationality'].fillna('대한민국').str.contains('대한민국|한국')
+    global_df.loc[is_domestic, 'raw_ovr'] *= 1.15
 
-    global_df['raw_off_norm'] = 40 + ((global_df['raw_off'] - off_min) / (off_max - off_min)) * 59
-    global_df['raw_def_norm'] = 40 + ((global_df['raw_def'] - def_min) / (def_max - def_min)) * 59
-    global_df['raw_ovr'] = (global_df['raw_off_norm'] * 0.55) + (global_df['raw_def_norm'] * 0.45)
-
-    # ── 시즌별 오버롤 스무딩: 최근 3시즌 가중평균 + 나이 곡선 + 슈퍼스타 방어 ──────────
-    # tools/ovr_curve_model.py의 OvrCurveModel(2K/FC류 게임 오버롤 곡선 설계, 사용자 요청으로
-    # 설계) 그대로 재사용한다. 예전의 "raw 표본 축소 + 나이 곡선 피크 앵커" 두 겹을 이
-    # 모델 하나로 대체한다 - 3시즌 가중평균이 표본 축소 역할을, 슈퍼스타 방어(한 번이라도
-    # 90 이상을 찍으면 이후 하락 저항력 부여)가 피크 앵커 역할을 대신한다.
-    birth_years = load_birth_years()
-    global_df['birth_year'] = global_df['pcode'].map(birth_years)
-    global_df['start_year'] = global_df['season_name'].apply(parse_start_year)
-    global_df['age'] = np.where(
-        global_df['birth_year'].notna() & global_df['start_year'].notna(),
-        global_df['start_year'] - global_df['birth_year'],
-        np.nan,
-    )
-    # 나이를 모르는 선수는 NEUTRAL_AGE(전성기 한복판)로 채운다 - 나이 보정 없이 3시즌
-    # 가중평균만 적용되게 하기 위함(생년월일 없다고 스무딩 자체를 건너뛰지 않는다).
-    global_df['age_for_model'] = global_df['age'].fillna(NEUTRAL_AGE)
-
-    model = OvrCurveModel()
-    corrected_ovr = pd.Series(index=global_df.index, dtype=float)
-    corrected_off = pd.Series(index=global_df.index, dtype=float)
-    corrected_def = pd.Series(index=global_df.index, dtype=float)
-
-    for pcode, group in global_df.groupby('pcode'):
-        group = group.sort_values('season_name')
-        idxs = group.index.tolist()
-        for raw_col, out_series in (
-            ('raw_ovr', corrected_ovr), ('raw_off_norm', corrected_off), ('raw_def_norm', corrected_def)
-        ):
-            seasons = [
-                {
-                    "season": group.loc[i, 'season_name'],
-                    "age": int(group.loc[i, 'age_for_model']),
-                    "raw_performance": group.loc[i, raw_col],
-                }
-                for i in idxs
-            ]
-            for i, r in zip(idxs, model.process_player(seasons)):
-                out_series.loc[i] = r["calculated_ovr"]
-
-    global_df['ovr_adj'] = corrected_ovr
-    global_df['off_adj'] = corrected_off
-    global_df['def_adj'] = corrected_def
-
-    total_players = global_df['pcode'].nunique()
-    age_known_players = global_df.loc[global_df['age'].notna(), 'pcode'].nunique()
-    print(f"오버롤 스무딩 적용: 전체 {total_players}명 (나이 곡선까지 반영된 선수 {age_known_players}명, birth_date 매칭 {len(birth_years)}명 중)")
-
-    # 2. kbl540의 앵커 매핑 방식 (Piecewise-linear based on historical quantiles)
-    # 전체 역사적 분포에서 등수를 구함
-    global_df = global_df.sort_values(by='ovr_adj')
+    global_df = global_df.sort_values(by='raw_ovr')
     n = len(global_df)
 
+    # 2K26 정규분포 비율을 정확히 반영한 앵커
     anchors = [
-        (0.000, 45), (0.010, 50), (0.010, 51), (0.350, 64), (0.350, 65),
-        (0.800, 74), (0.800, 75), (0.950, 82), (0.950, 83), (0.990, 88),
-        (0.990, 89), (1.000, 91)
+        (0.000, 60),
+        (0.040, 69),
+        (0.220, 74),
+        (0.620, 79),
+        (0.840, 84),
+        (0.940, 89),
+        (0.985, 94),
+        (1.000, 99)
     ]
 
     def map_percentile(p):
@@ -193,42 +186,88 @@ def compute_ovr(target_season='2024-2025'):
                 return v0 + ((p - p0) / (p1 - p0)) * (v1 - v0)
         return anchors[-1][1]
 
-    # Thresholds for TypeScript
-    print("\n--- OVR Thresholds for TypeScript ---")
-    for p, _ in anchors:
-        if p == 0: continue
-        val = global_df['ovr_adj'].quantile(p)
-        print(f"p={p:.3f} -> raw={val:.3f}")
-    print("-------------------------------------\n")
-
-    # 글로벌 전체 선수에 대해 새 레이팅 부여
-    new_ratings = [None] * n
+    raw_ovr_mapped = [None] * n
     for rank, idx in enumerate(global_df.index):
         p = (rank + 0.5) / n
-        new_ratings[idx] = map_percentile(p)
+        raw_ovr_mapped[idx] = map_percentile(p)
 
-    global_df['OVR'] = pd.Series(new_ratings, index=global_df.index)
+    global_df['raw_ovr_mapped'] = pd.Series(raw_ovr_mapped, index=global_df.index)
 
-    # 전설적인 99 보정 (역대 최상위 10명만 91~99로 강제 펼침)
+    # 전설적인 99 보정 (역대 최상위 10명만 91~99로 강제 펼침) - 스무딩 전에 적용!
     LEGEND_COUNT = 10
     LEGEND_TOP = 99
     LEGEND_BOTTOM = 91
     top_indices = global_df.index[-LEGEND_COUNT:]
     for rank, idx in enumerate(reversed(top_indices)):
         t = rank / (LEGEND_COUNT - 1) if LEGEND_COUNT > 1 else 0
-        global_df.loc[idx, 'OVR'] = round(LEGEND_TOP - t * (LEGEND_TOP - LEGEND_BOTTOM))
+        global_df.loc[idx, 'raw_ovr_mapped'] = round(LEGEND_TOP - t * (LEGEND_TOP - LEGEND_BOTTOM))
 
-    # OFF / DEF 세부 레이팅은 OVR 스케일링 비율에 맞춰 동일하게 곱함
-    global_df['OVR'] = global_df['OVR'].round().astype(int)
-    global_df['scale_ratio'] = np.where(global_df['ovr_adj'] > 0, global_df['OVR'] / global_df['ovr_adj'], 1.0)
+    # OFF / DEF 세부 레이팅은 OVR 스케일링 비율에 맞춰 곱함
+    global_df['scale_ratio'] = np.where(global_df['raw_ovr'] > 0, global_df['raw_ovr_mapped'] / global_df['raw_ovr'], 1.0)
+    
+    off_min, off_max = global_df['raw_off'].min(), global_df['raw_off'].max()
+    def_min, def_max = global_df['raw_def'].min(), global_df['raw_def'].max()
+    global_df['raw_off_norm'] = 40 + ((global_df['raw_off'] - off_min) / (off_max - off_min)) * 59
+    global_df['raw_def_norm'] = 40 + ((global_df['raw_def'] - def_min) / (def_max - def_min)) * 59
+    
+    global_df['raw_off_mapped'] = global_df['raw_off_norm'] * global_df['scale_ratio']
+    global_df['raw_def_mapped'] = global_df['raw_def_norm'] * global_df['scale_ratio']
 
-    global_df['OFF'] = (global_df['off_adj'] * global_df['scale_ratio']).round().astype(int)
-    global_df['DEF'] = (global_df['def_adj'] * global_df['scale_ratio']).round().astype(int)
+    # ── 2. 시즌별 오버롤 스무딩 (OvrCurveModel) 적용 ──
+    # 스무딩을 거치면 이제 등수가 밀려도 2K 스케일 값(45~99) 위에서 직접 방어된다.
+    birth_years = load_birth_years()
+    global_df['birth_year'] = global_df['pcode'].map(birth_years)
+    global_df['start_year'] = global_df['season_name'].apply(parse_start_year)
+    global_df['age'] = np.where(
+        global_df['birth_year'].notna() & global_df['start_year'].notna(),
+        global_df['start_year'] - global_df['birth_year'],
+        np.nan,
+    )
+    global_df['age_for_model'] = global_df['age'].fillna(NEUTRAL_AGE)
 
-    # OVR 상한/하한
-    global_df['OVR'] = global_df['OVR'].clip(40, 99)
-    global_df['OFF'] = global_df['OFF'].clip(40, 99)
-    global_df['DEF'] = global_df['DEF'].clip(40, 99)
+    model = OvrCurveModel()
+    corrected_ovr = pd.Series(index=global_df.index, dtype=float)
+    corrected_off = pd.Series(index=global_df.index, dtype=float)
+    corrected_def = pd.Series(index=global_df.index, dtype=float)
+
+    for pcode, group in global_df.groupby('pcode'):
+        group = group.sort_values('season_name')
+        idxs = group.index.tolist()
+        
+        # Determine career play_style
+        career_tpm = group['tpm'].sum() / max(1, group['g'].sum())
+        career_pts = group['pts'].mean()
+        career_ast = group['ast'].mean()
+        career_reb = group['reb'].mean()
+        career_blk = group['blk'].mean()
+        
+        play_style = "balanced"
+        if career_tpm >= 2.0 or (career_tpm >= 1.5 and career_ast >= 4.0):
+            play_style = "shooter"
+        elif career_reb >= 8.0 or career_blk >= 1.0 or (career_pts >= 15.0 and career_tpm < 1.0):
+            play_style = "athletic"
+            
+        for mapped_col, out_series in (
+            ('raw_ovr_mapped', corrected_ovr), 
+            ('raw_off_mapped', corrected_off), 
+            ('raw_def_mapped', corrected_def)
+        ):
+            seasons = [
+                {
+                    "season": group.loc[i, 'season_name'],
+                    "age": int(group.loc[i, 'age_for_model']),
+                    "raw_performance": group.loc[i, mapped_col],
+                    "play_style": play_style,
+                }
+                for i in idxs
+            ]
+            for i, r in zip(idxs, model.process_player(seasons)):
+                out_series.loc[i] = r["calculated_ovr"]
+
+    # 최종 결과 산출
+    global_df['OVR'] = corrected_ovr.round().astype(int).clip(40, 99)
+    global_df['OFF'] = corrected_off.round().astype(int).clip(40, 99)
+    global_df['DEF'] = corrected_def.round().astype(int).clip(40, 99)
 
     # ── 3차: 배지 및 빌드(Archetype) 산출 ────────────────────────────────
     def determine_archetype(row):
@@ -291,11 +330,16 @@ def compute_ovr(target_season='2024-2025'):
     # 정렬: pcode(선수), season_name(시즌) 오름차순 (오래된 시즌부터)
     global_df = global_df.sort_values(by=['pcode', 'season_name'])
 
+    # 팀과 포지션 정보 로드
+    teams, positions = load_teams_and_positions()
+
     for _, row in global_df.iterrows():
         out_data.append({
             "pcode": row['pcode'],
             "name": row['name'],
             "season": row['season_name'],
+            "team": teams.get(row['pcode'], "Unknown"),
+            "position": positions.get(row['pcode'], "Unknown"),
             "OVR": int(row['OVR']),
             "OFF": int(row['OFF']),
             "DEF": int(row['DEF']),

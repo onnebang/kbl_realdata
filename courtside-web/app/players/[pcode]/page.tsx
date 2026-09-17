@@ -77,6 +77,8 @@ import { aggregateByOpponent, buildKoreaMapSvg } from "@/lib/koreaMap";
 import { getPlayerOvrHistory } from "@/lib/ovr";
 import CourtsidePlayerCard from "@/components/CourtsidePlayerCard";
 import OvrTrendChart from "@/components/OvrTrendChart";
+import AchievementTrophyRoom from "@/components/AchievementTrophyRoom";
+import PlayerAwards from "@/components/PlayerAwards";
 import styles from "./player-profile.module.css";
 
 // "데이터 사이언스 + 데이터로 아름다움" 대개편(요청) - sportsjobs.online 레퍼런스의
@@ -762,9 +764,8 @@ export default async function PlayerPage({
               )}
             </div>
 
-            {/* 오른쪽: 2K 스타일 선수 카드 - CourtsidePlayerCard는 photoUrl이 필수(string)라
-                사진 없는 선수는 카드 자체를 건너뛴다(플레이스홀더 이미지가 따로 없음). */}
-            {latestOvr && info.photoUrl && (
+            {/* 오른쪽: 2K 스타일 선수 카드 */}
+            {latestOvr && (
               <div className={styles.heroCardSide}>
                 <CourtsidePlayerCard
                   name={info.name}
@@ -787,6 +788,12 @@ export default async function PlayerPage({
               <OvrTrendChart history={ovrHistory} teamColor={teamColor} />
             </div>
           )}
+
+          {/* 🏅 커리어 수상 및 기록 */}
+          <PlayerAwards pcode={pcode} />
+
+          {/* 🏆 업적 트로피 룸 */}
+          <AchievementTrophyRoom pcode={pcode} />
 
         </div>
       </section>
