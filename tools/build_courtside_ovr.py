@@ -148,7 +148,7 @@ def compute_ovr(target_season='2024-2025'):
                             (global_df['pts'] * global_df['g']) / (2 * (global_df['fga'] + 0.44 * global_df['fta'])), 0)
 
     # Raw Scores
-    global_df['raw_off'] = (global_df['pts'] * 2.5) + (global_df['ast'] * 1.5) + (global_df['ts_pct'] * 10) + (global_df['per'] * 1.2)
+    global_df['raw_off'] = (global_df['pts'] * 2.5) + (global_df['ast'] * 1.5) + (global_df['ts_pct'] * (global_df['pts'] / 20.0)) + (global_df['per'] * 1.2)
     global_df['raw_def'] = (global_df['reb'] * 1.8) + (global_df['stl'] * 3.0) + (global_df['blk'] * 3.5) + (global_df['net_rtg'] * 0.5)
 
     # ── 1. 1차 매핑: 백분위 기반으로 2K 스케일 (45~99) 부여 ──
@@ -161,6 +161,11 @@ def compute_ovr(target_season='2024-2025'):
     # 국적이 대한민국이거나 널(신인 등 못 불러왔지만 보통 국내)이면 15% 가중치
     is_domestic = global_df['nationality'].fillna('대한민국').str.contains('대한민국|한국')
     global_df.loc[is_domestic, 'raw_ovr'] *= 1.15
+
+    # 1경기 출전 후 30점 넣은 선수가 99 OVR을 받는 것을 방지하기 위한 볼륨 페널티
+    # 15경기 미만 출전자는 출전 경기 수에 비례해 raw_ovr을 깎습니다. (최대 1/5 토막)
+    volume_penalty = np.clip(global_df['g'] / 15.0, 0.2, 1.0)
+    global_df['raw_ovr'] *= volume_penalty
 
     global_df = global_df.sort_values(by='raw_ovr')
     n = len(global_df)
@@ -186,32 +191,28 @@ def compute_ovr(target_season='2024-2025'):
                 return v0 + ((p - p0) / (p1 - p0)) * (v1 - v0)
         return anchors[-1][1]
 
-    raw_ovr_mapped = [None] * n
-    for rank, idx in enumerate(global_df.index):
-        p = (rank + 0.5) / n
-        raw_ovr_mapped[idx] = map_percentile(p)
-
-    global_df['raw_ovr_mapped'] = pd.Series(raw_ovr_mapped, index=global_df.index)
+    # Pandas의 rank(pct=True)를 이용해 인덱스 꼬임 없이 깔끔하게 백분위를 구하고 2K 스케일로 변환합니다.
+    global_df['raw_ovr_mapped'] = global_df['raw_ovr'].rank(method='average', pct=True).apply(map_percentile)
 
     # 전설적인 99 보정 (역대 최상위 10명만 91~99로 강제 펼침) - 스무딩 전에 적용!
     LEGEND_COUNT = 10
     LEGEND_TOP = 99
     LEGEND_BOTTOM = 91
-    top_indices = global_df.index[-LEGEND_COUNT:]
-    for rank, idx in enumerate(reversed(top_indices)):
+    # raw_ovr 순으로 상위 10명 추출 (동점자 처리 포함 안전하게 nlargest 사용)
+    top_indices = global_df['raw_ovr'].nlargest(LEGEND_COUNT).index
+    for rank, idx in enumerate(top_indices):
         t = rank / (LEGEND_COUNT - 1) if LEGEND_COUNT > 1 else 0
         global_df.loc[idx, 'raw_ovr_mapped'] = round(LEGEND_TOP - t * (LEGEND_TOP - LEGEND_BOTTOM))
 
-    # OFF / DEF 세부 레이팅은 OVR 스케일링 비율에 맞춰 곱함
-    global_df['scale_ratio'] = np.where(global_df['raw_ovr'] > 0, global_df['raw_ovr_mapped'] / global_df['raw_ovr'], 1.0)
+    # OFF / DEF 세부 레이팅은 각각 독립적으로 백분위를 구해 2K 스케일(40~99)로 변환한 뒤,
+    # 이 둘의 가중평균이 최종 OVR(raw_ovr_mapped)에 완벽히 수렴하도록 보정합니다.
+    global_df['off_base'] = global_df['raw_off'].rank(method='average', pct=True).apply(map_percentile)
+    global_df['def_base'] = global_df['raw_def'].rank(method='average', pct=True).apply(map_percentile)
+
+    global_df['ovr_base'] = (global_df['off_base'] * 0.55) + (global_df['def_base'] * 0.45)
     
-    off_min, off_max = global_df['raw_off'].min(), global_df['raw_off'].max()
-    def_min, def_max = global_df['raw_def'].min(), global_df['raw_def'].max()
-    global_df['raw_off_norm'] = 40 + ((global_df['raw_off'] - off_min) / (off_max - off_min)) * 59
-    global_df['raw_def_norm'] = 40 + ((global_df['raw_def'] - def_min) / (def_max - def_min)) * 59
-    
-    global_df['raw_off_mapped'] = global_df['raw_off_norm'] * global_df['scale_ratio']
-    global_df['raw_def_mapped'] = global_df['raw_def_norm'] * global_df['scale_ratio']
+    global_df['raw_off_mapped'] = global_df['off_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
+    global_df['raw_def_mapped'] = global_df['def_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
 
     # ── 2. 시즌별 오버롤 스무딩 (OvrCurveModel) 적용 ──
     # 스무딩을 거치면 이제 등수가 밀려도 2K 스케일 값(45~99) 위에서 직접 방어된다.

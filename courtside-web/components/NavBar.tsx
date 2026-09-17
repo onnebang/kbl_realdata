@@ -18,7 +18,7 @@ const MAIN_LINKS = [
 // 선수별 조합(WOWY)은 선수 도구라 선수 항목 옆에, 시즌 리더보드는 나머지 리더보드 묶음
 // 맨 앞에 둔다(요청: "시즌별 리더보드 추가 / 선수별 조합").
 const ANALYSIS_LINKS = [
-  { href: "/rankings/ovr", label: "OVR 랭킹 (2K)" },
+  // { href: "/rankings/ovr", label: "OVR 랭킹 (2K)" },
   { href: "/lineups", label: "선수별 조합" },
   { href: "/season-browser", label: "시즌 브라우저" },
   { href: "/leaderboards/season", label: "시즌 리더보드" },
