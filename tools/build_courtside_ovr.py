@@ -56,9 +56,14 @@ def compute_ovr(target_season='2024-2025'):
     conn = sqlite3.connect(DB_PATH)
 
     # 1. 전체 시즌(역대 기록) 모든 선수의 스탯을 조회하여 "역사적 정규분포"를 구한다.
+    # pname은 GROUP BY 키에 안 넣는다 - 예전엔 (pcode, pname, season)으로 묶어서, 귀화 등으로
+    # 등록명이 바뀐 선수(예: 290524 라건아 - 미국 이름 Ricardo Ratliffe로 뛰다 국가대표 자격
+    # 취득을 위해 귀화하며 개명)가 시즌마다 유령 중복 카드로 갈라졌다(같은 시즌인데 두 줄,
+    # 값도 살짝 다름 - 실은 동점자 백분위 처리에서 갈린 것뿐이었다). pcode+season만으로 묶고,
+    # 표시 이름은 아래에서 이 pcode의 "가장 최근 시즌에 쓰인 이름" 하나로 통일한다.
     global_query = """
     SELECT
-        p.pcode, p.pname as name, g.season_name,
+        gps.pcode, g.season_name,
         COUNT(gps.gmkey) as g,
         SUM(gps.play_min + gps.play_sec/60.0) as total_min,
         AVG(gps.score) as pts,
@@ -75,14 +80,18 @@ def compute_ovr(target_season='2024-2025'):
         SUM(gps.ft) as ftm, SUM(gps.ft_a) as fta
     FROM player_game_stats gps
     JOIN games g ON gps.gmkey = g.gmkey
-    JOIN (SELECT DISTINCT pcode, pname FROM player_game_stats) p ON gps.pcode = p.pcode
     WHERE g.season_category IN ('정규시즌', '플레이오프', '챔프전')
-    GROUP BY p.pcode, p.pname, g.season_name
+    GROUP BY gps.pcode, g.season_name
     HAVING total_min > 50
     """
 
     try:
         global_df = pd.read_sql_query(global_query, conn)
+        name_df = pd.read_sql_query(
+            "SELECT gps.pcode, gps.pname, g.season_name"
+            " FROM player_game_stats gps JOIN games g ON gps.gmkey = g.gmkey",
+            conn,
+        )
     except Exception as e:
         print(f"DB Query failed: {e}")
         conn.close()
@@ -93,6 +102,13 @@ def compute_ovr(target_season='2024-2025'):
     if global_df.empty:
         print("No historical data found in DB.")
         return
+
+    # 이름 등록이 바뀐 선수는 가장 최근 시즌에 쓰인 이름으로 과거 시즌까지 통일해서 보여준다.
+    name_df['start_year'] = name_df['season_name'].apply(parse_start_year)
+    canonical_name = (
+        name_df.sort_values('start_year').groupby('pcode')['pname'].last().to_dict()
+    )
+    global_df['name'] = global_df['pcode'].map(canonical_name)
 
     # TS% Calculation
     global_df['ts_pct'] = np.where((global_df['fga'] + 0.44 * global_df['fta']) > 0,
