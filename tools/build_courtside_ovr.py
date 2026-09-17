@@ -105,9 +105,9 @@ def compute_ovr(target_season='2024-2025'):
         AVG(gps.stl) as stl,
         AVG(gps.bs) as blk,
         AVG(gps.to_) as tov,
-        AVG(gps.per) as per,
-        AVG(gps.netrtg) as net_rtg,
-        AVG(gps.usg_rt) as usage,
+        SUM(gps.per * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as per,
+        SUM(MAX(MIN(gps.netrtg, 50), -50) * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as net_rtg,
+        SUM(gps.usg_rt * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as usage,
         SUM(gps.fg) as fgm, SUM(gps.fg_a) as fga,
         SUM(gps.threep) as tpm, SUM(gps.threep_a) as tpa,
         SUM(gps.ft) as ftm, SUM(gps.ft_a) as fta
@@ -162,10 +162,9 @@ def compute_ovr(target_season='2024-2025'):
     is_domestic = global_df['nationality'].fillna('대한민국').str.contains('대한민국|한국')
     global_df.loc[is_domestic, 'raw_ovr'] *= 1.15
 
-    # 1경기 출전 후 30점 넣은 선수가 99 OVR을 받는 것을 방지하기 위한 볼륨 페널티
-    # 15경기 미만 출전자는 출전 경기 수에 비례해 raw_ovr을 깎습니다. (최대 1/5 토막)
-    volume_penalty = np.clip(global_df['g'] / 15.0, 0.2, 1.0)
-    global_df['raw_ovr'] *= volume_penalty
+    SHRINK_MINUTES = 300
+    global_df['w'] = global_df['total_min'] / (global_df['total_min'] + SHRINK_MINUTES)
+    global_df['raw_ovr'] *= global_df['w']
 
     global_df = global_df.sort_values(by='raw_ovr')
     n = len(global_df)
