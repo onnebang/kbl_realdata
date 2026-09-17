@@ -16,6 +16,8 @@ export interface OvrSeasonRecord {
     playmaking: number;
     defense: number;
   };
+  /** true면 아직 경기 기록이 없는 다음 시즌의 예상치(작년 기록 기반 나이 곡선 추정) - 실측 아님. */
+  projected?: boolean;
 }
 
 export function getOvrHistoryCache(): OvrSeasonRecord[] {

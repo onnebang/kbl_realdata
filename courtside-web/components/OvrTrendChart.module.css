@@ -77,27 +77,28 @@
 }
 
 .yAxisLabel {
-  /* #666 on #0d0d0d 배경은 명암비 3.4:1 - 작은 글자(11px) 기준 WCAG AA(4.5:1) 미달이라
-     실제로 잘 안 보였다(감사 피드백). rgba(255,255,255,0.55)는 같은 배경에서 6:1대. */
-  fill: rgba(255, 255, 255, 0.55);
-  font-size: 11px;
+  /* 11px는 SVG viewBox(1000폭) 기준 좌표라 실제 렌더 폭(카드 안, 보통 400~700px)으로
+     축소되면 4~7px 상당까지 눌려서 사실상 안 보였다(제보: "인간의 눈으로 볼 수가 없어") -
+     viewBox 좌표계에서 훨씬 크게 잡아 실제 화면에서 읽을 수 있는 크기로 맞춘다. */
+  fill: rgba(255, 255, 255, 0.7);
+  font-size: 26px;
   font-family: "IBM Plex Mono", monospace;
   text-anchor: end;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .xAxisLabel {
-  fill: rgba(255, 255, 255, 0.55);
-  font-size: 11px;
+  fill: rgba(255, 255, 255, 0.7);
+  font-size: 26px;
   font-family: "IBM Plex Mono", monospace;
   text-anchor: middle;
-  font-weight: 600;
+  font-weight: 700;
   transition: all 0.2s ease;
 }
 
 .xAxisLabelActive {
   fill: var(--chart-color);
-  font-size: 13px;
+  font-size: 30px;
   font-weight: bold;
 }
 
@@ -136,15 +137,15 @@
 }
 
 .tooltipTitle {
-  fill: #a0a0a0;
-  font-size: 10px;
+  fill: #c0c0c0;
+  font-size: 20px;
   font-family: "IBM Plex Mono", monospace;
   font-weight: bold;
 }
 
 .tooltipValue {
   fill: #ffffff;
-  font-size: 14px;
+  font-size: 24px;
   font-weight: 800;
   font-family: var(--font-bangers), "Impact", sans-serif;
   letter-spacing: 1px;
@@ -152,12 +153,12 @@
 
 .tooltipHighlight {
   fill: var(--chart-color);
-  font-size: 18px;
+  font-size: 30px;
 }
 
 .tooltipSub {
-  fill: #888888;
-  font-size: 11px;
+  fill: #a0a0a0;
+  font-size: 20px;
   font-weight: 600;
 }
 

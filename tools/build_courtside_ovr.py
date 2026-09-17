@@ -17,6 +17,10 @@ OUT_PATH = '../data/courtside_ovr.json'
 # 3시즌 가중평균만 적용되고 나이 곡선 자체는 사실상 안 걸리는 효과를 낸다.
 NEUTRAL_AGE = 26
 
+# 아직 경기 기록이 없는 다음 시즌 - courtside-web/lib/preseason.ts의 PRESEASON_SEASON과
+# 같은 값이어야 한다(그쪽이 로스터/이적 화면 기준 시즌).
+PROJECTION_SEASON = '2026-2027'
+
 
 def load_birth_years():
     """kbl540 카드 풀(같은 kbl.or.kr pcode 체계)에서 pcode -> 출생연도 매핑을 만든다.
@@ -73,6 +77,32 @@ def load_teams_and_positions():
             if team: teams[pcode] = team
             if pos: positions[pcode] = pos
     return teams, positions
+
+def load_next_season_roster(season):
+    """season_roster(Supabase, import_roster.py가 적재)에서 이 시즌 확정 로스터의
+    pcode -> {team, name}을 반환한다(name은 KBL 기록이 전혀 없는 완전 신인의 표시용 -
+    global_df에는 그 pcode 행 자체가 없어 이름을 따로 들고 있어야 한다). 개막 전 스탯이
+    0개인 시즌에 예상 OVR을 만들 대상을 정하는 데 쓴다. DB 접속이 안 되면(로컬/오프라인)
+    빈 dict로 조용히 건너뛴다 - 예상 OVR은 있으면 좋은 부가 기능이지 본 파이프라인의
+    필수 요건이 아니다."""
+    try:
+        import psycopg2
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from import_roster import load_database_url
+        conn = psycopg2.connect(load_database_url())
+        cur = conn.cursor()
+        cur.execute(
+            "select r.pcode, t.name, r.player_name from season_roster r join teams t using (tcode)"
+            " where r.season_name = %s and r.pcode is not null",
+            (season,),
+        )
+        result = {pcode: {"team": team, "name": name} for pcode, team, name in cur.fetchall()}
+        conn.close()
+        return result
+    except Exception as e:
+        print(f"경고: season_roster 조회 실패({e}) - {season} 예상 OVR 생성을 건너뜀")
+        return {}
+
 
 def parse_start_year(season_name):
     try:
@@ -149,18 +179,48 @@ def compute_ovr(target_season='2024-2025'):
 
     # Raw Scores
     global_df['raw_off'] = (global_df['pts'] * 2.5) + (global_df['ast'] * 1.5) + (global_df['ts_pct'] * (global_df['pts'] / 20.0)) + (global_df['per'] * 1.2)
-    global_df['raw_def'] = (global_df['reb'] * 1.8) + (global_df['stl'] * 3.0) + (global_df['blk'] * 3.5) + (global_df['net_rtg'] * 0.5)
+    # net_rtg 가중치 0.5 -> 0.2: 팀 전체 성적(동료 효과)이 개인 수비 기여로 그대로 새는
+    # 폭이 커서, 개인 수비 지표(리바운드/스틸/블록)가 약해도 팀이 잘 막으면 DEF가 확 뜬다
+    # (실측: 케렘 칸터 - 블록 0.28/약함에도 팀 net_rtg에 얹혀 DEF 88~89까지 상승, 반면
+    # kbl540 자체 스카우팅 def_rating은 66). 완전히 빼면 팀 방어 기여 자체가 사라지므로
+    # 남겨두되 비중만 줄인다.
+    global_df['raw_def'] = (global_df['reb'] * 1.8) + (global_df['stl'] * 3.0) + (global_df['blk'] * 3.5) + (global_df['net_rtg'] * 0.2)
 
     # ── 1. 1차 매핑: 백분위 기반으로 2K 스케일 (45~99) 부여 ──
     # 원본 스탯(raw_ovr)을 구한 뒤, 국내 선수에게 버프를 주고 전체 줄을 세워 스케일링합니다.
     global_df['raw_ovr'] = (global_df['raw_off'] * 0.55) + (global_df['raw_def'] * 0.45)
     
     # 국내 선수 보정 (Domestic Buff)
+    # 라건아(귀화 후에도 이 파일에서 nationality='외국'로 유지됨 - 로스터 쿼터상으로는
+    # 국내지만 스탯상 전형적 외국인 빅맨이라 이 버프 대상에서 계속 제외한다)는 여기서
+    # 자동으로 빠진다: 사용자 제보(귀화로 국내 취급돼 국내 선수들이 상대적으로 낮아 보인다는
+    # 우려) 확인 결과 이미 정상 - 실측 원인은 버프 오적용이 아니라 아래 두 가지였다.
     nats = load_nationalities()
     global_df['nationality'] = global_df['pcode'].map(nats)
-    # 국적이 대한민국이거나 널(신인 등 못 불러왔지만 보통 국내)이면 15% 가중치
+    # 국적이 대한민국이거나 널(신인 등 못 불러왔지만 보통 국내)이면 가중치
     is_domestic = global_df['nationality'].fillna('대한민국').str.contains('대한민국|한국')
-    global_df.loc[is_domestic, 'raw_ovr'] *= 1.15
+    # 국내 상위권(이정현 등)이 외국인 빅맨들 밑 88점대에 눌려 있다는 제보 확인 - 리그 역대
+    # 단신/윙 포지션 다수가 국내라 외국인 빅맨 위주 스탯 볼륨과 원천적으로 경쟁이 안 되던
+    # 구간이었다. 처음엔 국내 전원에게 같은 배율(15%->55%)을 곱하는 식으로 풀었는데, 이러면
+    # 벤치급 국내 선수까지 실력과 무관하게 통째로 떠밀려 올라가는 부작용이 있다(사용자 지적:
+    # "55%까지 올려도 괜찮은가"). 대신 이 선수 자체의 사전(버프 전) 백분위가 높을수록 버프율도
+    # 커지는 누진 버프로 바꾼다 - 세제곱을 써서 상위 10%대에서만 버프가 확 커지고 중하위권은
+    # 사실상 그대로 둔다(요청: "상위권은 확실히, 하위권은 안 건드려도 됨"과 정확히 대응).
+    # 최고 버프율(top_buff)은 최상위 선수 기준 이정현 vs 이선 알바노(아시아쿼터라 버프 대상 아님,
+    # 실측 둘 다 시즌 활약이 비슷했다는 지적)가 거의 같은 OVR로 수렴하도록 눈으로 맞춘 값.
+    percentile = global_df['raw_ovr'].rank(method='average', pct=True)
+    TOP_BUFF = 0.55
+    domestic_buff = TOP_BUFF * (percentile ** 3)
+    global_df.loc[is_domestic, 'raw_ovr'] *= (1 + domestic_buff[is_domestic])
+
+    # 신인/1년차 할인 - 케렘 칸터처럼 KBL 첫 시즌에 좋은 스탯 한 번 찍으면 커리어 검증 없이
+    # 곧장 90점대로 튀는 문제(제보)가 있었다. 시즌 표본이 쌓일수록(=이 선수가 몇 년차인지)
+    # 정상 반영되게 하고, 첫 시즌은 15% 할인 - 4년차부터는 할인 없음. 국내/외국인 구분 없이
+    # 똑같이 적용(신인이면 국내 선수도 동일하게 할인 - 벤치마크인 2K도 루키는 낮게 잡는다).
+    global_df = global_df.sort_values(['pcode', 'season_name'])
+    global_df['season_idx'] = global_df.groupby('pcode').cumcount() + 1
+    global_df['experience_factor'] = np.minimum(1.0, 0.75 + 0.0625 * (global_df['season_idx'] - 1))
+    global_df['raw_ovr'] *= global_df['experience_factor']
 
     SHRINK_MINUTES = 300
     global_df['w'] = global_df['total_min'] / (global_df['total_min'] + SHRINK_MINUTES)
@@ -344,7 +404,81 @@ def compute_ovr(target_season='2024-2025'):
             "OFF": int(row['OFF']),
             "DEF": int(row['DEF']),
             "archetype": row['archetype'],
-            "badges": row['badges']
+            "badges": row['badges'],
+            "projected": False,
+        })
+
+    # ── 다음 시즌 예상 OVR (개막 전이라 이번 시즌 경기 기록이 0개인 선수용) ──
+    # 제보 1) "스탯이 적어서 오버롤이 없는 선수도 표시해달라" 2) "작년 기준 이번 시즌 새
+    # 오버롤 표시" - 둘 다 같은 원인: 시즌 전엔 그 시즌 행 자체가 없어 프로필이 빈 카드가
+    # 된다. 확정 로스터(season_roster)에 있고 과거 KBL 기록이 있는 선수는, 마지막 시즌의
+    # calculated_ovr을 "새 정보 없음" raw_performance로 한 번 더 태워(나이만 한 살 더 먹임)
+    # OvrCurveModel의 나이 곡선을 그대로 적용한 예상치를 만든다. 과거 기록이 아예 없는
+    # 완전 신인은 예상할 근거가 없어 건너뛴다(그 선수는 지금처럼 "기록 없음"으로 남는다 -
+    # 이건 데이터 부족이 아니라 사실이 그렇다).
+    next_season_roster = load_next_season_roster(PROJECTION_SEASON)
+    already_covered = set(global_df.loc[global_df['season_name'] == PROJECTION_SEASON, 'pcode'])
+    to_project = set(next_season_roster) - already_covered
+
+    # 커리어 기록이 전혀 없는 완전 신인용 최저치 - 실측 데이터에서 실제로 몇 경기 못 뛴
+    # 선수들의 바닥권(하위 5명 53~58)을 참고해 잡았다(요청: "실력이 없어서 경기에 못 나온
+    # 거니, 몇 번 출전하지 못한 선수들과 비슷하게 측정해달라"). 이론상 하한선(40)까지 내리면
+    # 실제 최약체 로테이션 선수보다도 낮아져 오히려 부정확해진다.
+    ROOKIE_FLOOR_OVR = 55
+
+    for pcode in to_project:
+        hist = global_df[global_df['pcode'] == pcode].sort_values('season_name')
+        if hist.empty:
+            out_data.append({
+                "pcode": pcode,
+                "name": next_season_roster.get(pcode, {}).get("name", "Unknown"),
+                "season": PROJECTION_SEASON,
+                "team": next_season_roster.get(pcode, {}).get("team", "Unknown"),
+                "position": positions.get(pcode, "Unknown"),
+                "OVR": ROOKIE_FLOOR_OVR,
+                "OFF": ROOKIE_FLOOR_OVR,
+                "DEF": ROOKIE_FLOOR_OVR,
+                "archetype": "롤 플레이어",
+                "badges": {"finishing": 0, "shooting": 0, "playmaking": 0, "defense": 0},
+                "projected": True,
+            })
+            continue
+        last = hist.iloc[-1]
+        next_age = int(last['age_for_model']) + 1 if pd.notna(last['age']) else NEUTRAL_AGE
+
+        career_tpm = hist['tpm'].sum() / max(1, hist['g'].sum())
+        play_style = "balanced"
+        if career_tpm >= 2.0 or (career_tpm >= 1.5 and hist['ast'].mean() >= 4.0):
+            play_style = "shooter"
+        elif hist['reb'].mean() >= 8.0 or hist['blk'].mean() >= 1.0 or (hist['pts'].mean() >= 15.0 and career_tpm < 1.0):
+            play_style = "athletic"
+
+        def project_one(mapped_col, final_col):
+            seasons = [
+                {"season": r['season_name'], "age": int(r['age_for_model']),
+                 "raw_performance": r[mapped_col], "play_style": play_style}
+                for _, r in hist.iterrows()
+            ]
+            seasons.append({"season": PROJECTION_SEASON, "age": next_age,
+                             "raw_performance": float(last[final_col]), "play_style": play_style})
+            return model.process_player(seasons)[-1]["calculated_ovr"]
+
+        proj_ovr = round(project_one('raw_ovr_mapped', 'OVR'))
+        proj_off = round(project_one('raw_off_mapped', 'OFF'))
+        proj_def = round(project_one('raw_def_mapped', 'DEF'))
+
+        out_data.append({
+            "pcode": pcode,
+            "name": last['name'],
+            "season": PROJECTION_SEASON,
+            "team": next_season_roster.get(pcode, {}).get("team") or teams.get(pcode, "Unknown"),
+            "position": positions.get(pcode, "Unknown"),
+            "OVR": int(max(40, min(99, proj_ovr))),
+            "OFF": int(max(40, min(99, proj_off))),
+            "DEF": int(max(40, min(99, proj_def))),
+            "archetype": last['archetype'],
+            "badges": last['badges'],
+            "projected": True,
         })
 
     OUT_PATH = os.path.join(os.path.dirname(__file__), '..', 'courtside-web', 'lib', 'courtside_ovr_history.json')

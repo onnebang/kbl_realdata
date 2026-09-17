@@ -26,9 +26,11 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
   // 축 라벨이 회전 없이 가로로 짧게만 찍혀서(formatSeason) 60px짜리 하단 여백은 과했다 -
   // 줄여서 꺾은선 자체가 상자를 더 채우게(감사 피드백: "추이가 잘 안 보임"의 절반은 라벨/점
   // 대비 문제였지만 나머지 절반은 그래프가 상자 안에서 너무 작게 그려지던 것).
-  const PADDING_TOP = 28;
-  const PADDING_BOTTOM = 42;
-  const PADDING_X = 50;
+  // 축 글자 크기를 11px->26px로 키운 만큼(제보: "인간의 눈으로 볼 수가 없어") 라벨이
+  // 잘리지 않도록 여백도 같이 키운다.
+  const PADDING_TOP = 34;
+  const PADDING_BOTTOM = 60;
+  const PADDING_X = 90;
 
   // 고정 40-99 범위(리그 전체 스케일)는 한 선수의 실제 등락(보통 한 자리~10대 초반)을
   // 59점짜리 축에 욱여넣어 선이 거의 평평해 보였다(제보: "모바일에서 차이가 거의 안 보임" -
@@ -125,7 +127,7 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
                 y2={getY(val)}
                 className={styles.gridLine}
               />
-              <text x={PADDING_X - 20} y={getY(val) + 4} className={styles.yAxisLabel}>
+              <text x={PADDING_X - 16} y={getY(val) + 8} className={styles.yAxisLabel}>
                 {val}
               </text>
             </g>
@@ -158,7 +160,7 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
                 {/* X축 시즌 라벨 */}
                 <text
                   x={cx}
-                  y={HEIGHT - 25}
+                  y={HEIGHT - 32}
                   className={`${styles.xAxisLabel} ${isHovered ? styles.xAxisLabelActive : ""}`}
                 >
                   {formatSeason(record.season)}
@@ -187,13 +189,15 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
                 {isHovered && (
                   <g className={styles.tooltipGroup}>
                     {/* 툴팁 위치 조정 (오른쪽 가장자리 짤림 방지) */}
-                    <g transform={`translate(${cx > WIDTH - 150 ? cx - 130 : cx + 15}, ${Math.max(cy - 60, PADDING_TOP)})`}>
-                      <rect width="110" height="70" rx="4" className={styles.tooltipBg} />
-                      <text x="10" y="24" className={styles.tooltipTitle}>{record.season}</text>
-                      <text x="10" y="44" className={styles.tooltipValue}>
+                    <g transform={`translate(${cx > WIDTH - 220 ? cx - 200 : cx + 20}, ${Math.max(cy - 100, PADDING_TOP)})`}>
+                      <rect width="190" height="120" rx="6" className={styles.tooltipBg} />
+                      <text x="16" y="34" className={styles.tooltipTitle}>
+                        {record.season}{record.projected ? " (예상)" : ""}
+                      </text>
+                      <text x="16" y="70" className={styles.tooltipValue}>
                         OVR <tspan className={styles.tooltipHighlight}>{record.OVR}</tspan>
                       </text>
-                      <text x="10" y="60" className={styles.tooltipSub}>
+                      <text x="16" y="100" className={styles.tooltipSub}>
                         OFF {record.OFF} / DEF {record.DEF}
                       </text>
                     </g>
