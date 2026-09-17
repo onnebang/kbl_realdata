@@ -1,59 +1,21 @@
+import sys
 import sqlite3
 import pandas as pd
 import numpy as np
 import json
 import os
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ovr_curve_model import OvrCurveModel
+
 DB_PATH = '../raw/kbl_realdata.db'
 KBL540_PLAYERS_PATH = '../../kbl540/kbl540_players_public.json'
 OUT_PATH = '../data/courtside_ovr.json'
 
-# kleague38(SHRINK_GAMES=10 / 38경기 시즌 - build_kleague_cards.py)과 같은 비율(~26%)을
-# KBL 정규시즌 54경기에 맞춘 값(2019-2020처럼 단축된 시즌도 있으나 다수 시즌은 54경기).
-SHRINK_GAMES = 14
-
-
-def age_curve(age):
-    """
-    kleague38/tools/apply_age_curve.py에서 착안한 나이 곡선 팩터. 농구는 25~30세가
-    최전성기, 33세 이후 완만한 하강으로 설정.
-
-    2026-09-17: kbl540_players_public.json의 birth_date를 pcode로 조인해서 실제 나이를
-    구할 수 있게 됐다(courtside 쪽 원본 DB엔 생년월일이 없음 - kbl540과 kbl_realdata가
-    같은 kbl.or.kr pcode를 공유한다는 걸 kbl540/tools/prepare_realdata_integration.py가
-    이미 실측 확인해뒀다: 오마리 스펠맨이 두 데이터셋에 동일 pcode로 존재). 더 이상 죽은
-    코드가 아니라 load_birth_years()로 채운 age 컬럼을 통해 실제로 호출된다.
-    """
-    if pd.isna(age) or age is None:
-        return 1.0
-
-    ramp_start = 19
-    peak_lo, peak_hi = 25, 30
-
-    if age <= ramp_start: return 0.80
-    if age < peak_lo: return 0.80 + (1.0 - 0.80) * (age - ramp_start) / (peak_lo - ramp_start)
-    if age <= peak_hi: return 1.0
-    return max(0.65, 1.0 - 0.05 * (age - peak_hi))
-
-
-def confidence(g):
-    """
-    나이 곡선 보정 단계에서 쓰는 표본 신뢰도. 20경기 이상이면 그 시즌 실제 값을 거의
-    그대로 존중한다 - kleague38/tools/apply_age_curve.py의 confidence()와 동일 취지
-    (나이 곡선은 연 단위의 거친 기대치라, 표본이 확실한 시즌까지 억지로 끌어당기지 않는다).
-    """
-    return max(0.3, min(1.0, (g or 0) / 20.0))
-
-
-def raw_shrink_weight(g):
-    """
-    raw 스탯 단계 표본 축소 가중치 - kleague38 build_kleague_cards.py의 shrink()와 같은
-    g/(g+K) 쌍곡선(포화 없음). confidence()와 달리 100%에 도달하지 않아 풀시즌(54경기)도
-    항상 약간(54/(54+14)=79%)은 전체 평균 쪽으로 당겨진다 - 표본이 많을수록 raw값을
-    거의 그대로 쓰되, 몇 경기 안 뛴 시즌의 극단치를 완화하는 1차 방어선.
-    """
-    g = g or 0
-    return g / (g + SHRINK_GAMES)
+# 나이를 모르는 선수(kbl540 카드 풀에 없는 최근 신인 등)에게 줄 중립 나이 - 전성기
+# 한복판이라 OvrCurveModel의 나이 보정 배율이 정확히 1.0(보너스도 페널티도 없음)이라서,
+# 3시즌 가중평균만 적용되고 나이 곡선 자체는 사실상 안 걸리는 효과를 낸다.
+NEUTRAL_AGE = 26
 
 
 def load_birth_years():
@@ -114,7 +76,7 @@ def compute_ovr(target_season='2024-2025'):
     FROM player_game_stats gps
     JOIN games g ON gps.gmkey = g.gmkey
     JOIN (SELECT DISTINCT pcode, pname FROM player_game_stats) p ON gps.pcode = p.pcode
-    WHERE g.season_category = '정규시즌'
+    WHERE g.season_category IN ('정규시즌', '플레이오프', '챔프전')
     GROUP BY p.pcode, p.pname, g.season_name
     HAVING total_min > 50
     """
@@ -148,29 +110,11 @@ def compute_ovr(target_season='2024-2025'):
     global_df['raw_def_norm'] = 40 + ((global_df['raw_def'] - def_min) / (def_max - def_min)) * 59
     global_df['raw_ovr'] = (global_df['raw_off_norm'] * 0.55) + (global_df['raw_def_norm'] * 0.45)
 
-    # ── 1차: 표본 축소(raw 단계, 비포화) ────────────────────────────────────
-    # kleague38과 같은 원칙 - 몇 경기 안 뛴 시즌의 raw per-game 평균 자체가 튀는 걸 전체
-    # 평균 쪽으로 당겨서 완화한다. 나이/커리어와 무관하게 "표본이 작다"는 사실 하나만으로
-    # 작동하는 1차 방어선(풀시즌도 21%는 항상 평균 쪽으로 당겨짐 - confidence()와 달리
-    # 포화되지 않는다).
-    global_df['w'] = global_df['g'].apply(raw_shrink_weight)
-    ovr_mean = global_df['raw_ovr'].mean()
-    off_mean = global_df['raw_off_norm'].mean()
-    def_mean = global_df['raw_def_norm'].mean()
-    global_df['ovr_shrunk'] = global_df['raw_ovr'] * global_df['w'] + ovr_mean * (1 - global_df['w'])
-    global_df['off_shrunk'] = global_df['raw_off_norm'] * global_df['w'] + off_mean * (1 - global_df['w'])
-    global_df['def_shrunk'] = global_df['raw_def_norm'] * global_df['w'] + def_mean * (1 - global_df['w'])
-
-    # ── 2차: 나이 곡선 x 개인 피크 앵커 보정 ────────────────────────────────
-    # kleague38/tools/apply_age_curve.py와 동일한 방식: 이 선수의 커리어 최고 기록(peak)에
-    # 나이 곡선 비율을 곱해 "이 나이라면 대략 이 정도"인 기대치를 만들고, 표본이 적을수록
-    # (confidence가 낮을수록) 그 기대치 쪽으로 당긴다. 기대치는 실제 peak를 절대 못 넘도록
-    # 캡을 건다(전성기 곡선으로 역산해서 실제 최고 기록보다 부풀리는 걸 방지).
-    #
-    # 예전의 "공백 감지 -> 피크로 앵커링" 휴리스틱(parse_start_year 기반 return_trust)을
-    # 대체한다 - 공백이든 부상이든 그냥 자연스러운 노쇠든, "이 나이의 이 선수에게
-    # 기대되는 수준"이라는 하나의 기준으로 전부 같은 방식으로 흡수된다. 생년월일이 없는
-    # 선수(kbl540 카드 풀에 없는 최근 신인 등)는 1차 축소 값을 그대로 쓴다.
+    # ── 시즌별 오버롤 스무딩: 최근 3시즌 가중평균 + 나이 곡선 + 슈퍼스타 방어 ──────────
+    # tools/ovr_curve_model.py의 OvrCurveModel(2K/FC류 게임 오버롤 곡선 설계, 사용자 요청으로
+    # 설계) 그대로 재사용한다. 예전의 "raw 표본 축소 + 나이 곡선 피크 앵커" 두 겹을 이
+    # 모델 하나로 대체한다 - 3시즌 가중평균이 표본 축소 역할을, 슈퍼스타 방어(한 번이라도
+    # 90 이상을 찍으면 이후 하락 저항력 부여)가 피크 앵커 역할을 대신한다.
     birth_years = load_birth_years()
     global_df['birth_year'] = global_df['pcode'].map(birth_years)
     global_df['start_year'] = global_df['season_name'].apply(parse_start_year)
@@ -179,41 +123,39 @@ def compute_ovr(target_season='2024-2025'):
         global_df['start_year'] - global_df['birth_year'],
         np.nan,
     )
-    global_df['conf'] = global_df['g'].apply(confidence)
+    # 나이를 모르는 선수는 NEUTRAL_AGE(전성기 한복판)로 채운다 - 나이 보정 없이 3시즌
+    # 가중평균만 적용되게 하기 위함(생년월일 없다고 스무딩 자체를 건너뛰지 않는다).
+    global_df['age_for_model'] = global_df['age'].fillna(NEUTRAL_AGE)
 
-    corrected_ovr = global_df['ovr_shrunk'].copy()
-    corrected_off = global_df['off_shrunk'].copy()
-    corrected_def = global_df['def_shrunk'].copy()
+    model = OvrCurveModel()
+    corrected_ovr = pd.Series(index=global_df.index, dtype=float)
+    corrected_off = pd.Series(index=global_df.index, dtype=float)
+    corrected_def = pd.Series(index=global_df.index, dtype=float)
 
-    matched_players = 0
     for pcode, group in global_df.groupby('pcode'):
-        if len(group) < 2 or group['age'].isna().all():
-            continue
-        valid = group[group['age'].between(14, 46)]
-        if len(valid) < 2:
-            continue
-        matched_players += 1
-
-        peak_idx = valid['ovr_shrunk'].idxmax()
-        peak_age = valid.loc[peak_idx, 'age']
-        peak_curve = age_curve(peak_age) or 1.0
-        peak_ovr = valid.loc[peak_idx, 'ovr_shrunk']
-        peak_off = valid.loc[peak_idx, 'off_shrunk']
-        peak_def = valid.loc[peak_idx, 'def_shrunk']
-
-        for idx, row in valid.iterrows():
-            curve = age_curve(row['age'])
-            ratio = min(1.0, curve / peak_curve)
-            conf = row['conf']
-            corrected_ovr.loc[idx] = row['ovr_shrunk'] * conf + (peak_ovr * ratio) * (1 - conf)
-            corrected_off.loc[idx] = row['off_shrunk'] * conf + (peak_off * ratio) * (1 - conf)
-            corrected_def.loc[idx] = row['def_shrunk'] * conf + (peak_def * ratio) * (1 - conf)
+        group = group.sort_values('season_name')
+        idxs = group.index.tolist()
+        for raw_col, out_series in (
+            ('raw_ovr', corrected_ovr), ('raw_off_norm', corrected_off), ('raw_def_norm', corrected_def)
+        ):
+            seasons = [
+                {
+                    "season": group.loc[i, 'season_name'],
+                    "age": int(group.loc[i, 'age_for_model']),
+                    "raw_performance": group.loc[i, raw_col],
+                }
+                for i in idxs
+            ]
+            for i, r in zip(idxs, model.process_player(seasons)):
+                out_series.loc[i] = r["calculated_ovr"]
 
     global_df['ovr_adj'] = corrected_ovr
     global_df['off_adj'] = corrected_off
     global_df['def_adj'] = corrected_def
 
-    print(f"나이 곡선 보정 적용: {matched_players}명 (birth_date 매칭 {len(birth_years)}명 중)")
+    total_players = global_df['pcode'].nunique()
+    age_known_players = global_df.loc[global_df['age'].notna(), 'pcode'].nunique()
+    print(f"오버롤 스무딩 적용: 전체 {total_players}명 (나이 곡선까지 반영된 선수 {age_known_players}명, birth_date 매칭 {len(birth_years)}명 중)")
 
     # 2. kbl540의 앵커 매핑 방식 (Piecewise-linear based on historical quantiles)
     # 전체 역사적 분포에서 등수를 구함
