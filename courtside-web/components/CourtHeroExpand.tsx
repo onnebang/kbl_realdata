@@ -175,8 +175,20 @@ export function CourtHeroExpand({
             )}
             <div className={styles.canvasWrap}>
               <WidgetBoundary name="3D 코트">
-                <Court3DScene shots={filteredShots} accentColor={accentColor} onProgress={setProgress} skipToken={skipToken} groupBy={effectiveGroupBy} showMadeArcs={showMadeArcs} showMissedArcs={showMissedArcs} />
+                <Court3DScene
+                  shots={filteredShots}
+                  accentColor={accentColor}
+                  onProgress={setProgress}
+                  skipToken={skipToken}
+                  groupBy={effectiveGroupBy}
+                  showMadeArcs={showMadeArcs}
+                  showMissedArcs={showMissedArcs}
+                />
               </WidgetBoundary>
+              <div className={styles.helpText}>
+                💡 <b>PC</b>: 좌클릭 회전 / 우클릭(또는 방향키) 이동<br/>
+                📱 <b>모바일</b>: 한 손가락 회전 / 두 손가락 이동
+              </div>
             </div>
             <div className={styles.legend}>
               <span>

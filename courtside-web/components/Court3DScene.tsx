@@ -262,6 +262,9 @@ export function Court3DScene({
     controls.minDistance = 1.5;
     controls.maxDistance = 60;
     controls.maxPolarAngle = Math.PI - 0.02;
+    controls.listenToKeyEvents(window);
+    controls.keyPanSpeed = 15;
+    controls.screenSpacePanning = true;
     controls.enabled = false; // 재생 중엔 끔
     controls.update();
 
