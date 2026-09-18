@@ -14,7 +14,8 @@ export default function PlayerAwards({ pcode }: Props) {
 
   const getIcon = (id: string, name: string) => {
     if (id === "champ") return "🏆";
-    if (id === "runner_up") return "🥈";
+    if (id === "regular_champ") return "🥇";
+    if (id === "runner_up" || id === "regular_runner_up") return "🥈";
     if (id === "mvp") return "⭐";
     if (name.includes("올스타")) return "🌟";
     if (name.includes("수비")) return "🛡️";
