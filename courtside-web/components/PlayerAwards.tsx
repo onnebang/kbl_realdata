@@ -23,6 +23,7 @@ export default function PlayerAwards({ pcode }: Props) {
     if (id === "sixth_man" || name.includes("식스맨")) return "💺";
     if (id === "mip" || name.includes("기량발전")) return "📈";
     if (id === "coy" || name.includes("감독")) return "👔";
+    if (id === "round_mvp" || name.includes("라운드")) return "🎖️";
     if (id === "dpoy" || name.includes("수비")) return "🛡️";
     if (name.includes("득점")) return "🔥";
     if (name.includes("어시스트")) return "🏀";
