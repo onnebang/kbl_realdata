@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TeamBadge } from "@/components/TeamBadge";
+import PlayerAwards from "@/components/PlayerAwards";
+import coachPcodes from "@/lib/coach_pcodes.json";
 import {
   getCoachProfile,
   buildCoachRadarSvg,
@@ -58,6 +60,7 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
   if (!p) notFound();
 
   const { coach, seasons, career, careerStyle, currentTeam, challengeLeague, timeoutCareer } = p;
+  const pcode = (coachPcodes as Record<string, string>)[coach.name] || null;
   const timeoutSeasons = seasons.filter((s): s is CoachSeasonRow & { timeout: NonNullable<CoachSeasonRow["timeout"]> } => s.timeout != null);
   const lastSeason = seasons[seasons.length - 1];
   // 진행 중인 시즌 = 데이터셋의 마지막 시즌이면서 아직 54경기에 못 미치는 경우(경기 수만으로 보면
@@ -105,6 +108,7 @@ export default async function CoachPage({ params, searchParams }: { params: Prom
         <Link href="/coaches" className={dir.chip}>
           감독 목록
         </Link>
+        {pcode && <div style={{ marginTop: 8 }}><PlayerAwards pcode={pcode} /></div>}
       </div>
       </section>
 
