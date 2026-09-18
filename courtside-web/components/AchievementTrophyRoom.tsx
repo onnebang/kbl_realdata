@@ -11,14 +11,24 @@ const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: "double_double_machine_bronze", name: "더블 더블 머신 (Bronze)", desc: "시즌 5회 더블더블 달성", category: "milestone" },
   { id: "club_180", name: "180 클럽", desc: "야투 50%, 3점슛 40%, 자유투 90% 동시 달성", category: "milestone" },
   { id: "iron_man", name: "철인", desc: "30경기 연속 20분 이상 출장", category: "milestone" },
+  { id: "man_of_steel", name: "강철 체력", desc: "시즌 54경기 출장 및 평균 30분 이상 출전", category: "milestone" },
+  { id: "block_machine", name: "블록 머신", desc: "시즌 누적 블록슛 60개 이상 달성", category: "milestone" },
   { id: "wailing_wall", name: "통곡의 벽", desc: "한 경기 5블록 이상", category: "impact" },
   { id: "triple_double", name: "트리플 더블", desc: "트리플 더블 달성", category: "impact" },
+  { id: "bomber", name: "폭격기", desc: "3경기 연속 30득점 이상 달성", category: "impact" },
+  { id: "perimeter_sniper", name: "외곽의 저격수", desc: "한 경기 3점슛 7개 이상 성공", category: "impact" },
+  { id: "hawk_eye", name: "매의 눈", desc: "한 경기 스틸 6개 이상", category: "impact" },
+  { id: "backboard_destroyer", name: "백보드 파괴자", desc: "한 경기 리바운드 15개 이상 달성", category: "impact" },
+  { id: "perfectionist", name: "완벽주의자", desc: "야투 성공률 100%로 15득점 이상 달성", category: "impact" },
+  { id: "maestro", name: "마에스트로", desc: "무실책 10어시스트 이상 달성", category: "impact" },
   { id: "scene_stealer", name: "씬 스틸러", desc: "15분 이하 출전 10득점 이상", category: "bench" },
   { id: "sacrificial_lamb", name: "아름다운 희생", desc: "15분 이하 출전 후 5반칙 퇴장", category: "bench" },
   { id: "invisible_man", name: "투명 인간", desc: "15분 이상 출전, 모든 1차 스탯 0", category: "easter_egg" },
   { id: "giving_tree", name: "아낌없이 주는 나무", desc: "무득점 10어시스트 이상 달성", category: "easter_egg" },
   { id: "unforgiving_rim", name: "자비 없는 림", desc: "한 경기 자유투 4구 이상 시도 0개 성공", category: "easter_egg" },
-  { id: "pacifist", name: "평화주의자", desc: "30분 이상 출전, 파울 0개", category: "easter_egg" }
+  { id: "pacifist", name: "평화주의자", desc: "30분 이상 출전, 파울 0개", category: "easter_egg" },
+  { id: "black_hole", name: "블랙홀", desc: "야투율 20% 미만으로 야투 15개 이상 시도", category: "easter_egg" },
+  { id: "ft_phobia", name: "자유투 공포증", desc: "한 경기 자유투 5개 이상 시도하여 0구 성공", category: "easter_egg" }
 ];
 
 export default function AchievementTrophyRoom({ pcode }: Props) {
@@ -35,29 +45,30 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
     <div className={styles.trophyRoom}>
       <h3 className={styles.title}>🏆 업적 & 퀘스트 트로피 룸</h3>
       
-      <div className={styles.grid}>
+      <div className={styles.iconGrid}>
         {ALL_ACHIEVEMENTS.map(ach => {
           const unlocked = unlockedIds.has(ach.id);
           const isEasterEgg = ach.category === "easter_egg";
           
+          const title = !unlocked && isEasterEgg ? "???" : ach.name;
+          const desc = !unlocked && isEasterEgg ? "달성 조건이 숨겨져 있습니다." : ach.desc;
+
           return (
-            <div key={ach.id} className={`${styles.trophyCard} ${unlocked ? styles.unlocked : styles.locked}`}>
-              <div className={styles.iconBox}>
-                {unlocked ? (
-                   <span className={styles.icon}>
-                     {ach.category === "milestone" ? "🏅" : ach.category === "impact" ? "🔥" : ach.category === "bench" ? "⚡" : "👀"}
-                   </span>
-                ) : (
-                   <span className={styles.iconLocked}>🔒</span>
-                )}
-              </div>
-              <div className={styles.info}>
-                <h4 className={styles.achName}>
-                  {!unlocked && isEasterEgg ? "???" : ach.name}
-                </h4>
-                <p className={styles.achDesc}>
-                  {!unlocked && isEasterEgg ? "달성 조건이 숨겨져 있습니다." : ach.desc}
-                </p>
+            <div key={ach.id} className={styles.hexWrapper}>
+              <div 
+                className={`${styles.hexagonCard} ${unlocked ? styles.unlocked : styles.locked}`}
+                data-tooltip-title={title}
+                data-tooltip-desc={desc}
+              >
+                <div className={styles.hexInner}>
+                  {unlocked ? (
+                     <span className={styles.icon}>
+                       {ach.category === "milestone" ? "🏅" : ach.category === "impact" ? "🔥" : ach.category === "bench" ? "⚡" : "👀"}
+                     </span>
+                  ) : (
+                     <span className={styles.iconLocked}>🔒</span>
+                  )}
+                </div>
               </div>
             </div>
           );

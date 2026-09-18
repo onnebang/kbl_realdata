@@ -92,6 +92,26 @@ def get_achievement_data():
                 iron_man_streak = 0
         if max_iron_man_streak >= 30:
              season_achievements.append({"id": "iron_man", "name": "철인", "desc": "30경기 연속 20분 이상 출장", "category": "milestone"})
+             
+        # 강철 체력 (시즌 54경기 전경기 출장 및 평균 30분 이상 출전)
+        if games_played >= 54 and group['total_min'].mean() >= 30:
+             season_achievements.append({"id": "man_of_steel", "name": "강철 체력", "desc": "시즌 54경기 출장 및 평균 30분 이상 출전", "category": "milestone"})
+             
+        # 블록 머신 (시즌 60블록 이상)
+        if group['blk'].sum() >= 60:
+             season_achievements.append({"id": "block_machine", "name": "블록 머신", "desc": "시즌 누적 블록슛 60개 이상 달성", "category": "milestone"})
+             
+        # 폭격기 (3경기 연속 30득점)
+        bomber_streak = 0
+        max_bomber_streak = 0
+        for _, row in group.iterrows():
+            if row['pts'] >= 30:
+                bomber_streak += 1
+                max_bomber_streak = max(max_bomber_streak, bomber_streak)
+            else:
+                bomber_streak = 0
+        if max_bomber_streak >= 3:
+             season_achievements.append({"id": "bomber", "name": "폭격기", "desc": "3경기 연속 30득점 이상 달성", "category": "impact"})
 
         # 2. 임팩트 퀘스트 & 이스터 에그 (개별 경기 로그 분석)
         for _, row in group.iterrows():
@@ -127,6 +147,34 @@ def get_achievement_data():
             # 평화주의자 (30분 이상 무파울)
             if row['total_min'] >= 30 and row['foul'] == 0:
                  season_achievements.append({"id": "pacifist", "name": "평화주의자", "desc": "30분 이상 출전, 파울 0개", "category": "easter_egg"})
+                 
+            # 외곽의 저격수
+            if row['threep'] >= 7:
+                 season_achievements.append({"id": "perimeter_sniper", "name": "외곽의 저격수", "desc": "한 경기 3점슛 7개 이상 성공", "category": "impact"})
+                 
+            # 매의 눈
+            if row['stl'] >= 6:
+                 season_achievements.append({"id": "hawk_eye", "name": "매의 눈", "desc": "한 경기 스틸 6개 이상", "category": "impact"})
+                 
+            # 백보드 파괴자 (리바운드 15개 이상으로 대체)
+            if row['reb'] >= 15:
+                 season_achievements.append({"id": "backboard_destroyer", "name": "백보드 파괴자", "desc": "한 경기 리바운드 15개 이상 달성", "category": "impact"})
+                 
+            # 완벽주의자
+            if row['pts'] >= 15 and row['fg_a'] > 0 and row['fg'] == row['fg_a']:
+                 season_achievements.append({"id": "perfectionist", "name": "완벽주의자", "desc": "야투 성공률 100%로 15득점 이상 달성", "category": "impact"})
+                 
+            # 마에스트로
+            if row['ast'] >= 10 and row['tov'] == 0:
+                 season_achievements.append({"id": "maestro", "name": "마에스트로", "desc": "무실책 10어시스트 이상 달성", "category": "impact"})
+                 
+            # 블랙홀
+            if row['fg_a'] >= 15 and (row['fg'] / row['fg_a']) < 0.2:
+                 season_achievements.append({"id": "black_hole", "name": "블랙홀", "desc": "야투율 20% 미만으로 야투 15개 이상 시도", "category": "easter_egg"})
+                 
+            # 자유투 공포증
+            if row['ft_a'] >= 5 and row['ft'] == 0:
+                 season_achievements.append({"id": "ft_phobia", "name": "자유투 공포증", "desc": "한 경기 자유투 5개 이상 시도하여 0구 성공", "category": "easter_egg"})
         
         # 중복 제거
         unique_achievements = { a['id']: a for a in season_achievements }.values()

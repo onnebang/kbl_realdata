@@ -1,80 +1,132 @@
 .trophyRoom {
   margin-top: 32px;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 12px;
+  background: var(--surface);
+  border-radius: var(--r-card);
   padding: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--line-rgb), 0.16);
 }
 
 .title {
-  font-size: 1.5rem;
+  font-size: var(--fs-400);
   font-weight: 800;
   margin-bottom: 20px;
-  color: var(--hero-team, #d9640a);
+  color: var(--hero-team, var(--ink));
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.trophyCard {
+.iconGrid {
   display: flex;
-  align-items: center;
-  padding: 16px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255,255,255,0.05);
-  transition: transform 0.2s;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
-.trophyCard:hover {
-  transform: translateY(-2px);
-  background: rgba(0, 0, 0, 0.6);
+.hexWrapper {
+  position: relative;
+  display: inline-block;
 }
 
-.unlocked {
-  border-color: rgba(255, 215, 0, 0.3);
-  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.1);
-}
-
-.locked {
-  opacity: 0.5;
-  filter: grayscale(100%);
-}
-
-.iconBox {
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
+/* Hexagon Card base */
+.hexagonCard {
+  position: relative;
+  width: 52px;
+  height: 60px;
+  background: rgba(var(--line-rgb), 0.1);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #333;
-  margin-right: 16px;
-  font-size: 24px;
+  transition: transform 0.2s, background 0.3s;
+  cursor: help;
 }
 
-.unlocked .iconBox {
+.hexagonCard:hover {
+  transform: translateY(-4px) scale(1.05);
+}
+
+.hexInner {
+  width: 48px;
+  height: 56px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+/* Unlocked styles */
+.unlocked {
   background: linear-gradient(135deg, #ffd700, #b8860b);
 }
-
-.info {
-  display: flex;
-  flex-direction: column;
+.unlocked .hexInner {
+  background: rgba(20, 20, 20, 0.85); /* Dark background inside border */
+}
+.unlocked .icon {
+  filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.4));
 }
 
-.achName {
-  font-size: 1.1rem;
-  font-weight: 700;
+/* Locked styles */
+.locked {
+  background: rgba(var(--line-rgb), 0.15);
+  opacity: 0.6;
+}
+.locked .hexInner {
+  background: var(--surface);
+}
+.iconLocked {
+  font-size: 16px;
+  opacity: 0.5;
+}
+
+/* Custom Tooltip using data attributes */
+.hexagonCard::before,
+.hexagonCard::after {
+  position: absolute;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* Tooltip Arrow */
+.hexagonCard::before {
+  content: "";
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%) translateY(5px);
+  border-width: 6px 6px 0 6px;
+  border-style: solid;
+  border-color: rgba(30, 35, 41, 0.95) transparent transparent transparent;
+}
+
+/* Tooltip Box */
+.hexagonCard::after {
+  content: attr(data-tooltip-title) "\A\A" attr(data-tooltip-desc);
+  white-space: pre-wrap;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%) translateY(calc(-100% + 5px));
+  background: rgba(30, 35, 41, 0.95);
   color: #fff;
-  margin: 0 0 4px 0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  width: max-content;
+  max-width: 220px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-.achDesc {
-  font-size: 0.9rem;
-  color: rgba(255,255,255,0.6);
-  margin: 0;
+/* Hover state for tooltips */
+.hexagonCard:hover::before {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.hexagonCard:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(-100%);
 }
