@@ -94,7 +94,7 @@ def rookie_floor_for(draft_rank):
     뛴 선수들이 전부 55라 뻔해 보인다") 드래프트 순위라는 실제 신호로 53~58 사이에서
     갈라준다. 이 구간은 실측 최약체 KBL 기여자들의 실제 분포(하위 5명 53~58)를 벗어나지
     않는다 - 경기 기록이 없으니 그 이상을 준다는 근거가 없다."""
-    if not draft_rank:
+    if not draft_rank or not isinstance(draft_rank, str):
         return 53  # 드래프트 외 지명(연습생 등)
     m_round = re.search(r'(\d)R', draft_rank)
     if not m_round:
@@ -189,8 +189,8 @@ def compute_ovr(target_season='2024-2025'):
     FROM player_game_stats gps
     JOIN games g ON gps.gmkey = g.gmkey
     WHERE g.season_category IN ('정규시즌', '플레이오프', '챔프전')
+      AND g.season_name NOT LIKE '%D리그%'
     GROUP BY gps.pcode, g.season_name
-    HAVING total_min > 50
     """
 
     try:
@@ -297,6 +297,17 @@ def compute_ovr(target_season='2024-2025'):
 
     # Pandas의 rank(pct=True)를 이용해 인덱스 꼬임 없이 깔끔하게 백분위를 구하고 2K 스케일로 변환합니다.
     global_df['raw_ovr_mapped'] = global_df['raw_ovr'].rank(method='average', pct=True).apply(map_percentile)
+
+    # 출전 시간이 극도로 적은 선수(가비지 타임 전용)는 백분위상 70점이 나오더라도
+    # 신인 바닥치(53~58)로 강하게 끌어내립니다. (예: 이윤수 선수처럼 시즌 10~30분 뛴 경우)
+    draft_ranks = load_draft_ranks()
+    global_df['draft_rank_val'] = global_df['pcode'].map(draft_ranks)
+    global_df['rookie_floor'] = global_df['draft_rank_val'].apply(rookie_floor_for)
+
+    # 100분 미만일수록 rookie_floor 비중이 커짐. 100분 이상이면 100% 자기 실력(raw_ovr_mapped)
+    # 0분이면 100% rookie_floor
+    minutes_factor = np.clip(global_df['total_min'] / 100.0, 0.0, 1.0)
+    global_df['raw_ovr_mapped'] = global_df['raw_ovr_mapped'] * minutes_factor + global_df['rookie_floor'] * (1.0 - minutes_factor)
 
     # 전설적인 99 보정 (역대 최상위 10명만 91~99로 강제 펼침) - 스무딩 전에 적용!
     LEGEND_COUNT = 10
@@ -458,18 +469,26 @@ def compute_ovr(target_season='2024-2025'):
     # 오버롤 그래프가 좀더 다양해 보이게" - 지금까지는 공백 시즌엔 행 자체가 없어 그래프가
     # 공백 앞뒤를 그냥 직선으로 건너뛰었다. 나이 곡선을 다시 태우지는 않는다(그 기간 실제로
     # 안 뛰었으니 검증할 근거가 없다) - 대신 공백 앞뒤의 실측값을 선형보간해 매끄럽게 잇는다.
-    GAP_FILL_MAX_SEASONS = 3  # 이보다 긴 공백은 보간하지 않음 - 은퇴 후 복귀 등 다른 서사일 확률이 큼
+    GAP_FILL_MAX_SEASONS = 10  # 사용자의 요청에 따라 모든 공백(군대, 장기 부상 등)을 이어지게 하기 위해 크게 늘림
     gap_fill_rows = []
     for pcode, group in global_df.groupby('pcode'):
         recs = group.sort_values('season_name').to_dict('records')
-        starts = [parse_start_year(r['season_name']) for r in recs]
-        for i in range(len(recs) - 1):
-            gap = starts[i + 1] - starts[i]
+        # 유효한 시작 연도가 있는 레코드만 필터링 (에러 방지)
+        valid_recs = []
+        valid_starts = []
+        for r in recs:
+            s = parse_start_year(r['season_name'])
+            if s is not None:
+                valid_recs.append(r)
+                valid_starts.append(s)
+        
+        for i in range(len(valid_recs) - 1):
+            gap = valid_starts[i + 1] - valid_starts[i]
             if 1 < gap <= GAP_FILL_MAX_SEASONS + 1:
-                before, after = recs[i], recs[i + 1]
+                before, after = valid_recs[i], valid_recs[i + 1]
                 for k in range(1, gap):
                     frac = k / gap
-                    missing_start = starts[i] + k
+                    missing_start = valid_starts[i] + k
                     gap_fill_rows.append({
                         "pcode": pcode,
                         "name": after['name'],
