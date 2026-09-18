@@ -918,6 +918,15 @@ export default async function PlayerPage({
             viewBox="345 27 375 357"
             dangerouslySetInnerHTML={{ __html: impactSvg ?? "" }}
           />
+          {seasonShots.length > 0 && (
+            <div style={{ position: "relative", zIndex: 10, marginTop: "-20px", textAlign: "center" }}>
+              <CourtHeroExpand
+                shots={toCourt3D(seasonShots)}
+                accentColor={teamColor}
+                label="3D 슈팅 보기"
+              />
+            </div>
+          )}
         </div>
         <div className={styles.heatStat}>
           {impactSvg

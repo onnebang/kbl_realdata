@@ -6,16 +6,17 @@
   margin-top: 12px;
   padding: 7px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  border: 1px solid rgba(var(--line-rgb), 0.35);
+  background: var(--surface);
+  color: var(--ink);
   font-family: "Pretendard", system-ui, sans-serif;
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 .trigger:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--bg-body);
 }
 
 .overlay {
