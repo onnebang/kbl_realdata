@@ -154,28 +154,52 @@ class OvrCurveModel:
 
     def project_forward(self, seasons: list[dict], extra_years: int = 1) -> float:
         """seasons: 실제 시즌 이력(오래된 순, process_player와 같은 형식). 다음 시즌 경기
-        기록이 아직 없을 때(개막 전) 쓰는 예상치 - "새 정보 없음"을 process_player에 합성
-        raw로 흉내내면(마지막 값을 raw_performance로 다시 넣어 한 스텝 더 돌리면) 성장기
-        선수의 데뷔 시즌처럼 오래되고 약한 raw가 3시즌 가중평균에 20% 가중치로 다시 끌려
-        들어오는 부작용이 있다(실측: 22세 김보배 - 데뷔 시즌 raw 75.1이 재투입되며 79->78로
-        하락, 성장기 보너스가 23세에 0%로 사라지는 것과 겹쳐 실제로는 오르고 있는 선수가
-        떨어지는 것처럼 보임).
-
-        그래서 이 메서드는 process_player를 다시 돌리지 않는다:
-          - 다음 나이가 아직 성장기~전성기(<= peak_hi)면 새 근거가 없으니 마지막 확정값을
-            그대로 유지한다("떨어질 이유가 없다").
-          - 하락기에 접어들었으면 등급별 하락 저항력을 마지막 확정값에 한 시즌(extra_years)만
-            추가로 복리 적용한다 - process_player의 하락기 공식과 동일한 로직이되, 약한
-            과거 시즌을 다시 평균에 끌어오지 않는다.
+        기록이 아직 없을 때(개막 전) 쓰는 예상치. NBA 2K처럼 비시즌 동안의 자연 성장, 
+        과거 추세(Trend), 그리고 약간의 랜덤성(오프시즌 캠프 성과)을 반영한다.
         """
         processed = self.process_player(seasons)
         last_row = seasons[-1]
         last_value = processed[-1]["calculated_ovr"]
         next_age = last_row["age"] + extra_years
 
-        if next_age <= self.peak_hi:
-            return last_value
+        # 과거 추세(Trend) 계산: 직전 2~3시즌 간의 상승/하락세
+        trend = 0.0
+        if len(processed) >= 2:
+            trend = processed[-1]["calculated_ovr"] - processed[-2]["calculated_ovr"]
+            if len(processed) >= 3:
+                trend_prev = processed[-2]["calculated_ovr"] - processed[-3]["calculated_ovr"]
+                trend = (trend * 0.7) + (trend_prev * 0.3)
 
+        # 난수(Pseudo-random) 보정: 매번 돌릴 때마다 결과가 달라지지 않도록 결정론적 난수(Hash) 사용
+        # 오프시즌 트레이닝 캠프의 성과를 흉내 냄 (-1.0 ~ +1.0)
+        import hashlib
+        hash_input = f"{last_row.get('name', 'player')}_{next_age}_{last_value}"
+        hash_val = int(hashlib.md5(hash_input.encode()).hexdigest(), 16)
+        pseudo_rand = (hash_val % 21 - 10) / 10.0  # -1.0 to +1.0
+
+        if next_age <= self.growth_hi:
+            # 1. 성장기 (Growth Phase: ~23세)
+            potential = last_row.get("potential", 1.0)
+            base_growth = 1.5 * potential
+            trend_effect = max(-1.0, min(3.0, trend * 0.5))  # 부진해도 유망주는 크게 꺾이지 않음
+            
+            value = last_value + base_growth + trend_effect + pseudo_rand
+            # 유망주는 비시즌에 최소 0(동결) ~ 최대 +4 정도의 성장을 보임
+            value = max(last_value, min(last_value + 4.0, value))
+            value = max(self.ovr_floor, min(self.ovr_ceiling, value))
+            return round(value, 1)
+
+        elif next_age <= self.peak_hi:
+            # 2. 전성기 (Peak Phase: 24~29세)
+            trend_effect = max(-2.0, min(2.0, trend * 0.5))
+            
+            value = last_value + trend_effect + pseudo_rand
+            # 전성기 선수는 비시즌에 -2 ~ +2 정도의 등락을 보임
+            value = max(last_value - 2.0, min(last_value + 2.0, value))
+            value = max(self.ovr_floor, min(self.ovr_ceiling, value))
+            return round(value, 1)
+
+        # 3. 하락기 (Decline Phase: 30세~)
         career_peak = max(r["calculated_ovr"] for r in processed)
         raw_peak = max(r["raw_performance"] for r in seasons)
         aging_resistance, perf_buffer, min_retention = self._tier_for(raw_peak)
@@ -188,11 +212,12 @@ class OvrCurveModel:
             base_decline *= 1.4
         rate = base_decline * (1 - aging_resistance)
 
-        # 부진 방어(perf_buffer)는 여기서 다시 적용하지 않는다 - last_value는 이미 마지막
-        # 실제 시즌에서 그 방어를 한 번 거친 값이라, 여기 또 적용하면 이중으로 명성 보정이
-        # 걸려 "한 시즌 더 늙었는데 오히려 오버롤이 오르는" 역전이 생긴다(실측: 라건아
-        # 93->95). 순수 노화 감쇠 한 스텝만 곱하고, 하한선(min_retention)만 안전장치로 유지.
         value = last_value * ((1 - rate) ** extra_years)
+        
+        # 하락기에도 미세한 추세 반등(회춘)이 있을 수 있음
+        trend_effect = max(-1.0, min(1.0, trend * 0.3))
+        value += trend_effect + (pseudo_rand * 0.5)
+
         value = max(value, career_peak * min_retention)
         value = max(self.ovr_floor, min(self.ovr_ceiling, value))
         return round(value, 1)
