@@ -1,65 +1,44 @@
 .awardsContainer {
-  margin-top: 1.5rem;
-  padding: 1.5rem;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 2rem;
 }
 
 .header {
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 800;
-  letter-spacing: 0.15em;
-  color: var(--hero-team, #d9640a);
-  margin-bottom: 1rem;
+  letter-spacing: 0.05em;
+  color: var(--hero-team, #fff);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
 }
 
 .list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .awardItem {
   display: flex;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 12px 16px;
-  min-width: 220px;
-}
-
-.icon {
-  font-size: 24px;
-  margin-right: 12px;
-}
-
-.details {
-  display: flex;
-  flex-direction: column;
-}
-
-.countRow {
-  display: flex;
   align-items: baseline;
-  gap: 6px;
+  font-size: 0.95rem;
+  line-height: 1.4;
 }
 
 .count {
-  font-size: 1.2rem;
-  font-weight: 800;
+  font-weight: 700;
   color: #fff;
+  min-width: 24px; /* Align numbers */
 }
 
 .name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .years {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 2px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-left: 6px;
 }

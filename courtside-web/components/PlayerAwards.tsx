@@ -12,43 +12,20 @@ export default function PlayerAwards({ pcode }: Props) {
     return null;
   }
 
-  const getIcon = (id: string, name: string) => {
-    if (id === "champ") return "🏆";
-    if (id === "regular_champ") return "🥇";
-    if (id === "runner_up" || id === "regular_runner_up") return "🥈";
-    if (id === "regular_mvp") return "⭐";
-    if (id === "po_mvp") return "👑";
-    if (id === "allstar_mvp" || name.includes("올스타")) return "🌟";
-    if (id === "rookie") return "🌱";
-    if (id === "sixth_man" || name.includes("식스맨")) return "💺";
-    if (id === "mip" || name.includes("기량발전")) return "📈";
-    if (id === "coy" || name.includes("감독")) return "👔";
-    if (id === "round_mvp" || id === "month_mvp" || name.includes("라운드") || name.includes("이달의")) return "🎖️";
-    if (id === "3pt_contest" || name.includes("3점슛")) return "🎯";
-    if (id === "dunk_contest" || name.includes("덩크슛")) return "💥";
-    if (id === "dpoy" || name.includes("수비")) return "🛡️";
-    if (name.includes("득점")) return "🔥";
-    if (name.includes("어시스트")) return "🏀";
-    if (name.includes("리바운드")) return "🧱";
-    return "🏅";
-  };
-
+  // To display them cleanly, sort by count descending? 
+  // Let's keep the existing order (from the Python script).
+  
   return (
     <div className={styles.awardsContainer}>
-      <div className={styles.header}>AWARDS & HONORS</div>
+      <div className={styles.header}>AWARDS AND HONORS</div>
       <div className={styles.list}>
         {awards.map((award, i) => (
           <div key={i} className={styles.awardItem}>
-            <div className={styles.icon}>{getIcon(award.id, award.name)}</div>
-            <div className={styles.details}>
-              <div className={styles.countRow}>
-                <span className={styles.count}>{award.count}x</span>
-                <span className={styles.name}>{award.name}</span>
-              </div>
-              {award.years && award.years.length > 0 && (
-                <div className={styles.years}>{award.years.join(", ")}</div>
-              )}
-            </div>
+            <span className={styles.count}>{award.count}</span>
+            <span className={styles.name}>{award.name}</span>
+            {award.years && award.years.length > 0 && (
+              <span className={styles.years}>({award.years.join(", ")})</span>
+            )}
           </div>
         ))}
       </div>
