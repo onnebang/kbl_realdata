@@ -1,4 +1,7 @@
-import { Achievement, getPlayerAchievements } from "../lib/achievements";
+"use client";
+
+import { useState } from "react";
+import { Achievement, CareerQuest, getPlayerAchievements } from "../lib/achievements";
 import styles from "./AchievementTrophyRoom.module.css";
 
 interface Props {
@@ -32,48 +35,107 @@ const ALL_ACHIEVEMENTS: Achievement[] = [
 ];
 
 export default function AchievementTrophyRoom({ pcode }: Props) {
+  const [activeTab, setActiveTab] = useState<"career" | "season">("career");
+  
   const playerAchievements = getPlayerAchievements(pcode);
   const unlockedIds = new Set<string>();
   
-  if (playerAchievements) {
+  if (playerAchievements && playerAchievements.seasons) {
     Object.values(playerAchievements.seasons).forEach(season => {
       season.forEach(ach => unlockedIds.add(ach.id));
     });
   }
 
+  const quests = playerAchievements?.career_quests || [];
+
   return (
     <div className={styles.trophyRoom}>
-      <h3 className={styles.title}>🏆 업적 & 퀘스트 트로피 룸</h3>
-      
-      <div className={styles.iconGrid}>
-        {ALL_ACHIEVEMENTS.map(ach => {
-          const unlocked = unlockedIds.has(ach.id);
-          const isEasterEgg = ach.category === "easter_egg";
-          
-          const title = !unlocked && isEasterEgg ? "???" : ach.name;
-          const desc = !unlocked && isEasterEgg ? "달성 조건이 숨겨져 있습니다." : ach.desc;
-
-          return (
-            <div key={ach.id} className={styles.hexWrapper}>
-              <div 
-                className={`${styles.hexagonCard} ${unlocked ? styles.unlocked : styles.locked}`}
-                data-tooltip-title={title}
-                data-tooltip-desc={desc}
-              >
-                <div className={styles.hexInner}>
-                  {unlocked ? (
-                     <span className={styles.icon}>
-                       {ach.category === "milestone" ? "🏅" : ach.category === "impact" ? "🔥" : ach.category === "bench" ? "⚡" : "👀"}
-                     </span>
-                  ) : (
-                     <span className={styles.iconLocked}>🔒</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+      <div className={styles.header}>
+        <h3 className={styles.title}>🏆 트로피 룸</h3>
+        <div className={styles.tabs}>
+          <button 
+            className={`${styles.tabBtn} ${activeTab === "career" ? styles.active : ""}`}
+            onClick={() => setActiveTab("career")}
+          >
+            올타임 퀘스트
+          </button>
+          <button 
+            className={`${styles.tabBtn} ${activeTab === "season" ? styles.active : ""}`}
+            onClick={() => setActiveTab("season")}
+          >
+            시즌 업적
+          </button>
+        </div>
       </div>
+      
+      {activeTab === "career" && (
+        <div className={styles.tabContent}>
+          {quests.length === 0 ? (
+            <div style={{ color: "rgba(255,255,255,0.5)", textAlign: "center", padding: "20px" }}>
+              진행 중인 퀘스트가 없습니다.
+            </div>
+          ) : (
+            <div className={styles.questList}>
+              {quests.map(quest => {
+                const pct = Math.min(100, (quest.current / quest.target) * 100);
+                return (
+                  <div key={quest.id} className={`${styles.questItem} ${quest.completed ? styles.questCompleted : ""}`}>
+                    <div className={styles.questHeader}>
+                      <div className={styles.questName}>
+                        {quest.name}
+                        {quest.completed && <span className={styles.questCompletedText}>✔ 완료</span>}
+                      </div>
+                      <div className={styles.questNumbers}>
+                        {quest.current.toLocaleString()} / {quest.target.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className={styles.progressBarContainer}>
+                      <div 
+                        className={styles.progressBarFill} 
+                        style={{ width: `${pct}%` }} 
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "season" && (
+        <div className={styles.tabContent}>
+          <div className={styles.iconGrid}>
+            {ALL_ACHIEVEMENTS.map(ach => {
+              const unlocked = unlockedIds.has(ach.id);
+              const isEasterEgg = ach.category === "easter_egg";
+              
+              const title = !unlocked && isEasterEgg ? "???" : ach.name;
+              const desc = !unlocked && isEasterEgg ? "달성 조건이 숨겨져 있습니다." : ach.desc;
+
+              return (
+                <div key={ach.id} className={styles.hexWrapper}>
+                  <div 
+                    className={`${styles.hexagonCard} ${unlocked ? styles.unlocked : styles.locked}`}
+                    data-tooltip-title={title}
+                    data-tooltip-desc={desc}
+                  >
+                    <div className={styles.hexInner}>
+                      {unlocked ? (
+                         <span className={styles.icon}>
+                           {ach.category === "milestone" ? "🏅" : ach.category === "impact" ? "🔥" : ach.category === "bench" ? "⚡" : "👀"}
+                         </span>
+                      ) : (
+                         <span className={styles.iconLocked}>🔒</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,6 +5,39 @@ import os
 
 DB_PATH = '../raw/kbl_realdata.db'
 
+# Quest Configurations
+CAREER_MILESTONES = {
+    'pts': [100, 500, 1000, 2000, 3000, 5000, 7000, 10000],
+    'reb': [100, 500, 1000, 2000, 3000, 5000],
+    'ast': [100, 500, 1000, 2000, 3000, 5000],
+    'threep': [50, 100, 300, 500, 1000]
+}
+
+def generate_career_quests(total_pts, total_reb, total_ast, total_threep):
+    quests = []
+    
+    def process_milestones(stat_type, current_val, thresholds, name_prefix):
+        for target in thresholds:
+            completed = current_val >= target
+            quests.append({
+                "id": f"{stat_type}_{target}",
+                "type": stat_type,
+                "name": f"{target:,} {name_prefix} 달성",
+                "current": int(current_val),
+                "target": target,
+                "completed": completed
+            })
+            if not completed:
+                # Only show up to the FIRST uncompleted quest per stat
+                break
+
+    process_milestones('pts', total_pts, CAREER_MILESTONES['pts'], '득점')
+    process_milestones('reb', total_reb, CAREER_MILESTONES['reb'], '리바운드')
+    process_milestones('ast', total_ast, CAREER_MILESTONES['ast'], '어시스트')
+    process_milestones('threep', total_threep, CAREER_MILESTONES['threep'], '3점슛')
+    
+    return quests
+
 def get_achievement_data():
     real_db_path = os.path.join(os.path.dirname(__file__), DB_PATH)
     if not os.path.exists(real_db_path):
@@ -48,18 +81,29 @@ def get_achievement_data():
 
     achievements = {}
     
+    # 1. 선수별 통산 누적 스탯 먼저 계산
+    career_totals = df.groupby('pcode').agg({
+        'pts': 'sum',
+        'reb': 'sum',
+        'ast': 'sum',
+        'threep': 'sum'
+    }).to_dict(orient='index')
+
     # 시즌별로 그룹화
     for (pcode, season_name), group in df.groupby(['pcode', 'season_name']):
         name = group['name'].iloc[0]
+        
         if str(pcode) not in achievements:
+            c_totals = career_totals.get(pcode, {'pts': 0, 'reb': 0, 'ast': 0, 'threep': 0})
             achievements[str(pcode)] = {
                 "name": name,
+                "career_quests": generate_career_quests(c_totals['pts'], c_totals['reb'], c_totals['ast'], c_totals['threep']),
                 "seasons": {}
             }
         
         season_achievements = []
         
-        # 1. 누적 퀘스트 계산
+        # 2. 누적 퀘스트 (시즌용 유지)
         games_played = len(group)
         double_doubles = 0
         for _, row in group.iterrows():
@@ -100,51 +144,48 @@ def get_achievement_data():
         # 블록 머신 (시즌 60블록 이상)
         if group['blk'].sum() >= 60:
              season_achievements.append({"id": "block_machine", "name": "블록 머신", "desc": "시즌 누적 블록슛 60개 이상 달성", "category": "milestone"})
-             
-        # 폭격기 (3경기 연속 30득점)
-        bomber_streak = 0
-        max_bomber_streak = 0
-        for _, row in group.iterrows():
-            if row['pts'] >= 30:
-                bomber_streak += 1
-                max_bomber_streak = max(max_bomber_streak, bomber_streak)
-            else:
-                bomber_streak = 0
-        if max_bomber_streak >= 3:
-             season_achievements.append({"id": "bomber", "name": "폭격기", "desc": "3경기 연속 30득점 이상 달성", "category": "impact"})
 
-        # 2. 임팩트 퀘스트 & 이스터 에그 (개별 경기 로그 분석)
+        # 단일 경기 임팩트
+        bomber_streak = 0
         for _, row in group.iterrows():
             # 통곡의 벽
             if row['blk'] >= 5:
                 season_achievements.append({"id": "wailing_wall", "name": "통곡의 벽", "desc": "한 경기 5블록 이상", "category": "impact"})
-            
+                
             # 트리플 더블
             tens = sum(1 for stat in [row['pts'], row['ast'], row['reb'], row['stl'], row['blk']] if stat >= 10)
             if tens >= 3:
-                 season_achievements.append({"id": "triple_double", "name": "트리플 더블", "desc": "트리플 더블 달성", "category": "impact"})
-                 
-            # 씬 스틸러 (15분 이하 출전, 10점 이상)
-            if row['total_min'] > 0 and row['total_min'] <= 15 and row['pts'] >= 10:
+                season_achievements.append({"id": "triple_double", "name": "트리플 더블", "desc": "트리플 더블 달성", "category": "impact"})
+                
+            # 폭격기 (3경기 연속 30득점)
+            if row['pts'] >= 30:
+                bomber_streak += 1
+                if bomber_streak >= 3:
+                    season_achievements.append({"id": "bomber", "name": "폭격기", "desc": "3경기 연속 30득점 이상 달성", "category": "impact"})
+            else:
+                bomber_streak = 0
+                
+            # 벤치 (15분 이하 출전 10득점 이상)
+            if row['total_min'] <= 15 and row['pts'] >= 10:
                 season_achievements.append({"id": "scene_stealer", "name": "씬 스틸러", "desc": "15분 이하 출전 10득점 이상", "category": "bench"})
                 
-            # 아름다운 희생 (15분 이하 출전 5반칙)
-            if row['total_min'] > 0 and row['total_min'] <= 15 and row['foul'] >= 5:
-                 season_achievements.append({"id": "sacrificial_lamb", "name": "아름다운 희생", "desc": "15분 이하 출전 후 5반칙 퇴장", "category": "bench"})
-
-            # 이스터 에그: 투명 인간 (Tony Snell Club)
-            if row['total_min'] >= 15 and row['pts'] == 0 and row['reb'] == 0 and row['ast'] == 0 and row['stl'] == 0 and row['blk'] == 0 and row['tov'] == 0 and row['foul'] == 0:
+            # 아름다운 희생 (15분 이하 5반칙)
+            if row['total_min'] <= 15 and row['foul'] >= 5:
+                season_achievements.append({"id": "sacrificial_lamb", "name": "아름다운 희생", "desc": "15분 이하 출전 후 5반칙 퇴장", "category": "bench"})
+                
+            # 투명인간
+            if row['total_min'] >= 15 and row['pts'] == 0 and row['reb'] == 0 and row['ast'] == 0 and row['stl'] == 0 and row['blk'] == 0:
                 season_achievements.append({"id": "invisible_man", "name": "투명 인간", "desc": "15분 이상 출전, 모든 1차 스탯 0", "category": "easter_egg"})
                 
-            # 아낌없이 주는 나무 (0득점 10+어시스트)
+            # 아낌없이 주는 나무
             if row['pts'] == 0 and row['ast'] >= 10:
                 season_achievements.append({"id": "giving_tree", "name": "아낌없이 주는 나무", "desc": "무득점 10어시스트 이상 달성", "category": "easter_egg"})
                 
-            # 자비 없는 림 (연속은 DB 로그상 어려우므로 한경기 자유투 0/4 이상으로 대체)
+            # 자비 없는 림
             if row['ft_a'] >= 4 and row['ft'] == 0:
                 season_achievements.append({"id": "unforgiving_rim", "name": "자비 없는 림", "desc": "한 경기 자유투 4구 이상 시도 0개 성공", "category": "easter_egg"})
                 
-            # 평화주의자 (30분 이상 무파울)
+            # 평화주의자
             if row['total_min'] >= 30 and row['foul'] == 0:
                  season_achievements.append({"id": "pacifist", "name": "평화주의자", "desc": "30분 이상 출전, 파울 0개", "category": "easter_egg"})
                  
@@ -156,7 +197,7 @@ def get_achievement_data():
             if row['stl'] >= 6:
                  season_achievements.append({"id": "hawk_eye", "name": "매의 눈", "desc": "한 경기 스틸 6개 이상", "category": "impact"})
                  
-            # 백보드 파괴자 (리바운드 15개 이상으로 대체)
+            # 백보드 파괴자
             if row['reb'] >= 15:
                  season_achievements.append({"id": "backboard_destroyer", "name": "백보드 파괴자", "desc": "한 경기 리바운드 15개 이상 달성", "category": "impact"})
                  

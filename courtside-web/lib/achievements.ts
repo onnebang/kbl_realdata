@@ -7,8 +7,18 @@ export interface Achievement {
   category: "milestone" | "impact" | "bench" | "easter_egg";
 }
 
+export interface CareerQuest {
+  id: string;
+  type: string;
+  name: string;
+  current: number;
+  target: number;
+  completed: boolean;
+}
+
 export interface PlayerAchievements {
   name: string;
+  career_quests: CareerQuest[];
   seasons: Record<string, Achievement[]>;
 }
 
