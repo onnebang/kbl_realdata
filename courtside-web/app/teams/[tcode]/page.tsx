@@ -9,6 +9,7 @@ import { TeamBadge } from "@/components/TeamBadge";
 import { getTeamPlayedRegCount, type TeamFixture, type StandingsRow } from "@/lib/matchups";
 import { getAllTeams } from "@/lib/playerProfile";
 import { displayTeamName } from "@/lib/teamNames";
+import { getTeamPowerByName } from "@/lib/teamPower";
 import { buildConstellationSvg } from "@/lib/playerDataScience";
 import {
   getTeamSeasonShots,
@@ -709,6 +710,12 @@ export default async function TeamPage({
   // 저명도 팀 색(KT #1A1A1A 등)은 차트에서만 보조 액센트로 - 데이터 주장이 아닌 디자인 상수.
   const accent = accentFor(team.tcode, team.color);
 
+  // 요청: "우리가 만든 오버롤 데이터로 파워를 수치화해서 보여주면 재밌을 것 같아". 시즌
+  // 파라미터를 생략해 항상 히스토리상 가장 최신 시즌(다음 시즌 예상 포함) 기준으로 - 과거
+  // 시즌을 보는 중이어도 "지금 이 팀의 전력"은 하나로 고정해서 보여준다(courtside_ovr_history의
+  // team 필드가 그 선수의 "현재" 소속 기준이라 과거 시즌 기준 팀 매칭은 애초에 부정확함).
+  const teamPower = getTeamPowerByName(teamName);
+
   const constellationSvg = shots.length ? buildConstellationSvg(shots) : null;
 
   // 히어로 전적/순위: 사실이므로 factSeason에서 한 경기라도 치렀으면 factSeason, 아니면 estSeason.
@@ -791,6 +798,14 @@ export default async function TeamPage({
             )}
           </div>
           <div className={styles.heroStatRow}>
+            {teamPower && (
+              <div>
+                <div className={styles.heroStatVal}>{teamPower.ovr}</div>
+                <div className={styles.heroStatLabel}>
+                  PWR · {seasonShort(teamPower.season)} 로스터 오버롤(OFF {teamPower.off} · DEF {teamPower.def})
+                </div>
+              </div>
+            )}
             {(
               [
                 ["W-L", record, `${seasonShort(recordSeason)} ${standingRow ? "정규시즌" : "전체"}`],

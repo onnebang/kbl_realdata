@@ -108,8 +108,11 @@
 }
 
 .xAxisLabelActive {
+  /* font-size는 여기서 고정하지 않는다 - CSS 클래스 규칙이 SVG presentation attribute보다
+     우선순위가 높아서, 이 자리에 고정 px를 두면 시즌이 많아 글자를 줄인 차트에서도
+     호버한 라벨만 원래 크기로 튀어 화면을 가렸다(제보: "오버롤이 화면을 가리는 문제") -
+     크기는 컴포넌트가 inline style로 (기본 크기 * 1.15) 직접 계산해 넣는다. */
   fill: var(--chart-color);
-  font-size: 30px;
   font-weight: bold;
 }
 
@@ -147,6 +150,9 @@
   stroke-dasharray: 2 2;
 }
 
+/* fill(확정 배지)/stroke(예상 배지)는 컴포넌트가 그 시즌 OVR 등급 색을 inline style로
+   직접 넣는다(요청: "오버롤 별로 색상을 다르게 표시해서 위압감을") - 여기 값은 style이
+   못 들어간 예외적인 경우의 기본값일 뿐. */
 .ovrBadge {
   fill: var(--chart-color);
   stroke: #0d0d0d;
@@ -159,7 +165,7 @@
   stroke: #ffffff;
 }
 
-/* 예상 배지는 확정치와 구분되게 속을 비우고 팀 컬러 테두리만 남긴다. */
+/* 예상 배지는 확정치와 구분되게 속을 비우고 등급 색 테두리만 남긴다. */
 .ovrBadgeProjected {
   fill: #0d0d0d;
   stroke: var(--chart-color);
@@ -171,6 +177,18 @@
   fill: #ffffff;
   font-weight: 800;
   font-family: "Big Shoulders Display", "IBM Plex Mono", sans-serif;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+/* 이적 전환 칩의 팀 약어 글자 - 배경 원(팀 컬러)이 이미 inline style로 들어오니 글자
+   자체는 고정 스타일. */
+.teamChipText {
+  fill: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: "IBM Plex Mono", monospace;
   text-anchor: middle;
   dominant-baseline: central;
   pointer-events: none;

@@ -630,6 +630,18 @@ export default async function PlayerPage({
     teamColors.set(tc, t.color);
     teamAbbrs.set(tc, t.abbr);
   }
+  // OVR 트렌드 차트에서 이적 구간을 팀 컬러로 구분하는 데 쓴다(요청: "팀을 이적한 선수들 -
+  // 팀 구분은 밑에 그래프 색상을 팀 색상으로, 또는 구단 로고?"). courtside_ovr_history.json의
+  // team 필드는 kbl540 쪽 "team_name_current" 표기라 tcode가 아니라 이름으로 매칭해야 한다 -
+  // 이 페이지가 이미 갖고 있는 teamByTcode(Supabase teams)를 이름 기준으로 다시 인덱싱만 한다.
+  // Map이 아니라 평범한 객체로 넘긴다 - 서버 컴포넌트(이 파일)에서 클라이언트 컴포넌트
+  // (OvrTrendChart, "use client")로 건너가는 props는 RSC 직렬화를 거치는데, Map 인스턴스는
+  // 실측상 조용히 빈 값처럼 동작했다(에러 없이 통과하지만 .get()이 아무것도 못 찾음) -
+  // 평범한 객체/배열만 이 경계를 확실하게 넘는다.
+  const teamMetaByName: Record<string, { abbr: string; color: string; logoUrl: string | null }> = {};
+  for (const t of teamByTcode.values()) {
+    teamMetaByName[t.name] = { abbr: t.abbr, color: t.color, logoUrl: t.logoUrl };
+  }
   // 히어로 발치 밴드: 폭 800 · 높이 72(= 라벨 줄 13 + 막대 47 + 레일 12)를 요청하면 빌더가
   // 구간별 글자에 맞춰 라벨 줄과 최종 뷰박스 높이를 잡는다(막대 47은 그대로 남는다).
   // fit은 이 SVG가 화면에서 그려지는 방식이다 - CSS 높이 --strip-h(79px)·가로 크롬 92px
@@ -796,7 +808,11 @@ export default async function PlayerPage({
               PlayerHeroTabs.module.css가 이 필터링을 min-width 641px 위로는 되돌린다(탭바
               숨김 + 전 패널 표시) - 데스크톱 미관은 그대로. */}
           <PlayerHeroTabs
-            ovrTrend={ovrHistory.length > 0 ? <OvrTrendChart history={ovrHistory} teamColor={teamColor} /> : null}
+            ovrTrend={
+              ovrHistory.length > 0 ? (
+                <OvrTrendChart history={ovrHistory} teamColor={teamColor} teamByName={teamMetaByName} />
+              ) : null
+            }
             awards={getPlayerAwards(pcode).length > 0 ? <PlayerAwards pcode={pcode} /> : null}
             trophyRoom={<AchievementTrophyRoom pcode={pcode} />}
           />

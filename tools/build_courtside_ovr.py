@@ -1,4 +1,5 @@
 import sys
+import re
 import sqlite3
 import pandas as pd
 import numpy as np
@@ -69,6 +70,40 @@ def load_nationalities():
             nats[pcode] = nat
     return nats
 
+
+
+def load_draft_ranks():
+    """kbl540 카드 풀의 draft_rank(예: "2024 1R 3순위")를 pcode -> 원문 문자열로 반환.
+    커리어 기록이 전혀 없는 신인의 바닥치를 정할 때 쓴다(rookie_floor_for)."""
+    path = os.path.join(os.path.dirname(__file__), KBL540_PLAYERS_PATH)
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding='utf-8') as f:
+        cards = json.load(f)
+    ranks = {}
+    for c in cards:
+        pcode = c.get('pcode')
+        dr = c.get('draft_rank')
+        if pcode and dr and dr != '-':
+            ranks[pcode] = dr
+    return ranks
+
+
+def rookie_floor_for(draft_rank):
+    """커리어 기록이 전혀 없는 완전 신인의 바닥치 - 예전엔 전원 55로 고정해서(제보: "거의 안
+    뛴 선수들이 전부 55라 뻔해 보인다") 드래프트 순위라는 실제 신호로 53~58 사이에서
+    갈라준다. 이 구간은 실측 최약체 KBL 기여자들의 실제 분포(하위 5명 53~58)를 벗어나지
+    않는다 - 경기 기록이 없으니 그 이상을 준다는 근거가 없다."""
+    if not draft_rank:
+        return 53  # 드래프트 외 지명(연습생 등)
+    m_round = re.search(r'(\d)R', draft_rank)
+    if not m_round:
+        return 53
+    if m_round.group(1) != '1':
+        return 54  # 2라운드 지명
+    m_pick = re.search(r'(\d+)순위', draft_rank)
+    pick = int(m_pick.group(1)) if m_pick else 5
+    return 58 - min(pick - 1, 4)  # 1라운드: 1순위 58 ~ 5순위 이후 54
 
 
 def load_teams_and_positions():
@@ -418,6 +453,38 @@ def compute_ovr(target_season='2024-2025'):
             "projected": False,
         })
 
+    # ── 공백 시즌 보간(군 복무·부상 등으로 그 시즌 KBL 기록이 통째로 없는 경우) ──
+    # 요청: "부상이나 군 문제로 빠진 선수들도 오버롤이 이어질 수 있게, 앞뒤를 보고 예측값으로
+    # 오버롤 그래프가 좀더 다양해 보이게" - 지금까지는 공백 시즌엔 행 자체가 없어 그래프가
+    # 공백 앞뒤를 그냥 직선으로 건너뛰었다. 나이 곡선을 다시 태우지는 않는다(그 기간 실제로
+    # 안 뛰었으니 검증할 근거가 없다) - 대신 공백 앞뒤의 실측값을 선형보간해 매끄럽게 잇는다.
+    GAP_FILL_MAX_SEASONS = 3  # 이보다 긴 공백은 보간하지 않음 - 은퇴 후 복귀 등 다른 서사일 확률이 큼
+    gap_fill_rows = []
+    for pcode, group in global_df.groupby('pcode'):
+        recs = group.sort_values('season_name').to_dict('records')
+        starts = [parse_start_year(r['season_name']) for r in recs]
+        for i in range(len(recs) - 1):
+            gap = starts[i + 1] - starts[i]
+            if 1 < gap <= GAP_FILL_MAX_SEASONS + 1:
+                before, after = recs[i], recs[i + 1]
+                for k in range(1, gap):
+                    frac = k / gap
+                    missing_start = starts[i] + k
+                    gap_fill_rows.append({
+                        "pcode": pcode,
+                        "name": after['name'],
+                        "season": f"{missing_start}-{missing_start + 1}",
+                        "team": teams.get(pcode, "Unknown"),
+                        "position": positions.get(pcode, "Unknown"),
+                        "OVR": int(round(before['OVR'] + (after['OVR'] - before['OVR']) * frac)),
+                        "OFF": int(round(before['OFF'] + (after['OFF'] - before['OFF']) * frac)),
+                        "DEF": int(round(before['DEF'] + (after['DEF'] - before['DEF']) * frac)),
+                        "archetype": before['archetype'],
+                        "badges": before['badges'],
+                        "projected": True,
+                    })
+    out_data.extend(gap_fill_rows)
+
     # ── 다음 시즌 예상 OVR (개막 전이라 이번 시즌 경기 기록이 0개인 선수용) ──
     # 제보 1) "스탯이 적어서 오버롤이 없는 선수도 표시해달라" 2) "작년 기준 이번 시즌 새
     # 오버롤 표시" - 둘 다 같은 원인: 시즌 전엔 그 시즌 행 자체가 없어 프로필이 빈 카드가
@@ -431,23 +498,24 @@ def compute_ovr(target_season='2024-2025'):
     to_project = set(next_season_roster) - already_covered
 
     # 커리어 기록이 전혀 없는 완전 신인용 최저치 - 실측 데이터에서 실제로 몇 경기 못 뛴
-    # 선수들의 바닥권(하위 5명 53~58)을 참고해 잡았다(요청: "실력이 없어서 경기에 못 나온
-    # 거니, 몇 번 출전하지 못한 선수들과 비슷하게 측정해달라"). 이론상 하한선(40)까지 내리면
-    # 실제 최약체 로테이션 선수보다도 낮아져 오히려 부정확해진다.
-    ROOKIE_FLOOR_OVR = 55
+    # 선수들의 바닥권(하위 5명 53~58)을 참고해 잡았다. 처음엔 전원 55로 고정했는데(제보:
+    # "거의 안 뛴 선수들이 전부 55라 뻔해 보인다") 그 범위 안에서 실제로 존재하는 신호
+    # (드래프트 순위)로 갈라준다 - 여전히 경기 기록이 없으니 53~58을 벗어나는 근거는 없다.
+    draft_ranks = load_draft_ranks()
 
     for pcode in to_project:
         hist = global_df[global_df['pcode'] == pcode].sort_values('season_name')
         if hist.empty:
+            floor = rookie_floor_for(draft_ranks.get(pcode))
             out_data.append({
                 "pcode": pcode,
                 "name": next_season_roster.get(pcode, {}).get("name", "Unknown"),
                 "season": PROJECTION_SEASON,
                 "team": next_season_roster.get(pcode, {}).get("team", "Unknown"),
                 "position": positions.get(pcode, "Unknown"),
-                "OVR": ROOKIE_FLOOR_OVR,
-                "OFF": ROOKIE_FLOOR_OVR,
-                "DEF": ROOKIE_FLOOR_OVR,
+                "OVR": floor,
+                "OFF": floor,
+                "DEF": floor,
                 "archetype": "롤 플레이어",
                 "badges": {"finishing": 0, "shooting": 0, "playmaking": 0, "defense": 0},
                 "projected": True,
@@ -493,6 +561,12 @@ def compute_ovr(target_season='2024-2025'):
             "badges": last['badges'],
             "projected": True,
         })
+
+    # 공백 시즌 보간/다음 시즌 예상 행이 뒤에 통째로 덧붙는 구조라, 그대로 두면 한 선수의
+    # 시즌이 배열 순서상 뒤섞인다(예: 2016-17 보간 행이 2021-22 뒤에 옴) - lib/ovr.ts의
+    # getPlayerOvrHistory()는 이 배열이 이미 오름차순 정렬돼 있다고 가정하므로(재정렬 안 함)
+    # 여기서 최종적으로 한 번 더 정렬해 그 가정을 보장한다.
+    out_data.sort(key=lambda r: (r['pcode'], r['season']))
 
     OUT_PATH = os.path.join(os.path.dirname(__file__), '..', 'courtside-web', 'lib', 'courtside_ovr_history.json')
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)

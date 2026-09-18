@@ -1,76 +1,33 @@
 import Link from "next/link";
-import { getOvrHistoryCache } from "@/lib/ovr";
+import { getAllTeamPowers, tierClass as sharedTierClass } from "@/lib/teamPower";
 import styles from "../rankings.module.css";
 import { TeamBadge } from "@/components/TeamBadge";
 
 export const maxDuration = 60;
 
+const TIER_CLASS_MAP = {
+  gold: "tierGold",
+  silver: "tierSilver",
+  bronze: "tierBronze",
+  default: "tierDefault",
+} as const;
+
 function tierClass(rating: number): string {
-  if (rating >= 95) return styles.tierGold;
-  if (rating >= 85) return styles.tierSilver;
-  if (rating >= 75) return styles.tierBronze;
-  return styles.tierDefault;
+  return styles[TIER_CLASS_MAP[sharedTierClass(rating)]];
 }
 
 export default async function TeamRankingsPage() {
-  const history = getOvrHistoryCache();
-  
-  // Find the latest season
-  const seasons = Array.from(new Set(history.map(r => r.season))).sort();
-  const latestSeason = seasons[seasons.length - 1];
-  
-  const players = history.filter(r => r.season === latestSeason && r.team && r.team !== "Unknown");
-  
-  const teamsMap = new Map<string, typeof players>();
-  for (const p of players) {
-    if (!teamsMap.has(p.team!)) teamsMap.set(p.team!, []);
-    teamsMap.get(p.team!)!.push(p);
-  }
-  
-  const teamPowers = Array.from(teamsMap.entries()).map(([teamName, roster]) => {
-    // Sort roster by OVR desc
-    const sorted = [...roster].sort((a, b) => b.OVR - a.OVR);
-    
-    // Team Power Formula: (Top 5 OVR * 0.7 + Next 4 OVR * 0.3) / 4.7
-    // If team has fewer players, just average them
-    let teamOvr = 0, teamOff = 0, teamDef = 0;
-    
-    if (sorted.length === 0) {
-      return { teamName, teamOvr: 0, teamOff: 0, teamDef: 0, topPlayers: [] };
-    } else if (sorted.length < 5) {
-      teamOvr = sorted.reduce((sum, p) => sum + p.OVR, 0) / sorted.length;
-      teamOff = sorted.reduce((sum, p) => sum + p.OFF, 0) / sorted.length;
-      teamDef = sorted.reduce((sum, p) => sum + p.DEF, 0) / sorted.length;
-    } else {
-      const top5 = sorted.slice(0, 5);
-      const next4 = sorted.slice(5, 9); // up to 4 players
-      
-      const calcPower = (key: 'OVR' | 'OFF' | 'DEF') => {
-        const sum5 = top5.reduce((sum, p) => sum + p[key], 0);
-        const sum4 = next4.reduce((sum, p) => sum + p[key], 0);
-        const weight5 = 0.7;
-        const weight4 = 0.3;
-        const totalWeight = (top5.length * weight5) + (next4.length * weight4);
-        return ((sum5 * weight5) + (sum4 * weight4)) / totalWeight;
-      };
-      
-      teamOvr = calcPower('OVR');
-      teamOff = calcPower('OFF');
-      teamDef = calcPower('DEF');
-    }
-    
-    return {
-      teamName,
-      teamOvr: Math.round(teamOvr),
-      teamOff: Math.round(teamOff),
-      teamDef: Math.round(teamDef),
-      topPlayers: sorted.slice(0, 5),
-      fullRoster: sorted
-    };
-  });
-  
-  // Sort teams by Team OVR desc
-  teamPowers.sort((a, b) => b.teamOvr - a.teamOvr);
+  // 계산 로직은 lib/teamPower.ts로 옮겼다(프리시즌/팀 상세 페이지와 공유) - 이 페이지는
+  // 그 결과를 topPlayers(주전 5) 표시용으로만 다시 다듬는다.
+  const allPowers = getAllTeamPowers();
+  const teamPowers = allPowers.map((t) => ({
+    teamName: t.teamName,
+    teamOvr: t.ovr,
+    teamOff: t.off,
+    teamDef: t.def,
+    topPlayers: t.roster.slice(0, 5),
+  }));
+  const latestSeason = allPowers[0]?.season ?? "";
 
   return (
     <div className={styles.container}>

@@ -30,6 +30,7 @@ import { DepartureImpact } from "@/components/DepartureImpact";
 import { ImportRule } from "@/components/ImportRule";
 import { getDepartureReport } from "@/lib/departureImpact";
 import { getImportRuleReport } from "@/lib/importRule";
+import { getAllTeamPowers, type TeamPower } from "@/lib/teamPower";
 import styles from "./preseason.module.css";
 
 /**
@@ -486,7 +487,15 @@ function ProjectionSection({
 }
 
 // ── 2. 로스터 이동 지도 - 한 줄 렌더(ChangeLine/statLine)는 팀 프로필과 공유(components/RosterChangeLine.tsx) ──
-function TeamCard({ t, abbrOf }: { t: TeamRosterChanges; abbrOf: (tcode: string | null) => string | null }) {
+function TeamCard({
+  t,
+  abbrOf,
+  power,
+}: {
+  t: TeamRosterChanges;
+  abbrOf: (tcode: string | null) => string | null;
+  power: TeamPower | null;
+}) {
   // 국내 로스터까지 들어오면 팀당 25행 안팎이 되는데, 그중 15~18행이 "잔류"라 카드가 잔류
   // 목록에 묻힌다. 변화(영입·신입·이탈)만 펼쳐 두고 잔류는 접어 둔다(순수 <details>, JS 없음).
   const changed = [...t.in, ...t.back, ...t.new, ...t.out];
@@ -506,6 +515,11 @@ function TeamCard({ t, abbrOf }: { t: TeamRosterChanges; abbrOf: (tcode: string 
         {/* 맨 텍스트 노드로 두면 익명 flex 아이템이 되어 최소 폭까지 줄어든다("원/주/DB").
             span으로 감싸 nowrap을 준다 - 좁아질 때 접혀야 하는 건 이름이 아니라 오른쪽 요약이다. */}
         <span className={styles.teamCardName}>{t.team.name}</span>
+        {power && (
+          <span className={styles.teamPowerBadge} title={`OFF ${power.off} · DEF ${power.def}`}>
+            PWR {power.ovr}
+          </span>
+        )}
         <span className={styles.teamCardSum}>{summary}</span>
       </Link>
       {changed.map((r) => (
@@ -528,6 +542,9 @@ function RosterSection({ report, num }: { report: RosterChangeReport; num: numbe
   const abbrByTcode = new Map(report.teams.map((t) => [t.team.tcode, t.team.abbr]));
   const abbrOf = (tcode: string | null) => (tcode ? (abbrByTcode.get(tcode) ?? tcode) : null);
   const prev = shortSeason(report.prevSeason);
+  // 요청: "우리가 만든 오버롤 데이터로 파워를 수치화해서 보여주면 재밌을 것 같아" - 팀
+  // 이름(이번 시즌 표기, displayTeamName 적용된 값)으로 매칭한다.
+  const powerByTeamName = new Map(getAllTeamPowers().map((p) => [p.teamName, p]));
 
   // 대조 결과가 0행이면 "변화 없음"이 아니라 "아직 확정 로스터를 못 받음"이다. 헤드라인 타일을
   // 그대로 그리면 "팀 간 이동 0건 · 영입 0 · 이탈 0"이 되어, 하지도 않은 대조를 수행한 것처럼
@@ -602,7 +619,7 @@ function RosterSection({ report, num }: { report: RosterChangeReport; num: numbe
 
       <div className={styles.teamGrid}>
         {report.teams.map((t) => (
-          <TeamCard key={t.team.tcode} t={t} abbrOf={abbrOf} />
+          <TeamCard key={t.team.tcode} t={t} abbrOf={abbrOf} power={powerByTeamName.get(t.team.name) ?? null} />
         ))}
       </div>
 
