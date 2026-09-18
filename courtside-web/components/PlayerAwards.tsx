@@ -16,9 +16,11 @@ export default function PlayerAwards({ pcode }: Props) {
     if (id === "champ") return "🏆";
     if (id === "regular_champ") return "🥇";
     if (id === "runner_up" || id === "regular_runner_up") return "🥈";
-    if (id === "mvp") return "⭐";
-    if (name.includes("올스타")) return "🌟";
-    if (name.includes("수비")) return "🛡️";
+    if (id === "regular_mvp") return "⭐";
+    if (id === "po_mvp") return "👑";
+    if (id === "allstar_mvp" || name.includes("올스타")) return "🌟";
+    if (id === "rookie") return "🌱";
+    if (id === "dpoy" || name.includes("수비")) return "🛡️";
     if (name.includes("득점")) return "🔥";
     if (name.includes("어시스트")) return "🏀";
     if (name.includes("리바운드")) return "🧱";
