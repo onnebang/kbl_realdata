@@ -1,0 +1,86 @@
+.container {
+  margin-top: 1.5rem;
+  background: var(--surface);
+  border-radius: var(--r-card);
+  padding: 1.5rem;
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+}
+
+.title {
+  font-size: var(--fs-400);
+  font-weight: 800;
+  margin-bottom: 24px;
+  color: var(--hero-team, var(--ink));
+  text-transform: uppercase;
+}
+
+.tableSection {
+  margin-bottom: 32px;
+}
+.tableSection:last-child {
+  margin-bottom: 0;
+}
+
+.sectionTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dashTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+
+.dashTable th,
+.dashTable td {
+  padding: 8px 12px;
+  text-align: right;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dashTable th:first-child,
+.dashTable td:first-child {
+  text-align: left;
+  padding-left: 0;
+}
+
+.dashTable th:last-child,
+.dashTable td:last-child {
+  padding-right: 0;
+}
+
+.dashTable th {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8rem;
+}
+
+.dashTable td {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+}
+
+.dashTable tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.labelCol {
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+
+/* Empty state */
+.empty {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  padding: 32px 0;
+}

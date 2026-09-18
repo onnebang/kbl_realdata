@@ -80,6 +80,7 @@ import OvrTrendChart from "@/components/OvrTrendChart";
 import AchievementTrophyRoom from "@/components/AchievementTrophyRoom";
 import PlayerAwards from "@/components/PlayerAwards";
 import PlayerHeroTabs from "@/components/PlayerHeroTabs";
+import ShootingDashboard from "@/components/ShootingDashboard";
 import { getPlayerAwards } from "@/lib/awards";
 import styles from "./player-profile.module.css";
 
@@ -953,6 +954,13 @@ export default async function PlayerPage({
           </div>
         )}
       </div>
+
+      {/* ── NEW: Shooting Dashboard ── */}
+      {seasonShots.length > 0 && (
+        <div className={styles.panel}>
+          <ShootingDashboard shots={seasonShots} />
+        </div>
+      )}
 
       {/* ── 3. 슈팅 DNA - 존 구성비의 커리어 변화 ── */}
       <div className={styles.panel}>
