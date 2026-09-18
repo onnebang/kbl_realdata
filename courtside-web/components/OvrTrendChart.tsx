@@ -135,15 +135,36 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
     return season;
   };
 
+  // 호버한 시즌의 세부 정보 - 예전엔 그 점 옆에 뜨는 SVG 툴팁 박스였는데, 다시즌 커리어는
+  // 점 간격(spacing)이 툴팁 폭(190)보다 훨씬 좁아서 옆 배지 2~3개를 그대로 덮어버렸다
+  // (제보: "지금도 마찬가지로 가리고 있어" - 배지 크기/간격을 아무리 조정해도 툴팁이 점을
+  // 따라다니는 구조 자체가 문제였다). 그래프 위에 떠다니는 대신 헤더 밑 고정된 자리에
+  // 표시해서, 데이터가 몇 개든 겹칠 여지 자체를 없앤다.
+  const hovered = hoverIdx !== null ? history[hoverIdx] : null;
+
   return (
     <div className={styles.container} style={{ "--chart-color": teamColor } as React.CSSProperties}>
       <div className={styles.header}>
         <h3 className={styles.title}>SEASON OVR TREND</h3>
-        <p className={styles.subtitle}>
-          역대 시즌 오버롤(OVR) 변화 추이 · 배지 색=시즌 등급
-          {hasTeamChange ? " · 선 색=소속팀" : ""}
-          {anyProjected ? " · 점선=예상(다음 시즌 또는 공백 시즌 보간)" : ""}
-        </p>
+        {hovered ? (
+          <div className={styles.hoverDetail}>
+            <span className={styles.hoverSeason}>
+              {hovered.season}{hovered.projected ? " (예상)" : ""}
+            </span>
+            <span className={styles.hoverOvr} style={{ background: tierColor(hovered.OVR) }}>
+              OVR {hovered.OVR}
+            </span>
+            <span className={styles.hoverSub}>
+              OFF {hovered.OFF} · DEF {hovered.DEF}{hovered.team ? ` · ${hovered.team}` : ""}
+            </span>
+          </div>
+        ) : (
+          <p className={styles.subtitle}>
+            역대 시즌 오버롤(OVR) 변화 추이 · 배지 색=시즌 등급
+            {hasTeamChange ? " · 선 색=소속팀" : ""}
+            {anyProjected ? " · 점선=예상(다음 시즌 또는 공백 시즌 보간)" : ""}
+          </p>
+        )}
       </div>
 
       <div className={styles.chartWrapper}>
@@ -288,25 +309,6 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
                 >
                   {record.OVR}
                 </text>
-
-                {/* 툴팁 SVG 구현 (Hover) */}
-                {isHovered && (
-                  <g className={styles.tooltipGroup}>
-                    {/* 툴팁 위치 조정 (오른쪽 가장자리 짤림 방지) */}
-                    <g transform={`translate(${cx > WIDTH - 220 ? cx - 200 : cx + 20}, ${Math.max(cy - 60, PADDING_TOP)})`}>
-                      <rect width="190" height="120" rx="6" className={styles.tooltipBg} style={{ stroke: pointColor }} />
-                      <text x="16" y="34" className={styles.tooltipTitle}>
-                        {record.season}{isProjected ? " (예상)" : ""}
-                      </text>
-                      <text x="16" y="70" className={styles.tooltipValue}>
-                        OVR <tspan className={styles.tooltipHighlight} style={{ fill: tColor }}>{record.OVR}</tspan>
-                      </text>
-                      <text x="16" y="100" className={styles.tooltipSub}>
-                        OFF {record.OFF} / DEF {record.DEF}{record.team ? ` · ${record.team}` : ""}
-                      </text>
-                    </g>
-                  </g>
-                )}
               </g>
             );
           })}

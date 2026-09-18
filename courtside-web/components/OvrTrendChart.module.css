@@ -200,48 +200,44 @@
   color: #888;
 }
 
-/* 툴팁 */
-.tooltipGroup {
-  pointer-events: none;
-  animation: fadeIn 0.15s ease forwards;
+/* 호버 세부 정보 - 헤더 밑 고정된 자리(요청: "지금도 마찬가지로 가리고 있어" - 그래프
+   위를 따라다니는 툴팁은 다시즌 커리어에서 점 간격보다 넓어 옆 배지를 계속 덮었다.
+   고정 위치라 데이터가 몇 개든, 어느 점을 호버하든 겹칠 여지가 없다). subtitle과
+   자리를 바꿔가며 나오므로 레이아웃이 튀지 않게 같은 줄 높이를 쓴다. */
+.hoverDetail {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+  animation: fadeIn 0.12s ease;
 }
 
-.tooltipBg {
-  fill: rgba(20, 20, 20, 0.95);
-  stroke: var(--chart-color);
-  stroke-width: 1.5;
-  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
-}
-
-.tooltipTitle {
-  fill: #c0c0c0;
-  font-size: 20px;
+.hoverSeason {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #ffffff;
   font-family: "IBM Plex Mono", monospace;
-  font-weight: bold;
 }
 
-.tooltipValue {
-  fill: #ffffff;
-  font-size: 24px;
+.hoverOvr {
+  font-size: 0.75rem;
   font-weight: 800;
-  font-family: var(--font-bangers), "Impact", sans-serif;
-  letter-spacing: 1px;
+  color: #0d0d0d;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-family: "Big Shoulders Display", sans-serif;
 }
 
-.tooltipHighlight {
-  fill: var(--chart-color);
-  font-size: 30px;
-}
-
-.tooltipSub {
-  fill: #a0a0a0;
-  font-size: 20px;
-  font-weight: 600;
+.hoverSub {
+  font-size: 0.8125rem;
+  color: #a0a0a0;
+  font-weight: 500;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @media (max-width: 480px) {
