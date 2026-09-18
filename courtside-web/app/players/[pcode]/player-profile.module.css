@@ -576,7 +576,8 @@
 }
 .courtTilt {
   perspective: 800px;
-  max-width: 320px;
+  width: 100%;
+  max-width: 480px;
   margin: 0 auto;
 }
 .courtSvg {
