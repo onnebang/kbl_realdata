@@ -18,32 +18,24 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
 
   // 차트 스케일링 설정
   const WIDTH = 1000;
-  // 원래 260(가로세로 비 3.85:1)은 svgChart가 width:100%/height:auto로 뷰박스 비율을 그대로
-  // 유지하는 구조라, 모바일처럼 폭이 좁아지면 높이도 같이 줄어들어(예: 340px 폭이면 높이
-  // 88px) 등락 자체가 눌려서 거의 안 보였다(감사 피드백: "아직도 너무 작아서 안 보임").
-  // 380으로 늘려 비율을 2.6:1로 낮추면 같은 폭에서도 세로 진폭이 훨씬 커진다.
-  const HEIGHT = 380;
-  // 축 라벨이 회전 없이 가로로 짧게만 찍혀서(formatSeason) 60px짜리 하단 여백은 과했다 -
-  // 줄여서 꺾은선 자체가 상자를 더 채우게(감사 피드백: "추이가 잘 안 보임"의 절반은 라벨/점
-  // 대비 문제였지만 나머지 절반은 그래프가 상자 안에서 너무 작게 그려지던 것).
-  // 축 글자 크기를 11px->26px로 키운 만큼(제보: "인간의 눈으로 볼 수가 없어") 라벨이
-  // 잘리지 않도록 여백도 같이 키운다.
-  const PADDING_TOP = 34;
+  // 2kratings.com류 참고 이미지처럼 각 점 위에 오버롤 숫자를 항상 큼직하게 띄우려면 그
+  // 배지가 들어갈 위쪽 여백이 예전(34)보다 훨씬 더 필요하다 - 높이/상단 패딩을 늘린다.
+  const HEIGHT = 460;
+  const PADDING_TOP = 90;
   const PADDING_BOTTOM = 60;
   const PADDING_X = 90;
 
   // 고정 40-99 범위(리그 전체 스케일)는 한 선수의 실제 등락(보통 한 자리~10대 초반)을
-  // 59점짜리 축에 욱여넣어 선이 거의 평평해 보였다(제보: "모바일에서 차이가 거의 안 보임" -
-  // 실은 모바일만의 문제가 아니라 축 자체가 이 선수의 변동폭보다 훨씬 넓었던 것). 그 선수의
-  // 실제 최저~최고를 기준으로 축을 맞춰서(+여유), 변동이 작을수록 더 확대해서 보여준다.
+  // 59점짜리 축에 욱여넣어 선이 거의 평평해 보였다. 그 선수의 실제 최저~최고를 기준으로
+  // 축을 맞춰서(+여유), 변동이 작을수록 더 확대해서 보여준다.
   const values = history.map((r) => r.OVR);
   const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
   const pad = Math.max(4, (rawMax - rawMin) * 0.25);
   let MIN_OVR = Math.max(30, Math.floor((rawMin - pad) / 5) * 5);
   let MAX_OVR = Math.min(99, Math.ceil((rawMax + pad) / 5) * 5);
-  // 변동이 거의 없는 선수(예: 커리어 내내 OVR 70 고정)까지 확대하면 축이 5점짜리가 되어
-  // 오히려 사소한 잡음을 큰 등락처럼 과장한다 - 최소 폭 15점은 유지.
+  // 변동이 거의 없는 선수까지 확대하면 축이 5점짜리가 되어 사소한 잡음을 큰 등락처럼
+  // 과장한다 - 최소 폭 15점은 유지.
   if (MAX_OVR - MIN_OVR < 15) {
     const mid = (MAX_OVR + MIN_OVR) / 2;
     MIN_OVR = Math.max(30, Math.round(mid - 7.5));
@@ -51,10 +43,17 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
   }
 
   const yRange = MAX_OVR - MIN_OVR;
-  // 눈금 4개 - 축 범위가 선수마다 달라지므로(위 동적 계산) 예전처럼 40/60/80/99를 박아둘 수 없다.
   const gridVals = Array.from(new Set([MIN_OVR, Math.round(MIN_OVR + yRange / 3), Math.round(MIN_OVR + (yRange * 2) / 3), MAX_OVR]));
   const innerHeight = HEIGHT - PADDING_TOP - PADDING_BOTTOM;
   const innerWidth = WIDTH - PADDING_X * 2;
+
+  // 커리어가 길수록(시즌 수가 많을수록) 점 사이 간격이 좁아진다 - 배지/글자 크기를 그
+  // 간격에 맞춰 줄여서 겹치지 않게 한다(신인 2~3시즌은 참고 이미지처럼 크게, 15시즌
+  // 롱런 선수는 촘촘하게).
+  const spacing = history.length > 1 ? innerWidth / (history.length - 1) : innerWidth;
+  const badgeR = Math.max(15, Math.min(30, spacing / 2 - 4));
+  const badgeFont = Math.max(15, Math.round(badgeR * 0.8));
+  const xLabelFont = Math.max(14, Math.min(26, spacing / 3.4));
 
   // 좌표 계산 함수
   const getX = (index: number) => {
@@ -67,7 +66,20 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
     return PADDING_TOP + innerHeight - ((clamped - MIN_OVR) / yRange) * innerHeight;
   };
 
-  // Area Path (Fill)
+  // 예상(다음 시즌, 아직 경기 기록 없음) 구간은 확정 구간과 선을 분리해 점선으로 그린다 -
+  // 실측/추정이 시각적으로도 구분되게(요청: "예상 오버롤이 흐름이 제대로 이어지는지").
+  const projectedStartIdx = history.findIndex((r) => r.projected);
+  const confirmedHistory = projectedStartIdx === -1 ? history : history.slice(0, projectedStartIdx + 1);
+
+  const pathFor = (rows: OvrSeasonRecord[], offset: number) => {
+    if (rows.length === 0) return "";
+    return `M ${getX(offset)},${getY(rows[0].OVR)} ${rows
+      .slice(1)
+      .map((r, i) => `L ${getX(offset + i + 1)},${getY(r.OVR)}`)
+      .join(" ")}`;
+  };
+
+  // Area Path (Fill) - 전체 구간(예상 포함) 채우기
   const areaPath = `
     M ${getX(0)},${HEIGHT - PADDING_BOTTOM}
     ${history.map((r, i) => `L ${getX(i)},${getY(r.OVR)}`).join(" ")}
@@ -75,11 +87,11 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
     Z
   `;
 
-  // Line Path (Stroke)
-  const linePath = `
-    M ${getX(0)},${getY(history[0].OVR)}
-    ${history.slice(1).map((r, i) => `L ${getX(i + 1)},${getY(r.OVR)}`).join(" ")}
-  `;
+  // 확정 구간 선(실선) - 예상 구간이 있으면 그 시작점까지만
+  const confirmedLinePath = pathFor(confirmedHistory, 0);
+  // 예상 구간 선(점선) - 마지막 확정 점 -> 예상 점만 잇는다
+  const projectedLinePath =
+    projectedStartIdx > 0 ? pathFor(history.slice(projectedStartIdx - 1), projectedStartIdx - 1) : "";
 
   // 시즌 라벨 (ex: 2024-2025 -> 24/25)
   const formatSeason = (season: string) => {
@@ -94,7 +106,7 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
     <div className={styles.container} style={{ "--chart-color": teamColor } as React.CSSProperties}>
       <div className={styles.header}>
         <h3 className={styles.title}>SEASON OVR TREND</h3>
-        <p className={styles.subtitle}>역대 시즌 오버롤(OVR) 변화 추이</p>
+        <p className={styles.subtitle}>역대 시즌 오버롤(OVR) 변화 추이{projectedStartIdx !== -1 ? " · 점선=다음 시즌 예상" : ""}</p>
       </div>
 
       <div className={styles.chartWrapper}>
@@ -136,22 +148,27 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
           {/* 영역형 차트 채우기 */}
           <path d={areaPath} fill="url(#areaGradient)" className={styles.areaPath} />
 
-          {/* 꺾은선 */}
-          <path d={linePath} className={styles.linePath} filter="url(#glow)" />
+          {/* 꺾은선: 확정 구간(실선) + 예상 구간(점선) */}
+          <path d={confirmedLinePath} className={styles.linePath} filter="url(#glow)" />
+          {projectedLinePath && (
+            <path d={projectedLinePath} className={styles.linePathProjected} />
+          )}
 
-          {/* 데이터 포인트 (Dots) 및 호버 인터랙션 영역 */}
+          {/* 데이터 포인트 + 항상 보이는 오버롤 숫자 배지 */}
           {history.map((record, i) => {
             const cx = getX(i);
             const cy = getY(record.OVR);
             const isHovered = hoverIdx === i;
+            const isProjected = !!record.projected;
+            const badgeCy = Math.max(cy - badgeR - 14, badgeR + 4);
 
             return (
               <g key={i} onMouseEnter={() => setHoverIdx(i)}>
                 {/* 툴팁을 띄우기 위한 넓은 감지 영역 */}
                 <rect
-                  x={cx - (innerWidth / history.length) / 2}
+                  x={cx - spacing / 2}
                   y={0}
-                  width={innerWidth / history.length}
+                  width={spacing}
                   height={HEIGHT}
                   fill="transparent"
                   style={{ cursor: "crosshair" }}
@@ -161,9 +178,10 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
                 <text
                   x={cx}
                   y={HEIGHT - 32}
+                  fontSize={xLabelFont}
                   className={`${styles.xAxisLabel} ${isHovered ? styles.xAxisLabelActive : ""}`}
                 >
-                  {formatSeason(record.season)}
+                  {formatSeason(record.season)}{isProjected ? "*" : ""}
                 </text>
 
                 {/* 활성화된 세로 가이드라인 */}
@@ -182,17 +200,37 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
                   cx={cx}
                   cy={cy}
                   r={isHovered ? 6 : 4}
-                  className={`${styles.dataPoint} ${isHovered ? styles.dataPointActive : ""}`}
+                  className={`${styles.dataPoint} ${isHovered ? styles.dataPointActive : ""} ${isProjected ? styles.dataPointProjected : ""}`}
                 />
+
+                {/* 참고 이미지 스타일: 오버롤 숫자를 배지로 항상 표시(호버 없이도 읽힘) */}
+                <line
+                  x1={cx} y1={cy} x2={cx} y2={badgeCy + badgeR}
+                  className={styles.badgeStem}
+                />
+                <circle
+                  cx={cx}
+                  cy={badgeCy}
+                  r={badgeR}
+                  className={`${styles.ovrBadge} ${isProjected ? styles.ovrBadgeProjected : ""} ${isHovered ? styles.ovrBadgeActive : ""}`}
+                />
+                <text
+                  x={cx}
+                  y={badgeCy}
+                  fontSize={badgeFont}
+                  className={styles.ovrBadgeText}
+                >
+                  {record.OVR}
+                </text>
 
                 {/* 툴팁 SVG 구현 (Hover) */}
                 {isHovered && (
                   <g className={styles.tooltipGroup}>
                     {/* 툴팁 위치 조정 (오른쪽 가장자리 짤림 방지) */}
-                    <g transform={`translate(${cx > WIDTH - 220 ? cx - 200 : cx + 20}, ${Math.max(cy - 100, PADDING_TOP)})`}>
+                    <g transform={`translate(${cx > WIDTH - 220 ? cx - 200 : cx + 20}, ${Math.max(cy - 60, PADDING_TOP)})`}>
                       <rect width="190" height="120" rx="6" className={styles.tooltipBg} />
                       <text x="16" y="34" className={styles.tooltipTitle}>
-                        {record.season}{record.projected ? " (예상)" : ""}
+                        {record.season}{isProjected ? " (예상)" : ""}
                       </text>
                       <text x="16" y="70" className={styles.tooltipValue}>
                         OVR <tspan className={styles.tooltipHighlight}>{record.OVR}</tspan>
@@ -208,6 +246,9 @@ export default function OvrTrendChart({ history, teamColor = "#542582" }: OvrTre
           })}
         </svg>
       </div>
+      {projectedStartIdx !== -1 && (
+        <p className={styles.projectedNote}>* 아직 경기 기록이 없는 다음 시즌 - 작년 기록 기반 예상치</p>
+      )}
     </div>
   );
 }

@@ -41814,14 +41814,14 @@
     "projected": false
   },
   {
-    "pcode": "291589",
-    "name": "인승찬",
+    "pcode": "291388",
+    "name": "이도헌",
     "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "FD",
+    "team": "울산 현대모비스",
+    "position": "GD",
     "OVR": 72,
-    "OFF": 73,
-    "DEF": 70,
+    "OFF": 72,
+    "DEF": 71,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -41832,15 +41832,15 @@
     "projected": true
   },
   {
-    "pcode": "291091",
-    "name": "양홍석",
+    "pcode": "291351",
+    "name": "이윤기",
     "season": "2026-2027",
-    "team": "창원 LG",
+    "team": "원주 DB",
     "position": "FD",
-    "OVR": 86,
-    "OFF": 86,
-    "DEF": 86,
-    "archetype": "락다운 디펜더",
+    "OVR": 70,
+    "OFF": 69,
+    "DEF": 71,
+    "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
       "shooting": 0,
@@ -41850,35 +41850,143 @@
     "projected": true
   },
   {
-    "pcode": "290754",
-    "name": "한호빈",
+    "pcode": "291844",
+    "name": "김명진",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "FD",
+    "OVR": 71,
+    "OFF": 70,
+    "DEF": 71,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291289",
+    "name": "박준은",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "FD",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291070",
+    "name": "최성원",
+    "season": "2026-2027",
+    "team": "원주 DB",
+    "position": "GD",
+    "OVR": 77,
+    "OFF": 80,
+    "DEF": 76,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291605",
+    "name": "조재우",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "C",
+    "OVR": 69,
+    "OFF": 69,
+    "DEF": 69,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290485",
+    "name": "최부경",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "C",
+    "OVR": 72,
+    "OFF": 70,
+    "DEF": 80,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290501",
+    "name": "최현민",
     "season": "2026-2027",
     "team": "서울 삼성",
+    "position": "FD",
+    "OVR": 72,
+    "OFF": 71,
+    "DEF": 73,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291855",
+    "name": "강지훈",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "C",
+    "OVR": 80,
+    "OFF": 79,
+    "DEF": 80,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291499",
+    "name": "조은후",
+    "season": "2026-2027",
+    "team": "원주 DB",
     "position": "GD",
     "OVR": 72,
-    "OFF": 73,
+    "OFF": 72,
     "DEF": 72,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
-      "shooting": 1,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291787",
-    "name": "케렘 칸터",
-    "season": "2026-2027",
-    "team": "서울 삼성",
-    "position": "C",
-    "OVR": 87,
-    "OFF": 88,
-    "DEF": 86,
-    "archetype": "글래스 클리너",
-    "badges": {
-      "finishing": 2,
       "shooting": 0,
       "playmaking": 0,
       "defense": 0
@@ -41886,32 +41994,14 @@
     "projected": true
   },
   {
-    "pcode": "291583",
-    "name": "렌즈 아반도",
-    "season": "2026-2027",
-    "team": "안양 정관장",
-    "position": "GD",
-    "OVR": 81,
-    "OFF": 80,
-    "DEF": 82,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 1
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291597",
-    "name": "신동혁",
+    "pcode": "291764",
+    "name": "황영찬",
     "season": "2026-2027",
     "team": "서울 삼성",
-    "position": "FD",
-    "OVR": 76,
-    "OFF": 76,
-    "DEF": 77,
+    "position": "Unknown",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -41922,12 +42012,12 @@
     "projected": true
   },
   {
-    "pcode": "291489",
-    "name": "문시윤",
+    "pcode": "291095",
+    "name": "윤성원",
     "season": "2026-2027",
-    "team": "창원 LG",
+    "team": "서울 삼성",
     "position": "FD",
-    "OVR": 71,
+    "OVR": 72,
     "OFF": 71,
     "DEF": 72,
     "archetype": "롤 플레이어",
@@ -41940,14 +42030,14 @@
     "projected": true
   },
   {
-    "pcode": "290783",
-    "name": "이현석",
+    "pcode": "291005",
+    "name": "최승욱",
     "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "GD",
-    "OVR": 65,
-    "OFF": 64,
-    "DEF": 67,
+    "team": "대구 한국가스공사",
+    "position": "FD",
+    "OVR": 74,
+    "OFF": 73,
+    "DEF": 76,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -41958,13 +42048,13 @@
     "projected": true
   },
   {
-    "pcode": "290603",
-    "name": "이대헌",
+    "pcode": "290765",
+    "name": "이재도",
     "season": "2026-2027",
-    "team": "안양 정관장",
-    "position": "FD",
-    "OVR": 81,
-    "OFF": 81,
+    "team": "고양 소노",
+    "position": "GD",
+    "OVR": 83,
+    "OFF": 84,
     "DEF": 81,
     "archetype": "롤 플레이어",
     "badges": {
@@ -41976,17 +42066,53 @@
     "projected": true
   },
   {
-    "pcode": "290790",
-    "name": "정효근",
+    "pcode": "290750",
+    "name": "김종규",
     "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "FD",
+    "team": "안양 정관장",
+    "position": "C",
     "OVR": 82,
-    "OFF": 77,
+    "OFF": 80,
     "DEF": 84,
+    "archetype": "락다운 디펜더",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291599",
+    "name": "염유성",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "GD",
+    "OVR": 72,
+    "OFF": 72,
+    "DEF": 72,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291342",
+    "name": "숀 롱",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "FD",
+    "OVR": 90,
+    "OFF": 90,
+    "DEF": 90,
+    "archetype": "글래스 클리너",
+    "badges": {
+      "finishing": 3,
       "shooting": 0,
       "playmaking": 0,
       "defense": 1
@@ -41994,157 +42120,49 @@
     "projected": true
   },
   {
-    "pcode": "290450",
-    "name": "오세근",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "FD",
-    "OVR": 84,
-    "OFF": 83,
-    "DEF": 85,
-    "archetype": "락다운 디펜더",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291208",
-    "name": "조한진",
-    "season": "2026-2027",
-    "team": "울산 현대모비스",
-    "position": "FD",
-    "OVR": 78,
-    "OFF": 76,
-    "DEF": 80,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290524",
-    "name": "라건아",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "C",
-    "OVR": 92,
-    "OFF": 92,
-    "DEF": 93,
-    "archetype": "글래스 클리너",
-    "badges": {
-      "finishing": 2,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291641",
-    "name": "박종하",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "GD",
-    "OVR": 75,
-    "OFF": 76,
-    "DEF": 73,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291845",
-    "name": "안성우",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "GD",
-    "OVR": 71,
-    "OFF": 72,
-    "DEF": 70,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291291",
-    "name": "박정현",
-    "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "C",
-    "OVR": 71,
-    "OFF": 70,
-    "DEF": 74,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291640",
-    "name": "유기상",
-    "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "GD",
-    "OVR": 82,
-    "OFF": 83,
-    "DEF": 82,
-    "archetype": "샤프슈터",
-    "badges": {
-      "finishing": 0,
-      "shooting": 3,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291008",
-    "name": "박지훈",
-    "season": "2026-2027",
-    "team": "안양 정관장",
-    "position": "GD",
-    "OVR": 87,
-    "OFF": 88,
-    "DEF": 86,
-    "archetype": "락다운 디펜더",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 1,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291587",
-    "name": "박선웅",
+    "pcode": "291671",
+    "name": "패리스 배스",
     "season": "2026-2027",
     "team": "수원 KT",
+    "position": "FD",
+    "OVR": 95,
+    "OFF": 97,
+    "DEF": 92,
+    "archetype": "스트레치 빅",
+    "badges": {
+      "finishing": 3,
+      "shooting": 2,
+      "playmaking": 1,
+      "defense": 2
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291368",
+    "name": "오재현",
+    "season": "2026-2027",
+    "team": "서울 SK",
     "position": "GD",
-    "OVR": 70,
-    "OFF": 68,
+    "OVR": 82,
+    "OFF": 82,
+    "DEF": 82,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291592",
+    "name": "여준형",
+    "season": "2026-2027",
+    "team": "서울 삼성",
+    "position": "FD",
+    "OVR": 71,
+    "OFF": 71,
     "DEF": 71,
     "archetype": "롤 플레이어",
     "badges": {
@@ -42156,86 +42174,32 @@
     "projected": true
   },
   {
-    "pcode": "291512",
-    "name": "저스틴 구탕",
+    "pcode": "291220",
+    "name": "변준형",
     "season": "2026-2027",
-    "team": "서울 삼성",
-    "position": "FD",
-    "OVR": 83,
-    "OFF": 82,
-    "DEF": 83,
-    "archetype": "롤 플레이어",
+    "team": "안양 정관장",
+    "position": "GD",
+    "OVR": 84,
+    "OFF": 86,
+    "DEF": 82,
+    "archetype": "올어라운드 스렛",
     "badges": {
       "finishing": 0,
       "shooting": 0,
       "playmaking": 1,
-      "defense": 1
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290440",
-    "name": "이관희",
-    "season": "2026-2027",
-    "team": "서울 삼성",
-    "position": "GD",
-    "OVR": 80,
-    "OFF": 82,
-    "DEF": 79,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 1,
-      "playmaking": 0,
       "defense": 0
     },
     "projected": true
   },
   {
-    "pcode": "291862",
-    "name": "양우혁",
+    "pcode": "291304",
+    "name": "이윤수",
     "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "GD",
-    "OVR": 86,
-    "OFF": 89,
-    "DEF": 83,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290539",
-    "name": "장재석",
-    "season": "2026-2027",
-    "team": "전주 KCC",
+    "team": "원주 DB",
     "position": "C",
-    "OVR": 81,
-    "OFF": 73,
-    "DEF": 83,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291659",
-    "name": "민기남",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "GD",
-    "OVR": 73,
-    "OFF": 73,
-    "DEF": 73,
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -42264,157 +42228,13 @@
     "projected": true
   },
   {
-    "pcode": "291266",
-    "name": "전성환",
+    "pcode": "291483",
+    "name": "정호영",
     "season": "2026-2027",
-    "team": "서울 SK",
+    "team": "원주 DB",
     "position": "GD",
-    "OVR": 69,
-    "OFF": 73,
-    "DEF": 65,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290776",
-    "name": "허웅",
-    "season": "2026-2027",
-    "team": "전주 KCC",
-    "position": "GD",
-    "OVR": 86,
-    "OFF": 90,
-    "DEF": 82,
-    "archetype": "샤프슈터",
-    "badges": {
-      "finishing": 1,
-      "shooting": 3,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291848",
-    "name": "박정환",
-    "season": "2026-2027",
-    "team": "울산 현대모비스",
-    "position": "GD",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291095",
-    "name": "윤성원",
-    "season": "2026-2027",
-    "team": "서울 삼성",
-    "position": "FD",
-    "OVR": 71,
-    "OFF": 70,
-    "DEF": 72,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291604",
-    "name": "백지웅",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "GD",
-    "OVR": 70,
-    "OFF": 70,
-    "DEF": 71,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291856",
-    "name": "신지원",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "Unknown",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290897",
-    "name": "송교창",
-    "season": "2026-2027",
-    "team": "전주 KCC",
-    "position": "FD",
-    "OVR": 86,
-    "OFF": 86,
-    "DEF": 86,
-    "archetype": "락다운 디펜더",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290542",
-    "name": "임동섭",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "FD",
-    "OVR": 71,
-    "OFF": 71,
-    "DEF": 72,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290985",
-    "name": "최성모",
-    "season": "2026-2027",
-    "team": "서울 삼성",
-    "position": "GD",
-    "OVR": 75,
-    "OFF": 75,
+    "OVR": 74,
+    "OFF": 76,
     "DEF": 74,
     "archetype": "롤 플레이어",
     "badges": {
@@ -42426,13 +42246,211 @@
     "projected": true
   },
   {
-    "pcode": "290478",
-    "name": "장민국",
+    "pcode": "291208",
+    "name": "조한진",
     "season": "2026-2027",
-    "team": "창원 LG",
+    "team": "울산 현대모비스",
     "position": "FD",
-    "OVR": 66,
-    "OFF": 65,
+    "OVR": 78,
+    "OFF": 76,
+    "DEF": 79,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291497",
+    "name": "선상혁",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "C",
+    "OVR": 69,
+    "OFF": 68,
+    "DEF": 71,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291370",
+    "name": "박진철",
+    "season": "2026-2027",
+    "team": "서울 삼성",
+    "position": "C",
+    "OVR": 75,
+    "OFF": 74,
+    "DEF": 76,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291276",
+    "name": "박찬호",
+    "season": "2026-2027",
+    "team": "안양 정관장",
+    "position": "C",
+    "OVR": 70,
+    "OFF": 69,
+    "DEF": 70,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290785",
+    "name": "최승욱",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "GD",
+    "OVR": 74,
+    "OFF": 74,
+    "DEF": 75,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291287",
+    "name": "김훈",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "FD",
+    "OVR": 70,
+    "OFF": 71,
+    "DEF": 70,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291859",
+    "name": "윤기찬",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "FD",
+    "OVR": 80,
+    "OFF": 80,
+    "DEF": 80,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291680",
+    "name": "케베 알루마",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "FD",
+    "OVR": 84,
+    "OFF": 85,
+    "DEF": 84,
+    "archetype": "샷 크리에이터",
+    "badges": {
+      "finishing": 1,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290784",
+    "name": "최원혁",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "GD",
+    "OVR": 72,
+    "OFF": 69,
+    "DEF": 72,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291760",
+    "name": "이민서",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "GD",
+    "OVR": 74,
+    "OFF": 75,
+    "DEF": 73,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291750",
+    "name": "정성조",
+    "season": "2026-2027",
+    "team": "서울 삼성",
+    "position": "FD",
+    "OVR": 70,
+    "OFF": 70,
+    "DEF": 69,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291843",
+    "name": "박민재",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "FD",
+    "OVR": 68,
+    "OFF": 68,
     "DEF": 67,
     "archetype": "롤 플레이어",
     "badges": {
@@ -42462,14 +42480,14 @@
     "projected": true
   },
   {
-    "pcode": "291749",
-    "name": "서동원",
+    "pcode": "291748",
+    "name": "이근준",
     "season": "2026-2027",
     "team": "고양 소노",
     "position": "FD",
-    "OVR": 64,
-    "OFF": 66,
-    "DEF": 62,
+    "OVR": 79,
+    "OFF": 78,
+    "DEF": 81,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -42480,36 +42498,18 @@
     "projected": true
   },
   {
-    "pcode": "291070",
-    "name": "최성원",
+    "pcode": "290754",
+    "name": "한호빈",
     "season": "2026-2027",
-    "team": "원주 DB",
+    "team": "서울 삼성",
     "position": "GD",
-    "OVR": 76,
-    "OFF": 80,
-    "DEF": 76,
+    "OVR": 74,
+    "OFF": 74,
+    "DEF": 73,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291599",
-    "name": "염유성",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "GD",
-    "OVR": 72,
-    "OFF": 72,
-    "DEF": 72,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
+      "shooting": 1,
       "playmaking": 0,
       "defense": 0
     },
@@ -42534,49 +42534,49 @@
     "projected": true
   },
   {
-    "pcode": "291490",
-    "name": "김동현",
+    "pcode": "291498",
+    "name": "김수환",
     "season": "2026-2027",
-    "team": "전주 KCC",
+    "team": "서울 SK",
+    "position": "Unknown",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290440",
+    "name": "이관희",
+    "season": "2026-2027",
+    "team": "서울 삼성",
+    "position": "GD",
+    "OVR": 80,
+    "OFF": 82,
+    "DEF": 79,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 1,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291352",
+    "name": "박지원",
+    "season": "2026-2027",
+    "team": "수원 KT",
     "position": "GD",
     "OVR": 75,
-    "OFF": 74,
-    "DEF": 76,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291859",
-    "name": "윤기찬",
-    "season": "2026-2027",
-    "team": "전주 KCC",
-    "position": "FD",
-    "OVR": 80,
-    "OFF": 80,
-    "DEF": 81,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290785",
-    "name": "최승욱",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "GD",
-    "OVR": 74,
-    "OFF": 73,
+    "OFF": 76,
     "DEF": 74,
     "archetype": "롤 플레이어",
     "badges": {
@@ -42588,210 +42588,12 @@
     "projected": true
   },
   {
-    "pcode": "291644",
-    "name": "이경도",
+    "pcode": "290284",
+    "name": "허일영",
     "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "GD",
-    "OVR": 76,
-    "OFF": 76,
-    "DEF": 75,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290501",
-    "name": "최현민",
-    "season": "2026-2027",
-    "team": "서울 삼성",
+    "team": "안양 정관장",
     "position": "FD",
-    "OVR": 71,
-    "OFF": 70,
-    "DEF": 72,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291556",
-    "name": "샘조세프 벨란겔",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "GD",
-    "OVR": 88,
-    "OFF": 91,
-    "DEF": 83,
-    "archetype": "샷 크리에이터",
-    "badges": {
-      "finishing": 1,
-      "shooting": 1,
-      "playmaking": 1,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291368",
-    "name": "오재현",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "GD",
-    "OVR": 82,
-    "OFF": 82,
-    "DEF": 82,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291486",
-    "name": "김종호",
-    "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "Unknown",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291866",
-    "name": "김준영",
-    "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "Unknown",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291248",
-    "name": "자밀 워니",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "C",
-    "OVR": 93,
-    "OFF": 95,
-    "DEF": 92,
-    "archetype": "스트레치 빅",
-    "badges": {
-      "finishing": 3,
-      "shooting": 1,
-      "playmaking": 1,
-      "defense": 2
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291668",
-    "name": "신주영",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "FD",
-    "OVR": 75,
-    "OFF": 74,
-    "DEF": 76,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291755",
-    "name": "권순우",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "Unknown",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291699",
-    "name": "칼 타마요",
-    "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "FD",
-    "OVR": 84,
-    "OFF": 85,
-    "DEF": 83,
-    "archetype": "샷 크리에이터",
-    "badges": {
-      "finishing": 1,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290740",
-    "name": "전준범",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "FD",
-    "OVR": 70,
-    "OFF": 69,
-    "DEF": 70,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291586",
-    "name": "이두원",
-    "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "C",
-    "OVR": 76,
+    "OVR": 77,
     "OFF": 76,
     "DEF": 78,
     "archetype": "롤 플레이어",
@@ -42804,14 +42606,14 @@
     "projected": true
   },
   {
-    "pcode": "291372",
-    "name": "한승희",
+    "pcode": "290996",
+    "name": "정인덕",
     "season": "2026-2027",
-    "team": "안양 정관장",
+    "team": "창원 LG",
     "position": "FD",
-    "OVR": 81,
-    "OFF": 79,
-    "DEF": 82,
+    "OVR": 75,
+    "OFF": 74,
+    "DEF": 76,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -42822,10 +42624,208 @@
     "projected": true
   },
   {
-    "pcode": "291850",
-    "name": "이유진",
+    "pcode": "291604",
+    "name": "백지웅",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "GD",
+    "OVR": 70,
+    "OFF": 70,
+    "DEF": 71,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291210",
+    "name": "김준형",
+    "season": "2026-2027",
+    "team": "안양 정관장",
+    "position": "FD",
+    "OVR": 76,
+    "OFF": 76,
+    "DEF": 77,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291281",
+    "name": "김세창",
+    "season": "2026-2027",
+    "team": "안양 정관장",
+    "position": "GD",
+    "OVR": 73,
+    "OFF": 73,
+    "DEF": 72,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291001",
+    "name": "강상재",
     "season": "2026-2027",
     "team": "원주 DB",
+    "position": "FD",
+    "OVR": 84,
+    "OFF": 83,
+    "DEF": 86,
+    "archetype": "락다운 디펜더",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291355",
+    "name": "이용우",
+    "season": "2026-2027",
+    "team": "원주 DB",
+    "position": "GD",
+    "OVR": 76,
+    "OFF": 76,
+    "DEF": 77,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291087",
+    "name": "김국찬",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "GD",
+    "OVR": 76,
+    "OFF": 76,
+    "DEF": 77,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291698",
+    "name": "레이션 해먼즈",
+    "season": "2026-2027",
+    "team": "원주 DB",
+    "position": "FD",
+    "OVR": 91,
+    "OFF": 92,
+    "DEF": 90,
+    "archetype": "락다운 디펜더",
+    "badges": {
+      "finishing": 3,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 1
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291847",
+    "name": "최강민",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "GD",
+    "OVR": 74,
+    "OFF": 74,
+    "DEF": 74,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290901",
+    "name": "정성우",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "GD",
+    "OVR": 78,
+    "OFF": 78,
+    "DEF": 76,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 1,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290783",
+    "name": "이현석",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "GD",
+    "OVR": 67,
+    "OFF": 66,
+    "DEF": 68,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290381",
+    "name": "이정현",
+    "season": "2026-2027",
+    "team": "원주 DB",
+    "position": "GD",
+    "OVR": 81,
+    "OFF": 83,
+    "DEF": 78,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290603",
+    "name": "이대헌",
+    "season": "2026-2027",
+    "team": "안양 정관장",
     "position": "FD",
     "OVR": 80,
     "OFF": 80,
@@ -42840,46 +42840,28 @@
     "projected": true
   },
   {
-    "pcode": "291370",
-    "name": "박진철",
-    "season": "2026-2027",
-    "team": "서울 삼성",
-    "position": "C",
-    "OVR": 75,
-    "OFF": 74,
-    "DEF": 76,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291653",
-    "name": "조준희",
-    "season": "2026-2027",
-    "team": "서울 삼성",
-    "position": "GD",
-    "OVR": 78,
-    "OFF": 79,
-    "DEF": 77,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291861",
-    "name": "김윤성",
+    "pcode": "291770",
+    "name": "이현호",
     "season": "2026-2027",
     "team": "전주 KCC",
+    "position": "Unknown",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291851",
+    "name": "김휴범",
+    "season": "2026-2027",
+    "team": "원주 DB",
     "position": "Unknown",
     "OVR": 55,
     "OFF": 55,
@@ -42912,141 +42894,51 @@
     "projected": true
   },
   {
-    "pcode": "291843",
-    "name": "박민재",
+    "pcode": "291091",
+    "name": "양홍석",
     "season": "2026-2027",
-    "team": "수원 KT",
+    "team": "창원 LG",
     "position": "FD",
-    "OVR": 68,
-    "OFF": 68,
-    "DEF": 67,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291274",
-    "name": "양재혁",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "FD",
-    "OVR": 71,
-    "OFF": 71,
-    "DEF": 70,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291210",
-    "name": "김준형",
-    "season": "2026-2027",
-    "team": "안양 정관장",
-    "position": "FD",
-    "OVR": 76,
-    "OFF": 75,
-    "DEF": 76,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291649",
-    "name": "박무빈",
-    "season": "2026-2027",
-    "team": "울산 현대모비스",
-    "position": "GD",
-    "OVR": 80,
-    "OFF": 82,
-    "DEF": 79,
-    "archetype": "퓨어 플레이메이커",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 2,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291592",
-    "name": "여준형",
-    "season": "2026-2027",
-    "team": "서울 삼성",
-    "position": "FD",
-    "OVR": 71,
-    "OFF": 71,
-    "DEF": 71,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291601",
-    "name": "고찬혁",
-    "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "GD",
-    "OVR": 72,
-    "OFF": 72,
-    "DEF": 72,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291842",
-    "name": "강성욱",
-    "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "GD",
     "OVR": 86,
-    "OFF": 87,
-    "DEF": 84,
-    "archetype": "올어라운드 스렛",
+    "OFF": 86,
+    "DEF": 86,
+    "archetype": "락다운 디펜더",
     "badges": {
-      "finishing": 1,
+      "finishing": 0,
       "shooting": 0,
-      "playmaking": 1,
-      "defense": 1
+      "playmaking": 0,
+      "defense": 0
     },
     "projected": true
   },
   {
-    "pcode": "290997",
-    "name": "김진유",
+    "pcode": "291476",
+    "name": "김준환",
     "season": "2026-2027",
-    "team": "고양 소노",
+    "team": "수원 KT",
     "position": "GD",
-    "OVR": 71,
-    "OFF": 70,
-    "DEF": 75,
+    "OVR": 74,
+    "OFF": 74,
+    "DEF": 73,
     "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290897",
+    "name": "송교창",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "FD",
+    "OVR": 85,
+    "OFF": 85,
+    "DEF": 85,
+    "archetype": "락다운 디펜더",
     "badges": {
       "finishing": 0,
       "shooting": 0,
@@ -43061,27 +42953,9 @@
     "season": "2026-2027",
     "team": "울산 현대모비스",
     "position": "GD",
-    "OVR": 86,
-    "OFF": 88,
-    "DEF": 83,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291275",
-    "name": "김경원",
-    "season": "2026-2027",
-    "team": "울산 현대모비스",
-    "position": "C",
-    "OVR": 77,
-    "OFF": 75,
-    "DEF": 79,
+    "OVR": 82,
+    "OFF": 85,
+    "DEF": 80,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -43115,9 +42989,9 @@
     "season": "2026-2027",
     "team": "대구 한국가스공사",
     "position": "C",
-    "OVR": 80,
-    "OFF": 79,
-    "DEF": 81,
+    "OVR": 79,
+    "OFF": 78,
+    "DEF": 80,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -43128,18 +43002,180 @@
     "projected": true
   },
   {
-    "pcode": "291764",
-    "name": "황영찬",
+    "pcode": "290553",
+    "name": "배병준",
     "season": "2026-2027",
-    "team": "서울 삼성",
-    "position": "Unknown",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
+    "team": "울산 현대모비스",
+    "position": "GD",
+    "OVR": 69,
+    "OFF": 69,
+    "DEF": 68,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
       "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290763",
+    "name": "전성현",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "FD",
+    "OVR": 80,
+    "OFF": 82,
+    "DEF": 71,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290997",
+    "name": "김진유",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "GD",
+    "OVR": 72,
+    "OFF": 71,
+    "DEF": 75,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291511",
+    "name": "이선 알바노",
+    "season": "2026-2027",
+    "team": "원주 DB",
+    "position": "GD",
+    "OVR": 90,
+    "OFF": 93,
+    "DEF": 86,
+    "archetype": "퓨어 플레이메이커",
+    "badges": {
+      "finishing": 1,
+      "shooting": 2,
+      "playmaking": 3,
+      "defense": 1
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291489",
+    "name": "문시윤",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "FD",
+    "OVR": 72,
+    "OFF": 71,
+    "DEF": 72,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291583",
+    "name": "렌즈 아반도",
+    "season": "2026-2027",
+    "team": "안양 정관장",
+    "position": "GD",
+    "OVR": 81,
+    "OFF": 80,
+    "DEF": 82,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 1
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291862",
+    "name": "양우혁",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "GD",
+    "OVR": 82,
+    "OFF": 85,
+    "DEF": 80,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291349",
+    "name": "이광진",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "FD",
+    "OVR": 73,
+    "OFF": 73,
+    "DEF": 73,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291863",
+    "name": "김민규",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "FD",
+    "OVR": 75,
+    "OFF": 74,
+    "DEF": 77,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290776",
+    "name": "허웅",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "GD",
+    "OVR": 86,
+    "OFF": 90,
+    "DEF": 82,
+    "archetype": "샤프슈터",
+    "badges": {
+      "finishing": 1,
+      "shooting": 3,
       "playmaking": 0,
       "defense": 0
     },
@@ -43164,32 +43200,14 @@
     "projected": true
   },
   {
-    "pcode": "291304",
-    "name": "이윤수",
+    "pcode": "290985",
+    "name": "최성모",
     "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "C",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290765",
-    "name": "이재도",
-    "season": "2026-2027",
-    "team": "고양 소노",
+    "team": "서울 삼성",
     "position": "GD",
-    "OVR": 83,
-    "OFF": 85,
-    "DEF": 82,
+    "OVR": 75,
+    "OFF": 75,
+    "DEF": 74,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -43200,450 +43218,18 @@
     "projected": true
   },
   {
-    "pcode": "291351",
-    "name": "이윤기",
-    "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "FD",
-    "OVR": 71,
-    "OFF": 70,
-    "DEF": 72,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291432",
-    "name": "아셈 마레이",
-    "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "C",
-    "OVR": 91,
-    "OFF": 89,
-    "DEF": 94,
-    "archetype": "글래스 클리너",
-    "badges": {
-      "finishing": 3,
-      "shooting": 0,
-      "playmaking": 2,
-      "defense": 2
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291492",
-    "name": "하윤기",
-    "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "C",
-    "OVR": 85,
-    "OFF": 84,
-    "DEF": 87,
-    "archetype": "락다운 디펜더",
-    "badges": {
-      "finishing": 1,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291865",
-    "name": "김선우",
-    "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "Unknown",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291087",
-    "name": "김국찬",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "GD",
-    "OVR": 77,
-    "OFF": 77,
-    "DEF": 77,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291333",
-    "name": "아이재아 힉스",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "FD",
-    "OVR": 85,
-    "OFF": 86,
-    "DEF": 84,
-    "archetype": "올어라운드 스렛",
-    "badges": {
-      "finishing": 1,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291664",
-    "name": "김태호",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "Unknown",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291220",
-    "name": "변준형",
-    "season": "2026-2027",
-    "team": "안양 정관장",
-    "position": "GD",
-    "OVR": 85,
-    "OFF": 87,
-    "DEF": 82,
-    "archetype": "올어라운드 스렛",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 1,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291287",
-    "name": "김훈",
-    "season": "2026-2027",
-    "team": "전주 KCC",
-    "position": "FD",
-    "OVR": 71,
-    "OFF": 71,
-    "DEF": 72,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291851",
-    "name": "김휴범",
-    "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "Unknown",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291085",
-    "name": "허훈",
-    "season": "2026-2027",
-    "team": "전주 KCC",
-    "position": "GD",
-    "OVR": 87,
-    "OFF": 91,
-    "DEF": 81,
-    "archetype": "퓨어 플레이메이커",
-    "badges": {
-      "finishing": 0,
-      "shooting": 1,
-      "playmaking": 3,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291579",
-    "name": "게이지 프림",
-    "season": "2026-2027",
-    "team": "울산 현대모비스",
-    "position": "C",
-    "OVR": 92,
-    "OFF": 93,
-    "DEF": 92,
-    "archetype": "슬래셔",
-    "badges": {
-      "finishing": 3,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 1
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291478",
-    "name": "이원석",
+    "pcode": "291374",
+    "name": "이근휘",
     "season": "2026-2027",
     "team": "서울 삼성",
     "position": "FD",
-    "OVR": 82,
-    "OFF": 80,
-    "DEF": 85,
-    "archetype": "락다운 디펜더",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291281",
-    "name": "김세창",
-    "season": "2026-2027",
-    "team": "안양 정관장",
-    "position": "GD",
-    "OVR": 73,
-    "OFF": 73,
-    "DEF": 72,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290648",
-    "name": "한상혁",
-    "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "GD",
-    "OVR": 67,
-    "OFF": 68,
-    "DEF": 66,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291692",
-    "name": "미구엘 안드레 옥존",
-    "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "GD",
-    "OVR": 77,
-    "OFF": 79,
-    "DEF": 75,
+    "OVR": 78,
+    "OFF": 78,
+    "DEF": 78,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
       "shooting": 1,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290553",
-    "name": "배병준",
-    "season": "2026-2027",
-    "team": "울산 현대모비스",
-    "position": "GD",
-    "OVR": 67,
-    "OFF": 67,
-    "DEF": 66,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291766",
-    "name": "박성재",
-    "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "GD",
-    "OVR": 78,
-    "OFF": 78,
-    "DEF": 79,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290407",
-    "name": "김선형",
-    "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "GD",
-    "OVR": 84,
-    "OFF": 86,
-    "DEF": 82,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291771",
-    "name": "최형찬",
-    "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "GD",
-    "OVR": 74,
-    "OFF": 73,
-    "DEF": 75,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290750",
-    "name": "김종규",
-    "season": "2026-2027",
-    "team": "안양 정관장",
-    "position": "C",
-    "OVR": 83,
-    "OFF": 81,
-    "DEF": 85,
-    "archetype": "락다운 디펜더",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291594",
-    "name": "김태완",
-    "season": "2026-2027",
-    "team": "울산 현대모비스",
-    "position": "GD",
-    "OVR": 76,
-    "OFF": 76,
-    "DEF": 76,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291606",
-    "name": "안정욱",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "FD",
-    "OVR": 71,
-    "OFF": 70,
-    "DEF": 72,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290661",
-    "name": "문성곤",
-    "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "FD",
-    "OVR": 80,
-    "OFF": 72,
-    "DEF": 83,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291756",
-    "name": "이대균",
-    "season": "2026-2027",
-    "team": "울산 현대모비스",
-    "position": "FD",
-    "OVR": 72,
-    "OFF": 71,
-    "DEF": 73,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
       "playmaking": 0,
       "defense": 0
     },
@@ -43655,9 +43241,9 @@
     "season": "2026-2027",
     "team": "울산 현대모비스",
     "position": "FD",
-    "OVR": 61,
-    "OFF": 61,
-    "DEF": 61,
+    "OVR": 64,
+    "OFF": 64,
+    "DEF": 65,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -43668,136 +43254,10 @@
     "projected": true
   },
   {
-    "pcode": "290529",
-    "name": "정희재",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "FD",
-    "OVR": 68,
-    "OFF": 67,
-    "DEF": 69,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290996",
-    "name": "정인덕",
-    "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "FD",
-    "OVR": 75,
-    "OFF": 74,
-    "DEF": 76,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291303",
-    "name": "김형빈",
+    "pcode": "291869",
+    "name": "프레디",
     "season": "2026-2027",
     "team": "서울 SK",
-    "position": "FD",
-    "OVR": 77,
-    "OFF": 76,
-    "DEF": 79,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291752",
-    "name": "김보배",
-    "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "FD",
-    "OVR": 78,
-    "OFF": 76,
-    "DEF": 80,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291667",
-    "name": "문정현",
-    "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "FD",
-    "OVR": 81,
-    "OFF": 79,
-    "DEF": 83,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291778",
-    "name": "케빈 켐바오",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "FD",
-    "OVR": 86,
-    "OFF": 87,
-    "DEF": 85,
-    "archetype": "락다운 디펜더",
-    "badges": {
-      "finishing": 1,
-      "shooting": 2,
-      "playmaking": 1,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291388",
-    "name": "이도헌",
-    "season": "2026-2027",
-    "team": "울산 현대모비스",
-    "position": "GD",
-    "OVR": 72,
-    "OFF": 72,
-    "DEF": 71,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291765",
-    "name": "조환희",
-    "season": "2026-2027",
-    "team": "수원 KT",
     "position": "Unknown",
     "OVR": 55,
     "OFF": 55,
@@ -43812,13 +43272,67 @@
     "projected": true
   },
   {
-    "pcode": "291349",
-    "name": "이광진",
+    "pcode": "291644",
+    "name": "이경도",
     "season": "2026-2027",
     "team": "창원 LG",
+    "position": "GD",
+    "OVR": 76,
+    "OFF": 77,
+    "DEF": 76,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291848",
+    "name": "박정환",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "GD",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290787",
+    "name": "이승현",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
     "position": "FD",
-    "OVR": 73,
-    "OFF": 73,
+    "OVR": 83,
+    "OFF": 82,
+    "DEF": 84,
+    "archetype": "락다운 디펜더",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291293",
+    "name": "최진광",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "GD",
+    "OVR": 74,
+    "OFF": 74,
     "DEF": 73,
     "archetype": "롤 플레이어",
     "badges": {
@@ -43848,32 +43362,14 @@
     "projected": true
   },
   {
-    "pcode": "291189",
-    "name": "서명진",
+    "pcode": "290661",
+    "name": "문성곤",
     "season": "2026-2027",
-    "team": "울산 현대모비스",
-    "position": "GD",
-    "OVR": 83,
-    "OFF": 85,
-    "DEF": 81,
-    "archetype": "샷 크리에이터",
-    "badges": {
-      "finishing": 0,
-      "shooting": 2,
-      "playmaking": 1,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291289",
-    "name": "박준은",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
+    "team": "수원 KT",
     "position": "FD",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
+    "OVR": 79,
+    "OFF": 73,
+    "DEF": 82,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -43884,86 +43380,14 @@
     "projected": true
   },
   {
-    "pcode": "291847",
-    "name": "최강민",
+    "pcode": "291485",
+    "name": "이승우",
     "season": "2026-2027",
     "team": "울산 현대모비스",
-    "position": "GD",
+    "position": "FD",
     "OVR": 74,
-    "OFF": 74,
+    "OFF": 73,
     "DEF": 74,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291753",
-    "name": "백승엽",
-    "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "Unknown",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291277",
-    "name": "김진영",
-    "season": "2026-2027",
-    "team": "안양 정관장",
-    "position": "GD",
-    "OVR": 75,
-    "OFF": 75,
-    "DEF": 74,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291488",
-    "name": "이정현",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "GD",
-    "OVR": 91,
-    "OFF": 95,
-    "DEF": 86,
-    "archetype": "오펜시브 엔진",
-    "badges": {
-      "finishing": 1,
-      "shooting": 2,
-      "playmaking": 2,
-      "defense": 1
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291770",
-    "name": "이현호",
-    "season": "2026-2027",
-    "team": "전주 KCC",
-    "position": "Unknown",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -43992,100 +43416,10 @@
     "projected": true
   },
   {
-    "pcode": "290901",
-    "name": "정성우",
+    "pcode": "291755",
+    "name": "권순우",
     "season": "2026-2027",
     "team": "대구 한국가스공사",
-    "position": "GD",
-    "OVR": 77,
-    "OFF": 78,
-    "DEF": 76,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 1,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291182",
-    "name": "우동현",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "GD",
-    "OVR": 70,
-    "OFF": 71,
-    "DEF": 69,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291386",
-    "name": "이준희",
-    "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "GD",
-    "OVR": 76,
-    "OFF": 78,
-    "DEF": 74,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290662",
-    "name": "이동엽",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "GD",
-    "OVR": 72,
-    "OFF": 72,
-    "DEF": 72,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291436",
-    "name": "라숀 토마스",
-    "season": "2026-2027",
-    "team": "안양 정관장",
-    "position": "FD",
-    "OVR": 88,
-    "OFF": 87,
-    "DEF": 90,
-    "archetype": "글래스 클리너",
-    "badges": {
-      "finishing": 3,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 2
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291858",
-    "name": "송한준",
-    "season": "2026-2027",
-    "team": "안양 정관장",
     "position": "Unknown",
     "OVR": 55,
     "OFF": 55,
@@ -44100,85 +43434,13 @@
     "projected": true
   },
   {
-    "pcode": "291483",
-    "name": "정호영",
-    "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "GD",
-    "OVR": 74,
-    "OFF": 76,
-    "DEF": 74,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291698",
-    "name": "레이션 해먼즈",
-    "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "FD",
-    "OVR": 91,
-    "OFF": 92,
-    "DEF": 90,
-    "archetype": "락다운 디펜더",
-    "badges": {
-      "finishing": 3,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 1
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291376",
-    "name": "양준우",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "GD",
-    "OVR": 73,
-    "OFF": 74,
-    "DEF": 72,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291750",
-    "name": "정성조",
-    "season": "2026-2027",
-    "team": "서울 삼성",
-    "position": "FD",
-    "OVR": 70,
-    "OFF": 70,
-    "DEF": 69,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291655",
-    "name": "나성호",
+    "pcode": "290478",
+    "name": "장민국",
     "season": "2026-2027",
     "team": "창원 LG",
     "position": "FD",
-    "OVR": 64,
-    "OFF": 60,
+    "OVR": 68,
+    "OFF": 67,
     "DEF": 69,
     "archetype": "롤 플레이어",
     "badges": {
@@ -44190,14 +43452,32 @@
     "projected": true
   },
   {
-    "pcode": "291588",
-    "name": "박인웅",
+    "pcode": "291787",
+    "name": "케렘 칸터",
     "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "FD",
-    "OVR": 79,
-    "OFF": 78,
-    "DEF": 81,
+    "team": "서울 삼성",
+    "position": "C",
+    "OVR": 87,
+    "OFF": 88,
+    "DEF": 86,
+    "archetype": "글래스 클리너",
+    "badges": {
+      "finishing": 2,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291771",
+    "name": "최형찬",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "GD",
+    "OVR": 74,
+    "OFF": 73,
+    "DEF": 75,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -44208,28 +43488,28 @@
     "projected": true
   },
   {
-    "pcode": "291747",
-    "name": "소준혁",
+    "pcode": "290454",
+    "name": "정창영",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "GD",
+    "OVR": 69,
+    "OFF": 69,
+    "DEF": 70,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291391",
+    "name": "조석호",
     "season": "2026-2027",
     "team": "고양 소노",
-    "position": "GD",
-    "OVR": 73,
-    "OFF": 73,
-    "DEF": 74,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291869",
-    "name": "프레디",
-    "season": "2026-2027",
-    "team": "서울 SK",
     "position": "Unknown",
     "OVR": 55,
     "OFF": 55,
@@ -44244,86 +43524,14 @@
     "projected": true
   },
   {
-    "pcode": "291511",
-    "name": "이선 알바노",
-    "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "GD",
-    "OVR": 90,
-    "OFF": 93,
-    "DEF": 87,
-    "archetype": "퓨어 플레이메이커",
-    "badges": {
-      "finishing": 1,
-      "shooting": 2,
-      "playmaking": 3,
-      "defense": 1
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291857",
-    "name": "문유현",
-    "season": "2026-2027",
-    "team": "안양 정관장",
-    "position": "GD",
-    "OVR": 84,
-    "OFF": 84,
-    "DEF": 83,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 1
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291491",
-    "name": "서정현",
-    "season": "2026-2027",
-    "team": "전주 KCC",
-    "position": "C",
-    "OVR": 70,
-    "OFF": 71,
-    "DEF": 68,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290381",
-    "name": "이정현",
-    "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "GD",
-    "OVR": 82,
-    "OFF": 84,
-    "DEF": 79,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291476",
-    "name": "김준환",
+    "pcode": "291586",
+    "name": "이두원",
     "season": "2026-2027",
     "team": "수원 KT",
-    "position": "GD",
-    "OVR": 74,
-    "OFF": 74,
-    "DEF": 73,
+    "position": "C",
+    "OVR": 76,
+    "OFF": 76,
+    "DEF": 78,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -44334,15 +43542,15 @@
     "projected": true
   },
   {
-    "pcode": "291680",
-    "name": "케베 알루마",
+    "pcode": "291333",
+    "name": "아이재아 힉스",
     "season": "2026-2027",
-    "team": "대구 한국가스공사",
+    "team": "서울 SK",
     "position": "FD",
     "OVR": 84,
     "OFF": 85,
     "DEF": 84,
-    "archetype": "샷 크리에이터",
+    "archetype": "올어라운드 스렛",
     "badges": {
       "finishing": 1,
       "shooting": 0,
@@ -44352,50 +43560,50 @@
     "projected": true
   },
   {
-    "pcode": "291853",
-    "name": "이규태",
-    "season": "2026-2027",
-    "team": "서울 삼성",
-    "position": "FD",
-    "OVR": 77,
-    "OFF": 77,
-    "DEF": 77,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291363",
-    "name": "윤원상",
-    "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "GD",
-    "OVR": 77,
-    "OFF": 77,
-    "DEF": 77,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290599",
-    "name": "서민수",
+    "pcode": "291842",
+    "name": "강성욱",
     "season": "2026-2027",
     "team": "수원 KT",
+    "position": "GD",
+    "OVR": 85,
+    "OFF": 86,
+    "DEF": 83,
+    "archetype": "올어라운드 스렛",
+    "badges": {
+      "finishing": 1,
+      "shooting": 0,
+      "playmaking": 1,
+      "defense": 1
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290790",
+    "name": "정효근",
+    "season": "2026-2027",
+    "team": "원주 DB",
     "position": "FD",
-    "OVR": 73,
-    "OFF": 72,
-    "DEF": 74,
+    "OVR": 82,
+    "OFF": 78,
+    "DEF": 84,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 1
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291274",
+    "name": "양재혁",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "FD",
+    "OVR": 71,
+    "OFF": 71,
+    "DEF": 70,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -44424,14 +43632,644 @@
     "projected": true
   },
   {
-    "pcode": "290904",
-    "name": "박봉진",
+    "pcode": "290407",
+    "name": "김선형",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "GD",
+    "OVR": 83,
+    "OFF": 85,
+    "DEF": 81,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291664",
+    "name": "김태호",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "Unknown",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291587",
+    "name": "박선웅",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "GD",
+    "OVR": 70,
+    "OFF": 68,
+    "DEF": 71,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291867",
+    "name": "임정현",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "Unknown",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291490",
+    "name": "김동현",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "GD",
+    "OVR": 74,
+    "OFF": 73,
+    "DEF": 75,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291436",
+    "name": "라숀 토마스",
+    "season": "2026-2027",
+    "team": "안양 정관장",
+    "position": "FD",
+    "OVR": 88,
+    "OFF": 87,
+    "DEF": 90,
+    "archetype": "글래스 클리너",
+    "badges": {
+      "finishing": 3,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 2
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291478",
+    "name": "이원석",
+    "season": "2026-2027",
+    "team": "서울 삼성",
+    "position": "FD",
+    "OVR": 82,
+    "OFF": 80,
+    "DEF": 85,
+    "archetype": "락다운 디펜더",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291291",
+    "name": "박정현",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "C",
+    "OVR": 71,
+    "OFF": 70,
+    "DEF": 73,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291597",
+    "name": "신동혁",
+    "season": "2026-2027",
+    "team": "서울 삼성",
+    "position": "FD",
+    "OVR": 76,
+    "OFF": 76,
+    "DEF": 77,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291277",
+    "name": "김진영",
+    "season": "2026-2027",
+    "team": "안양 정관장",
+    "position": "GD",
+    "OVR": 75,
+    "OFF": 75,
+    "DEF": 74,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291746",
+    "name": "박정웅",
+    "season": "2026-2027",
+    "team": "안양 정관장",
+    "position": "GD",
+    "OVR": 81,
+    "OFF": 80,
+    "DEF": 81,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291858",
+    "name": "송한준",
+    "season": "2026-2027",
+    "team": "안양 정관장",
+    "position": "Unknown",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290539",
+    "name": "장재석",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "C",
+    "OVR": 80,
+    "OFF": 74,
+    "DEF": 82,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291084",
+    "name": "안영준",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "FD",
+    "OVR": 87,
+    "OFF": 86,
+    "DEF": 88,
+    "archetype": "락다운 디펜더",
+    "badges": {
+      "finishing": 1,
+      "shooting": 1,
+      "playmaking": 0,
+      "defense": 1
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291759",
+    "name": "김태훈",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "GD",
+    "OVR": 73,
+    "OFF": 72,
+    "DEF": 74,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291747",
+    "name": "소준혁",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "GD",
+    "OVR": 73,
+    "OFF": 73,
+    "DEF": 74,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291588",
+    "name": "박인웅",
     "season": "2026-2027",
     "team": "원주 DB",
     "position": "FD",
-    "OVR": 69,
-    "OFF": 68,
-    "DEF": 69,
+    "OVR": 79,
+    "OFF": 78,
+    "DEF": 81,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291753",
+    "name": "백승엽",
+    "season": "2026-2027",
+    "team": "원주 DB",
+    "position": "Unknown",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290524",
+    "name": "라건아",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "C",
+    "OVR": 92,
+    "OFF": 91,
+    "DEF": 93,
+    "archetype": "글래스 클리너",
+    "badges": {
+      "finishing": 2,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291189",
+    "name": "서명진",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "GD",
+    "OVR": 82,
+    "OFF": 84,
+    "DEF": 80,
+    "archetype": "샷 크리에이터",
+    "badges": {
+      "finishing": 0,
+      "shooting": 2,
+      "playmaking": 1,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291756",
+    "name": "이대균",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "FD",
+    "OVR": 72,
+    "OFF": 71,
+    "DEF": 73,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291383",
+    "name": "임현택",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "Unknown",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291699",
+    "name": "칼 타마요",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "FD",
+    "OVR": 84,
+    "OFF": 85,
+    "DEF": 83,
+    "archetype": "샷 크리에이터",
+    "badges": {
+      "finishing": 1,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291085",
+    "name": "허훈",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "GD",
+    "OVR": 87,
+    "OFF": 90,
+    "DEF": 81,
+    "archetype": "퓨어 플레이메이커",
+    "badges": {
+      "finishing": 0,
+      "shooting": 1,
+      "playmaking": 3,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291492",
+    "name": "하윤기",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "C",
+    "OVR": 85,
+    "OFF": 84,
+    "DEF": 87,
+    "archetype": "락다운 디펜더",
+    "badges": {
+      "finishing": 1,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291068",
+    "name": "김낙현",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "GD",
+    "OVR": 84,
+    "OFF": 86,
+    "DEF": 79,
+    "archetype": "올어라운드 스렛",
+    "badges": {
+      "finishing": 0,
+      "shooting": 2,
+      "playmaking": 1,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291500",
+    "name": "조니 오브라이언트",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "C",
+    "OVR": 84,
+    "OFF": 84,
+    "DEF": 84,
+    "archetype": "샷 크리에이터",
+    "badges": {
+      "finishing": 1,
+      "shooting": 1,
+      "playmaking": 0,
+      "defense": 1
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291386",
+    "name": "이준희",
+    "season": "2026-2027",
+    "team": "원주 DB",
+    "position": "GD",
+    "OVR": 76,
+    "OFF": 78,
+    "DEF": 75,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291589",
+    "name": "인승찬",
+    "season": "2026-2027",
+    "team": "원주 DB",
+    "position": "FD",
+    "OVR": 72,
+    "OFF": 73,
+    "DEF": 70,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291576",
+    "name": "양준석",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "GD",
+    "OVR": 82,
+    "OFF": 84,
+    "DEF": 80,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 2,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290781",
+    "name": "김준일",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "C",
+    "OVR": 81,
+    "OFF": 76,
+    "DEF": 81,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290542",
+    "name": "임동섭",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "FD",
+    "OVR": 72,
+    "OFF": 72,
+    "DEF": 72,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291692",
+    "name": "미구엘 안드레 옥존",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "GD",
+    "OVR": 77,
+    "OFF": 79,
+    "DEF": 75,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 1,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291579",
+    "name": "게이지 프림",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "C",
+    "OVR": 92,
+    "OFF": 93,
+    "DEF": 92,
+    "archetype": "슬래셔",
+    "badges": {
+      "finishing": 3,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 1
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290529",
+    "name": "정희재",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "FD",
+    "OVR": 70,
+    "OFF": 69,
+    "DEF": 71,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290583",
+    "name": "한희원",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "FD",
+    "OVR": 74,
+    "OFF": 74,
+    "DEF": 75,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -44460,67 +44298,13 @@
     "projected": true
   },
   {
-    "pcode": "291844",
-    "name": "김명진",
+    "pcode": "291853",
+    "name": "이규태",
     "season": "2026-2027",
-    "team": "서울 SK",
+    "team": "서울 삼성",
     "position": "FD",
-    "OVR": 70,
-    "OFF": 70,
-    "DEF": 71,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291005",
-    "name": "최승욱",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "FD",
-    "OVR": 75,
-    "OFF": 74,
-    "DEF": 76,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291342",
-    "name": "숀 롱",
-    "season": "2026-2027",
-    "team": "전주 KCC",
-    "position": "FD",
-    "OVR": 90,
-    "OFF": 90,
-    "DEF": 90,
-    "archetype": "글래스 클리너",
-    "badges": {
-      "finishing": 3,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 1
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291863",
-    "name": "김민규",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "FD",
-    "OVR": 75,
-    "OFF": 74,
+    "OVR": 77,
+    "OFF": 77,
     "DEF": 77,
     "archetype": "롤 플레이어",
     "badges": {
@@ -44532,14 +44316,14 @@
     "projected": true
   },
   {
-    "pcode": "291648",
-    "name": "표승빈",
+    "pcode": "291866",
+    "name": "김준영",
     "season": "2026-2027",
-    "team": "안양 정관장",
-    "position": "FD",
-    "OVR": 74,
-    "OFF": 75,
-    "DEF": 74,
+    "team": "창원 LG",
+    "position": "Unknown",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -44550,31 +44334,67 @@
     "projected": true
   },
   {
-    "pcode": "290781",
-    "name": "김준일",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "C",
-    "OVR": 82,
-    "OFF": 76,
-    "DEF": 82,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291494",
-    "name": "김동준",
+    "pcode": "291649",
+    "name": "박무빈",
     "season": "2026-2027",
     "team": "울산 현대모비스",
     "position": "GD",
-    "OVR": 73,
-    "OFF": 74,
+    "OVR": 80,
+    "OFF": 82,
+    "DEF": 79,
+    "archetype": "퓨어 플레이메이커",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 2,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291846",
+    "name": "에디 다니엘",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "FD",
+    "OVR": 86,
+    "OFF": 85,
+    "DEF": 88,
+    "archetype": "락다운 디펜더",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291640",
+    "name": "유기상",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "GD",
+    "OVR": 82,
+    "OFF": 82,
+    "DEF": 82,
+    "archetype": "샤프슈터",
+    "badges": {
+      "finishing": 0,
+      "shooting": 3,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291601",
+    "name": "고찬혁",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "GD",
+    "OVR": 72,
+    "OFF": 72,
     "DEF": 72,
     "archetype": "롤 플레이어",
     "badges": {
@@ -44586,391 +44406,13 @@
     "projected": true
   },
   {
-    "pcode": "290763",
-    "name": "전성현",
-    "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "FD",
-    "OVR": 81,
-    "OFF": 83,
-    "DEF": 70,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291001",
-    "name": "강상재",
-    "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "FD",
-    "OVR": 84,
-    "OFF": 83,
-    "DEF": 86,
-    "archetype": "락다운 디펜더",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291383",
-    "name": "임현택",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "Unknown",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290784",
-    "name": "최원혁",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "GD",
-    "OVR": 70,
-    "OFF": 66,
-    "DEF": 71,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291084",
-    "name": "안영준",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "FD",
-    "OVR": 88,
-    "OFF": 87,
-    "DEF": 88,
-    "archetype": "락다운 디펜더",
-    "badges": {
-      "finishing": 1,
-      "shooting": 1,
-      "playmaking": 0,
-      "defense": 1
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291784",
-    "name": "알빈 톨렌티노",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "FD",
-    "OVR": 78,
-    "OFF": 79,
-    "DEF": 77,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291194",
-    "name": "전현우",
-    "season": "2026-2027",
-    "team": "대구 한국가스공사",
-    "position": "FD",
-    "OVR": 75,
-    "OFF": 75,
-    "DEF": 76,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291855",
-    "name": "강지훈",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "C",
-    "OVR": 80,
-    "OFF": 79,
-    "DEF": 80,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291374",
-    "name": "이근휘",
-    "season": "2026-2027",
-    "team": "서울 삼성",
-    "position": "FD",
-    "OVR": 78,
-    "OFF": 78,
-    "DEF": 78,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 1,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291498",
-    "name": "김수환",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "Unknown",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290993",
-    "name": "최준용",
-    "season": "2026-2027",
-    "team": "전주 KCC",
-    "position": "FD",
-    "OVR": 85,
-    "OFF": 85,
-    "DEF": 85,
-    "archetype": "락다운 디펜더",
-    "badges": {
-      "finishing": 1,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 1
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291068",
-    "name": "김낙현",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "GD",
-    "OVR": 85,
-    "OFF": 87,
-    "DEF": 80,
-    "archetype": "올어라운드 스렛",
-    "badges": {
-      "finishing": 0,
-      "shooting": 2,
-      "playmaking": 1,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290583",
-    "name": "한희원",
-    "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "FD",
-    "OVR": 74,
-    "OFF": 73,
-    "DEF": 74,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291276",
-    "name": "박찬호",
-    "season": "2026-2027",
-    "team": "안양 정관장",
-    "position": "C",
-    "OVR": 70,
-    "OFF": 69,
-    "DEF": 70,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291355",
-    "name": "이용우",
-    "season": "2026-2027",
-    "team": "원주 DB",
-    "position": "GD",
-    "OVR": 76,
-    "OFF": 76,
-    "DEF": 77,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291748",
-    "name": "이근준",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "FD",
-    "OVR": 81,
-    "OFF": 80,
-    "DEF": 82,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291605",
-    "name": "조재우",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "C",
-    "OVR": 69,
-    "OFF": 69,
-    "DEF": 69,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291746",
-    "name": "박정웅",
-    "season": "2026-2027",
-    "team": "안양 정관장",
-    "position": "GD",
-    "OVR": 82,
-    "OFF": 82,
-    "DEF": 82,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290788",
-    "name": "이호현",
+    "pcode": "291651",
+    "name": "이주영",
     "season": "2026-2027",
     "team": "전주 KCC",
     "position": "GD",
-    "OVR": 71,
+    "OVR": 72,
     "OFF": 72,
-    "DEF": 69,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291671",
-    "name": "패리스 배스",
-    "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "FD",
-    "OVR": 95,
-    "OFF": 97,
-    "DEF": 92,
-    "archetype": "스트레치 빅",
-    "badges": {
-      "finishing": 3,
-      "shooting": 2,
-      "playmaking": 1,
-      "defense": 2
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291603",
-    "name": "문가온",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "GD",
-    "OVR": 55,
-    "OFF": 55,
-    "DEF": 55,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291293",
-    "name": "최진광",
-    "season": "2026-2027",
-    "team": "전주 KCC",
-    "position": "GD",
-    "OVR": 74,
-    "OFF": 75,
     "DEF": 73,
     "archetype": "롤 플레이어",
     "badges": {
@@ -44982,26 +44424,8 @@
     "projected": true
   },
   {
-    "pcode": "290787",
-    "name": "이승현",
-    "season": "2026-2027",
-    "team": "울산 현대모비스",
-    "position": "FD",
-    "OVR": 84,
-    "OFF": 83,
-    "DEF": 85,
-    "archetype": "락다운 디펜더",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291391",
-    "name": "조석호",
+    "pcode": "291856",
+    "name": "신지원",
     "season": "2026-2027",
     "team": "고양 소노",
     "position": "Unknown",
@@ -45036,14 +44460,14 @@
     "projected": true
   },
   {
-    "pcode": "291485",
-    "name": "이승우",
+    "pcode": "291266",
+    "name": "전성환",
     "season": "2026-2027",
-    "team": "울산 현대모비스",
-    "position": "FD",
-    "OVR": 75,
+    "team": "서울 SK",
+    "position": "GD",
+    "OVR": 70,
     "OFF": 73,
-    "DEF": 75,
+    "DEF": 66,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -45054,10 +44478,136 @@
     "projected": true
   },
   {
-    "pcode": "291499",
-    "name": "조은후",
+    "pcode": "291659",
+    "name": "민기남",
     "season": "2026-2027",
-    "team": "원주 DB",
+    "team": "고양 소노",
+    "position": "GD",
+    "OVR": 74,
+    "OFF": 74,
+    "DEF": 74,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291008",
+    "name": "박지훈",
+    "season": "2026-2027",
+    "team": "안양 정관장",
+    "position": "GD",
+    "OVR": 87,
+    "OFF": 88,
+    "DEF": 86,
+    "archetype": "락다운 디펜더",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 1,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291766",
+    "name": "박성재",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "GD",
+    "OVR": 79,
+    "OFF": 78,
+    "DEF": 80,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290740",
+    "name": "전준범",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "FD",
+    "OVR": 70,
+    "OFF": 69,
+    "DEF": 70,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291556",
+    "name": "샘조세프 벨란겔",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "GD",
+    "OVR": 87,
+    "OFF": 90,
+    "DEF": 83,
+    "archetype": "샷 크리에이터",
+    "badges": {
+      "finishing": 1,
+      "shooting": 1,
+      "playmaking": 1,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290599",
+    "name": "서민수",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "FD",
+    "OVR": 73,
+    "OFF": 72,
+    "DEF": 74,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291749",
+    "name": "서동원",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "FD",
+    "OVR": 65,
+    "OFF": 67,
+    "DEF": 63,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290662",
+    "name": "이동엽",
+    "season": "2026-2027",
+    "team": "고양 소노",
     "position": "GD",
     "OVR": 72,
     "OFF": 72,
@@ -45072,8 +44622,368 @@
     "projected": true
   },
   {
-    "pcode": "291867",
-    "name": "임정현",
+    "pcode": "291603",
+    "name": "문가온",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "GD",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291655",
+    "name": "나성호",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "FD",
+    "OVR": 65,
+    "OFF": 60,
+    "DEF": 70,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291648",
+    "name": "표승빈",
+    "season": "2026-2027",
+    "team": "안양 정관장",
+    "position": "FD",
+    "OVR": 74,
+    "OFF": 75,
+    "DEF": 74,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291765",
+    "name": "조환희",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "Unknown",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291668",
+    "name": "신주영",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "FD",
+    "OVR": 75,
+    "OFF": 74,
+    "DEF": 76,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291850",
+    "name": "이유진",
+    "season": "2026-2027",
+    "team": "원주 DB",
+    "position": "FD",
+    "OVR": 79,
+    "OFF": 78,
+    "DEF": 80,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291182",
+    "name": "우동현",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "GD",
+    "OVR": 70,
+    "OFF": 71,
+    "DEF": 69,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291488",
+    "name": "이정현",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "GD",
+    "OVR": 91,
+    "OFF": 95,
+    "DEF": 86,
+    "archetype": "오펜시브 엔진",
+    "badges": {
+      "finishing": 1,
+      "shooting": 2,
+      "playmaking": 2,
+      "defense": 1
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291512",
+    "name": "저스틴 구탕",
+    "season": "2026-2027",
+    "team": "서울 삼성",
+    "position": "FD",
+    "OVR": 83,
+    "OFF": 82,
+    "DEF": 83,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 1,
+      "defense": 1
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291376",
+    "name": "양준우",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "GD",
+    "OVR": 73,
+    "OFF": 74,
+    "DEF": 72,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291372",
+    "name": "한승희",
+    "season": "2026-2027",
+    "team": "안양 정관장",
+    "position": "FD",
+    "OVR": 80,
+    "OFF": 79,
+    "DEF": 81,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291194",
+    "name": "전현우",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "FD",
+    "OVR": 75,
+    "OFF": 75,
+    "DEF": 75,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291857",
+    "name": "문유현",
+    "season": "2026-2027",
+    "team": "안양 정관장",
+    "position": "GD",
+    "OVR": 83,
+    "OFF": 84,
+    "DEF": 83,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 1
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291594",
+    "name": "김태완",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "GD",
+    "OVR": 76,
+    "OFF": 77,
+    "DEF": 76,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291784",
+    "name": "알빈 톨렌티노",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "FD",
+    "OVR": 78,
+    "OFF": 80,
+    "DEF": 77,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291845",
+    "name": "안성우",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "GD",
+    "OVR": 72,
+    "OFF": 72,
+    "DEF": 71,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291641",
+    "name": "박종하",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "GD",
+    "OVR": 75,
+    "OFF": 76,
+    "DEF": 73,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290450",
+    "name": "오세근",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "FD",
+    "OVR": 83,
+    "OFF": 82,
+    "DEF": 84,
+    "archetype": "락다운 디펜더",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291861",
+    "name": "김윤성",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "Unknown",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291752",
+    "name": "김보배",
+    "season": "2026-2027",
+    "team": "원주 DB",
+    "position": "FD",
+    "OVR": 82,
+    "OFF": 80,
+    "DEF": 84,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291486",
+    "name": "김종호",
     "season": "2026-2027",
     "team": "창원 LG",
     "position": "Unknown",
@@ -45090,49 +45000,31 @@
     "projected": true
   },
   {
-    "pcode": "290485",
-    "name": "최부경",
+    "pcode": "291432",
+    "name": "아셈 마레이",
     "season": "2026-2027",
-    "team": "서울 SK",
+    "team": "창원 LG",
     "position": "C",
-    "OVR": 70,
-    "OFF": 68,
-    "DEF": 80,
-    "archetype": "롤 플레이어",
+    "OVR": 91,
+    "OFF": 89,
+    "DEF": 94,
+    "archetype": "글래스 클리너",
     "badges": {
-      "finishing": 0,
+      "finishing": 3,
       "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
+      "playmaking": 2,
+      "defense": 2
     },
     "projected": true
   },
   {
-    "pcode": "291759",
-    "name": "김태훈",
+    "pcode": "291653",
+    "name": "조준희",
     "season": "2026-2027",
-    "team": "서울 SK",
+    "team": "서울 삼성",
     "position": "GD",
-    "OVR": 73,
-    "OFF": 72,
-    "DEF": 74,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291352",
-    "name": "박지원",
-    "season": "2026-2027",
-    "team": "수원 KT",
-    "position": "GD",
-    "OVR": 75,
-    "OFF": 76,
+    "OVR": 76,
+    "OFF": 77,
     "DEF": 75,
     "archetype": "롤 플레이어",
     "badges": {
@@ -45144,14 +45036,14 @@
     "projected": true
   },
   {
-    "pcode": "291651",
-    "name": "이주영",
+    "pcode": "291303",
+    "name": "김형빈",
     "season": "2026-2027",
-    "team": "전주 KCC",
-    "position": "GD",
-    "OVR": 72,
-    "OFF": 72,
-    "DEF": 73,
+    "team": "서울 SK",
+    "position": "FD",
+    "OVR": 77,
+    "OFF": 76,
+    "DEF": 79,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -45162,13 +45054,103 @@
     "projected": true
   },
   {
-    "pcode": "290454",
-    "name": "정창영",
+    "pcode": "290993",
+    "name": "최준용",
     "season": "2026-2027",
-    "team": "수원 KT",
+    "team": "전주 KCC",
+    "position": "FD",
+    "OVR": 85,
+    "OFF": 85,
+    "DEF": 85,
+    "archetype": "락다운 디펜더",
+    "badges": {
+      "finishing": 1,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 1
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291248",
+    "name": "자밀 워니",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "C",
+    "OVR": 93,
+    "OFF": 94,
+    "DEF": 91,
+    "archetype": "스트레치 빅",
+    "badges": {
+      "finishing": 3,
+      "shooting": 1,
+      "playmaking": 1,
+      "defense": 2
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290904",
+    "name": "박봉진",
+    "season": "2026-2027",
+    "team": "원주 DB",
+    "position": "FD",
+    "OVR": 69,
+    "OFF": 69,
+    "DEF": 69,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291865",
+    "name": "김선우",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "Unknown",
+    "OVR": 55,
+    "OFF": 55,
+    "DEF": 55,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291778",
+    "name": "케빈 켐바오",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "FD",
+    "OVR": 86,
+    "OFF": 87,
+    "DEF": 85,
+    "archetype": "락다운 디펜더",
+    "badges": {
+      "finishing": 1,
+      "shooting": 2,
+      "playmaking": 1,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290648",
+    "name": "한상혁",
+    "season": "2026-2027",
+    "team": "창원 LG",
     "position": "GD",
-    "OVR": 67,
-    "OFF": 67,
+    "OVR": 69,
+    "OFF": 70,
     "DEF": 68,
     "archetype": "롤 플레이어",
     "badges": {
@@ -45180,67 +45162,31 @@
     "projected": true
   },
   {
-    "pcode": "291576",
-    "name": "양준석",
+    "pcode": "291667",
+    "name": "문정현",
     "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "GD",
-    "OVR": 83,
-    "OFF": 85,
-    "DEF": 81,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 2,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291760",
-    "name": "이민서",
-    "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "GD",
-    "OVR": 74,
-    "OFF": 75,
-    "DEF": 72,
-    "archetype": "롤 플레이어",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291500",
-    "name": "조니 오브라이언트",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "C",
-    "OVR": 84,
-    "OFF": 84,
-    "DEF": 84,
-    "archetype": "샷 크리에이터",
-    "badges": {
-      "finishing": 1,
-      "shooting": 1,
-      "playmaking": 0,
-      "defense": 1
-    },
-    "projected": true
-  },
-  {
-    "pcode": "290284",
-    "name": "허일영",
-    "season": "2026-2027",
-    "team": "안양 정관장",
+    "team": "수원 KT",
     "position": "FD",
+    "OVR": 81,
+    "OFF": 79,
+    "DEF": 83,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291275",
+    "name": "김경원",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "C",
     "OVR": 77,
-    "OFF": 76,
+    "OFF": 75,
     "DEF": 78,
     "archetype": "롤 플레이어",
     "badges": {
@@ -45252,14 +45198,14 @@
     "projected": true
   },
   {
-    "pcode": "291497",
-    "name": "선상혁",
+    "pcode": "291606",
+    "name": "안정욱",
     "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "C",
-    "OVR": 69,
-    "OFF": 68,
-    "DEF": 71,
+    "team": "고양 소노",
+    "position": "FD",
+    "OVR": 71,
+    "OFF": 70,
+    "DEF": 72,
     "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
@@ -45270,15 +45216,69 @@
     "projected": true
   },
   {
-    "pcode": "291846",
-    "name": "에디 다니엘",
+    "pcode": "291491",
+    "name": "서정현",
     "season": "2026-2027",
-    "team": "서울 SK",
-    "position": "FD",
-    "OVR": 90,
-    "OFF": 88,
-    "DEF": 92,
-    "archetype": "락다운 디펜더",
+    "team": "전주 KCC",
+    "position": "C",
+    "OVR": 69,
+    "OFF": 71,
+    "DEF": 67,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291494",
+    "name": "김동준",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "GD",
+    "OVR": 73,
+    "OFF": 74,
+    "DEF": 72,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291363",
+    "name": "윤원상",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "GD",
+    "OVR": 77,
+    "OFF": 77,
+    "DEF": 77,
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "290788",
+    "name": "이호현",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "GD",
+    "OVR": 72,
+    "OFF": 73,
+    "DEF": 70,
+    "archetype": "롤 플레이어",
     "badges": {
       "finishing": 0,
       "shooting": 0,

@@ -21,6 +21,16 @@ NEUTRAL_AGE = 26
 # 같은 값이어야 한다(그쪽이 로스터/이적 화면 기준 시즌).
 PROJECTION_SEASON = '2026-2027'
 
+# 박스스코어에는 없는 외부 신호(국가대표 발탁 등)를 다음 시즌 예상치에만 명시적으로
+# 가산한다 - roster_departure(은퇴/미계약처럼 경기 기록만으로는 알 수 없는 사실을 사람이
+# 확인해 적재하는 테이블)와 같은 패턴. 나이 곡선/스무딩 파라미터를 손대는 시도는 "어릴수록
+# 보너스가 크다"는 구조 때문에 데뷔 시즌이 최근 시즌보다 높아지는 역전을 낳아 되돌렸다
+# (2026-09-18) - 대신 확정된 과거 시즌은 그대로 두고, 아직 경기가 없는 예상치에만 사람이
+# 사유를 남기고 가산하는 이 방식으로 대체한다. 사용자 확인 후에만 추가/제거할 것.
+PROJECTION_REPUTATION_BOOST = {
+    '291752': {'boost': 3, 'reason': '2026 국가대표 발탁(김보배) - 박스스코어에 없는 외부 신호, 2026-09-18 사용자 확인'},
+}
+
 
 def load_birth_years():
     """kbl540 카드 풀(같은 kbl.or.kr pcode 체계)에서 pcode -> 출생연도 매핑을 만든다.
@@ -293,7 +303,7 @@ def compute_ovr(target_season='2024-2025'):
     for pcode, group in global_df.groupby('pcode'):
         group = group.sort_values('season_name')
         idxs = group.index.tolist()
-        
+
         # Determine career play_style
         career_tpm = group['tpm'].sum() / max(1, group['g'].sum())
         career_pts = group['pts'].mean()
@@ -444,7 +454,6 @@ def compute_ovr(target_season='2024-2025'):
             })
             continue
         last = hist.iloc[-1]
-        next_age = int(last['age_for_model']) + 1 if pd.notna(last['age']) else NEUTRAL_AGE
 
         career_tpm = hist['tpm'].sum() / max(1, hist['g'].sum())
         play_style = "balanced"
@@ -453,19 +462,23 @@ def compute_ovr(target_season='2024-2025'):
         elif hist['reb'].mean() >= 8.0 or hist['blk'].mean() >= 1.0 or (hist['pts'].mean() >= 15.0 and career_tpm < 1.0):
             play_style = "athletic"
 
-        def project_one(mapped_col, final_col):
+        def project_one(mapped_col):
             seasons = [
                 {"season": r['season_name'], "age": int(r['age_for_model']),
                  "raw_performance": r[mapped_col], "play_style": play_style}
                 for _, r in hist.iterrows()
             ]
-            seasons.append({"season": PROJECTION_SEASON, "age": next_age,
-                             "raw_performance": float(last[final_col]), "play_style": play_style})
-            return model.process_player(seasons)[-1]["calculated_ovr"]
+            return model.project_forward(seasons, extra_years=1)
 
-        proj_ovr = round(project_one('raw_ovr_mapped', 'OVR'))
-        proj_off = round(project_one('raw_off_mapped', 'OFF'))
-        proj_def = round(project_one('raw_def_mapped', 'DEF'))
+        proj_ovr = round(project_one('raw_ovr_mapped'))
+        proj_off = round(project_one('raw_off_mapped'))
+        proj_def = round(project_one('raw_def_mapped'))
+
+        boost = PROJECTION_REPUTATION_BOOST.get(pcode)
+        if boost:
+            proj_ovr += boost['boost']
+            proj_off += boost['boost']
+            proj_def += boost['boost']
 
         out_data.append({
             "pcode": pcode,

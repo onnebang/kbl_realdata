@@ -35,6 +35,13 @@ class OvrCurveModel:
     growth_hi: int = 23   # 이 나이까지는 성장기, 24세부터 전성기 시작
     peak_hi: int = 29     # 24~29세 전성기, 30세부터 하락기
     growth_max_bonus: float = 0.10   # growth_lo세일 때 최대 +10% 보너스(잠재력 1.0 기준)
+    # 시도했다가 되돌림: 0.18로 올리고 potential>1.0을 얹으면, 나이 보너스가 "어릴수록
+    # 크다"는 구조 때문에 더 어린(=증명 안 된) 시즌이 최근 시즌보다 더 크게 부스트되면서
+    # 오히려 데뷔 시즌 > 2년차로 역전되는 부작용이 생겼다(실측: 김보배 21세 82 > 22세 81).
+    # 이 파라미터는 "아직 증명 안 된 유망주에 대한 낙관"용이라 시즌 간 상승분을 키우는 데는
+    # 구조적으로 안 맞는다 - 성장기 시즌 간 변동폭을 키우려면 이 값이 아니라 스무딩
+    # 가중치(weights) 자체를 손봐야 하는데, 이건 전체 선수에 영향을 주는 더 큰 변경이라
+    # 별도로 검토가 필요하다.
     decline_rate: float = 0.025      # 하락기 매년 복리로 -2.5%(등급별 저항력 적용 전 기준값)
 
     # 3) 등급별 하락 저항력 - (이 peak 이상이면, 하락률 저항 비율, 부진시 peak쪽 견인 비율,
@@ -144,6 +151,51 @@ class OvrCurveModel:
             career_peak = max(career_peak, value)
 
         return out
+
+    def project_forward(self, seasons: list[dict], extra_years: int = 1) -> float:
+        """seasons: 실제 시즌 이력(오래된 순, process_player와 같은 형식). 다음 시즌 경기
+        기록이 아직 없을 때(개막 전) 쓰는 예상치 - "새 정보 없음"을 process_player에 합성
+        raw로 흉내내면(마지막 값을 raw_performance로 다시 넣어 한 스텝 더 돌리면) 성장기
+        선수의 데뷔 시즌처럼 오래되고 약한 raw가 3시즌 가중평균에 20% 가중치로 다시 끌려
+        들어오는 부작용이 있다(실측: 22세 김보배 - 데뷔 시즌 raw 75.1이 재투입되며 79->78로
+        하락, 성장기 보너스가 23세에 0%로 사라지는 것과 겹쳐 실제로는 오르고 있는 선수가
+        떨어지는 것처럼 보임).
+
+        그래서 이 메서드는 process_player를 다시 돌리지 않는다:
+          - 다음 나이가 아직 성장기~전성기(<= peak_hi)면 새 근거가 없으니 마지막 확정값을
+            그대로 유지한다("떨어질 이유가 없다").
+          - 하락기에 접어들었으면 등급별 하락 저항력을 마지막 확정값에 한 시즌(extra_years)만
+            추가로 복리 적용한다 - process_player의 하락기 공식과 동일한 로직이되, 약한
+            과거 시즌을 다시 평균에 끌어오지 않는다.
+        """
+        processed = self.process_player(seasons)
+        last_row = seasons[-1]
+        last_value = processed[-1]["calculated_ovr"]
+        next_age = last_row["age"] + extra_years
+
+        if next_age <= self.peak_hi:
+            return last_value
+
+        career_peak = max(r["calculated_ovr"] for r in processed)
+        raw_peak = max(r["raw_performance"] for r in seasons)
+        aging_resistance, perf_buffer, min_retention = self._tier_for(raw_peak)
+
+        base_decline = self.decline_rate
+        play_style = last_row.get("play_style", "balanced")
+        if play_style == "shooter":
+            base_decline *= 0.6
+        elif play_style == "athletic":
+            base_decline *= 1.4
+        rate = base_decline * (1 - aging_resistance)
+
+        # 부진 방어(perf_buffer)는 여기서 다시 적용하지 않는다 - last_value는 이미 마지막
+        # 실제 시즌에서 그 방어를 한 번 거친 값이라, 여기 또 적용하면 이중으로 명성 보정이
+        # 걸려 "한 시즌 더 늙었는데 오히려 오버롤이 오르는" 역전이 생긴다(실측: 라건아
+        # 93->95). 순수 노화 감쇠 한 스텝만 곱하고, 하한선(min_retention)만 안전장치로 유지.
+        value = last_value * ((1 - rate) ** extra_years)
+        value = max(value, career_peak * min_retention)
+        value = max(self.ovr_floor, min(self.ovr_ceiling, value))
+        return round(value, 1)
 
 
 def _plot_on_ax(ax, rows: list[dict], title: str):
@@ -303,6 +355,34 @@ def demo():
     })
     fig.savefig("ovr_curve_demo.png", dpi=120)
     print("차트 저장: ovr_curve_demo.png")
+
+    # 검증 5: 예상치(project_forward) - 성장기 선수는 새 정보 없이 떨어지면 안 된다
+    # (유저 제보 재현: 22세, 데뷔 시즌 raw가 약해서 3시즌 평균에 재투입되면 79->78로 착시
+    # 하락하던 문제).
+    growing_player = [
+        {"season": "y1", "age": 21, "raw_performance": 75, "play_style": "balanced"},
+        {"season": "y2", "age": 22, "raw_performance": 78, "play_style": "balanced"},
+    ]
+    projected_growth = model.project_forward(growing_player, extra_years=1)
+    last_real_growth = model.process_player(growing_player)[-1]["calculated_ovr"]
+    assert projected_growth >= last_real_growth, (
+        f"성장기 선수 예상치가 마지막 확정값보다 낮음(착시 하락 재발): "
+        f"{projected_growth} < {last_real_growth}"
+    )
+    print(f"검증 통과: 성장기 선수(22->23세) 예상치 {projected_growth} >= 마지막 확정값 {last_real_growth}")
+
+    # 검증 6: 하락기 선수는 한 시즌 더 늙으면 실제로 더 낮아져야 한다(부진 방어를 예상치에
+    # 다시 적용해 오히려 오르던 역전 버그 재발 방지 - 실측: 라건아 93->95로 역전됐던 사례).
+    declining_player = legend_data + [
+        {"season": "y_late", "age": 36, "raw_performance": 70, "play_style": "athletic"},
+    ]
+    projected_decline = model.project_forward(declining_player, extra_years=1)
+    last_real_decline = model.process_player(declining_player)[-1]["calculated_ovr"]
+    assert projected_decline <= last_real_decline, (
+        f"하락기 선수 예상치가 마지막 확정값보다 높음(부진 방어 이중 적용 재발): "
+        f"{projected_decline} > {last_real_decline}"
+    )
+    print(f"검증 통과: 하락기 선수(36->37세) 예상치 {projected_decline} <= 마지막 확정값 {last_real_decline}")
 
 
 if __name__ == "__main__":

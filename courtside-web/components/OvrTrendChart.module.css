@@ -70,6 +70,17 @@
   stroke-linejoin: round;
 }
 
+/* 다음 시즌 예상 구간 - 확정 구간과 시각적으로 구분되게 점선 처리(요청: "예상이 흐름이
+   제대로 이어지는지"를 눈으로 바로 확인할 수 있게). */
+.linePathProjected {
+  fill: none;
+  stroke: var(--chart-color);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 10 8;
+  opacity: 0.75;
+}
+
 .gridLine {
   stroke: rgba(255, 255, 255, 0.1);
   stroke-width: 1;
@@ -121,6 +132,54 @@
   fill: var(--chart-color);
   stroke: #ffffff;
   stroke-width: 2;
+}
+
+.dataPointProjected {
+  fill: transparent;
+  stroke-dasharray: 3 2;
+}
+
+/* 오버롤 숫자 배지 - 2kratings.com류 참고 이미지처럼 호버 없이도 항상 크게 보이게.
+   (요청: "오버롤 흐름도를 크기를 키워서 제대로 보일 수 있게") */
+.badgeStem {
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 2;
+}
+
+.ovrBadge {
+  fill: var(--chart-color);
+  stroke: #0d0d0d;
+  stroke-width: 3;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  transition: r 0.2s ease;
+}
+
+.ovrBadgeActive {
+  stroke: #ffffff;
+}
+
+/* 예상 배지는 확정치와 구분되게 속을 비우고 팀 컬러 테두리만 남긴다. */
+.ovrBadgeProjected {
+  fill: #0d0d0d;
+  stroke: var(--chart-color);
+  stroke-width: 3;
+  stroke-dasharray: 5 3;
+}
+
+.ovrBadgeText {
+  fill: #ffffff;
+  font-weight: 800;
+  font-family: "Big Shoulders Display", "IBM Plex Mono", sans-serif;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+.projectedNote {
+  margin: 0.6rem 0 0;
+  font-size: 0.75rem;
+  color: #888;
 }
 
 /* 툴팁 */
