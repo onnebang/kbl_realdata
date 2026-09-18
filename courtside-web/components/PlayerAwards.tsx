@@ -24,6 +24,8 @@ export default function PlayerAwards({ pcode }: Props) {
     if (id === "mip" || name.includes("기량발전")) return "📈";
     if (id === "coy" || name.includes("감독")) return "👔";
     if (id === "round_mvp" || name.includes("라운드")) return "🎖️";
+    if (id === "3pt_contest" || name.includes("3점슛")) return "🎯";
+    if (id === "dunk_contest" || name.includes("덩크슛")) return "💥";
     if (id === "dpoy" || name.includes("수비")) return "🛡️";
     if (name.includes("득점")) return "🔥";
     if (name.includes("어시스트")) return "🏀";
