@@ -419,10 +419,10 @@ def compute_ovr(target_season='2024-2025'):
     global_df['raw_ovr_mapped'] = global_df['raw_ovr']
     
 
-    # 베테랑 보정 및 궂은 일(PIE)
-    min_per_game = global_df['total_min'] / np.maximum(1, global_df['g'])
-    unsung_hero_mask = (min_per_game >= 20.0) & (global_df['usage'] <= 16.0) & (global_df['total_min'] >= 600)
-    global_df.loc[unsung_hero_mask, 'raw_ovr_mapped'] += 2.0
+    # 베테랑/궂은일 전용 보정(Unsung Hero)은 폐기함.
+    # 기존에는 수비형 선수들이 All-Around로 묶여 손해를 봤기 때문에 강제 +2.0 보정을 주었으나,
+    # 이제 11개 롤(Multi-Role Max) 시스템으로 수비/3&D 스페셜리스트들이 본인의 강점을 100% 반영받으므로
+    # 추가 보정을 주면 오재현 같은 선수가 80점대 후반의 슈퍼스타로 이중 버프(Double-dip)를 받는 부작용이 발생함.
     
     # Winning Impact (승률, 마진, WPA, PIE 기반)
     wpa_boost = global_df['wpaPerGame'].fillna(0) * 2.0
@@ -485,6 +485,18 @@ def compute_ovr(target_season='2024-2025'):
         elif role == 'Scoring Threat':
             off = (row['attr_outside_mapped']*0.5 + row['attr_inside_mapped']*0.3 + row['attr_playmaking_mapped']*0.2)
             dfn = (row['attr_athletic_mapped']*0.3 + row['attr_defense_mapped']*0.5 + row['attr_rebounding_mapped']*0.2)
+        elif role == 'Sharpshooter':
+            off = (row['attr_outside_mapped']*0.7 + row['attr_inside_mapped']*0.1 + row['attr_playmaking_mapped']*0.2)
+            dfn = (row['attr_athletic_mapped']*0.3 + row['attr_defense_mapped']*0.5 + row['attr_rebounding_mapped']*0.2)
+        elif role == 'Slasher':
+            off = (row['attr_outside_mapped']*0.1 + row['attr_inside_mapped']*0.7 + row['attr_athletic_mapped']*0.2)
+            dfn = (row['attr_athletic_mapped']*0.3 + row['attr_defense_mapped']*0.5 + row['attr_rebounding_mapped']*0.2)
+        elif role == 'Lockdown Defender':
+            off = (row['attr_outside_mapped']*0.4 + row['attr_inside_mapped']*0.4 + row['attr_playmaking_mapped']*0.2)
+            dfn = (row['attr_athletic_mapped']*0.2 + row['attr_defense_mapped']*0.7 + row['attr_rebounding_mapped']*0.1)
+        elif role == 'Glass Cleaner':
+            off = (row['attr_inside_mapped']*0.5 + row['attr_playmaking_mapped']*0.1 + row['attr_rebounding_mapped']*0.4)
+            dfn = (row['attr_athletic_mapped']*0.1 + row['attr_defense_mapped']*0.2 + row['attr_rebounding_mapped']*0.7)
         else: # All-Around
             off = (row['attr_outside_mapped']*0.4 + row['attr_inside_mapped']*0.3 + row['attr_playmaking_mapped']*0.3)
             dfn = (row['attr_athletic_mapped']*0.3 + row['attr_defense_mapped']*0.4 + row['attr_rebounding_mapped']*0.3)
@@ -599,6 +611,25 @@ def compute_ovr(target_season='2024-2025'):
         minutes_bonus = min(2.0, row['total_min'] / 1000.0)
         return int(min(val, cap + minutes_bonus))
 
+    # ── Role Player Cap (저점유율 스페셜리스트 하드 상한선) ──
+    # 오재현과 같이 압도적인 수비/3점 지표를 가졌으나 공격 점유율(Usage)이 낮은 선수가
+    # 리그 최상위권 85+ 오버롤을 받는 현상(과대평가)을 방지합니다.
+    def final_role_player_cap(row):
+        val = row['OVR']
+        usg = row['usage']
+        role = row['role']
+        
+        # 메인 볼핸들러(Playmaker), 빅맨(Paint Beast, Glass Cleaner, Point Center)은
+        # 원래 점유율이 낮아도 영향력이 크므로 제외
+        if usg > 18.0 or role in ['Playmaker', 'Paint Beast', 'Glass Cleaner', 'Point Center', 'All-Around'] or pd.isna(usg):
+            return val
+            
+        # 수비형/3점 스페셜리스트 역할군이 점유율 18% 이하일 경우 하드캡 적용
+        # 오재현(17.4%) 같은 롤 플레이어를 현실적인 81점 만점으로 제한
+        cap = 81.0
+        minutes_bonus = min(1.0, row['total_min'] / 1000.0)
+        return int(min(val, cap + minutes_bonus))
+
 
     # DEBUG START
     debug_mask = global_df['name'].isin(['에디 다니엘', '강성욱', '이선 알바노'])
@@ -607,9 +638,12 @@ def compute_ovr(target_season='2024-2025'):
     # DEBUG END
 
     capped_ovr = global_df.apply(final_rookie_cap, axis=1)
-    diff = capped_ovr - global_df['OVR']
-    
     global_df['OVR'] = capped_ovr
+    
+    role_capped_ovr = global_df.apply(final_role_player_cap, axis=1)
+    diff = role_capped_ovr - global_df['OVR']
+    global_df['OVR'] = role_capped_ovr
+    
     global_df['OFF'] = (global_df['OFF'] + diff).clip(40, 99)
     global_df['DEF'] = (global_df['DEF'] + diff).clip(40, 99)
     global_df['ATTR_OUTSIDE'] = (global_df['ATTR_OUTSIDE'] + diff).clip(40, 99)
