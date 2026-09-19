@@ -167,27 +167,9 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                 nodes.push({ pcode, name: player.name, val: stack.val, rank: myRank || 0 });
               }
 
-              // Calculate staggers to prevent overlap
+              // Sort by value ascending for logical display
               nodes.sort((a, b) => a.val - b.val);
-              let lastLeft = -100;
-              let stagger = 0;
-              let maxStagger = 0;
-              
-              const staggeredNodes = nodes.map(r => {
-                const leftPct = (r.val / maxVal) * 100;
-                // If it's within 12% width of the previous node, drop it down further
-                if (leftPct - lastLeft < 12) {
-                  stagger += 1;
-                } else {
-                  stagger = 0;
-                }
-                lastLeft = leftPct;
-                maxStagger = Math.max(maxStagger, stagger);
-                return { ...r, leftPct, stagger };
-              });
-
-              // Re-sort so that "my" node is always rendered last (on top in z-index naturally if same)
-              staggeredNodes.sort((a, b) => (String(a.pcode) === String(pcode) ? 1 : -1));
+              const totalNodes = nodes.length;
 
               const tierClass = styles[`tier${stack.tier}`] || "";
 
@@ -218,26 +200,53 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                     </div>
                   </div>
                   
-                  {/* Dynamic bottom margin to fit staggered avatars */}
-                  <div className={styles.progressBarTrack} style={{ marginBottom: `${Math.max(20, (maxStagger + 1) * 44 + 10)}px` }}>
-                    <div 
-                      className={styles.progressBarFill} 
-                      style={{ width: `${myPct}%` }} 
-                    />
+                  <div className={styles.trackerContainer}>
+                    {/* Progress Bar */}
+                    <div className={styles.progressBarTrack}>
+                      <div 
+                        className={styles.progressBarFill} 
+                        style={{ width: `${myPct}%` }} 
+                      />
+                      {/* Plot actual points on the bar */}
+                      {nodes.map((r, i) => {
+                        const isMe = String(r.pcode) === String(pcode);
+                        const leftPct = (r.val / maxVal) * 100;
+                        return (
+                          <div 
+                            key={`marker-${r.pcode}`}
+                            className={`${styles.trackMarker} ${isMe ? styles.isMe : ""}`}
+                            style={{ left: `${leftPct}%` }}
+                          />
+                        );
+                      })}
+                    </div>
                     
-                    {staggeredNodes.map((r, i) => {
-                      const isMe = String(r.pcode) === String(pcode);
-                      return (
-                        <div 
-                          key={`${r.pcode}-${i}`} 
-                          className={`${styles.rivalNode} ${isMe ? styles.isMe : ""}`}
-                          style={{ 
-                            left: `${r.leftPct}%`, 
-                            top: `calc(10px + ${r.stagger * 44}px)` // Drop down based on stagger
-                          }}
-                        >
-                          <div className={styles.rivalLine} style={{ height: `${r.stagger * 44 + 6}px` }} />
-                          <div className={styles.rivalContent}>
+                    {/* SVG Connecting Lines */}
+                    <svg className={styles.connectionLines} viewBox="0 0 100 100" preserveAspectRatio="none">
+                      {nodes.map((r, i) => {
+                        const isMe = String(r.pcode) === String(pcode);
+                        const startX = (r.val / maxVal) * 100;
+                        const endX = ((i + 0.5) / totalNodes) * 100;
+                        return (
+                          <path 
+                            key={`path-${r.pcode}`}
+                            d={`M ${startX} 0 C ${startX} 50, ${endX} 50, ${endX} 100`}
+                            className={`${styles.svgLine} ${isMe ? styles.isMe : ""}`}
+                            vectorEffect="non-scaling-stroke"
+                          />
+                        );
+                      })}
+                    </svg>
+
+                    {/* Horizontal Avatars Row */}
+                    <div className={styles.avatarsRow}>
+                      {nodes.map((r, i) => {
+                        const isMe = String(r.pcode) === String(pcode);
+                        return (
+                          <div 
+                            key={`node-${r.pcode}`} 
+                            className={`${styles.rivalNode} ${isMe ? styles.isMe : ""}`}
+                          >
                             <img 
                               src={`https://kbl.or.kr/images/players/Portrait/${r.pcode}.png`} 
                               alt={r.name} 
@@ -245,13 +254,14 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                               onError={(e) => { e.currentTarget.src = 'https://kbl.or.kr/images/common/no_player.jpg'; }}
                             />
                             <div className={styles.rivalLabel}>
-                              <span className={styles.rivalRankLabel}>[{r.rank}위]</span> {r.name}<br/>
-                              <span className={styles.rivalValLabel}>{r.val.toLocaleString()}</span>
+                              <div className={styles.rivalRankLabel}>[{r.rank}위]</div>
+                              <div className={styles.rivalNameLabel}>{r.name}</div>
+                              <div className={styles.rivalValLabel}>{r.val.toLocaleString()}</div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
               );
