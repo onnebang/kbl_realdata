@@ -6,36 +6,30 @@
         "val": 3319,
         "tier": "Diamond",
         "target": 5000,
-        "rank_alltime": 71,
+        "rank_alltime": 72,
         "rivals_alltime": [
           {
             "pcode": "230056",
             "name": "박지현",
             "val": 3439,
-            "rank": 68
+            "rank": 69
           },
           {
             "pcode": "230061",
             "name": "오용준",
             "val": 3425,
-            "rank": 69
+            "rank": 70
           },
           {
             "pcode": "291511",
             "name": "이선 알바노",
             "val": 3423,
-            "rank": 70
+            "rank": 71
           },
           {
             "pcode": "290238",
             "name": "크리스 다니엘스",
             "val": 3319,
-            "rank": 71
-          },
-          {
-            "pcode": "245028",
-            "name": "추승균",
-            "val": 3263,
             "rank": 72
           },
           {
@@ -49,6 +43,12 @@
             "name": "임동섭",
             "val": 3260,
             "rank": 74
+          },
+          {
+            "pcode": "235042",
+            "name": "이규섭",
+            "val": 3206,
+            "rank": 75
           }
         ],
         "rank_active": null,
@@ -177,8 +177,8 @@
             "rank": 224
           },
           {
-            "pcode": "290142",
-            "name": "제이슨 로빈슨",
+            "pcode": "290518",
+            "name": "리온 윌리엄스",
             "val": 91,
             "rank": 226
           },
@@ -189,8 +189,8 @@
             "rank": 226
           },
           {
-            "pcode": "290518",
-            "name": "리온 윌리엄스",
+            "pcode": "290142",
+            "name": "제이슨 로빈슨",
             "val": 91,
             "rank": 226
           },

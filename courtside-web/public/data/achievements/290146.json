@@ -165,26 +165,14 @@
         "rank_alltime": 302,
         "rivals_alltime": [
           {
-            "pcode": "291483",
-            "name": "정호영",
-            "val": 52,
-            "rank": 298
-          },
-          {
-            "pcode": "210088",
-            "name": "김학섭",
-            "val": 52,
-            "rank": 298
-          },
-          {
             "pcode": "291338",
             "name": "얼 클락",
             "val": 51,
             "rank": 302
           },
           {
-            "pcode": "290146",
-            "name": "캘빈 워너",
+            "pcode": "290908",
+            "name": "샤크 맥키식",
             "val": 51,
             "rank": 302
           },
@@ -195,16 +183,28 @@
             "rank": 302
           },
           {
+            "pcode": "290146",
+            "name": "캘빈 워너",
+            "val": 51,
+            "rank": 302
+          },
+          {
             "pcode": "290186",
             "name": "카를로스 딕슨",
             "val": 51,
             "rank": 302
           },
           {
-            "pcode": "290908",
-            "name": "샤크 맥키식",
+            "pcode": "291771",
+            "name": "최형찬",
             "val": 51,
             "rank": 302
+          },
+          {
+            "pcode": "290120",
+            "name": "허효진",
+            "val": 50,
+            "rank": 309
           }
         ],
         "rank_active": null,

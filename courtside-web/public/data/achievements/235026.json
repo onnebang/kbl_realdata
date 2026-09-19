@@ -159,52 +159,34 @@
         "rivals_active": []
       },
       "threep": {
-        "val": 291,
-        "tier": "Silver",
-        "target": 300,
-        "rank_alltime": 85,
+        "val": 1669,
+        "tier": "Legend",
+        "target": 1500,
+        "rank_alltime": 1,
         "rivals_alltime": [
-          {
-            "pcode": "291248",
-            "name": "자밀 워니",
-            "val": 298,
-            "rank": 83
-          },
-          {
-            "pcode": "290101",
-            "name": "박구영",
-            "val": 296,
-            "rank": 84
-          },
-          {
-            "pcode": "291475",
-            "name": "오마리 스펠맨",
-            "val": 291,
-            "rank": 85
-          },
           {
             "pcode": "235026",
             "name": "문경은",
-            "val": 291,
-            "rank": 85
+            "val": 1669,
+            "rank": 1
           },
           {
-            "pcode": "235057",
-            "name": "박종천",
-            "val": 285,
-            "rank": 87
+            "pcode": "215012",
+            "name": "주희정",
+            "val": 1152,
+            "rank": 2
           },
           {
-            "pcode": "290583",
-            "name": "한희원",
-            "val": 284,
-            "rank": 88
+            "pcode": "225019",
+            "name": "우지원",
+            "val": 1116,
+            "rank": 3
           },
           {
-            "pcode": "290897",
-            "name": "송교창",
-            "val": 283,
-            "rank": 89
+            "pcode": "290381",
+            "name": "이정현",
+            "val": 1090,
+            "rank": 4
           }
         ],
         "rank_active": null,

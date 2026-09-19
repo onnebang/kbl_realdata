@@ -6,49 +6,49 @@
         "val": 5847,
         "tier": "Master",
         "target": 7000,
-        "rank_alltime": 19,
+        "rank_alltime": 21,
         "rivals_alltime": [
           {
             "pcode": "290119",
             "name": "김영환",
             "val": 5909,
-            "rank": 16
+            "rank": 18
           },
           {
             "pcode": "290440",
             "name": "이관희",
             "val": 5880,
-            "rank": 17
+            "rank": 19
           },
           {
             "pcode": "290284",
             "name": "허일영",
             "val": 5877,
-            "rank": 18
+            "rank": 20
           },
           {
             "pcode": "290750",
             "name": "김종규",
             "val": 5847,
-            "rank": 19
+            "rank": 21
           },
           {
             "pcode": "290367",
             "name": "로드 벤슨",
             "val": 5802,
-            "rank": 20
+            "rank": 22
           },
           {
             "pcode": "290395",
             "name": "데이비드 사이먼",
             "val": 5574,
-            "rank": 21
+            "rank": 23
           },
           {
             "pcode": "290227",
             "name": "김민수",
             "val": 5432,
-            "rank": 22
+            "rank": 24
           }
         ],
         "rank_active": 11,
@@ -101,49 +101,49 @@
         "val": 3190,
         "tier": "Master",
         "target": 5000,
-        "rank_alltime": 10,
+        "rank_alltime": 11,
         "rivals_alltime": [
           {
             "pcode": "290450",
             "name": "오세근",
             "val": 3629,
-            "rank": 7
+            "rank": 8
           },
           {
             "pcode": "290280",
             "name": "문태영",
             "val": 3222,
-            "rank": 8
+            "rank": 9
           },
           {
             "pcode": "291432",
             "name": "아셈 마레이",
             "val": 3212,
-            "rank": 9
+            "rank": 10
           },
           {
             "pcode": "290750",
             "name": "김종규",
             "val": 3190,
-            "rank": 10
+            "rank": 11
           },
           {
             "pcode": "290371",
             "name": "찰스 로드",
             "val": 3178,
-            "rank": 11
+            "rank": 12
           },
           {
             "pcode": "290147",
             "name": "테렌스 레더",
             "val": 3054,
-            "rank": 12
+            "rank": 13
           },
           {
             "pcode": "290248",
             "name": "하승진",
             "val": 2989,
-            "rank": 13
+            "rank": 14
           }
         ],
         "rank_active": 6,
@@ -484,21 +484,21 @@
         "rank_alltime": 4,
         "rivals_alltime": [
           {
+            "pcode": "215053",
+            "name": "김주성",
+            "val": 1037,
+            "rank": 1
+          },
+          {
             "pcode": "290524",
             "name": "리카르도 라틀리프",
             "val": 737,
-            "rank": 1
+            "rank": 2
           },
           {
             "pcode": "290371",
             "name": "찰스 로드",
             "val": 601,
-            "rank": 2
-          },
-          {
-            "pcode": "215053",
-            "name": "김주성",
-            "val": 587,
             "rank": 3
           },
           {

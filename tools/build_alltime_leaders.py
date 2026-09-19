@@ -49,6 +49,31 @@ def build_alltime_leaders():
     # Merge with player info
     df = pd.merge(agg_stats, player_seasons, on='pcode')
     
+    # Load overrides to fix missing 1997-2005 data
+    overrides_path = os.path.join(BASE, "alltime_overrides.json")
+    if os.path.exists(overrides_path):
+        with open(overrides_path, 'r', encoding='utf-8') as f:
+            overrides = json.load(f)
+        
+        for col, data_list in overrides.items():
+            for item in data_list:
+                pcode = item['pcode']
+                val = item['value']
+                
+                # Check if pcode exists in df
+                if pcode in df['pcode'].values:
+                    df.loc[df['pcode'] == pcode, col] = val
+                else:
+                    # Missing entirely, append a new row
+                    new_row = {
+                        'pcode': pcode,
+                        'pname': item.get('pname', ''),
+                        'is_active': False,
+                        'gp': 0, 'pts': 0, 'reb': 0, 'ast': 0, 'stl': 0, 'blk': 0, 'threep': 0
+                    }
+                    new_row[col] = val
+                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
     leaders = {}
     categories = [
         ('pts', '득점'),

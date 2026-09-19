@@ -99,6 +99,31 @@ def get_achievement_data():
         'gmkey': 'count' # GP
     }).rename(columns={'gmkey': 'gp'}).reset_index()
 
+    # Load overrides to fix missing 1997-2005 data
+    import json
+    overrides_path = os.path.join(os.path.dirname(__file__), "alltime_overrides.json")
+    if os.path.exists(overrides_path):
+        with open(overrides_path, 'r', encoding='utf-8') as f:
+            overrides = json.load(f)
+        
+        for col, data_list in overrides.items():
+            for item in data_list:
+                pcode = item['pcode']
+                val = item['value']
+                
+                # Check if pcode exists in career_totals
+                if pcode in career_totals['pcode'].values:
+                    career_totals.loc[career_totals['pcode'] == pcode, col] = val
+                else:
+                    new_row = {
+                        'pcode': pcode,
+                        'name': item.get('pname', ''),
+                        'gp': 0, 'pts': 0, 'reb': 0, 'ast': 0, 'stl': 0, 'blk': 0, 'threep': 0
+                    }
+                    new_row[col] = val
+                    career_totals = pd.concat([career_totals, pd.DataFrame([new_row])], ignore_index=True)
+
+
     # 2. Career Active Totals
     latest_season = df['season_name'].max()
     active_pcodes = df[df['season_name'] == latest_season]['pcode'].unique()

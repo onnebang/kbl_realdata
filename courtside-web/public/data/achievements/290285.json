@@ -162,49 +162,49 @@
         "val": 262,
         "tier": "Silver",
         "target": 300,
-        "rank_alltime": 99,
+        "rank_alltime": 100,
         "rivals_alltime": [
-          {
-            "pcode": "225037",
-            "name": "조동현",
-            "val": 266,
-            "rank": 96
-          },
           {
             "pcode": "290380",
             "name": "박찬희",
             "val": 266,
-            "rank": 96
+            "rank": 97
+          },
+          {
+            "pcode": "225037",
+            "name": "조동현",
+            "val": 266,
+            "rank": 97
           },
           {
             "pcode": "291316",
             "name": "디드릭 로슨",
             "val": 264,
-            "rank": 98
+            "rank": 99
           },
           {
             "pcode": "290285",
             "name": "박성진",
             "val": 262,
-            "rank": 99
+            "rank": 100
           },
           {
             "pcode": "290982",
             "name": "테리코 화이트",
             "val": 261,
-            "rank": 100
+            "rank": 101
           },
           {
             "pcode": "245028",
             "name": "추승균",
             "val": 251,
-            "rank": 101
+            "rank": 102
           },
           {
             "pcode": "290241",
             "name": "리카르도 포웰",
             "val": 248,
-            "rank": 102
+            "rank": 103
           }
         ],
         "rank_active": null,

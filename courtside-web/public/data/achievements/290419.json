@@ -165,26 +165,32 @@
         "rank_alltime": 346,
         "rivals_alltime": [
           {
+            "pcode": "260005",
+            "name": "주태수",
+            "val": 38,
+            "rank": 340
+          },
+          {
             "pcode": "291009",
             "name": "정희원",
             "val": 38,
             "rank": 340
           },
           {
-            "pcode": "291668",
-            "name": "신주영",
+            "pcode": "291746",
+            "name": "박정웅",
             "val": 38,
             "rank": 340
           },
           {
-            "pcode": "291182",
-            "name": "우동현",
+            "pcode": "290419",
+            "name": "조효현",
             "val": 37,
             "rank": 346
           },
           {
-            "pcode": "290419",
-            "name": "조효현",
+            "pcode": "291182",
+            "name": "우동현",
             "val": 37,
             "rank": 346
           },
@@ -199,12 +205,6 @@
             "name": "캘빈 제프리 에피스톨라",
             "val": 37,
             "rank": 346
-          },
-          {
-            "pcode": "290233",
-            "name": "아이반 존슨",
-            "val": 36,
-            "rank": 350
           }
         ],
         "rank_active": null,

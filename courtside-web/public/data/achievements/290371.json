@@ -6,49 +6,49 @@
         "val": 6451,
         "tier": "Master",
         "target": 7000,
-        "rank_alltime": 11,
+        "rank_alltime": 13,
         "rivals_alltime": [
+          {
+            "pcode": "291248",
+            "name": "자밀 워니",
+            "val": 7755,
+            "rank": 10
+          },
           {
             "pcode": "290450",
             "name": "오세근",
             "val": 7046,
-            "rank": 8
-          },
-          {
-            "pcode": "215053",
-            "name": "김주성",
-            "val": 6624,
-            "rank": 9
+            "rank": 11
           },
           {
             "pcode": "210074",
             "name": "양동근",
             "val": 6614,
-            "rank": 10
+            "rank": 12
           },
           {
             "pcode": "290371",
             "name": "찰스 로드",
             "val": 6451,
-            "rank": 11
+            "rank": 13
           },
           {
             "pcode": "290518",
             "name": "리온 윌리엄스",
             "val": 6415,
-            "rank": 12
+            "rank": 14
           },
           {
             "pcode": "290776",
             "name": "허웅",
             "val": 6310,
-            "rank": 13
+            "rank": 15
           },
           {
             "pcode": "290147",
             "name": "테렌스 레더",
             "val": 6144,
-            "rank": 14
+            "rank": 16
           }
         ],
         "rank_active": null,
@@ -58,49 +58,49 @@
         "val": 3178,
         "tier": "Master",
         "target": 5000,
-        "rank_alltime": 11,
+        "rank_alltime": 12,
         "rivals_alltime": [
           {
             "pcode": "290280",
             "name": "문태영",
             "val": 3222,
-            "rank": 8
+            "rank": 9
           },
           {
             "pcode": "291432",
             "name": "아셈 마레이",
             "val": 3212,
-            "rank": 9
+            "rank": 10
           },
           {
             "pcode": "290750",
             "name": "김종규",
             "val": 3190,
-            "rank": 10
+            "rank": 11
           },
           {
             "pcode": "290371",
             "name": "찰스 로드",
             "val": 3178,
-            "rank": 11
+            "rank": 12
           },
           {
             "pcode": "290147",
             "name": "테렌스 레더",
             "val": 3054,
-            "rank": 12
+            "rank": 13
           },
           {
             "pcode": "290248",
             "name": "하승진",
             "val": 2989,
-            "rank": 13
+            "rank": 14
           },
           {
             "pcode": "215053",
             "name": "김주성",
             "val": 2831,
-            "rank": 14
+            "rank": 15
           }
         ],
         "rank_active": null,
@@ -171,24 +171,6 @@
             "rank": 271
           },
           {
-            "pcode": "290455",
-            "name": "안정환",
-            "val": 64,
-            "rank": 271
-          },
-          {
-            "pcode": "291342",
-            "name": "숀 롱",
-            "val": 64,
-            "rank": 271
-          },
-          {
-            "pcode": "290371",
-            "name": "찰스 로드",
-            "val": 63,
-            "rank": 274
-          },
-          {
             "pcode": "290412",
             "name": "김현민",
             "val": 63,
@@ -201,8 +183,26 @@
             "rank": 274
           },
           {
+            "pcode": "290371",
+            "name": "찰스 로드",
+            "val": 63,
+            "rank": 274
+          },
+          {
+            "pcode": "291143",
+            "name": "섀넌 쇼터",
+            "val": 62,
+            "rank": 277
+          },
+          {
             "pcode": "290774",
             "name": "웬델 맥키네스",
+            "val": 62,
+            "rank": 277
+          },
+          {
+            "pcode": "291232",
+            "name": "크리스토퍼 로프튼",
             "val": 62,
             "rank": 277
           }
@@ -266,24 +266,24 @@
         "val": 601,
         "tier": "Platinum",
         "target": 1000,
-        "rank_alltime": 2,
+        "rank_alltime": 3,
         "rivals_alltime": [
+          {
+            "pcode": "215053",
+            "name": "김주성",
+            "val": 1037,
+            "rank": 1
+          },
           {
             "pcode": "290524",
             "name": "리카르도 라틀리프",
             "val": 737,
-            "rank": 1
+            "rank": 2
           },
           {
             "pcode": "290371",
             "name": "찰스 로드",
             "val": 601,
-            "rank": 2
-          },
-          {
-            "pcode": "215053",
-            "name": "김주성",
-            "val": 587,
             "rank": 3
           },
           {
@@ -297,6 +297,12 @@
             "name": "애런 헤인즈",
             "val": 475,
             "rank": 5
+          },
+          {
+            "pcode": "290218",
+            "name": "윤호영",
+            "val": 459,
+            "rank": 6
           }
         ],
         "rank_active": null,

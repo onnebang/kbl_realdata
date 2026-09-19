@@ -6,49 +6,49 @@
         "val": 4248,
         "tier": "Diamond",
         "target": 5000,
-        "rank_alltime": 38,
+        "rank_alltime": 39,
         "rivals_alltime": [
           {
             "pcode": "290417",
             "name": "최진수",
             "val": 4540,
-            "rank": 35
+            "rank": 36
           },
           {
             "pcode": "290742",
             "name": "이대성",
             "val": 4336,
-            "rank": 36
+            "rank": 37
           },
           {
             "pcode": "290335",
             "name": "제스퍼 존슨",
             "val": 4279,
-            "rank": 37
+            "rank": 38
           },
           {
             "pcode": "290763",
             "name": "전성현",
             "val": 4248,
-            "rank": 38
+            "rank": 39
           },
           {
             "pcode": "290738",
             "name": "두경민",
             "val": 4190,
-            "rank": 39
+            "rank": 40
           },
           {
             "pcode": "290111",
             "name": "이동준",
             "val": 4152,
-            "rank": 40
+            "rank": 41
           },
           {
             "pcode": "291085",
             "name": "허훈",
             "val": 4089,
-            "rank": 41
+            "rank": 42
           }
         ],
         "rank_active": 16,
@@ -291,37 +291,49 @@
         "val": 928,
         "tier": "Platinum",
         "target": 1000,
-        "rank_alltime": 2,
+        "rank_alltime": 5,
         "rivals_alltime": [
+          {
+            "pcode": "215012",
+            "name": "주희정",
+            "val": 1152,
+            "rank": 2
+          },
+          {
+            "pcode": "225019",
+            "name": "우지원",
+            "val": 1116,
+            "rank": 3
+          },
           {
             "pcode": "290381",
             "name": "이정현",
-            "val": 1198,
-            "rank": 1
+            "val": 1090,
+            "rank": 4
           },
           {
             "pcode": "290763",
             "name": "전성현",
             "val": 928,
-            "rank": 2
+            "rank": 5
           },
           {
             "pcode": "290776",
             "name": "허웅",
             "val": 917,
-            "rank": 3
+            "rank": 6
           },
           {
             "pcode": "290284",
             "name": "허일영",
             "val": 855,
-            "rank": 4
+            "rank": 7
           },
           {
             "pcode": "210074",
             "name": "양동근",
             "val": 850,
-            "rank": 5
+            "rank": 8
           }
         ],
         "rank_active": 2,
@@ -329,7 +341,7 @@
           {
             "pcode": "290381",
             "name": "이정현",
-            "val": 1198,
+            "val": 1090,
             "rank": 1
           },
           {

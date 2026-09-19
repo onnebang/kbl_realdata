@@ -9,21 +9,21 @@
         "rank_alltime": 73,
         "rivals_alltime": [
           {
+            "pcode": "230061",
+            "name": "오용준",
+            "val": 3425,
+            "rank": 70
+          },
+          {
             "pcode": "291511",
             "name": "이선 알바노",
             "val": 3423,
-            "rank": 70
+            "rank": 71
           },
           {
             "pcode": "290238",
             "name": "크리스 다니엘스",
             "val": 3319,
-            "rank": 71
-          },
-          {
-            "pcode": "245028",
-            "name": "추승균",
-            "val": 3263,
             "rank": 72
           },
           {
@@ -58,49 +58,49 @@
         "val": 1864,
         "tier": "Platinum",
         "target": 2000,
-        "rank_alltime": 35,
+        "rank_alltime": 36,
         "rivals_alltime": [
           {
             "pcode": "290119",
             "name": "김영환",
             "val": 1888,
-            "rank": 32
+            "rank": 33
           },
           {
             "pcode": "290407",
             "name": "김선형",
             "val": 1880,
-            "rank": 33
+            "rank": 34
           },
           {
             "pcode": "230080",
             "name": "아이라 클라크",
             "val": 1874,
-            "rank": 34
+            "rank": 35
           },
           {
             "pcode": "291242",
             "name": "캐디 라렌",
             "val": 1864,
-            "rank": 35
-          },
-          {
-            "pcode": "290377",
-            "name": "문태종",
-            "val": 1841,
             "rank": 36
           },
           {
             "pcode": "290276",
             "name": "이승준",
             "val": 1841,
-            "rank": 36
+            "rank": 37
+          },
+          {
+            "pcode": "290377",
+            "name": "문태종",
+            "val": 1841,
+            "rank": 37
           },
           {
             "pcode": "290111",
             "name": "이동준",
             "val": 1804,
-            "rank": 38
+            "rank": 39
           }
         ],
         "rank_active": null,
@@ -165,12 +165,6 @@
         "rank_alltime": 146,
         "rivals_alltime": [
           {
-            "pcode": "291778",
-            "name": "케빈 켐바오",
-            "val": 167,
-            "rank": 144
-          },
-          {
             "pcode": "250042",
             "name": "정선규",
             "val": 166,
@@ -183,14 +177,14 @@
             "rank": 146
           },
           {
-            "pcode": "291242",
-            "name": "캐디 라렌",
+            "pcode": "291096",
+            "name": "유현준",
             "val": 165,
             "rank": 146
           },
           {
-            "pcode": "291096",
-            "name": "유현준",
+            "pcode": "291242",
+            "name": "캐디 라렌",
             "val": 165,
             "rank": 146
           },
@@ -205,6 +199,12 @@
             "name": "박상률",
             "val": 160,
             "rank": 150
+          },
+          {
+            "pcode": "291698",
+            "name": "레이션 해먼즈",
+            "val": 159,
+            "rank": 151
           }
         ],
         "rank_active": null,

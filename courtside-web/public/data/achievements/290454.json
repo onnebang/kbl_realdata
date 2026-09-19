@@ -196,49 +196,49 @@
         "val": 1037,
         "tier": "Platinum",
         "target": 2000,
-        "rank_alltime": 46,
+        "rank_alltime": 47,
         "rivals_alltime": [
+          {
+            "pcode": "290993",
+            "name": "최준용",
+            "val": 1075,
+            "rank": 44
+          },
           {
             "pcode": "290440",
             "name": "이관희",
             "val": 1072,
-            "rank": 43
-          },
-          {
-            "pcode": "230051",
-            "name": "김승현",
-            "val": 1072,
-            "rank": 43
+            "rank": 45
           },
           {
             "pcode": "291488",
             "name": "이정현",
             "val": 1043,
-            "rank": 45
+            "rank": 46
           },
           {
             "pcode": "290454",
             "name": "정창영",
             "val": 1037,
-            "rank": 46
+            "rank": 47
           },
           {
             "pcode": "290114",
             "name": "정영삼",
             "val": 965,
-            "rank": 47
+            "rank": 48
           },
           {
             "pcode": "290377",
             "name": "문태종",
             "val": 943,
-            "rank": 48
+            "rank": 49
           },
           {
             "pcode": "290243",
             "name": "양우섭",
             "val": 919,
-            "rank": 49
+            "rank": 50
           }
         ],
         "rank_active": 22,
@@ -291,49 +291,49 @@
         "val": 348,
         "tier": "Gold",
         "target": 500,
-        "rank_alltime": 63,
+        "rank_alltime": 65,
         "rivals_alltime": [
           {
             "pcode": "291220",
             "name": "변준형",
             "val": 357,
-            "rank": 60
+            "rank": 62
           },
           {
             "pcode": "235075",
             "name": "이원수",
             "val": 354,
-            "rank": 61
+            "rank": 63
           },
           {
             "pcode": "291070",
             "name": "최성원",
             "val": 350,
-            "rank": 62
+            "rank": 64
           },
           {
             "pcode": "290454",
             "name": "정창영",
             "val": 348,
-            "rank": 63
+            "rank": 65
           },
           {
             "pcode": "220172",
             "name": "방성윤",
             "val": 348,
-            "rank": 63
-          },
-          {
-            "pcode": "290231",
-            "name": "기승호",
-            "val": 338,
             "rank": 65
           },
           {
             "pcode": "290528",
             "name": "박경상",
             "val": 338,
-            "rank": 65
+            "rank": 67
+          },
+          {
+            "pcode": "290231",
+            "name": "기승호",
+            "val": 338,
+            "rank": 67
           }
         ],
         "rank_active": 32,

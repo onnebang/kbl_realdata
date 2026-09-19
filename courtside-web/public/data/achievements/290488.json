@@ -104,9 +104,9 @@
         "rank_alltime": 43,
         "rivals_alltime": [
           {
-            "pcode": "255032",
-            "name": "서장훈",
-            "val": 1732,
+            "pcode": "290417",
+            "name": "최진수",
+            "val": 1789,
             "rank": 40
           },
           {
@@ -196,37 +196,37 @@
         "val": 822,
         "tier": "Gold",
         "target": 1000,
-        "rank_alltime": 53,
+        "rank_alltime": 54,
         "rivals_alltime": [
+          {
+            "pcode": "245028",
+            "name": "추승균",
+            "val": 887,
+            "rank": 51
+          },
           {
             "pcode": "290239",
             "name": "강병현",
             "val": 874,
-            "rank": 51
+            "rank": 52
           },
           {
             "pcode": "291432",
             "name": "아셈 마레이",
             "val": 870,
-            "rank": 52
-          },
-          {
-            "pcode": "291091",
-            "name": "양홍석",
-            "val": 822,
             "rank": 53
           },
           {
             "pcode": "290488",
             "name": "차바위",
             "val": 822,
-            "rank": 53
+            "rank": 54
           },
           {
-            "pcode": "245026",
-            "name": "이상민",
-            "val": 812,
-            "rank": 55
+            "pcode": "291091",
+            "name": "양홍석",
+            "val": 822,
+            "rank": 54
           },
           {
             "pcode": "290118",
@@ -291,49 +291,49 @@
         "val": 503,
         "tier": "Platinum",
         "target": 1000,
-        "rank_alltime": 34,
+        "rank_alltime": 36,
         "rivals_alltime": [
           {
             "pcode": "291091",
             "name": "양홍석",
             "val": 521,
-            "rank": 31
+            "rank": 33
           },
           {
             "pcode": "290287",
             "name": "전태풍",
             "val": 514,
-            "rank": 32
+            "rank": 34
           },
           {
             "pcode": "220034",
             "name": "조상현",
             "val": 507,
-            "rank": 33
+            "rank": 35
           },
           {
             "pcode": "290488",
             "name": "차바위",
             "val": 503,
-            "rank": 34
+            "rank": 36
           },
           {
             "pcode": "250067",
             "name": "이현민",
             "val": 500,
-            "rank": 35
+            "rank": 37
           },
           {
             "pcode": "291084",
             "name": "안영준",
             "val": 496,
-            "rank": 36
+            "rank": 38
           },
           {
             "pcode": "291488",
             "name": "이정현",
             "val": 492,
-            "rank": 37
+            "rank": 39
           }
         ],
         "rank_active": 14,

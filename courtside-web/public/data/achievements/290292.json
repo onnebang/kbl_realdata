@@ -165,26 +165,14 @@
         "rank_alltime": 316,
         "rivals_alltime": [
           {
-            "pcode": "290418",
-            "name": "김민섭",
-            "val": 46,
-            "rank": 316
-          },
-          {
             "pcode": "250066",
             "name": "박범재",
             "val": 46,
             "rank": 316
           },
           {
-            "pcode": "250013",
-            "name": "박훈근",
-            "val": 46,
-            "rank": 316
-          },
-          {
-            "pcode": "290292",
-            "name": "김종근",
+            "pcode": "290418",
+            "name": "김민섭",
             "val": 46,
             "rank": 316
           },
@@ -195,16 +183,28 @@
             "rank": 316
           },
           {
-            "pcode": "290739",
-            "name": "김창모",
-            "val": 44,
-            "rank": 321
+            "pcode": "290292",
+            "name": "김종근",
+            "val": 46,
+            "rank": 316
           },
           {
             "pcode": "291855",
             "name": "강지훈",
             "val": 44,
             "rank": 321
+          },
+          {
+            "pcode": "290739",
+            "name": "김창모",
+            "val": 44,
+            "rank": 321
+          },
+          {
+            "pcode": "291351",
+            "name": "이윤기",
+            "val": 43,
+            "rank": 323
           }
         ],
         "rank_active": null,

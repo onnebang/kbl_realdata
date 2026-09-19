@@ -165,26 +165,32 @@
         "rank_alltime": 179,
         "rivals_alltime": [
           {
-            "pcode": "650014",
-            "name": "김도수",
-            "val": 134,
-            "rank": 175
-          },
-          {
             "pcode": "260003",
             "name": "이현준",
             "val": 134,
             "rank": 175
           },
           {
-            "pcode": "291671",
-            "name": "패리스 배스",
-            "val": 133,
-            "rank": 179
+            "pcode": "240044",
+            "name": "은희석",
+            "val": 134,
+            "rank": 175
+          },
+          {
+            "pcode": "650014",
+            "name": "김도수",
+            "val": 134,
+            "rank": 175
           },
           {
             "pcode": "291058",
             "name": "디온테 버튼",
+            "val": 133,
+            "rank": 179
+          },
+          {
+            "pcode": "291671",
+            "name": "패리스 배스",
             "val": 133,
             "rank": 179
           },
@@ -199,12 +205,6 @@
             "name": "김우람",
             "val": 131,
             "rank": 182
-          },
-          {
-            "pcode": "291246",
-            "name": "닉 미네라스",
-            "val": 130,
-            "rank": 183
           }
         ],
         "rank_active": null,
