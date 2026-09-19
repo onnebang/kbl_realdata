@@ -18,6 +18,18 @@
   transform: scale(1.02);
 }
 
+.radarWrap {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -40%);
+  width: 90%;
+  height: auto;
+  z-index: 15; /* Behind the photo but above the background */
+  opacity: 0.9;
+  pointer-events: none;
+}
+
 /* 배경에 흐리게 깔리는 대형 OVR 숫자 - 70cqw = 원본 디자인 비율(400px 카드에서 280px)과 동일 */
 .bgOvr {
   position: absolute;
@@ -194,18 +206,22 @@
   color: rgba(255, 255, 255, 0.3);
 }
 
-/* 등급별 색/발광 - 골드(95+) > 실버(85+) > 브론즈(75+) > 기본(흰색) */
+/* 등급별 색/발광 - 92+ > 89+ > 85+ > 75+ > 기본(흰색) */
+.tierElite {
+  color: #f43f5e;
+  filter: drop-shadow(0 0 10px rgba(244, 63, 94, 0.6));
+}
 .tierGold {
-  color: #ffd700;
-  filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.6));
+  color: #a855f7;
+  filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.6));
 }
 .tierSilver {
-  color: #c0c0c0;
-  filter: drop-shadow(0 0 8px rgba(192, 192, 192, 0.6));
+  color: #3b82f6;
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.6));
 }
 .tierBronze {
-  color: #cd7f32;
-  filter: drop-shadow(0 0 6px rgba(205, 127, 50, 0.5));
+  color: #10b981;
+  filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.5));
 }
 .tierDefault {
   color: #ffffff;

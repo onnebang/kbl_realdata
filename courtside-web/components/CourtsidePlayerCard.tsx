@@ -33,7 +33,8 @@ interface CourtsidePlayerCardProps {
 }
 
 function tierClass(rating: number): string {
-  if (rating >= 95) return styles.tierGold;
+  if (rating >= 92) return styles.tierElite;
+  if (rating >= 89) return styles.tierGold;
   if (rating >= 85) return styles.tierSilver;
   if (rating >= 75) return styles.tierBronze;
   return styles.tierDefault;
@@ -47,6 +48,8 @@ function badgeClass(level: number): string {
   return "";
 }
 
+import OvrRadarChart from "./OvrRadarChart";
+
 export default function CourtsidePlayerCard({
   name,
   ename,
@@ -59,7 +62,17 @@ export default function CourtsidePlayerCard({
   photoUrl,
   archetype,
   badges,
-}: CourtsidePlayerCardProps) {
+  attributes,
+}: CourtsidePlayerCardProps & {
+  attributes?: {
+    outside: number;
+    inside: number;
+    playmaking: number;
+    athletic: number;
+    defense: number;
+    rebounding: number;
+  };
+}) {
   const displayEname = ename || name;
   const [enameFirst, ...enameRestParts] = displayEname.split(" ");
   const enameRest = enameRestParts.join(" ") || name;
@@ -99,6 +112,12 @@ export default function CourtsidePlayerCard({
           sizes="(max-width: 800px) 260px, 340px"
           className={styles.photo}
         />
+        {/* 능력치 레이더 차트 오버레이 */}
+        {attributes && (
+          <div className={styles.radarWrap}>
+            <OvrRadarChart attributes={attributes} ovr={ovr} />
+          </div>
+        )}
       </div>
 
       <div className={styles.statsBar}>

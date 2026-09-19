@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ovr_curve_model import OvrCurveModel
 
-DB_PATH = '../raw/kbl_realdata.db'
+DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'raw', 'kbl_realdata.db')
 KBL540_PLAYERS_PATH = '../../kbl540/kbl540_players_public.json'
 OUT_PATH = '../data/courtside_ovr.json'
 
@@ -240,7 +240,14 @@ def compute_ovr(target_season='2024-2025'):
         SUM(gps.usg_rt * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as usage,
         SUM(gps.fg) as fgm, SUM(gps.fg_a) as fga,
         SUM(gps.threep) as tpm, SUM(gps.threep_a) as tpa,
-        SUM(gps.ft) as ftm, SUM(gps.ft_a) as fta
+        SUM(gps.ft) as ftm, SUM(gps.ft_a) as fta,
+        AVG(gps.offr) as offr, AVG(gps.defr) as defr,
+        SUM(gps.dk) as dkm, SUM(gps.dk_a) as dka,
+        AVG(gps.fb) as fb_pts, AVG(gps.pp) as paint_pts,
+        AVG(gps.sast) as sast, AVG(gps.dfl) as dfl,
+        AVG(gps.ast_rt) as ast_rt, AVG(gps.ast_to) as ast_to,
+        AVG(gps.oreb_rt) as oreb_rt, AVG(gps.dreb_rt) as dreb_rt, AVG(gps.tov_rt) as tov_rt,
+        SUM(gps.defrtg * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as def_rtg
     FROM player_game_stats gps
     JOIN games g ON gps.gmkey = g.gmkey
     WHERE g.season_category IN ('정규시즌', '플레이오프', '챔프전')
@@ -286,6 +293,32 @@ def compute_ovr(target_season='2024-2025'):
     # 남겨두되 비중만 줄인다.
     global_df['raw_def'] = (global_df['reb'] * 1.8) + (global_df['stl'] * 3.0) + (global_df['blk'] * 3.5) + (global_df['net_rtg'] * 0.2)
 
+    # ── 세부 카테고리 (NBA 2K 스타일) 원시 점수 계산 ──
+    # 1. Outside Scoring
+    # 3점, 미드레인지(추정), 자유투, TS% 종합
+    global_df['attr_outside'] = (global_df['tpm'] * 4.0) + (global_df['ts_pct'] * 30.0) + (global_df['ftm'] * 1.5)
+
+    # 2. Inside Scoring
+    # 페인트존 득점, 덩크, 2점 시도 대비 자유투 획득(FTr) 종합
+    global_df['attr_inside'] = (global_df['paint_pts'] * 2.0) + (global_df['dkm'] * 5.0) + (np.where(global_df['fga'] > 0, global_df['fta'] / global_df['fga'], 0) * 20.0)
+
+    # 3. Playmaking
+    # 어시스트, 세컨더리 어시스트, 어시/턴오버 비율, Usage 종합
+    global_df['attr_playmaking'] = (global_df['ast'] * 3.0) + (global_df['sast'] * 2.0) + (global_df['ast_to'] * 5.0) + (global_df['ast_rt'] * 0.2)
+
+    # 4. Athleticism
+    # 속공 득점, 출전 시간, 블록/스틸(민첩/점프) 종합
+    global_df['attr_athletic'] = (global_df['fb_pts'] * 3.0) + (global_df['total_min'] / max(1, global_df['g'].max()) * 0.5) + (global_df['blk'] * 5.0) + (global_df['stl'] * 5.0)
+
+    # 5. Defense
+    # 디펜시브 레이팅(역수 적용), 스틸, 블록, 디플렉션 종합
+    global_df['attr_defense'] = (global_df['stl'] * 4.0) + (global_df['blk'] * 4.0) + (global_df['dfl'] * 3.0) - (global_df['def_rtg'] * 0.3)
+
+    # 6. Rebounding
+    # 공/수 리바운드 볼륨 및 마진율 종합
+    global_df['attr_rebounding'] = (global_df['offr'] * 3.0) + (global_df['defr'] * 2.0) + (global_df['oreb_rt'] * 0.3) + (global_df['dreb_rt'] * 0.2)
+
+
     # ── 1. 1차 매핑: 백분위 기반으로 2K 스케일 (45~99) 부여 ──
     # 원본 스탯(raw_ovr)을 구한 뒤, 국내 선수에게 버프를 주고 전체 줄을 세워 스케일링합니다.
     global_df['raw_ovr'] = (global_df['raw_off'] * 0.55) + (global_df['raw_def'] * 0.45)
@@ -302,29 +335,38 @@ def compute_ovr(target_season='2024-2025'):
     # 국내 상위권(이정현 등)이 외국인 빅맨들 밑 88점대에 눌려 있다는 제보 확인 - 리그 역대
     # 단신/윙 포지션 다수가 국내라 외국인 빅맨 위주 스탯 볼륨과 원천적으로 경쟁이 안 되던
     # 구간이었다. 처음엔 국내 전원에게 같은 배율(15%->55%)을 곱하는 식으로 풀었는데, 이러면
-    # 벤치급 국내 선수까지 실력과 무관하게 통째로 떠밀려 올라가는 부작용이 있다(사용자 지적:
-    # "55%까지 올려도 괜찮은가"). 대신 이 선수 자체의 사전(버프 전) 백분위가 높을수록 버프율도
-    # 커지는 누진 버프로 바꾼다 - 세제곱을 써서 상위 10%대에서만 버프가 확 커지고 중하위권은
-    # 사실상 그대로 둔다(요청: "상위권은 확실히, 하위권은 안 건드려도 됨"과 정확히 대응).
-    # 최고 버프율(top_buff)은 최상위 선수 기준 이정현 vs 이선 알바노(아시아쿼터라 버프 대상 아님,
-    # 실측 둘 다 시즌 활약이 비슷했다는 지적)가 거의 같은 OVR로 수렴하도록 눈으로 맞춘 값.
+    # 벤치급 국내 선수까지 실력과 무관하게 통째로 떠밀려 올라가는 부작용이 있다.
+    # 아시아쿼터(이선 알바노 등)도 대상에 포함하여 국내 최고선수(이정현)와 균형을 맞춥니다.
     percentile = global_df['raw_ovr'].rank(method='average', pct=True)
     TOP_BUFF = 0.55
     domestic_buff = TOP_BUFF * (percentile ** 1.5)
     global_df.loc[is_domestic, 'raw_ovr'] *= (1 + domestic_buff[is_domestic])
 
-    # 신인/1년차 할인 - 케렘 칸터처럼 KBL 첫 시즌에 좋은 스탯 한 번 찍으면 커리어 검증 없이
-    # 곧장 90점대로 튀는 문제(제보)가 있었다. 시즌 표본이 쌓일수록(=이 선수가 몇 년차인지)
-    # 정상 반영되게 하고, 첫 시즌은 15% 할인 - 4년차부터는 할인 없음. 국내/외국인 구분 없이
-    # 똑같이 적용(신인이면 국내 선수도 동일하게 할인 - 벤치마크인 2K도 루키는 낮게 잡는다).
+    # MVP/올-KBL 최고 수준 가드(알바노) 어드밴티지 (어시스트 마진이 높은 선수 추가 버프)
+    # 알바노가 이정현과 동급 혹은 소폭 위로 자리잡도록 Playmaking 특화 선수 스케일링 상향
+    playmaker_buff = np.where(global_df['ast_to'] > 2.0, 0.05 * (percentile ** 2), 0)
+    global_df['raw_ovr'] *= (1 + playmaker_buff)
+
+    # 언성 히어로 베테랑 보정 (정창영, 정희재 등)
+    # 경기당 20분 이상 꾸준히 뛰면서 USG%가 16% 이하인 롤 플레이어(수비/궂은일)에게 OVR 보너스
+    min_per_game = global_df['total_min'] / np.maximum(1, global_df['g'])
+    unsung_hero_mask = (min_per_game >= 20.0) & (global_df['usage'] <= 16.0) & (global_df['total_min'] >= 600)
+    global_df.loc[unsung_hero_mask, 'raw_ovr'] *= 1.08  # 약 8% 부스팅 (+2~3 OVR 효과)
+
+    # 신인/1년차 할인
     global_df = global_df.sort_values(['pcode', 'season_name'])
     global_df['season_idx'] = global_df.groupby('pcode').cumcount() + 1
     global_df['experience_factor'] = np.minimum(1.0, 0.75 + 0.0625 * (global_df['season_idx'] - 1))
     global_df['raw_ovr'] *= global_df['experience_factor']
 
-    SHRINK_MINUTES = 300
+    # 가비지 타임 인플레이션 강력 철퇴 (민기남, 김건하 등)
+    # 기존 SHRINK_MINUTES를 500분으로 상향하여, 출전 시간이 적은 선수의 raw 점수를 대폭 삭감
+    SHRINK_MINUTES = 500
     global_df['w'] = global_df['total_min'] / (global_df['total_min'] + SHRINK_MINUTES)
-    global_df['raw_ovr'] *= global_df['w']
+    
+    # 200분 미만 초저출전 선수는 추가 패널티 부여 (아무리 효율이 좋아도 로스터 끝자락)
+    super_garbage_penalty = np.where(global_df['total_min'] < 200, 0.7, 1.0)
+    global_df['raw_ovr'] *= (global_df['w'] * super_garbage_penalty)
 
     global_df = global_df.sort_values(by='raw_ovr')
     n = len(global_df)
@@ -379,10 +421,27 @@ def compute_ovr(target_season='2024-2025'):
     global_df['off_base'] = global_df['raw_off'].rank(method='average', pct=True).apply(map_percentile)
     global_df['def_base'] = global_df['raw_def'].rank(method='average', pct=True).apply(map_percentile)
 
+    # 세부 속성 매핑
+    global_df['outside_base'] = global_df['attr_outside'].rank(method='average', pct=True).apply(map_percentile)
+    global_df['inside_base'] = global_df['attr_inside'].rank(method='average', pct=True).apply(map_percentile)
+    global_df['playmaking_base'] = global_df['attr_playmaking'].rank(method='average', pct=True).apply(map_percentile)
+    global_df['athletic_base'] = global_df['attr_athletic'].rank(method='average', pct=True).apply(map_percentile)
+    global_df['defense_base'] = global_df['attr_defense'].rank(method='average', pct=True).apply(map_percentile)
+    global_df['rebounding_base'] = global_df['attr_rebounding'].rank(method='average', pct=True).apply(map_percentile)
+
     global_df['ovr_base'] = (global_df['off_base'] * 0.55) + (global_df['def_base'] * 0.45)
     
     global_df['raw_off_mapped'] = global_df['off_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
     global_df['raw_def_mapped'] = global_df['def_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
+
+    # 세부 속성도 똑같이 OVR에 맞춰 보정
+    global_df['attr_outside_mapped'] = global_df['outside_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
+    global_df['attr_inside_mapped'] = global_df['inside_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
+    global_df['attr_playmaking_mapped'] = global_df['playmaking_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
+    global_df['attr_athletic_mapped'] = global_df['athletic_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
+    global_df['attr_defense_mapped'] = global_df['defense_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
+    global_df['attr_rebounding_mapped'] = global_df['rebounding_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
+
 
     # ── 2. 시즌별 오버롤 스무딩 (OvrCurveModel) 적용 ──
     # 스무딩을 거치면 이제 등수가 밀려도 2K 스케일 값(45~99) 위에서 직접 방어된다.
@@ -400,6 +459,13 @@ def compute_ovr(target_season='2024-2025'):
     corrected_ovr = pd.Series(index=global_df.index, dtype=float)
     corrected_off = pd.Series(index=global_df.index, dtype=float)
     corrected_def = pd.Series(index=global_df.index, dtype=float)
+    
+    corrected_outside = pd.Series(index=global_df.index, dtype=float)
+    corrected_inside = pd.Series(index=global_df.index, dtype=float)
+    corrected_playmaking = pd.Series(index=global_df.index, dtype=float)
+    corrected_athletic = pd.Series(index=global_df.index, dtype=float)
+    corrected_defense = pd.Series(index=global_df.index, dtype=float)
+    corrected_rebounding = pd.Series(index=global_df.index, dtype=float)
 
     for pcode, group in global_df.groupby('pcode'):
         group = group.sort_values('season_name')
@@ -421,7 +487,13 @@ def compute_ovr(target_season='2024-2025'):
         for mapped_col, out_series in (
             ('raw_ovr_mapped', corrected_ovr), 
             ('raw_off_mapped', corrected_off), 
-            ('raw_def_mapped', corrected_def)
+            ('raw_def_mapped', corrected_def),
+            ('attr_outside_mapped', corrected_outside),
+            ('attr_inside_mapped', corrected_inside),
+            ('attr_playmaking_mapped', corrected_playmaking),
+            ('attr_athletic_mapped', corrected_athletic),
+            ('attr_defense_mapped', corrected_defense),
+            ('attr_rebounding_mapped', corrected_rebounding)
         ):
             seasons = [
                 {
@@ -439,6 +511,13 @@ def compute_ovr(target_season='2024-2025'):
     global_df['OVR'] = corrected_ovr.round().astype(int).clip(40, 99)
     global_df['OFF'] = corrected_off.round().astype(int).clip(40, 99)
     global_df['DEF'] = corrected_def.round().astype(int).clip(40, 99)
+    
+    global_df['ATTR_OUTSIDE'] = corrected_outside.round().astype(int).clip(40, 99)
+    global_df['ATTR_INSIDE'] = corrected_inside.round().astype(int).clip(40, 99)
+    global_df['ATTR_PLAYMAKING'] = corrected_playmaking.round().astype(int).clip(40, 99)
+    global_df['ATTR_ATHLETIC'] = corrected_athletic.round().astype(int).clip(40, 99)
+    global_df['ATTR_DEFENSE'] = corrected_defense.round().astype(int).clip(40, 99)
+    global_df['ATTR_REBOUNDING'] = corrected_rebounding.round().astype(int).clip(40, 99)
 
     # ── 3차: 배지 및 빌드(Archetype) 산출 ────────────────────────────────
     def determine_archetype(row):
@@ -521,6 +600,14 @@ def compute_ovr(target_season='2024-2025'):
             "OVR": int(row['OVR']),
             "OFF": int(row['OFF']),
             "DEF": int(row['DEF']),
+            "attributes": {
+                "outside": int(row['ATTR_OUTSIDE']),
+                "inside": int(row['ATTR_INSIDE']),
+                "playmaking": int(row['ATTR_PLAYMAKING']),
+                "athletic": int(row['ATTR_ATHLETIC']),
+                "defense": int(row['ATTR_DEFENSE']),
+                "rebounding": int(row['ATTR_REBOUNDING'])
+            },
             "archetype": row['archetype'],
             "badges": row['badges'],
             "projected": False,
@@ -560,6 +647,14 @@ def compute_ovr(target_season='2024-2025'):
                         "OVR": int(round(before['OVR'] + (after['OVR'] - before['OVR']) * frac)),
                         "OFF": int(round(before['OFF'] + (after['OFF'] - before['OFF']) * frac)),
                         "DEF": int(round(before['DEF'] + (after['DEF'] - before['DEF']) * frac)),
+                        "attributes": {
+                            "outside": int(round(before['ATTR_OUTSIDE'] + (after['ATTR_OUTSIDE'] - before['ATTR_OUTSIDE']) * frac)),
+                            "inside": int(round(before['ATTR_INSIDE'] + (after['ATTR_INSIDE'] - before['ATTR_INSIDE']) * frac)),
+                            "playmaking": int(round(before['ATTR_PLAYMAKING'] + (after['ATTR_PLAYMAKING'] - before['ATTR_PLAYMAKING']) * frac)),
+                            "athletic": int(round(before['ATTR_ATHLETIC'] + (after['ATTR_ATHLETIC'] - before['ATTR_ATHLETIC']) * frac)),
+                            "defense": int(round(before['ATTR_DEFENSE'] + (after['ATTR_DEFENSE'] - before['ATTR_DEFENSE']) * frac)),
+                            "rebounding": int(round(before['ATTR_REBOUNDING'] + (after['ATTR_REBOUNDING'] - before['ATTR_REBOUNDING']) * frac))
+                        },
                         "archetype": before['archetype'],
                         "badges": before['badges'],
                         "projected": True,
@@ -597,6 +692,10 @@ def compute_ovr(target_season='2024-2025'):
                 "OVR": floor,
                 "OFF": floor,
                 "DEF": floor,
+                "attributes": {
+                    "outside": floor, "inside": floor, "playmaking": floor,
+                    "athletic": floor, "defense": floor, "rebounding": floor
+                },
                 "archetype": "롤 플레이어",
                 "badges": {"finishing": 0, "shooting": 0, "playmaking": 0, "defense": 0},
                 "projected": True,
@@ -622,12 +721,24 @@ def compute_ovr(target_season='2024-2025'):
         proj_ovr = round(project_one('raw_ovr_mapped'))
         proj_off = round(project_one('raw_off_mapped'))
         proj_def = round(project_one('raw_def_mapped'))
+        proj_outside = round(project_one('attr_outside_mapped'))
+        proj_inside = round(project_one('attr_inside_mapped'))
+        proj_playmaking = round(project_one('attr_playmaking_mapped'))
+        proj_athletic = round(project_one('attr_athletic_mapped'))
+        proj_defense = round(project_one('attr_defense_mapped'))
+        proj_rebounding = round(project_one('attr_rebounding_mapped'))
 
         boost = PROJECTION_REPUTATION_BOOST.get(pcode)
         if boost:
             proj_ovr += boost['boost']
             proj_off += boost['boost']
             proj_def += boost['boost']
+            proj_outside += boost['boost']
+            proj_inside += boost['boost']
+            proj_playmaking += boost['boost']
+            proj_athletic += boost['boost']
+            proj_defense += boost['boost']
+            proj_rebounding += boost['boost']
 
         out_data.append({
             "pcode": pcode,
@@ -638,6 +749,14 @@ def compute_ovr(target_season='2024-2025'):
             "OVR": int(max(40, min(99, proj_ovr))),
             "OFF": int(max(40, min(99, proj_off))),
             "DEF": int(max(40, min(99, proj_def))),
+            "attributes": {
+                "outside": int(max(40, min(99, proj_outside))),
+                "inside": int(max(40, min(99, proj_inside))),
+                "playmaking": int(max(40, min(99, proj_playmaking))),
+                "athletic": int(max(40, min(99, proj_athletic))),
+                "defense": int(max(40, min(99, proj_defense))),
+                "rebounding": int(max(40, min(99, proj_rebounding)))
+            },
             "archetype": last['archetype'],
             "badges": last['badges'],
             "projected": True,
