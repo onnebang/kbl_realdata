@@ -852,6 +852,37 @@ def compute_ovr(target_season='2024-2025'):
             proj_defense += boost['boost']
             proj_rebounding += boost['boost']
 
+        # ── Rookie Scale Cap (for projected data) ──
+        if last['is_domestic'] and pd.notna(last['start_year']):
+            proj_start_year = parse_start_year(PROJECTION_SEASON)
+            proj_pro_year = proj_start_year - debut_year_map[pcode] + 1
+            if 1 <= proj_pro_year <= 5:
+                if proj_pro_year == 1:
+                    cap = 84.0
+                elif proj_pro_year == 2:
+                    cap = 86.0
+                elif proj_pro_year == 3:
+                    cap = 91.0
+                elif proj_pro_year == 4:
+                    cap = 94.0
+                else:  # proj_pro_year == 5
+                    cap = 96.0
+                
+                minutes_bonus = min(2.0, last['total_min'] / 1000.0)
+                final_cap = cap + minutes_bonus
+                
+                if proj_ovr > final_cap:
+                    diff = proj_ovr - final_cap
+                    proj_ovr = final_cap
+                    proj_off -= diff
+                    proj_def -= diff
+                    proj_outside -= diff
+                    proj_inside -= diff
+                    proj_playmaking -= diff
+                    proj_athletic -= diff
+                    proj_defense -= diff
+                    proj_rebounding -= diff
+
         out_data.append({
             "pcode": pcode,
             "name": last['name'],
