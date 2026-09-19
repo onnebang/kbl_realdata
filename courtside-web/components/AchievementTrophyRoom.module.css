@@ -337,10 +337,30 @@
   transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
-.rivalNode:hover .rivalAvatar {
+.rivalNode:hover .rivalAvatar,
+.rivalNode:hover .rivalAvatarFallback {
   transform: scale(1.15);
   border-color: rgba(var(--line-rgb), 0.3);
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.rivalAvatarFallback {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid rgba(var(--line-rgb), 0.1);
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(var(--line-rgb), 0.05);
+}
+
+.rivalAvatarFallbackText {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink-faint, #8d93a3);
 }
 
 .rivalLabel {
@@ -373,7 +393,8 @@
   z-index: 5;
 }
 
-.rivalNode.isMe .rivalAvatar {
+.rivalNode.isMe .rivalAvatar,
+.rivalNode.isMe .rivalAvatarFallback {
   border-color: var(--hero-team, #d9640a);
   box-shadow: 0 0 10px rgba(var(--hero-team-rgb, 217,100,10), 0.4);
 }

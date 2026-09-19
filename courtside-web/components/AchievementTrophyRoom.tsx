@@ -328,12 +328,18 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                             key={`node-${r.pcode}`} 
                             className={`${styles.rivalNode} ${isMe ? styles.isMe : ""}`}
                           >
-                            <PlayerPhoto 
-                              src={r.photoUrl || `https://kbl.or.kr/images/players/Portrait/${r.pcode}.png`} 
-                              alt={r.name} 
-                              size={32}
-                              className={styles.rivalAvatar}
-                            />
+                            {r.photoUrl ? (
+                              <PlayerPhoto 
+                                src={r.photoUrl} 
+                                alt={r.name} 
+                                size={32}
+                                className={styles.rivalAvatar}
+                              />
+                            ) : (
+                              <div className={styles.rivalAvatarFallback}>
+                                <span className={styles.rivalAvatarFallbackText}>{r.name.slice(0, 1)}</span>
+                              </div>
+                            )}
                             <div className={styles.rivalLabel}>
                               <div className={styles.rivalRankLabel}>[{r.rank}위]</div>
                               <div className={styles.rivalNameLabel}>{r.name}</div>
