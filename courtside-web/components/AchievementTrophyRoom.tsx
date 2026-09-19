@@ -69,7 +69,6 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
 
   if (!player) return null;
 
-  // Derive unlocked missions for the active view
   const unlockedIds = new Set<string>();
   if (activeTab === "season" && selectedSeason && player.seasons[selectedSeason]) {
     player.seasons[selectedSeason].missions?.forEach(ach => unlockedIds.add(ach.id));
@@ -77,7 +76,6 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
     player.career.missions.forEach(ach => unlockedIds.add(ach.id));
   }
 
-  // Derive stacks to show
   let stacksData: Record<string, StackData> = {};
   if (activeTab === "season" && selectedSeason && player.seasons[selectedSeason]) {
     stacksData = player.seasons[selectedSeason].stacks || {};
@@ -150,18 +148,35 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                 rivals = (careerRivalType === "alltime" ? stack.rivals_alltime : stack.rivals_active) || [];
               }
 
-              // Calculate track scale based on max value to show
-              // max_val is either target, or the max rival's val, whichever is bigger, so they all fit on the graph line
               const maxVal = Math.max(stack.target, ...rivals.map(r => r.val), stack.val);
-              
-              // Base progress fill for the player
               const myPct = (stack.val / maxVal) * 100;
 
-              // Ensure we have "myself" in the nodes list. If my pcode isn't in rivals for some reason, add it.
               const nodes = [...rivals];
               if (!nodes.find(r => String(r.pcode) === String(pcode))) {
                 nodes.push({ pcode, name: player.name, val: stack.val, rank: myRank || 0 });
               }
+
+              // Calculate staggers to prevent overlap
+              nodes.sort((a, b) => a.val - b.val);
+              let lastLeft = -100;
+              let stagger = 0;
+              let maxStagger = 0;
+              
+              const staggeredNodes = nodes.map(r => {
+                const leftPct = (r.val / maxVal) * 100;
+                // If it's within 12% width of the previous node, drop it down further
+                if (leftPct - lastLeft < 12) {
+                  stagger += 1;
+                } else {
+                  stagger = 0;
+                }
+                lastLeft = leftPct;
+                maxStagger = Math.max(maxStagger, stagger);
+                return { ...r, leftPct, stagger };
+              });
+
+              // Re-sort so that "my" node is always rendered last (on top in z-index naturally if same)
+              staggeredNodes.sort((a, b) => (String(a.pcode) === String(pcode) ? 1 : -1));
 
               const tierClass = styles[`tier${stack.tier}`] || "";
 
@@ -192,31 +207,36 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                     </div>
                   </div>
                   
-                  <div className={styles.progressBarTrack}>
+                  {/* Dynamic bottom margin to fit staggered avatars */}
+                  <div className={styles.progressBarTrack} style={{ marginBottom: `${Math.max(20, (maxStagger + 1) * 44 + 10)}px` }}>
                     <div 
                       className={styles.progressBarFill} 
                       style={{ width: `${myPct}%` }} 
                     />
                     
-                    {/* Render Rival Nodes directly on the track */}
-                    {nodes.map((r, i) => {
+                    {staggeredNodes.map((r, i) => {
                       const isMe = String(r.pcode) === String(pcode);
-                      const leftPct = (r.val / maxVal) * 100;
                       return (
                         <div 
                           key={`${r.pcode}-${i}`} 
                           className={`${styles.rivalNode} ${isMe ? styles.isMe : ""}`}
-                          style={{ left: `${leftPct}%` }}
+                          style={{ 
+                            left: `${r.leftPct}%`, 
+                            top: `calc(10px + ${r.stagger * 44}px)` // Drop down based on stagger
+                          }}
                         >
-                          <img 
-                            src={`https://kbl.or.kr/images/players/Portrait/${r.pcode}.png`} 
-                            alt={r.name} 
-                            className={styles.rivalAvatar}
-                            onError={(e) => { e.currentTarget.src = 'https://kbl.or.kr/images/common/no_player.jpg'; }}
-                          />
-                          <div className={styles.rivalLabel}>
-                            {r.rank}위 {r.name}<br/>
-                            {r.val.toLocaleString()}
+                          <div className={styles.rivalLine} style={{ height: `${r.stagger * 44 + 6}px` }} />
+                          <div className={styles.rivalContent}>
+                            <img 
+                              src={`https://kbl.or.kr/images/players/Portrait/${r.pcode}.png`} 
+                              alt={r.name} 
+                              className={styles.rivalAvatar}
+                              onError={(e) => { e.currentTarget.src = 'https://kbl.or.kr/images/common/no_player.jpg'; }}
+                            />
+                            <div className={styles.rivalLabel}>
+                              <span className={styles.rivalRankLabel}>[{r.rank}위]</span> {r.name}<br/>
+                              <span className={styles.rivalValLabel}>{r.val.toLocaleString()}</span>
+                            </div>
                           </div>
                         </div>
                       )
@@ -234,7 +254,6 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                 <div key={ach.id} className={styles.hexWrapper}>
                   <div 
                     className={`${styles.hexagonCard} ${unlocked ? styles.unlocked : styles.locked}`}
-                    // Tooltip shows regardless of whether it's locked!
                     data-tooltip-title={ach.name}
                     data-tooltip-desc={ach.desc}
                   >

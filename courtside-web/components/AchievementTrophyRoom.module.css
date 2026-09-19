@@ -285,14 +285,14 @@
   font-weight: 700;
 }
 
-/* ── Rival Tracker ON Progress Bar ── */
+/* ── Rival Tracker ON Progress Bar (Staggered Lines) ── */
 .progressBarTrack {
   height: 12px;
   background: rgba(var(--line-rgb), 0.1);
   border-radius: 6px;
   position: relative;
   margin-top: 16px;
-  margin-bottom: 24px;
+  /* margin-bottom is set dynamically inline based on max stagger */
 }
 
 .progressBarFill {
@@ -305,77 +305,97 @@
   left: 0;
 }
 
-/* Rival Avatars positioned absolutely on the track */
+/* Rival Avatars positioned absolutely */
 .rivalNode {
   position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
   z-index: 10;
-  transition: left 0.5s ease-out;
+  transition: left 0.5s ease-out, top 0.5s ease-out;
+  transform: translateX(-50%);
 }
 
-.rivalAvatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 2px solid var(--surface);
+.rivalLine {
+  width: 2px;
+  background: rgba(var(--line-rgb), 0.2);
+  position: absolute;
+  top: -10px; /* Connect up to the bar */
+  z-index: 1;
+  transition: height 0.5s ease-out;
+}
+
+.rivalContent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto; /* Push content to bottom of node */
+  position: relative;
+  z-index: 2;
   background: var(--surface);
-  object-fit: cover;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  transition: transform 0.2s;
+  padding: 4px;
+  border-radius: 20px;
+  border: 1px solid rgba(var(--line-rgb), 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(100%);
+  transition: transform 0.2s, box-shadow 0.2s;
   cursor: pointer;
 }
 
-.rivalNode:hover .rivalAvatar {
-  transform: scale(1.2);
-  z-index: 20;
+.rivalNode:hover {
+  z-index: 30;
 }
 
-/* Label below the avatar */
+.rivalNode:hover .rivalContent {
+  transform: translateY(100%) scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  border-color: rgba(var(--line-rgb), 0.3);
+}
+
+.rivalNode:hover .rivalLine {
+  background: rgba(var(--line-rgb), 0.5);
+}
+
+.rivalAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(var(--line-rgb), 0.1);
+}
+
 .rivalLabel {
-  position: absolute;
-  top: 100%;
-  margin-top: 4px;
-  background: rgba(var(--surface-rgb), 0.9);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.65rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: var(--ink);
+  line-height: 1.2;
   white-space: nowrap;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.2s;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  pointer-events: none;
-  z-index: 20;
-  text-align: center;
+  padding-right: 8px;
 }
 
-.rivalNode:hover .rivalLabel {
-  opacity: 1;
-  visibility: visible;
+.rivalRankLabel {
+  color: rgba(var(--ink-rgb), 0.5);
+  font-weight: 800;
+}
+
+.rivalValLabel {
+  font-weight: 800;
+  color: var(--hero-team, #d9640a);
 }
 
 /* Distinguish "Me" node */
 .rivalNode.isMe {
-  z-index: 15;
+  z-index: 20;
 }
 
-.rivalNode.isMe .rivalAvatar {
-  border-color: var(--hero-team, #d9640a);
-  width: 38px;
-  height: 38px;
-  box-shadow: 0 0 10px rgba(var(--hero-team-rgb, 217,100,10), 0.6);
+.rivalNode.isMe .rivalLine {
+  background: var(--hero-team, #d9640a);
+  width: 3px;
 }
 
-.rivalNode.isMe .rivalLabel {
-  opacity: 1;
-  visibility: visible;
-  color: var(--hero-team, #d9640a);
+.rivalNode.isMe .rivalContent {
+  border: 2px solid var(--hero-team, #d9640a);
+  box-shadow: 0 0 10px rgba(var(--hero-team-rgb, 217,100,10), 0.4);
 }
 
 .rivalToggle {
