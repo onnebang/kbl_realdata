@@ -373,8 +373,7 @@ def compute_ovr(target_season='2024-2025'):
     }
 
     def calc_best_role(row):
-        best_ovr = 0.0
-        best_role = 'All-Around'
+        role_scores = []
         
         pos = str(row['position']).upper()
         is_big = ('C' in pos) or ('F' in pos and row['reb'] >= 6.0)
@@ -397,11 +396,18 @@ def compute_ovr(target_season='2024-2025'):
                 row['attr_rebounding_mapped'] * w_reb
             )
             
-            if ovr > best_ovr:
-                best_ovr = ovr
-                best_role = role
+            role_scores.append((role, ovr))
+            
+        # 점수 순으로 내림차순 정렬
+        role_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        # 대표 롤은 가장 점수가 높은 1등 롤로 지정
+        best_role = role_scores[0][0]
+        
+        # 최종 OVR은 상위 3개 롤의 평균값 (원툴 선수 방지)
+        top_3_avg = sum([score for role, score in role_scores[:3]]) / min(3, len(role_scores))
                 
-        return pd.Series([best_role, best_ovr])
+        return pd.Series([best_role, top_3_avg])
 
     global_df[['role', 'raw_ovr']] = global_df.apply(calc_best_role, axis=1)
 
@@ -578,15 +584,15 @@ def compute_ovr(target_season='2024-2025'):
             
         pro_year = row['pro_year']
         if pro_year == 1:
-            cap = 84.0
+            cap = 74.0
         elif pro_year == 2:
-            cap = 86.0
+            cap = 78.0
         elif pro_year == 3:
-            cap = 91.0
+            cap = 82.0
         elif pro_year == 4:
-            cap = 94.0
+            cap = 86.0
         elif pro_year == 5:
-            cap = 96.0
+            cap = 90.0
         else:
             return val
             
@@ -841,15 +847,15 @@ def compute_ovr(target_season='2024-2025'):
             proj_pro_year = proj_start_year - debut_year_map[pcode] + 1
             if 1 <= proj_pro_year <= 5:
                 if proj_pro_year == 1:
-                    cap = 84.0
+                    cap = 74.0
                 elif proj_pro_year == 2:
-                    cap = 86.0
+                    cap = 78.0
                 elif proj_pro_year == 3:
-                    cap = 91.0
+                    cap = 82.0
                 elif proj_pro_year == 4:
-                    cap = 94.0
+                    cap = 86.0
                 else:  # proj_pro_year == 5
-                    cap = 96.0
+                    cap = 90.0
                 
                 minutes_bonus = min(2.0, last['total_min'] / 1000.0)
                 final_cap = cap + minutes_bonus
