@@ -73,8 +73,8 @@ const SECURITY_HEADERS: Record<string, string> = {
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
     "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com",
     // blob: - PNG 내보내기(ScoringInfographicStudio.tsx)가 SVG를 Blob URL로 만들어 <img>에 태움.
-    "img-src 'self' data: blob: https://kbl.or.kr https://www.kbl.or.kr",
-    "connect-src 'self'",
+    "img-src 'self' data: blob: https://kbl.or.kr https://www.kbl.or.kr https://*.supabase.co",
+    "connect-src 'self' https://*.supabase.co",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
