@@ -282,72 +282,74 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                   </div>
                   
                   <div className={styles.trackerContainer}>
-                    {/* Progress Bar */}
-                    <div className={styles.progressBarTrack}>
-                      <div 
-                        className={styles.progressBarFill} 
-                        style={{ width: `${myPct}%` }} 
-                      />
-                      {/* Plot actual points on the bar */}
-                      {nodes.map((r, i) => {
-                        const isMe = String(r.pcode) === String(pcode);
-                        const leftPct = (r.val / maxVal) * 100;
-                        return (
-                          <div 
-                            key={`marker-${r.pcode}-${i}`}
-                            className={`${styles.trackMarker} ${isMe ? styles.isMe : ""}`}
-                            style={{ left: `${leftPct}%` }}
-                          />
-                        );
-                      })}
-                    </div>
-                    
-                    {/* SVG Connecting Lines */}
-                    <svg className={styles.connectionLines} viewBox="0 0 100 100" preserveAspectRatio="none">
-                      {nodes.map((r, i) => {
-                        const isMe = String(r.pcode) === String(pcode);
-                        const startX = (r.val / maxVal) * 100;
-                        const endX = ((i + 0.5) / totalNodes) * 100;
-                        return (
-                          <path 
-                            key={`path-${r.pcode}-${i}`}
-                            d={`M ${startX} 0 C ${startX} 50, ${endX} 50, ${endX} 100`}
-                            className={`${styles.svgLine} ${isMe ? styles.isMe : ""}`}
-                            vectorEffect="non-scaling-stroke"
-                          />
-                        );
-                      })}
-                    </svg>
+                    <div className={styles.trackerInner}>
+                      {/* Progress Bar */}
+                      <div className={styles.progressBarTrack}>
+                        <div 
+                          className={styles.progressBarFill} 
+                          style={{ width: `${myPct}%` }} 
+                        />
+                        {/* Plot actual points on the bar */}
+                        {nodes.map((r, i) => {
+                          const isMe = String(r.pcode) === String(pcode);
+                          const leftPct = (r.val / maxVal) * 100;
+                          return (
+                            <div 
+                              key={`marker-${r.pcode}-${i}`}
+                              className={`${styles.trackMarker} ${isMe ? styles.isMe : ""}`}
+                              style={{ left: `${leftPct}%` }}
+                            />
+                          );
+                        })}
+                      </div>
+                      
+                      {/* SVG Connecting Lines */}
+                      <svg className={styles.connectionLines} viewBox="0 0 100 100" preserveAspectRatio="none">
+                        {nodes.map((r, i) => {
+                          const isMe = String(r.pcode) === String(pcode);
+                          const startX = (r.val / maxVal) * 100;
+                          const endX = ((i + 0.5) / totalNodes) * 100;
+                          return (
+                            <path 
+                              key={`path-${r.pcode}-${i}`}
+                              d={`M ${startX} 0 C ${startX} 50, ${endX} 50, ${endX} 100`}
+                              className={`${styles.svgLine} ${isMe ? styles.isMe : ""}`}
+                              vectorEffect="non-scaling-stroke"
+                            />
+                          );
+                        })}
+                      </svg>
 
-                    {/* Horizontal Avatars Row */}
-                    <div className={styles.avatarsRow}>
-                      {nodes.map((r, i) => {
-                        const isMe = String(r.pcode) === String(pcode);
-                        return (
-                          <div 
-                            key={`node-${r.pcode}-${i}`} 
-                            className={`${styles.rivalNode} ${isMe ? styles.isMe : ""}`}
-                          >
-                            {r.photoUrl ? (
-                              <PlayerPhoto 
-                                src={r.photoUrl} 
-                                alt={r.name} 
-                                size={32}
-                                className={styles.rivalAvatar}
-                              />
-                            ) : (
-                              <div className={styles.rivalAvatarFallback}>
-                                <span className={styles.rivalAvatarFallbackText}>{r.name.slice(0, 1)}</span>
+                      {/* Horizontal Avatars Row */}
+                      <div className={styles.avatarsRow}>
+                        {nodes.map((r, i) => {
+                          const isMe = String(r.pcode) === String(pcode);
+                          return (
+                            <div 
+                              key={`node-${r.pcode}-${i}`} 
+                              className={`${styles.rivalNode} ${isMe ? styles.isMe : ""}`}
+                            >
+                              {r.photoUrl ? (
+                                <PlayerPhoto 
+                                  src={r.photoUrl} 
+                                  alt={r.name} 
+                                  size={32}
+                                  className={styles.rivalAvatar}
+                                />
+                              ) : (
+                                <div className={styles.rivalAvatarFallback}>
+                                  <span className={styles.rivalAvatarFallbackText}>{r.name.slice(0, 1)}</span>
+                                </div>
+                              )}
+                              <div className={styles.rivalLabel}>
+                                <div className={styles.rivalRankLabel}>[{r.rank}위]</div>
+                                <div className={styles.rivalNameLabel}>{r.name}</div>
+                                <div className={styles.rivalValLabel}>{r.val.toLocaleString()}</div>
                               </div>
-                            )}
-                            <div className={styles.rivalLabel}>
-                              <div className={styles.rivalRankLabel}>[{r.rank}위]</div>
-                              <div className={styles.rivalNameLabel}>{r.name}</div>
-                              <div className={styles.rivalValLabel}>{r.val.toLocaleString()}</div>
                             </div>
-                          </div>
-                        )
-                      })}
+                          )
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>

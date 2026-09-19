@@ -246,6 +246,24 @@
   display: flex;
   flex-direction: column;
   margin-top: 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 12px;
+  scrollbar-width: thin; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.trackerContainer::-webkit-scrollbar {
+  height: 6px;
+}
+.trackerContainer::-webkit-scrollbar-thumb {
+  background: rgba(var(--ink-rgb), 0.2);
+  border-radius: 4px;
+}
+
+.trackerInner {
+  min-width: max(100%, 500px);
+  display: flex;
+  flex-direction: column;
 }
 
 .progressBarTrack {
@@ -381,6 +399,7 @@
   font-weight: 700;
   color: var(--ink, #f2f3f7);
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .rivalValLabel {

@@ -39,10 +39,23 @@
 .chartWrapper {
   width: 100%;
   position: relative;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px; /* For scrollbar */
+  scrollbar-width: thin; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.chartWrapper::-webkit-scrollbar {
+  height: 6px;
+}
+.chartWrapper::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
 }
 
 .svgChart {
+  min-width: max(100%, 800px);
   width: 100%;
   height: auto;
   display: block;
