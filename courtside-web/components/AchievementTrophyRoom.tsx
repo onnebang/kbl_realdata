@@ -254,8 +254,7 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                 <div 
                   key={ach.id} 
                   className={styles.hexWrapper}
-                  data-tooltip-title={ach.name}
-                  data-tooltip-desc={ach.desc}
+                  title={`${ach.name}\n\n${ach.desc}`}
                 >
                   <div className={`${styles.hexagonCard} ${unlocked ? styles.unlocked : styles.locked}`}>
                     <div className={styles.hexInner}>

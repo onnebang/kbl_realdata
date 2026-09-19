@@ -169,51 +169,7 @@
   opacity: 0.5;
 }
 
-.hexagonCard::before,
-.hexagonCard::after {
-  position: absolute;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.2s, transform 0.2s;
-  pointer-events: none;
-  z-index: 100;
-}
 
-.hexagonCard::before {
-  content: "";
-  top: -8px;
-  left: 50%;
-  transform: translateX(-50%) translateY(5px);
-  border-width: 6px 6px 0 6px;
-  border-style: solid;
-  border-color: rgba(30, 35, 41, 0.95) transparent transparent transparent;
-}
-
-.hexagonCard::after {
-  content: attr(data-tooltip-title) "\A\A" attr(data-tooltip-desc);
-  white-space: pre-wrap;
-  top: -8px;
-  left: 50%;
-  transform: translateX(-50%) translateY(calc(-100% + 5px));
-  background: rgba(30, 35, 41, 0.95);
-  color: #fff;
-  padding: 10px 14px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.4;
-  width: max-content;
-  max-width: 220px;
-  text-align: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.hexagonCard:hover::before {
-  opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0);
-}
-.hexagonCard:hover::after {
-  opacity: 1; visibility: visible; transform: translateX(-50%) translateY(-100%);
-}
 
 /* ── Stack Quests Progress Bars ── */
 .questList {
