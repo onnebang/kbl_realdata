@@ -19,14 +19,23 @@ interface CategoryData {
 }
 
 interface Props {
-  leaders: Record<string, CategoryData>;
+  leaders: Record<string, Record<string, CategoryData>>;
 }
 
 export default function LegendsClient({ leaders }: Props) {
-  const categories = Object.keys(leaders);
+  const [splitType, setSplitType] = useState<"total" | "regular" | "playoffs">("regular");
+  
+  // Guard against missing data
+  const currentSplitData = leaders[splitType] || {};
+  const categories = Object.keys(currentSplitData);
   const [activeTab, setActiveTab] = useState(categories[0] || "");
 
-  if (categories.length === 0) {
+  // If activeTab is no longer valid in the new splitType, switch it
+  if (categories.length > 0 && !categories.includes(activeTab)) {
+    setActiveTab(categories[0]);
+  }
+
+  if (!leaders || Object.keys(leaders).length === 0 || categories.length === 0) {
     return (
       <div className={styles.container}>
         <div className={styles.title}>LIVING LEGENDS</div>
@@ -35,12 +44,33 @@ export default function LegendsClient({ leaders }: Props) {
     );
   }
 
-  const currentCategory = leaders[activeTab];
+  const currentCategory = currentSplitData[activeTab];
 
   return (
     <div className={styles.container}>
       <div className={styles.title}>LIVING LEGENDS</div>
-      <div className={styles.subtitle}>KBL 역대 통산 기록 (정규시즌+PO 통합)</div>
+      
+      {/* Split Type Selector */}
+      <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+        <button
+          className={`${styles.tab} ${splitType === "total" ? styles.tabActive : ""}`}
+          onClick={() => setSplitType("total")}
+        >
+          전체 기록
+        </button>
+        <button
+          className={`${styles.tab} ${splitType === "regular" ? styles.tabActive : ""}`}
+          onClick={() => setSplitType("regular")}
+        >
+          정규 리그
+        </button>
+        <button
+          className={`${styles.tab} ${splitType === "playoffs" ? styles.tabActive : ""}`}
+          onClick={() => setSplitType("playoffs")}
+        >
+          플레이오프
+        </button>
+      </div>
 
       <div className={styles.tabs}>
         {categories.map((key) => (
@@ -49,15 +79,15 @@ export default function LegendsClient({ leaders }: Props) {
             className={`${styles.tab} ${activeTab === key ? styles.tabActive : ""}`}
             onClick={() => setActiveTab(key)}
           >
-            {leaders[key].name}
+            {currentSplitData[key].name}
           </button>
         ))}
       </div>
 
       <div className={styles.list}>
-        {currentCategory.data.map((player) => (
+        {currentCategory && currentCategory.data.map((player) => (
           <Link
-            key={`${activeTab}-${player.pcode}`}
+            key={`${splitType}-${activeTab}-${player.pcode}`}
             href={`/players/${player.pcode}`}
             style={{ textDecoration: "none", color: "inherit" }}
           >

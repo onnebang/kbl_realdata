@@ -1,32 +1,34 @@
 {
-  "pts": [
-    {"pcode": "255032", "pname": "서장훈", "value": 13231},
-    {"pcode": "290524", "pname": "라건아", "value": 11343},
-    {"pcode": "290261", "pname": "애런 헤인즈", "value": 10878},
-    {"pcode": "215053", "pname": "김주성", "value": 10288},
-    {"pcode": "245028", "pname": "추승균", "value": 10019}
-  ],
-  "ast": [
-    {"pcode": "215012", "pname": "주희정", "value": 5381},
-    {"pcode": "245026", "pname": "이상민", "value": 3583},
-    {"pcode": "210074", "pname": "양동근", "value": 3344},
-    {"pcode": "215029", "pname": "신기성", "value": 3267},
-    {"pcode": "230051", "pname": "김승현", "value": 3243}
-  ],
-  "reb": [
-    {"pcode": "290524", "pname": "라건아", "value": 5236},
-    {"pcode": "255032", "pname": "서장훈", "value": 5235}
-  ],
-  "threep": [
-    {"pcode": "235026", "pname": "문경은", "value": 1669},
-    {"pcode": "215012", "pname": "주희정", "value": 1152},
-    {"pcode": "225019", "pname": "우지원", "value": 1116},
-    {"pcode": "290381", "pname": "이정현", "value": 1090}
-  ],
-  "blk": [
-    {"pcode": "215053", "pname": "김주성", "value": 1037}
-  ],
-  "stl": [
-    {"pcode": "215012", "pname": "주희정", "value": 1505}
-  ]
+  "regular": {
+    "pts": [
+      {"pcode": "255032", "pname": "서장훈", "value": 13231},
+      {"pcode": "290524", "pname": "라건아", "value": 11343},
+      {"pcode": "290261", "pname": "애런 헤인즈", "value": 10878},
+      {"pcode": "215053", "pname": "김주성", "value": 10288},
+      {"pcode": "245028", "pname": "추승균", "value": 10019}
+    ],
+    "ast": [
+      {"pcode": "215012", "pname": "주희정", "value": 5381},
+      {"pcode": "245026", "pname": "이상민", "value": 3583},
+      {"pcode": "210074", "pname": "양동근", "value": 3344},
+      {"pcode": "215029", "pname": "신기성", "value": 3267},
+      {"pcode": "230051", "pname": "김승현", "value": 3243}
+    ],
+    "reb": [
+      {"pcode": "255032", "pname": "서장훈", "value": 5235},
+      {"pcode": "215053", "pname": "김주성", "value": 4425}
+    ],
+    "threep": [
+      {"pcode": "235026", "pname": "문경은", "value": 1669},
+      {"pcode": "215012", "pname": "주희정", "value": 1152},
+      {"pcode": "225019", "pname": "우지원", "value": 1116},
+      {"pcode": "290381", "pname": "이정현", "value": 1090}
+    ],
+    "blk": [
+      {"pcode": "215053", "pname": "김주성", "value": 1037}
+    ],
+    "stl": [
+      {"pcode": "215012", "pname": "주희정", "value": 1505}
+    ]
+  }
 }

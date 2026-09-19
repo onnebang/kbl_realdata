@@ -17,62 +17,111 @@ def build_alltime_leaders():
     max_season = max_s_df.iloc[0]['max_s']
     
     # We want to know for each player if they played in the max_season
-    # So we get max season per pcode
+    # And get their most recent pname to avoid alphabetical issues like 라건아 < 라들리프 -> 라들리프
     player_max_season_query = """
     SELECT 
         p.pcode, 
-        MAX(g.season_name) as last_season,
-        MAX(p.pname) as pname
+        MAX(g.season_name) as last_season
     FROM player_game_stats p
     JOIN games g ON p.gmkey = g.gmkey
     GROUP BY p.pcode
     """
     player_seasons = pd.read_sql_query(player_max_season_query, conn)
-    player_seasons['is_active'] = player_seasons['last_season'] == max_season
     
-    # Aggregate stats
-    agg_query = """
-    SELECT 
-        pcode,
-        COUNT(gmkey) as gp,
-        SUM(score) as pts,
-        SUM(rb) as reb,
-        SUM(ast) as ast,
-        SUM(stl) as stl,
-        SUM(bs) as blk,
-        SUM(threep) as threep
-    FROM player_game_stats
-    GROUP BY pcode
+    # Get the latest pname for each player by joining back
+    latest_pname_query = """
+    SELECT p.pcode, p.pname, g.season_name
+    FROM player_game_stats p
+    JOIN games g ON p.gmkey = g.gmkey
     """
-    agg_stats = pd.read_sql_query(agg_query, conn)
+    latest_names = pd.read_sql_query(latest_pname_query, conn)
+    # Sort by season descending and keep the first one
+    latest_names = latest_names.sort_values(by='season_name', ascending=False).drop_duplicates(subset=['pcode'], keep='first')
     
-    # Merge with player info
-    df = pd.merge(agg_stats, player_seasons, on='pcode')
+    player_info = pd.merge(player_seasons, latest_names[['pcode', 'pname']], on='pcode')
+    player_info['is_active'] = player_info['last_season'] == max_season
     
-    # Load overrides to fix missing 1997-2005 data
+    # HARDCODE overrides for retired players
+    # 290100 is Ham Ji-hoon
+    player_info.loc[player_info['pcode'] == '290100', 'is_active'] = False
+    
+    # Map season_category
+    # '정규시즌' -> 'regular'
+    # '플레이오프', '챔피언결정전' -> 'playoffs'
+    cat_mapping_query = """
+    SELECT gmkey, 
+           CASE 
+             WHEN season_category = '정규시즌' THEN 'regular'
+             WHEN season_category IN ('플레이오프', '챔피언결정전') THEN 'playoffs'
+             ELSE 'other'
+           END as split_type
+    FROM games
+    """
+    cat_mapping = pd.read_sql_query(cat_mapping_query, conn)
+    
+    raw_stats_query = """
+    SELECT 
+        gmkey, pcode,
+        score as pts, rb as reb, ast, stl, bs as blk, threep, 1 as gp
+    FROM player_game_stats
+    """
+    raw_stats = pd.read_sql_query(raw_stats_query, conn)
+    
+    merged_stats = pd.merge(raw_stats, cat_mapping, on='gmkey')
+    
+    # Aggregate by pcode and split_type
+    agg_split = merged_stats.groupby(['pcode', 'split_type']).sum().reset_index()
+    
+    # We need to compute 'total' = regular + playoffs + other
+    agg_total = merged_stats.groupby('pcode').sum().reset_index()
+    agg_total['split_type'] = 'total'
+    
+    all_agg = pd.concat([agg_split, agg_total], ignore_index=True)
+    all_agg = pd.merge(all_agg, player_info[['pcode', 'pname', 'is_active']], on='pcode', how='left')
+    
+    # Load overrides
     overrides_path = os.path.join(BASE, "alltime_overrides.json")
     if os.path.exists(overrides_path):
         with open(overrides_path, 'r', encoding='utf-8') as f:
             overrides = json.load(f)
-        
-        for col, data_list in overrides.items():
-            for item in data_list:
-                pcode = item['pcode']
-                val = item['value']
-                
-                # Check if pcode exists in df
-                if pcode in df['pcode'].values:
-                    df.loc[df['pcode'] == pcode, col] = val
-                else:
-                    # Missing entirely, append a new row
-                    new_row = {
-                        'pcode': pcode,
-                        'pname': item.get('pname', ''),
-                        'is_active': False,
-                        'gp': 0, 'pts': 0, 'reb': 0, 'ast': 0, 'stl': 0, 'blk': 0, 'threep': 0
-                    }
-                    new_row[col] = val
-                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            
+        # apply 'regular' overrides
+        if 'regular' in overrides:
+            for col, data_list in overrides['regular'].items():
+                for item in data_list:
+                    pcode = str(item['pcode'])
+                    val = item['value']
+                    
+                    # update regular
+                    mask_reg = (all_agg['pcode'] == pcode) & (all_agg['split_type'] == 'regular')
+                    if mask_reg.any():
+                        old_reg = all_agg.loc[mask_reg, col].values[0]
+                        diff = val - old_reg
+                        all_agg.loc[mask_reg, col] = val
+                        
+                        # update total by the diff so that total = regular_override + playoffs_db
+                        mask_tot = (all_agg['pcode'] == pcode) & (all_agg['split_type'] == 'total')
+                        if mask_tot.any():
+                            all_agg.loc[mask_tot, col] += diff
+                    else:
+                        # Add new rows if entirely missing
+                        new_reg = {'pcode': pcode, 'pname': item.get('pname', ''), 'is_active': False, 'split_type': 'regular'}
+                        new_reg[col] = val
+                        
+                        new_tot = {'pcode': pcode, 'pname': item.get('pname', ''), 'is_active': False, 'split_type': 'total'}
+                        new_tot[col] = val
+                        
+                        # If playoffs exist, we should add it to total. 
+                        # Let's find playoff value in all_agg
+                        mask_po = (all_agg['pcode'] == pcode) & (all_agg['split_type'] == 'playoffs')
+                        if mask_po.any():
+                            po_val = all_agg.loc[mask_po, col].values[0]
+                            if pd.notna(po_val):
+                                new_tot[col] += po_val
+                                
+                        all_agg = pd.concat([all_agg, pd.DataFrame([new_reg, new_tot])], ignore_index=True)
+                        # Fix NaNs to 0 for other columns in new rows
+                        all_agg = all_agg.fillna(0)
 
     leaders = {}
     categories = [
@@ -85,30 +134,46 @@ def build_alltime_leaders():
         ('gp', '출전 경기')
     ]
     
-    for col, kr_name in categories:
-        top100 = df.sort_values(by=col, ascending=False).head(100)
+    splits = ['total', 'regular', 'playoffs']
+    
+    # Restructure output:
+    # {
+    #   "total": { "pts": { "name": "득점", "data": [...] }, ... },
+    #   "regular": { ... }
+    # }
+    for sp in splits:
+        leaders[sp] = {}
+        sp_df = all_agg[all_agg['split_type'] == sp]
         
-        category_list = []
-        rank = 1
-        for _, row in top100.iterrows():
-            category_list.append({
-                "rank": rank,
-                "pcode": str(row['pcode']),
-                "pname": str(row['pname']),
-                "value": int(row[col]),
-                "is_active": bool(row['is_active'])
-            })
-            rank += 1
+        for col, kr_name in categories:
+            if col not in sp_df.columns: continue
             
-        leaders[col] = {
-            "name": kr_name,
-            "data": category_list
-        }
-        
+            top100 = sp_df.sort_values(by=col, ascending=False).head(100)
+            
+            category_list = []
+            rank = 1
+            for _, row in top100.iterrows():
+                # Skip 0s
+                if row[col] == 0: continue
+                
+                category_list.append({
+                    "rank": rank,
+                    "pcode": str(row['pcode']),
+                    "pname": str(row['pname']),
+                    "value": int(row[col]),
+                    "is_active": bool(row['is_active'])
+                })
+                rank += 1
+                
+            leaders[sp][col] = {
+                "name": kr_name,
+                "data": category_list
+            }
+            
     with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
         json.dump(leaders, f, ensure_ascii=False, indent=2)
         
-    print(f"[SUCCESS] All-time leaders generated to {OUTPUT_PATH}")
+    print(f"[SUCCESS] All-time leaders (split) generated to {OUTPUT_PATH}")
 
 if __name__ == '__main__':
     build_alltime_leaders()
