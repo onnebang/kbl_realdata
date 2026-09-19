@@ -757,14 +757,31 @@ export default async function PlayerPage({
                 <span>{status.teamName ?? "-"}</span>
                 <span className={styles.heroMetaDot}>·</span>
                 <span>{status.pos ?? "-"}</span>
-                {status.backNum && (
+                {latestOvr ? (() => {
+                  const prevOvr = ovrHistory.length > 1 ? ovrHistory[ovrHistory.length - 2] : null;
+                  const ovrDiff = prevOvr ? latestOvr.OVR - prevOvr.OVR : null;
+                  const tierColor = latestOvr.OVR >= 92 ? '#f43f5e' : latestOvr.OVR >= 89 ? '#a855f7' : latestOvr.OVR >= 85 ? '#3b82f6' : latestOvr.OVR >= 75 ? '#10b981' : '#94a3b8';
+                  return (
+                    <>
+                      <span className={styles.heroMetaDot}>·</span>
+                      <span style={{ color: tierColor, fontWeight: 900, fontSize: '1.2em', filter: `drop-shadow(0 0 8px ${tierColor}80)` }}>
+                        OVR {latestOvr.OVR}
+                      </span>
+                      {ovrDiff !== null && ovrDiff !== 0 && (
+                        <span style={{ color: ovrDiff > 0 ? 'var(--positive)' : 'var(--negative)', marginLeft: '6px', fontSize: '1em', fontWeight: 'bold' }}>
+                          {ovrDiff > 0 ? '▲' : '▼'}{Math.abs(ovrDiff)}
+                        </span>
+                      )}
+                    </>
+                  );
+                })() : status.backNum ? (
                   <>
                     <span className={styles.heroMetaDot}>·</span>
                     <span style={{ color: 'var(--hero-accent)', fontWeight: 'bold' }}>
                       {status.backNumAsLastSeason && status.backNumSeason ? `${shortSeason(status.backNumSeason)} ` : ""}#{status.backNum}
                     </span>
                   </>
-                )}
+                ) : null}
                 <span className={styles.heroMetaDot}>·</span>
                 <span>커리어 {careerGp}경기</span>
               </div>

@@ -10,6 +10,14 @@ export interface OvrSeasonRecord {
   OVR: number;
   OFF: number;
   DEF: number;
+  attributes?: {
+    outside: number;
+    inside: number;
+    playmaking: number;
+    athletic: number;
+    defense: number;
+    rebounding: number;
+  };
   archetype?: string;
   badges?: {
     finishing: number;

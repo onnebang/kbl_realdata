@@ -124,14 +124,18 @@ def main():
                 """INSERT OR REPLACE INTO player_game_stats
                    (gmkey,pcode,pname,tcode,home_away,start_flag,play_min,play_sec,
                     score,rb,ast,stl,bs,to_,fg,fg_a,threep,threep_a,ft,ft_a,foul,
-                    per,offrtg,defrtg,netrtg,efg_rt,ts_rt,usg_rt,pace,pie)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    offr,defr,dk,dk_a,fb,pp,pp_a,sast,dfl,
+                    per,offrtg,defrtg,netrtg,efg_rt,ts_rt,usg_rt,pace,pie,
+                    ast_rt,ast_to,oreb_rt,dreb_rt,tov_rt)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (gmkey, p["pcode"], p["pname"], p["tcode"], row.get("homeAway"), row.get("startFlag"),
                  r.get("playMin"), r.get("playSec"), r.get("score"), r.get("rb"), r.get("ast"),
                  r.get("stl"), r.get("bs"), r.get("to"), r.get("fg"), r.get("fgA"), r.get("threep"),
-                 r.get("threepA"), r.get("ft"), r.get("ftA"), r.get("foul"), r.get("per"),
-                 r.get("offrtg"), r.get("defrtg"), r.get("netrtg"), r.get("efgRt"), r.get("tsRt"),
-                 r.get("usgRt"), r.get("pace"), r.get("pie")),
+                 r.get("threepA"), r.get("ft"), r.get("ftA"), r.get("foul"), 
+                 r.get("offr"), r.get("defr"), r.get("dk"), r.get("dkA"), r.get("fb"), r.get("pp"), r.get("ppA"), r.get("sast"), r.get("dfl"),
+                 r.get("per"), r.get("offrtg"), r.get("defrtg"), r.get("netrtg"), r.get("efgRt"), r.get("tsRt"),
+                 r.get("usgRt"), r.get("pace"), r.get("pie"),
+                 r.get("astRt"), r.get("astTo"), r.get("orebRt"), r.get("drebRt"), r.get("tovRt")),
             )
             pgs_count += 1
     print(f"  {pgs_count}건", flush=True)

@@ -236,6 +236,7 @@ def compute_ovr(target_season='2024-2025'):
         AVG(gps.bs) as blk,
         AVG(gps.to_) as tov,
         SUM(gps.per * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as per,
+        SUM(gps.pie * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as pie,
         SUM(MAX(MIN(gps.netrtg, 50), -50) * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as net_rtg,
         SUM(gps.usg_rt * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as usage,
         SUM(gps.fg) as fgm, SUM(gps.fg_a) as fga,
@@ -247,7 +248,9 @@ def compute_ovr(target_season='2024-2025'):
         AVG(gps.sast) as sast, AVG(gps.dfl) as dfl,
         AVG(gps.ast_rt) as ast_rt, AVG(gps.ast_to) as ast_to,
         AVG(gps.oreb_rt) as oreb_rt, AVG(gps.dreb_rt) as dreb_rt, AVG(gps.tov_rt) as tov_rt,
-        SUM(gps.defrtg * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as def_rtg
+        SUM(gps.defrtg * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as def_rtg,
+        AVG(CASE WHEN gps.tcode = g.home_tcode THEN g.home_score - g.away_score ELSE g.away_score - g.home_score END) as margin,
+        AVG(CASE WHEN (CASE WHEN gps.tcode = g.home_tcode THEN g.home_score - g.away_score ELSE g.away_score - g.home_score END) > 0 THEN 1.0 ELSE 0.0 END) as win_pct
     FROM player_game_stats gps
     JOIN games g ON gps.gmkey = g.gmkey
     WHERE g.season_category IN ('정규시즌', '플레이오프', '챔프전')
@@ -284,105 +287,50 @@ def compute_ovr(target_season='2024-2025'):
     global_df['ts_pct'] = np.where((global_df['fga'] + 0.44 * global_df['fta']) > 0,
                             (global_df['pts'] * global_df['g']) / (2 * (global_df['fga'] + 0.44 * global_df['fta'])), 0)
 
-    # Raw Scores
-    global_df['raw_off'] = (global_df['pts'] * 2.5) + (global_df['ast'] * 1.5) + (global_df['ts_pct'] * (global_df['pts'] / 20.0)) + (global_df['per'] * 1.2)
-    # net_rtg 가중치 0.5 -> 0.2: 팀 전체 성적(동료 효과)이 개인 수비 기여로 그대로 새는
-    # 폭이 커서, 개인 수비 지표(리바운드/스틸/블록)가 약해도 팀이 잘 막으면 DEF가 확 뜬다
-    # (실측: 케렘 칸터 - 블록 0.28/약함에도 팀 net_rtg에 얹혀 DEF 88~89까지 상승, 반면
-    # kbl540 자체 스카우팅 def_rating은 66). 완전히 빼면 팀 방어 기여 자체가 사라지므로
-    # 남겨두되 비중만 줄인다.
-    global_df['raw_def'] = (global_df['reb'] * 1.8) + (global_df['stl'] * 3.0) + (global_df['blk'] * 3.5) + (global_df['net_rtg'] * 0.2)
 
+    # WPA 데이터 로드
+    wpa_path = os.path.join(os.path.dirname(__file__), '..', 'raw', 'analysis', 'wpa_season_leaderboard.json')
+    if os.path.exists(wpa_path):
+        with open(wpa_path, 'r', encoding='utf-8') as f:
+            wpa_data = json.load(f)
+        
+        # DataFrame 형태로 변환: season, name, wpaPerGame
+        wpa_records = []
+        if 'bySeason' in wpa_data:
+            for season, players in wpa_data['bySeason'].items():
+                for p in players:
+                    wpa_records.append({'season_name': season, 'name': p['player'], 'wpaPerGame': p.get('wpaPerGame', 0)})
+        wpa_df = pd.DataFrame(wpa_records)
+        
+        # Merge WPA to global_df
+        if not wpa_df.empty:
+            global_df = pd.merge(global_df, wpa_df, on=['season_name', 'name'], how='left')
+            global_df['wpaPerGame'] = global_df['wpaPerGame'].fillna(0)
+        else:
+            global_df['wpaPerGame'] = 0.0
+    else:
+        global_df['wpaPerGame'] = 0.0
+
+    # 포지션 데이터를 먼저 로드하여 병합 (가중치 계산용)
+    teams, positions = load_teams_and_positions()
+    global_df['position'] = global_df['pcode'].map(positions).fillna('Unknown')
+    
     # ── 세부 카테고리 (NBA 2K 스타일) 원시 점수 계산 ──
     # 1. Outside Scoring
-    # 3점, 미드레인지(추정), 자유투, TS% 종합
     global_df['attr_outside'] = (global_df['tpm'] * 4.0) + (global_df['ts_pct'] * 30.0) + (global_df['ftm'] * 1.5)
-
     # 2. Inside Scoring
-    # 페인트존 득점, 덩크, 2점 시도 대비 자유투 획득(FTr) 종합
     global_df['attr_inside'] = (global_df['paint_pts'] * 2.0) + (global_df['dkm'] * 5.0) + (np.where(global_df['fga'] > 0, global_df['fta'] / global_df['fga'], 0) * 20.0)
-
     # 3. Playmaking
-    # 어시스트, 세컨더리 어시스트, 어시/턴오버 비율, Usage 종합
     global_df['attr_playmaking'] = (global_df['ast'] * 3.0) + (global_df['sast'] * 2.0) + (global_df['ast_to'] * 5.0) + (global_df['ast_rt'] * 0.2)
-
     # 4. Athleticism
-    # 속공 득점, 출전 시간, 블록/스틸(민첩/점프) 종합
     global_df['attr_athletic'] = (global_df['fb_pts'] * 3.0) + (global_df['total_min'] / max(1, global_df['g'].max()) * 0.5) + (global_df['blk'] * 5.0) + (global_df['stl'] * 5.0)
-
     # 5. Defense
-    # 디펜시브 레이팅(역수 적용), 스틸, 블록, 디플렉션 종합
     global_df['attr_defense'] = (global_df['stl'] * 4.0) + (global_df['blk'] * 4.0) + (global_df['dfl'] * 3.0) - (global_df['def_rtg'] * 0.3)
-
     # 6. Rebounding
-    # 공/수 리바운드 볼륨 및 마진율 종합
     global_df['attr_rebounding'] = (global_df['offr'] * 3.0) + (global_df['defr'] * 2.0) + (global_df['oreb_rt'] * 0.3) + (global_df['dreb_rt'] * 0.2)
 
-
-    # ── 1. 1차 매핑: 백분위 기반으로 2K 스케일 (45~99) 부여 ──
-    # 원본 스탯(raw_ovr)을 구한 뒤, 국내 선수에게 버프를 주고 전체 줄을 세워 스케일링합니다.
-    global_df['raw_ovr'] = (global_df['raw_off'] * 0.55) + (global_df['raw_def'] * 0.45)
-    
-    # 국내 선수 보정 (Domestic Buff)
-    # 라건아(귀화 후에도 이 파일에서 nationality='외국'로 유지됨 - 로스터 쿼터상으로는
-    # 국내지만 스탯상 전형적 외국인 빅맨이라 이 버프 대상에서 계속 제외한다)는 여기서
-    # 자동으로 빠진다: 사용자 제보(귀화로 국내 취급돼 국내 선수들이 상대적으로 낮아 보인다는
-    # 우려) 확인 결과 이미 정상 - 실측 원인은 버프 오적용이 아니라 아래 두 가지였다.
-    nats = load_nationalities()
-    global_df['nationality'] = global_df['pcode'].map(nats)
-    # 국적이 대한민국이거나 아시아쿼터(필리핀, 일본), 또는 널(신인 등)이면 가중치
-    is_domestic = global_df['nationality'].fillna('대한민국').str.contains('대한민국|한국|필리핀|일본')
-    # 국내 상위권(이정현 등)이 외국인 빅맨들 밑 88점대에 눌려 있다는 제보 확인 - 리그 역대
-    # 단신/윙 포지션 다수가 국내라 외국인 빅맨 위주 스탯 볼륨과 원천적으로 경쟁이 안 되던
-    # 구간이었다. 처음엔 국내 전원에게 같은 배율(15%->55%)을 곱하는 식으로 풀었는데, 이러면
-    # 벤치급 국내 선수까지 실력과 무관하게 통째로 떠밀려 올라가는 부작용이 있다.
-    # 아시아쿼터(이선 알바노 등)도 대상에 포함하여 국내 최고선수(이정현)와 균형을 맞춥니다.
-    percentile = global_df['raw_ovr'].rank(method='average', pct=True)
-    TOP_BUFF = 0.55
-    domestic_buff = TOP_BUFF * (percentile ** 1.5)
-    global_df.loc[is_domestic, 'raw_ovr'] *= (1 + domestic_buff[is_domestic])
-
-    # MVP/올-KBL 최고 수준 가드(알바노) 어드밴티지 (어시스트 마진이 높은 선수 추가 버프)
-    # 알바노가 이정현과 동급 혹은 소폭 위로 자리잡도록 Playmaking 특화 선수 스케일링 상향
-    playmaker_buff = np.where(global_df['ast_to'] > 2.0, 0.05 * (percentile ** 2), 0)
-    global_df['raw_ovr'] *= (1 + playmaker_buff)
-
-    # 언성 히어로 베테랑 보정 (정창영, 정희재 등)
-    # 경기당 20분 이상 꾸준히 뛰면서 USG%가 16% 이하인 롤 플레이어(수비/궂은일)에게 OVR 보너스
-    min_per_game = global_df['total_min'] / np.maximum(1, global_df['g'])
-    unsung_hero_mask = (min_per_game >= 20.0) & (global_df['usage'] <= 16.0) & (global_df['total_min'] >= 600)
-    global_df.loc[unsung_hero_mask, 'raw_ovr'] *= 1.08  # 약 8% 부스팅 (+2~3 OVR 효과)
-
-    # 신인/1년차 할인
-    global_df = global_df.sort_values(['pcode', 'season_name'])
-    global_df['season_idx'] = global_df.groupby('pcode').cumcount() + 1
-    global_df['experience_factor'] = np.minimum(1.0, 0.75 + 0.0625 * (global_df['season_idx'] - 1))
-    global_df['raw_ovr'] *= global_df['experience_factor']
-
-    # 가비지 타임 인플레이션 강력 철퇴 (민기남, 김건하 등)
-    # 기존 SHRINK_MINUTES를 500분으로 상향하여, 출전 시간이 적은 선수의 raw 점수를 대폭 삭감
-    SHRINK_MINUTES = 500
-    global_df['w'] = global_df['total_min'] / (global_df['total_min'] + SHRINK_MINUTES)
-    
-    # 200분 미만 초저출전 선수는 추가 패널티 부여 (아무리 효율이 좋아도 로스터 끝자락)
-    super_garbage_penalty = np.where(global_df['total_min'] < 200, 0.7, 1.0)
-    global_df['raw_ovr'] *= (global_df['w'] * super_garbage_penalty)
-
-    global_df = global_df.sort_values(by='raw_ovr')
-    n = len(global_df)
-
-    # 2K26 정규분포 비율을 정확히 반영한 앵커
-    anchors = [
-        (0.000, 60),
-        (0.040, 69),
-        (0.220, 74),
-        (0.620, 79),
-        (0.840, 84),
-        (0.940, 89),
-        (0.985, 94),
-        (1.000, 99)
-    ]
-
+    # ── 1. 1차 매핑: 백분위 기반으로 2K 스케일 (45~99) ──
+    anchors = [(0.000, 60), (0.040, 69), (0.220, 74), (0.620, 79), (0.840, 84), (0.940, 89), (0.985, 94), (1.000, 99)]
     def map_percentile(p):
         for k in range(len(anchors) - 1):
             p0, v0 = anchors[k]
@@ -392,59 +340,167 @@ def compute_ovr(target_season='2024-2025'):
                 return v0 + ((p - p0) / (p1 - p0)) * (v1 - v0)
         return anchors[-1][1]
 
-    # Pandas의 rank(pct=True)를 이용해 인덱스 꼬임 없이 깔끔하게 백분위를 구하고 2K 스케일로 변환합니다.
-    global_df['raw_ovr_mapped'] = global_df['raw_ovr'].rank(method='average', pct=True).apply(map_percentile)
+    # 각 속성 독립적으로 매핑
+    global_df['attr_outside_mapped'] = global_df['attr_outside'].rank(method='average', pct=True).apply(map_percentile)
+    global_df['attr_inside_mapped'] = global_df['attr_inside'].rank(method='average', pct=True).apply(map_percentile)
+    global_df['attr_playmaking_mapped'] = global_df['attr_playmaking'].rank(method='average', pct=True).apply(map_percentile)
+    global_df['attr_athletic_mapped'] = global_df['attr_athletic'].rank(method='average', pct=True).apply(map_percentile)
+    global_df['attr_defense_mapped'] = global_df['attr_defense'].rank(method='average', pct=True).apply(map_percentile)
+    global_df['attr_rebounding_mapped'] = global_df['attr_rebounding'].rank(method='average', pct=True).apply(map_percentile)
 
-    # 출전 시간이 극도로 적은 선수(가비지 타임 전용)는 백분위상 70점이 나오더라도
-    # 신인 바닥치(53~58)로 강하게 끌어내립니다. (예: 이윤수 선수처럼 시즌 10~30분 뛴 경우)
+    # ── 2. 모던 롤(Role) 판별 및 가중치 적용 ──
+    def determine_role(row):
+        pos = str(row['position']).upper()
+        g_games = max(1, row['g'])
+        
+        # tpm (총합)만 경기수로 나누고, 나머지는 이미 AVG 이므로 그대로 사용
+        tpm = row['tpm'] / g_games
+        ast = row['ast']
+        pts = row['pts']
+        stl = row['stl']
+        blk = row['blk']
+        reb = row['reb']
+        
+        is_big = ('C' in pos) or ('F' in pos and reb >= 6.0)
+        
+        # 포인트 센터: 빅맨인데 어시스트 3.0개 이상 (아셈 마레이, 요키치 롤)
+        if is_big and ast >= 3.0:
+            return 'Point Center'
+            
+        # 스트레치 빅: 빅맨인데 3점슛 1.0개 이상
+        if is_big and tpm >= 1.0:
+            return 'Stretch Big'
+            
+        # 페인트존 짐승: 빅맨인데 3점슛 1.0개 미만
+        if is_big and tpm < 1.0:
+            return 'Paint Beast'
+            
+        # 퓨어 플레이메이커: 어시스트 4.5 이상 가드
+        if ast >= 4.5:
+            return 'Playmaker'
+            
+        # 3&D 윙: 3점 1.5개 이상 + 수비 지표 준수
+        if tpm >= 1.5 and (stl >= 1.0 or blk >= 0.5):
+            return '3&D Wing'
+            
+        # 스코어링 스렛: 득점 볼륨이 높은 에이스
+        if pts >= 14.0:
+            return 'Scoring Threat'
+            
+        return 'All-Around'
+
+    global_df['role'] = global_df.apply(determine_role, axis=1)
+
+    def calc_role_ovr(row):
+        role = row['role']
+        if role == 'Point Center':
+            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.05, 0.25, 0.25, 0.05, 0.15, 0.25
+        elif role == 'Stretch Big':
+            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.25, 0.20, 0.05, 0.05, 0.20, 0.25
+        elif role == 'Paint Beast':
+            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.00, 0.35, 0.00, 0.10, 0.20, 0.35
+        elif role == 'Playmaker':
+            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.25, 0.05, 0.35, 0.15, 0.15, 0.05
+        elif role == '3&D Wing':
+            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.30, 0.05, 0.05, 0.15, 0.35, 0.10
+        elif role == 'Scoring Threat':
+            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.35, 0.25, 0.15, 0.15, 0.10, 0.00
+        else: # All-Around
+            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.20, 0.20, 0.15, 0.15, 0.15, 0.15
+            
+        return (row['attr_outside_mapped'] * w_out + 
+                row['attr_inside_mapped'] * w_in + 
+                row['attr_playmaking_mapped'] * w_pm + 
+                row['attr_athletic_mapped'] * w_ath + 
+                row['attr_defense_mapped'] * w_def + 
+                row['attr_rebounding_mapped'] * w_reb)
+                
+    global_df['raw_ovr'] = global_df.apply(calc_role_ovr, axis=1)
+
+    # ── 3. 고급 지표 및 보정치 가감 (OVR Buffs & Penalties) ──
+    nats = load_nationalities()
+    global_df['nationality'] = global_df['pcode'].map(nats)
+    global_df['is_domestic'] = global_df['nationality'].fillna('대한민국').str.contains('대한민국|한국|필리핀|일본')
+    
+    global_df['raw_ovr_mapped'] = global_df['raw_ovr']
+    
+    # Domestic Buff (국내 선수 +3점 내외 보정)
+    percentile = global_df['raw_ovr'].rank(method='average', pct=True)
+    domestic_buff = 2.0 * (percentile ** 1.5)
+    global_df.loc[global_df['is_domestic'], 'raw_ovr_mapped'] += domestic_buff[global_df['is_domestic']]
+    
+    # 베테랑 보정 및 궂은 일(PIE)
+    min_per_game = global_df['total_min'] / np.maximum(1, global_df['g'])
+    unsung_hero_mask = (min_per_game >= 20.0) & (global_df['usage'] <= 16.0) & (global_df['total_min'] >= 600)
+    global_df.loc[unsung_hero_mask, 'raw_ovr_mapped'] += 2.0
+    
+    # Winning Impact (승률, 마진, WPA, PIE 기반)
+    wpa_boost = global_df['wpaPerGame'] * 2.0
+    win_bonus = (global_df['win_pct'] - 0.5) * 5.0
+    margin_bonus = global_df['margin'] * 0.2
+    pie_bonus = (global_df['pie'] - 10.0) * 0.1 # PIE 평균 10 기준 오버/언더
+    
+    global_df['raw_ovr_mapped'] += (wpa_boost + win_bonus + margin_bonus + pie_bonus)
+
+    # ── 4. 가비지 타임 패널티 ──
+    def apply_garbage_penalty(row):
+        total_m = row['total_min']
+        val = row['raw_ovr_mapped']
+        if total_m < 200:
+            val -= 8.0
+        elif total_m < 500:
+            val -= 4.0
+        return val
+
+    global_df['raw_ovr_mapped'] = global_df.apply(apply_garbage_penalty, axis=1)
+    
+    # Rookie Floor
     draft_ranks = load_draft_ranks()
     global_df['draft_rank_val'] = global_df['pcode'].map(draft_ranks)
     global_df['rookie_floor'] = global_df['draft_rank_val'].apply(rookie_floor_for)
-
-    # 400분 미만일수록 rookie_floor 비중이 커짐. 400분 이상이면 100% 자기 실력(raw_ovr_mapped)
-    # 0분이면 100% rookie_floor
     minutes_factor = np.clip(global_df['total_min'] / 400.0, 0.0, 1.0)
     global_df['raw_ovr_mapped'] = global_df['raw_ovr_mapped'] * minutes_factor + global_df['rookie_floor'] * (1.0 - minutes_factor)
 
-    # 전설적인 99 보정 (역대 최상위 10명만 91~99로 강제 펼침) - 스무딩 전에 적용!
+    # 전설적인 99 보정
     LEGEND_COUNT = 10
     LEGEND_TOP = 99
     LEGEND_BOTTOM = 91
-    # raw_ovr 순으로 상위 10명 추출 (동점자 처리 포함 안전하게 nlargest 사용)
-    top_indices = global_df['raw_ovr'].nlargest(LEGEND_COUNT).index
+    top_indices = global_df['raw_ovr_mapped'].nlargest(LEGEND_COUNT).index
     for rank, idx in enumerate(top_indices):
         t = rank / (LEGEND_COUNT - 1) if LEGEND_COUNT > 1 else 0
         global_df.loc[idx, 'raw_ovr_mapped'] = round(LEGEND_TOP - t * (LEGEND_TOP - LEGEND_BOTTOM))
 
-    # OFF / DEF 세부 레이팅은 각각 독립적으로 백분위를 구해 2K 스케일(40~99)로 변환한 뒤,
-    # 이 둘의 가중평균이 최종 OVR(raw_ovr_mapped)에 완벽히 수렴하도록 보정합니다.
-    global_df['off_base'] = global_df['raw_off'].rank(method='average', pct=True).apply(map_percentile)
-    global_df['def_base'] = global_df['raw_def'].rank(method='average', pct=True).apply(map_percentile)
+    # OFF / DEF 분할
+    def calc_off_def(row):
+        role = row['role']
+        if role == 'Point Center':
+            off = (row['attr_outside_mapped']*0.1 + row['attr_inside_mapped']*0.4 + row['attr_playmaking_mapped']*0.5)
+            dfn = (row['attr_athletic_mapped']*0.1 + row['attr_defense_mapped']*0.4 + row['attr_rebounding_mapped']*0.5)
+        elif role == 'Stretch Big':
+            off = (row['attr_outside_mapped']*0.4 + row['attr_inside_mapped']*0.4 + row['attr_playmaking_mapped']*0.2)
+            dfn = (row['attr_athletic_mapped']*0.2 + row['attr_defense_mapped']*0.4 + row['attr_rebounding_mapped']*0.4)
+        elif role == 'Paint Beast':
+            off = (row['attr_inside_mapped']*0.7 + row['attr_playmaking_mapped']*0.1 + row['attr_rebounding_mapped']*0.2)
+            dfn = (row['attr_athletic_mapped']*0.2 + row['attr_defense_mapped']*0.3 + row['attr_rebounding_mapped']*0.5)
+        elif role == 'Playmaker':
+            off = (row['attr_outside_mapped']*0.4 + row['attr_inside_mapped']*0.1 + row['attr_playmaking_mapped']*0.5)
+            dfn = (row['attr_athletic_mapped']*0.2 + row['attr_defense_mapped']*0.6 + row['attr_rebounding_mapped']*0.2)
+        elif role == '3&D Wing':
+            off = (row['attr_outside_mapped']*0.7 + row['attr_inside_mapped']*0.2 + row['attr_playmaking_mapped']*0.1)
+            dfn = (row['attr_athletic_mapped']*0.2 + row['attr_defense_mapped']*0.6 + row['attr_rebounding_mapped']*0.2)
+        elif role == 'Scoring Threat':
+            off = (row['attr_outside_mapped']*0.5 + row['attr_inside_mapped']*0.3 + row['attr_playmaking_mapped']*0.2)
+            dfn = (row['attr_athletic_mapped']*0.3 + row['attr_defense_mapped']*0.5 + row['attr_rebounding_mapped']*0.2)
+        else: # All-Around
+            off = (row['attr_outside_mapped']*0.4 + row['attr_inside_mapped']*0.3 + row['attr_playmaking_mapped']*0.3)
+            dfn = (row['attr_athletic_mapped']*0.3 + row['attr_defense_mapped']*0.4 + row['attr_rebounding_mapped']*0.3)
+            
+        mod = (row['raw_ovr_mapped'] - row['raw_ovr']) # OVR에 더해진 버프/패널티 마진
+        return off + mod, dfn + mod
 
-    # 세부 속성 매핑
-    global_df['outside_base'] = global_df['attr_outside'].rank(method='average', pct=True).apply(map_percentile)
-    global_df['inside_base'] = global_df['attr_inside'].rank(method='average', pct=True).apply(map_percentile)
-    global_df['playmaking_base'] = global_df['attr_playmaking'].rank(method='average', pct=True).apply(map_percentile)
-    global_df['athletic_base'] = global_df['attr_athletic'].rank(method='average', pct=True).apply(map_percentile)
-    global_df['defense_base'] = global_df['attr_defense'].rank(method='average', pct=True).apply(map_percentile)
-    global_df['rebounding_base'] = global_df['attr_rebounding'].rank(method='average', pct=True).apply(map_percentile)
-
-    global_df['ovr_base'] = (global_df['off_base'] * 0.55) + (global_df['def_base'] * 0.45)
-    
-    global_df['raw_off_mapped'] = global_df['off_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
-    global_df['raw_def_mapped'] = global_df['def_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
-
-    # 세부 속성도 똑같이 OVR에 맞춰 보정
-    global_df['attr_outside_mapped'] = global_df['outside_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
-    global_df['attr_inside_mapped'] = global_df['inside_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
-    global_df['attr_playmaking_mapped'] = global_df['playmaking_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
-    global_df['attr_athletic_mapped'] = global_df['athletic_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
-    global_df['attr_defense_mapped'] = global_df['defense_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
-    global_df['attr_rebounding_mapped'] = global_df['rebounding_base'] * (global_df['raw_ovr_mapped'] / global_df['ovr_base'])
-
+    global_df[['raw_off_mapped', 'raw_def_mapped']] = global_df.apply(calc_off_def, axis=1, result_type='expand')
 
     # ── 2. 시즌별 오버롤 스무딩 (OvrCurveModel) 적용 ──
-    # 스무딩을 거치면 이제 등수가 밀려도 2K 스케일 값(45~99) 위에서 직접 방어된다.
     birth_years = load_birth_years()
     global_df['birth_year'] = global_df['pcode'].map(birth_years)
     global_df['start_year'] = global_df['season_name'].apply(parse_start_year)
@@ -597,6 +653,7 @@ def compute_ovr(target_season='2024-2025'):
             "season": row['season_name'],
             "team": row['team'],
             "position": positions.get(row['pcode'], "Unknown"),
+            "role": row.get('role', 'Unknown'),
             "OVR": int(row['OVR']),
             "OFF": int(row['OFF']),
             "DEF": int(row['DEF']),

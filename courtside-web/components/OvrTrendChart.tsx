@@ -26,10 +26,11 @@ interface OvrTrendChartProps {
 // 이 파일은 클라이언트 컴포넌트라 그 모듈(./ovr = 서버 전용)을 import할 수 없어 값을 복제한다 -
 // 카드·랭킹의 등급선을 바꾸면 여기도 같이 바꿀 것.
 const OVR_TIERS: { min: number; color: string }[] = [
-  { min: 95, color: "#ffd700" }, // 금
-  { min: 85, color: "#c0c0c0" }, // 은
-  { min: 75, color: "#cd7f32" }, // 동
-  { min: 0, color: "#8b949e" }, // 그 이하
+  { min: 92, color: "#f43f5e" }, // Elite (Pink/Ruby)
+  { min: 89, color: "#a855f7" }, // Gold (Purple/Amethyst)
+  { min: 85, color: "#3b82f6" }, // Silver (Blue/Sapphire)
+  { min: 75, color: "#10b981" }, // Bronze (Green/Emerald)
+  { min: 0, color: "#94a3b8" }, // Base (Gray/Slate)
 ];
 function tierColor(ovr: number): string {
   return (OVR_TIERS.find((t) => ovr >= t.min) ?? OVR_TIERS[OVR_TIERS.length - 1]).color;

@@ -36,9 +36,14 @@ CREATE TABLE player_game_stats (
     score INTEGER, rb INTEGER, ast INTEGER, stl INTEGER, bs INTEGER, to_ INTEGER,
     fg INTEGER, fg_a INTEGER, threep INTEGER, threep_a INTEGER, ft INTEGER, ft_a INTEGER,
     foul INTEGER,
+    -- 1차 스탯 (신규 추가된 세부 지표)
+    offr INTEGER, defr INTEGER, dk INTEGER, dk_a INTEGER,
+    fb INTEGER, pp INTEGER, pp_a INTEGER, sast INTEGER, dfl INTEGER,
     -- 2차(어드밴스드) 스탯 - 전부 경기 단위(시즌 평균 아님)
     per REAL, offrtg REAL, defrtg REAL, netrtg REAL,
     efg_rt REAL, ts_rt REAL, usg_rt REAL, pace REAL, pie REAL,
+    -- 2차 스탯 (신규 추가된 세부 지표)
+    ast_rt REAL, ast_to REAL, oreb_rt REAL, dreb_rt REAL, tov_rt REAL,
     PRIMARY KEY (gmkey, pcode)
 );
 
