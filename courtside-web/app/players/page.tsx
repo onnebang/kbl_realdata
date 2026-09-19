@@ -19,7 +19,8 @@ function normalize(s: string) {
 
 function getTierClass(ovr: number | null) {
   if (ovr === null) return "";
-  if (ovr >= 95) return styles.tierGold;
+  if (ovr >= 92) return styles.tierElite;
+  if (ovr >= 89) return styles.tierGold;
   if (ovr >= 85) return styles.tierSilver;
   if (ovr >= 75) return styles.tierBronze;
   return styles.tierBase;
