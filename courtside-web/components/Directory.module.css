@@ -232,41 +232,25 @@ a.playerRow:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
-.ovrInlineBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(var(--line-rgb), 0.08);
-  padding: 1px 6px;
-  border-radius: 12px;
-  font-family: "Big Shoulders Display", sans-serif;
-}
+.tierGold { color: #ffd700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.3); }
+.tierSilver { color: #c0c0c0; text-shadow: 0 0 8px rgba(192, 192, 192, 0.3); }
+.tierBronze { color: #cd7f32; text-shadow: 0 0 8px rgba(205, 127, 50, 0.3); }
+.tierBase { color: var(--ink-faint); }
 
-.ovrValue {
-  font-weight: 800;
-  font-size: 14px;
-  color: var(--ink);
-}
-
-.ovrUp {
-  font-weight: 800;
-  font-size: 12px;
+.ovrUpSub {
   color: var(--positive);
-  font-family: "Pretendard", system-ui, sans-serif;
-  letter-spacing: -0.02em;
+  font-weight: 700;
 }
 
-.ovrDown {
-  font-weight: 800;
-  font-size: 12px;
+.ovrDownSub {
   color: var(--negative);
-  font-family: "Pretendard", system-ui, sans-serif;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.subSep {
+  opacity: 0.5;
 }
 /* "가드 · 외국인 · 25-26 54G 12.3P" - 한글이 섞인 보조 줄이라 Pretendard + tabular-nums. */
 .sub {

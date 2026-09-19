@@ -17,10 +17,22 @@ function normalize(s: string) {
   return s.replace(/[\s·.'\-]+/g, "").toLowerCase();
 }
 
+function getTierClass(ovr: number | null) {
+  if (ovr === null) return "";
+  if (ovr >= 95) return styles.tierGold;
+  if (ovr >= 85) return styles.tierSilver;
+  if (ovr >= 75) return styles.tierBronze;
+  return styles.tierBase;
+}
+
 function PlayerRow({ p, prev, ovr, ovrDiff }: { p: DirectoryPlayer; prev: string; ovr: number | null; ovrDiff: number | null }) {
-  const sub = [p.pos, p.role, p.gp != null && p.ppg != null ? `${p.prevSeason ? shortSeason(p.prevSeason) : prev} ${p.gp}G ${p.ppg.toFixed(1)}P` : null, p.registryStatus]
-    .filter(Boolean)
-    .join(" · ");
+  const subTokens = [
+    p.pos, 
+    p.role, 
+    p.gp != null && p.ppg != null ? `${p.prevSeason ? shortSeason(p.prevSeason) : prev} ${p.gp}G ${p.ppg.toFixed(1)}P` : null, 
+    p.registryStatus
+  ].filter(Boolean);
+
   const inner = (
     <>
       {p.photoUrl ? (
@@ -28,22 +40,20 @@ function PlayerRow({ p, prev, ovr, ovrDiff }: { p: DirectoryPlayer; prev: string
       ) : (
         <div className={styles.photoFallback}>{p.backNum ?? "·"}</div>
       )}
-      <div className={styles.num}>{p.backNum ?? ""}</div>
+      <div className={`${styles.num} ${getTierClass(ovr)}`}>{ovr ?? "-"}</div>
       <div className={styles.nameCell}>
-        <div className={styles.name}>
-          {p.name}
-          {ovr !== null && (
-            <span className={styles.ovrInlineBadge}>
-              <span className={styles.ovrValue}>{ovr}</span>
-              {ovrDiff !== null && ovrDiff !== 0 && (
-                <span className={ovrDiff > 0 ? styles.ovrUp : styles.ovrDown}>
-                  {ovrDiff > 0 ? `+${ovrDiff}` : String(ovrDiff).replace("-", "−")}
-                </span>
-              )}
-            </span>
+        <div className={styles.name}>{p.name}</div>
+        <div className={styles.sub}>
+          {ovrDiff !== null && ovrDiff !== 0 && (
+            <>
+              <span className={ovrDiff > 0 ? styles.ovrUpSub : styles.ovrDownSub}>
+                {ovrDiff > 0 ? `▲ ${ovrDiff}` : `▼ ${Math.abs(ovrDiff)}`}
+              </span>
+              {subTokens.length > 0 && <span className={styles.subSep}> · </span>}
+            </>
           )}
+          {subTokens.join(" · ") || (p.pcode ? "" : "KBL 첫 시즌")}
         </div>
-        <div className={styles.sub}>{sub || (p.pcode ? "" : "KBL 첫 시즌")}</div>
       </div>
       <div>
         {p.role ? (
