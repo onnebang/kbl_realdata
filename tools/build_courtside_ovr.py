@@ -297,8 +297,8 @@ def compute_ovr(target_season='2024-2025'):
     # 우려) 확인 결과 이미 정상 - 실측 원인은 버프 오적용이 아니라 아래 두 가지였다.
     nats = load_nationalities()
     global_df['nationality'] = global_df['pcode'].map(nats)
-    # 국적이 대한민국이거나 널(신인 등 못 불러왔지만 보통 국내)이면 가중치
-    is_domestic = global_df['nationality'].fillna('대한민국').str.contains('대한민국|한국')
+    # 국적이 대한민국이거나 아시아쿼터(필리핀, 일본), 또는 널(신인 등)이면 가중치
+    is_domestic = global_df['nationality'].fillna('대한민국').str.contains('대한민국|한국|필리핀|일본')
     # 국내 상위권(이정현 등)이 외국인 빅맨들 밑 88점대에 눌려 있다는 제보 확인 - 리그 역대
     # 단신/윙 포지션 다수가 국내라 외국인 빅맨 위주 스탯 볼륨과 원천적으로 경쟁이 안 되던
     # 구간이었다. 처음엔 국내 전원에게 같은 배율(15%->55%)을 곱하는 식으로 풀었는데, 이러면
@@ -310,7 +310,7 @@ def compute_ovr(target_season='2024-2025'):
     # 실측 둘 다 시즌 활약이 비슷했다는 지적)가 거의 같은 OVR로 수렴하도록 눈으로 맞춘 값.
     percentile = global_df['raw_ovr'].rank(method='average', pct=True)
     TOP_BUFF = 0.55
-    domestic_buff = TOP_BUFF * (percentile ** 3)
+    domestic_buff = TOP_BUFF * (percentile ** 1.5)
     global_df.loc[is_domestic, 'raw_ovr'] *= (1 + domestic_buff[is_domestic])
 
     # 신인/1년차 할인 - 케렘 칸터처럼 KBL 첫 시즌에 좋은 스탯 한 번 찍으면 커리어 검증 없이
@@ -359,9 +359,9 @@ def compute_ovr(target_season='2024-2025'):
     global_df['draft_rank_val'] = global_df['pcode'].map(draft_ranks)
     global_df['rookie_floor'] = global_df['draft_rank_val'].apply(rookie_floor_for)
 
-    # 100분 미만일수록 rookie_floor 비중이 커짐. 100분 이상이면 100% 자기 실력(raw_ovr_mapped)
+    # 400분 미만일수록 rookie_floor 비중이 커짐. 400분 이상이면 100% 자기 실력(raw_ovr_mapped)
     # 0분이면 100% rookie_floor
-    minutes_factor = np.clip(global_df['total_min'] / 100.0, 0.0, 1.0)
+    minutes_factor = np.clip(global_df['total_min'] / 400.0, 0.0, 1.0)
     global_df['raw_ovr_mapped'] = global_df['raw_ovr_mapped'] * minutes_factor + global_df['rookie_floor'] * (1.0 - minutes_factor)
 
     # 전설적인 99 보정 (역대 최상위 10명만 91~99로 강제 펼침) - 스무딩 전에 적용!
