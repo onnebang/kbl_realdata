@@ -1,12 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Achievement, CareerQuest, getPlayerAchievements } from "../lib/achievements";
+import { Achievement, Rival, StackData, getPlayerAchievements } from "../lib/achievements";
 import styles from "./AchievementTrophyRoom.module.css";
 
 interface Props {
   pcode: string;
 }
+
+const STAT_LABELS: Record<string, string> = {
+  pts: "득점",
+  reb: "리바운드",
+  ast: "어시스트",
+  threep: "3점슛",
+  stl: "스틸",
+  blk: "블록",
+  gp: "출장 경기"
+};
 
 const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: "double_double_machine_gold", name: "더블 더블 머신 (Gold)", desc: "시즌 20회 더블더블 달성", category: "milestone" },
@@ -26,8 +36,6 @@ const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: "maestro", name: "마에스트로", desc: "무실책 10어시스트 이상 달성", category: "impact" },
   { id: "scene_stealer", name: "씬 스틸러", desc: "15분 이하 출전 10득점 이상", category: "bench" },
   { id: "sacrificial_lamb", name: "아름다운 희생", desc: "15분 이하 출전 후 5반칙 퇴장", category: "bench" },
-  
-  // 신규 미션형 업적 10종
   { id: "club_20_20", name: "20-20 클럽", desc: "한 경기 20득점 & 20리바운드 동시 달성", category: "impact" },
   { id: "swiss_army_knife", name: "스위스 아미 나이프", desc: "한 경기 5득점, 5리바, 5어시, 5스틸, 5블록 (5x5 달성)", category: "impact" },
   { id: "king_of_thieves", name: "도둑의 제왕", desc: "한 경기 스틸 8개 이상 달성", category: "impact" },
@@ -38,8 +46,6 @@ const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: "brick_layer", name: "벽돌공", desc: "한 경기 3점슛 10개 이상 시도하여 성공률 10% 미만", category: "easter_egg" },
   { id: "turnover_machine", name: "턴오버 자판기", desc: "한 경기 턴오버 8개 이상 기록", category: "easter_egg" },
   { id: "foul_trouble", name: "파울 트러블러", desc: "10분 미만 출전하여 5반칙 퇴장", category: "easter_egg" },
-
-  // 기존 이스터에그
   { id: "invisible_man", name: "투명 인간", desc: "15분 이상 출전, 모든 1차 스탯 0", category: "easter_egg" },
   { id: "giving_tree", name: "아낌없이 주는 나무", desc: "무득점 10어시스트 이상 달성", category: "easter_egg" },
   { id: "unforgiving_rim", name: "자비 없는 림", desc: "한 경기 자유투 4구 이상 시도 0개 성공", category: "easter_egg" },
@@ -48,35 +54,62 @@ const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: "ft_phobia", name: "자유투 공포증", desc: "한 경기 자유투 5개 이상 시도하여 0구 성공", category: "easter_egg" }
 ];
 
-function RankBadge({ label, rank }: { label: string, rank: number | null }) {
-  if (!rank) return null;
-  
-  let badgeClass = styles.rankBadge;
-  if (rank === 1) badgeClass += ` ${styles.rankGold}`;
-  else if (rank === 2) badgeClass += ` ${styles.rankSilver}`;
-  else if (rank === 3) badgeClass += ` ${styles.rankBronze}`;
+function RivalTracker({ rivals, myPcode }: { rivals?: Rival[], myPcode: string }) {
+  if (!rivals || rivals.length === 0) return null;
 
   return (
-    <span className={badgeClass}>
-      {label} <strong>{rank}위</strong>
-    </span>
+    <div className={styles.rivalTracker}>
+      {rivals.map((r, i) => {
+        const isMe = String(r.pcode) === String(myPcode);
+        return (
+          <div key={`${r.pcode}-${i}`} className={`${styles.rivalItem} ${isMe ? styles.isMe : ""}`}>
+            <span className={styles.rivalRank}>{r.rank}위</span>
+            {/* Using a placeholder image for generic avatar, ideally hook up to your player images URL */}
+            <img 
+              src={`https://kbl.or.kr/images/players/Portrait/${r.pcode}.png`} 
+              alt={r.name} 
+              className={styles.rivalAvatar}
+              onError={(e) => { e.currentTarget.src = 'https://kbl.or.kr/images/common/no_player.jpg'; }}
+            />
+            <span className={styles.rivalName}>{r.name}</span>
+            <span className={styles.rivalVal}>{r.val.toLocaleString()}</span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
 export default function AchievementTrophyRoom({ pcode }: Props) {
-  const [activeTab, setActiveTab] = useState<"career" | "season">("career");
+  const [activeTab, setActiveTab] = useState<"career" | "season">("season");
+  const [activeSubTab, setActiveSubTab] = useState<"stacks" | "missions">("stacks");
   
-  const playerAchievements = getPlayerAchievements(pcode);
+  // For career rival toggle
+  const [careerRivalType, setCareerRivalType] = useState<"alltime" | "active">("alltime");
+  
+  const player = getPlayerAchievements(pcode);
+  
+  // Season selector state
+  const seasonsList = player?.seasons ? Object.keys(player.seasons).sort((a,b) => b.localeCompare(a)) : [];
+  const [selectedSeason, setSelectedSeason] = useState<string>(seasonsList[0] || "");
+
+  if (!player) return null;
+
+  // Derive unlocked missions for the active view
   const unlockedIds = new Set<string>();
-  
-  if (playerAchievements && playerAchievements.seasons) {
-    Object.values(playerAchievements.seasons).forEach(season => {
-      season.forEach(ach => unlockedIds.add(ach.id));
-    });
+  if (activeTab === "season" && selectedSeason && player.seasons[selectedSeason]) {
+    player.seasons[selectedSeason].missions?.forEach(ach => unlockedIds.add(ach.id));
+  } else if (activeTab === "career" && player.career?.missions) {
+    player.career.missions.forEach(ach => unlockedIds.add(ach.id));
   }
 
-  const quests = playerAchievements?.career_quests || [];
-  const ranks = playerAchievements?.ranks || {};
+  // Derive stacks to show
+  let stacksData: Record<string, StackData> = {};
+  if (activeTab === "season" && selectedSeason && player.seasons[selectedSeason]) {
+    stacksData = player.seasons[selectedSeason].stacks || {};
+  } else if (activeTab === "career" && player.career) {
+    stacksData = player.career.stacks || {};
+  }
 
   return (
     <div className={styles.trophyRoom}>
@@ -84,67 +117,106 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
         <h3 className={styles.title}>🏆 트로피 룸</h3>
         <div className={styles.tabs}>
           <button 
-            className={`${styles.tabBtn} ${activeTab === "career" ? styles.active : ""}`}
-            onClick={() => setActiveTab("career")}
-          >
-            올타임 퀘스트
-          </button>
-          <button 
             className={`${styles.tabBtn} ${activeTab === "season" ? styles.active : ""}`}
             onClick={() => setActiveTab("season")}
           >
-            시즌 업적
+            시즌
+          </button>
+          <button 
+            className={`${styles.tabBtn} ${activeTab === "career" ? styles.active : ""}`}
+            onClick={() => setActiveTab("career")}
+          >
+            커리어
           </button>
         </div>
       </div>
       
-      {activeTab === "career" && (
-        <div className={styles.tabContent}>
-          {quests.length === 0 ? (
-            <div style={{ color: "rgba(255,255,255,0.5)", textAlign: "center", padding: "20px" }}>
-              진행 중인 퀘스트가 없습니다.
-            </div>
-          ) : (
-            <div className={styles.questList}>
-              {quests.map(quest => {
-                const pct = Math.min(100, (quest.current / quest.target) * 100);
-                const rankData = ranks[quest.type];
+      <div className={styles.subTabs}>
+        <button 
+          className={`${styles.subTabBtn} ${activeSubTab === "stacks" ? styles.active : ""}`}
+          onClick={() => setActiveSubTab("stacks")}
+        >
+          스택형 기록
+        </button>
+        <button 
+          className={`${styles.subTabBtn} ${activeSubTab === "missions" ? styles.active : ""}`}
+          onClick={() => setActiveSubTab("missions")}
+        >
+          미션형 배지
+        </button>
+      </div>
 
-                return (
-                  <div key={quest.id} className={`${styles.questItem} ${quest.completed ? styles.questCompleted : ""}`}>
-                    <div className={styles.questHeader}>
-                      <div className={styles.questNameRow}>
-                        <span className={styles.questName}>
-                          {quest.name}
-                          {quest.completed && <span className={styles.questCompletedText}>✔ 완료</span>}
-                        </span>
-                        {rankData && (
-                          <div className={styles.questBadges}>
-                            <RankBadge label="올타임" rank={rankData.all_time} />
-                            <RankBadge label="현역" rank={rankData.active} />
-                          </div>
-                        )}
-                      </div>
-                      <div className={styles.questNumbers}>
-                        {quest.current.toLocaleString()} / {quest.target.toLocaleString()}
-                      </div>
-                    </div>
-                    <div className={styles.progressBarContainer}>
-                      <div 
-                        className={styles.progressBarFill} 
-                        style={{ width: `${pct}%` }} 
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+      {activeTab === "season" && seasonsList.length > 0 && (
+        <div className={styles.seasonSelector}>
+          <select 
+            className={styles.seasonSelect} 
+            value={selectedSeason} 
+            onChange={(e) => setSelectedSeason(e.target.value)}
+          >
+            {seasonsList.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
         </div>
       )}
+      
+      <div className={styles.tabContent}>
+        {activeSubTab === "stacks" ? (
+          <div className={styles.questList}>
+            {Object.keys(stacksData).length === 0 && (
+              <div style={{ color: "rgba(255,255,255,0.5)", textAlign: "center" }}>기록이 없습니다.</div>
+            )}
+            {Object.entries(stacksData).map(([key, stack]) => {
+              const pct = Math.min(100, (stack.val / stack.target) * 100);
+              
+              let myRank = stack.rank;
+              let rivals = stack.rivals;
+              
+              if (activeTab === "career") {
+                myRank = careerRivalType === "alltime" ? stack.rank_alltime : stack.rank_active;
+                rivals = careerRivalType === "alltime" ? stack.rivals_alltime : stack.rivals_active;
+              }
 
-      {activeTab === "season" && (
-        <div className={styles.tabContent}>
+              return (
+                <div key={key} className={styles.questItem}>
+                  <div className={styles.questHeader}>
+                    <div className={styles.questNameRow}>
+                      <span className={styles.questName}>
+                        {STAT_LABELS[key] || key}
+                        {stack.tier && <span className={styles.questTier}>{stack.tier}</span>}
+                      </span>
+                      {activeTab === "career" && (
+                        <div className={styles.rivalToggle}>
+                          <button 
+                            className={`${styles.rivalToggleBtn} ${careerRivalType === "alltime" ? styles.active : ""}`}
+                            onClick={() => setCareerRivalType("alltime")}
+                          >올타임</button>
+                          <button 
+                            className={`${styles.rivalToggleBtn} ${careerRivalType === "active" ? styles.active : ""}`}
+                            onClick={() => setCareerRivalType("active")}
+                          >현역</button>
+                        </div>
+                      )}
+                    </div>
+                    <div className={styles.questNumbers}>
+                      {stack.val.toLocaleString()} / <span style={{opacity: 0.6}}>{stack.target.toLocaleString()}</span>
+                      {myRank && <span style={{marginLeft: "8px", color: "var(--hero-team, #d9640a)"}}>[{myRank}위]</span>}
+                    </div>
+                  </div>
+                  
+                  <div className={styles.progressBarContainer}>
+                    <div 
+                      className={styles.progressBarFill} 
+                      style={{ width: `${pct}%` }} 
+                    />
+                  </div>
+                  
+                  <RivalTracker rivals={rivals} myPcode={pcode} />
+                </div>
+              );
+            })}
+          </div>
+        ) : (
           <div className={styles.iconGrid}>
             {ALL_ACHIEVEMENTS.map(ach => {
               const unlocked = unlockedIds.has(ach.id);
@@ -174,8 +246,8 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

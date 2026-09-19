@@ -7,27 +7,43 @@ export interface Achievement {
   category: "milestone" | "impact" | "bench" | "easter_egg";
 }
 
-export interface CareerQuest {
-  id: string;
-  type: string;
+export interface Rival {
+  pcode: number | string;
   name: string;
-  current: number;
-  target: number;
-  completed: boolean;
+  val: number;
+  rank: number;
 }
 
-export interface PlayerRanks {
-  [key: string]: {
-    all_time: number;
-    active: number | null;
-  };
+export interface StackData {
+  val: number;
+  tier: string;
+  target: number;
+  
+  // For Career
+  rank_alltime?: number | null;
+  rivals_alltime?: Rival[];
+  rank_active?: number | null;
+  rivals_active?: Rival[];
+  
+  // For Season
+  rank?: number | null;
+  rivals?: Rival[];
+}
+
+export interface CareerMatrix {
+  stacks: Record<string, StackData>;
+  missions: Achievement[];
+}
+
+export interface SeasonMatrix {
+  stacks: Record<string, StackData>;
+  missions: Achievement[];
 }
 
 export interface PlayerAchievements {
   name: string;
-  ranks?: PlayerRanks;
-  career_quests: CareerQuest[];
-  seasons: Record<string, Achievement[]>;
+  career: CareerMatrix;
+  seasons: Record<string, SeasonMatrix>;
 }
 
 export function getPlayerAchievements(pcode: string): PlayerAchievements | null {
@@ -40,12 +56,24 @@ export function getAllAchievementsForPlayer(pcode: string): Achievement[] {
   if (!player) return [];
   
   const allMap = new Map<string, Achievement>();
-  for (const season of Object.values(player.seasons)) {
-    for (const ach of season) {
-      if (!allMap.has(ach.id)) {
-        allMap.set(ach.id, ach);
+  
+  // Collect career missions
+  if (player.career?.missions) {
+    for (const ach of player.career.missions) {
+      if (!allMap.has(ach.id)) allMap.set(ach.id, ach);
+    }
+  }
+
+  // Collect season missions
+  if (player.seasons) {
+    for (const season of Object.values(player.seasons)) {
+      if (season.missions) {
+        for (const ach of season.missions) {
+          if (!allMap.has(ach.id)) allMap.set(ach.id, ach);
+        }
       }
     }
   }
+  
   return Array.from(allMap.values());
 }
