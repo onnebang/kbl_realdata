@@ -4,6 +4,7 @@ import { PlayerPhoto } from "@/components/PlayerPhoto";
 import type { CSSProperties } from "react";
 import { TeamBadge } from "@/components/TeamBadge";
 import { PRESEASON_SEASON, getSeasonDirectory, shortSeason, prevSeasonName, type DirectoryPlayer } from "@/lib/preseason";
+import { getOvrHistoryCache } from "@/lib/ovr";
 import styles from "@/components/Directory.module.css";
 
 // 선수 디렉터리(요청: "상단 메뉴에 선수 자세히 보기") - 이 시즌 확정 로스터 전원을 팀별로 늘어놓고
@@ -16,7 +17,7 @@ function normalize(s: string) {
   return s.replace(/[\s·.'\-]+/g, "").toLowerCase();
 }
 
-function PlayerRow({ p, prev }: { p: DirectoryPlayer; prev: string }) {
+function PlayerRow({ p, prev, ovr, ovrDiff }: { p: DirectoryPlayer; prev: string; ovr: number | null; ovrDiff: number | null }) {
   const sub = [p.pos, p.role, p.gp != null && p.ppg != null ? `${p.prevSeason ? shortSeason(p.prevSeason) : prev} ${p.gp}G ${p.ppg.toFixed(1)}P` : null, p.registryStatus]
     .filter(Boolean)
     .join(" · ");
@@ -29,7 +30,19 @@ function PlayerRow({ p, prev }: { p: DirectoryPlayer; prev: string }) {
       )}
       <div className={styles.num}>{p.backNum ?? ""}</div>
       <div className={styles.nameCell}>
-        <div className={styles.name}>{p.name}</div>
+        <div className={styles.name}>
+          {p.name}
+          {ovr !== null && (
+            <span className={styles.ovrInlineBadge}>
+              <span className={styles.ovrValue}>{ovr}</span>
+              {ovrDiff !== null && ovrDiff !== 0 && (
+                <span className={ovrDiff > 0 ? styles.ovrUp : styles.ovrDown}>
+                  {ovrDiff > 0 ? `+${ovrDiff}` : String(ovrDiff).replace("-", "−")}
+                </span>
+              )}
+            </span>
+          )}
+        </div>
         <div className={styles.sub}>{sub || (p.pcode ? "" : "KBL 첫 시즌")}</div>
       </div>
       <div>
@@ -57,19 +70,54 @@ function PlayerRow({ p, prev }: { p: DirectoryPlayer; prev: string }) {
   );
 }
 
-export default async function PlayersPage({ searchParams }: { searchParams: Promise<{ q?: string; team?: string }> }) {
-  const { q, team } = await searchParams;
+export default async function PlayersPage({ searchParams }: { searchParams: Promise<{ q?: string; team?: string; sort?: string }> }) {
+  const { q, team, sort } = await searchParams;
   const directory = await getSeasonDirectory(PRESEASON_SEASON);
   const prev = shortSeason(prevSeasonName(PRESEASON_SEASON));
   const query = (q ?? "").trim();
   const nq = normalize(query);
 
-  const shown = directory
+  const ovrCache = getOvrHistoryCache();
+  const ovrMap = new Map<string, { ovr: number; diff: number | null }>();
+  const byPcode = new Map<string, typeof ovrCache>();
+  for (const r of ovrCache) {
+    if (!byPcode.has(r.pcode)) byPcode.set(r.pcode, []);
+    byPcode.get(r.pcode)!.push(r);
+  }
+  for (const [pcode, hist] of byPcode) {
+    if (hist.length > 0) {
+      const current = hist[hist.length - 1].OVR;
+      const diff = hist.length > 1 ? current - hist[hist.length - 2].OVR : null;
+      ovrMap.set(pcode, { ovr: current, diff });
+    }
+  }
+
+  let shown = directory
     .filter((t) => !team || t.team.tcode === team)
-    .map((t) => ({ ...t, players: nq ? t.players.filter((p) => normalize(p.name).includes(nq)) : t.players }))
+    .map((t) => {
+      const filteredPlayers = nq ? t.players.filter((p) => normalize(p.name).includes(nq)) : [...t.players];
+      filteredPlayers.sort((a, b) => {
+        const aOvr = a.pcode ? ovrMap.get(a.pcode)?.ovr ?? -1 : -1;
+        const bOvr = b.pcode ? ovrMap.get(b.pcode)?.ovr ?? -1 : -1;
+        return bOvr - aOvr || a.name.localeCompare(b.name);
+      });
+      return { ...t, players: filteredPlayers };
+    })
     .filter((t) => t.players.length > 0);
+
   const total = directory.reduce((s, t) => s + t.players.length, 0);
   const shownN = shown.reduce((s, t) => s + t.players.length, 0);
+
+  const isOvrSort = sort === "ovr";
+  let flatPlayers: DirectoryPlayer[] = [];
+  if (isOvrSort) {
+    flatPlayers = shown.flatMap(t => t.players);
+    flatPlayers.sort((a, b) => {
+      const aOvr = a.pcode ? ovrMap.get(a.pcode)?.ovr ?? -1 : -1;
+      const bOvr = b.pcode ? ovrMap.get(b.pcode)?.ovr ?? -1 : -1;
+      return bOvr - aOvr || a.name.localeCompare(b.name);
+    });
+  }
 
   return (
     <div className="wrap">
@@ -87,12 +135,13 @@ export default async function PlayersPage({ searchParams }: { searchParams: Prom
       <div className={styles.filters}>
         <form className={styles.search} action="/players">
           {team && <input type="hidden" name="team" value={team} />}
+          {isOvrSort && <input type="hidden" name="sort" value="ovr" />}
           <input type="search" name="q" defaultValue={query} placeholder="선수 이름 검색" aria-label="선수 이름 검색" />
           <button type="submit" className="btn-primary">
             검색
           </button>
         </form>
-        <Link href={query ? `/players?q=${encodeURIComponent(query)}` : "/players"} className={`${styles.chip} ${!team ? styles.chipActive : ""}`}>
+        <Link href={query ? `/players?q=${encodeURIComponent(query)}` : "/players"} className={`${styles.chip} ${!team && !isOvrSort ? styles.chipActive : ""}`}>
           전체
         </Link>
         {directory.map((t) => (
@@ -104,27 +153,49 @@ export default async function PlayersPage({ searchParams }: { searchParams: Prom
             {t.team.abbr}
           </Link>
         ))}
+        <Link
+          href={`/players?sort=ovr${query ? `&q=${encodeURIComponent(query)}` : ""}`}
+          className={`${styles.chip} ${isOvrSort ? styles.chipActive : ""}`}
+        >
+          오버롤 순
+        </Link>
       </div>
 
-      {shown.length === 0 && <div className="empty-note">{query ? `"${query}"에 해당하는 선수가 확정 로스터에 없습니다.` : "확정 로스터가 아직 없습니다."}</div>}
+      {shownN === 0 && <div className="empty-note">{query ? `"${query}"에 해당하는 선수가 확정 로스터에 없습니다.` : "확정 로스터가 아직 없습니다."}</div>}
 
-      {shown.map((t) => (
-        <section key={t.team.tcode} className={styles.teamSection} style={{ "--team": t.team.color } as CSSProperties}>
-          <Link href={`/teams/${t.team.tcode}?season=${PRESEASON_SEASON}`} className={styles.teamSectionHead}>
-            <TeamBadge team={{ name: t.team.name, abbr: t.team.abbr, color: t.team.color, logoUrl: t.team.logoUrl }} size={22} />
-            {t.team.name}
-            <span className={styles.teamSectionCount}>{t.players.length}명</span>
-          </Link>
+      {isOvrSort ? (
+        <section className={styles.teamSection} style={{ "--team": "var(--ink)" } as CSSProperties}>
+          <div className={styles.teamSectionHead}>
+            전체 오버롤 랭킹
+            <span className={styles.teamSectionCount}>{shownN}명</span>
+          </div>
           <div className={styles.playerGrid}>
-            {t.players.map((p) => (
-              <PlayerRow key={`${p.pcode ?? "new"}-${p.name}`} p={p} prev={prev} />
-            ))}
+            {flatPlayers.map((p) => {
+               const ovrData = p.pcode ? ovrMap.get(p.pcode) : null;
+               return <PlayerRow key={`${p.pcode ?? "new"}-${p.name}`} p={p} prev={prev} ovr={ovrData?.ovr ?? null} ovrDiff={ovrData?.diff ?? null} />;
+            })}
           </div>
         </section>
-      ))}
+      ) : (
+        shown.map((t) => (
+          <section key={t.team.tcode} className={styles.teamSection} style={{ "--team": t.team.color } as CSSProperties}>
+            <Link href={`/teams/${t.team.tcode}?season=${PRESEASON_SEASON}`} className={styles.teamSectionHead}>
+              <TeamBadge team={{ name: t.team.name, abbr: t.team.abbr, color: t.team.color, logoUrl: t.team.logoUrl }} size={22} />
+              {t.team.name}
+              <span className={styles.teamSectionCount}>{t.players.length}명</span>
+            </Link>
+            <div className={styles.playerGrid}>
+              {t.players.map((p) => {
+                 const ovrData = p.pcode ? ovrMap.get(p.pcode) : null;
+                 return <PlayerRow key={`${p.pcode ?? "new"}-${p.name}`} p={p} prev={prev} ovr={ovrData?.ovr ?? null} ovrDiff={ovrData?.diff ?? null} />;
+              })}
+            </div>
+          </section>
+        ))
+      )}
 
       <div className={styles.note}>
-        {query || team ? `${shownN}명 표시 / 전체 ${total}명. ` : ""}
+        {query || team || isOvrSort ? `${shownN}명 표시 / 전체 ${total}명. ` : ""}
         &quot;등록상태 별도&quot;는 KBL 명부에서 현역(A)이 아닌 코드(C/D)로 등록된 선수로, 군복무·육성 등으로 추정되나 확인되지 않았습니다. 감독·코치는 제외.
       </div>
     </div>
