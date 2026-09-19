@@ -110,7 +110,7 @@ export default async function PlayersPage({ searchParams }: { searchParams: Prom
     }
   }
 
-  let shown = directory
+  const shown = directory
     .filter((t) => !team || t.team.tcode === team)
     .map((t) => {
       const filteredPlayers = nq ? t.players.filter((p) => normalize(p.name).includes(nq)) : [...t.players];
