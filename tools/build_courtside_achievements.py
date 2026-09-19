@@ -83,6 +83,9 @@ def get_achievement_data():
     df['total_min'] = df['play_min'] + df['play_sec'] / 60.0
 
     stat_cols = ['pts', 'reb', 'ast', 'threep', 'stl', 'blk', 'gp']
+    
+    # Construct unique photo_url for each player
+    photo_map = {pcode: f"https://kbl.or.kr/images/players/Portrait/{pcode}.png" for pcode in df['pcode'].unique()}
 
     # 1. Career Totals (All-Time)
     career_totals = df.groupby(['pcode', 'name']).agg({
@@ -108,12 +111,14 @@ def get_achievement_data():
         # All-Time
         ct_sorted = career_totals.sort_values(by=col, ascending=False).copy()
         ct_sorted['rank'] = ct_sorted[col].rank(method='min', ascending=False).astype(int)
-        career_lb_alltime[col] = ct_sorted[['pcode', 'name', col, 'rank']].rename(columns={col: 'val'}).to_dict('records')
+        ct_sorted['photoUrl'] = ct_sorted['pcode'].map(photo_map)
+        career_lb_alltime[col] = ct_sorted[['pcode', 'name', col, 'rank', 'photoUrl']].rename(columns={col: 'val'}).to_dict('records')
         
         # Active
         act_sorted = active_totals.sort_values(by=col, ascending=False).copy()
         act_sorted['rank'] = act_sorted[col].rank(method='min', ascending=False).astype(int)
-        career_lb_active[col] = act_sorted[['pcode', 'name', col, 'rank']].rename(columns={col: 'val'}).to_dict('records')
+        act_sorted['photoUrl'] = act_sorted['pcode'].map(photo_map)
+        career_lb_active[col] = act_sorted[['pcode', 'name', col, 'rank', 'photoUrl']].rename(columns={col: 'val'}).to_dict('records')
 
     # 3. Season Totals
     season_totals = df.groupby(['season_name', 'pcode', 'name']).agg({
@@ -133,7 +138,8 @@ def get_achievement_data():
         for col in stat_cols:
             st_sorted = season_df.sort_values(by=col, ascending=False).copy()
             st_sorted['rank'] = st_sorted[col].rank(method='min', ascending=False).astype(int)
-            season_lbs[season_name][col] = st_sorted[['pcode', 'name', col, 'rank']].rename(columns={col: 'val'}).to_dict('records')
+            st_sorted['photoUrl'] = st_sorted['pcode'].map(photo_map)
+            season_lbs[season_name][col] = st_sorted[['pcode', 'name', col, 'rank', 'photoUrl']].rename(columns={col: 'val'}).to_dict('records')
 
     # 4. Generate JSON Output
     output = {}

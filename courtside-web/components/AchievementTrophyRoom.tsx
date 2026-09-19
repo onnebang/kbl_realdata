@@ -174,7 +174,7 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
               const tierClass = styles[`tier${stack.tier}`] || "";
 
               return (
-                <div key={key} className={styles.questItem}>
+                <div key={key} className={styles.questItem} data-tier={stack.tier}>
                   <div className={styles.questHeader}>
                     <div className={styles.questNameRow}>
                       <span className={styles.questName}>
@@ -248,7 +248,7 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                             className={`${styles.rivalNode} ${isMe ? styles.isMe : ""}`}
                           >
                             <img 
-                              src={`https://kbl.or.kr/images/players/Portrait/${r.pcode}.png`} 
+                              src={r.photoUrl || `https://kbl.or.kr/images/players/Portrait/${r.pcode}.png`} 
                               alt={r.name} 
                               className={styles.rivalAvatar}
                               onError={(e) => { e.currentTarget.src = 'https://kbl.or.kr/images/common/no_player.jpg'; }}

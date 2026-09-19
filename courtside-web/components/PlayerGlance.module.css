@@ -117,6 +117,9 @@
   font-weight: 700;
   color: var(--tone-ink);
   line-height: 1.35;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .headlineEmpty {
   margin-top: 12px;
@@ -348,7 +351,24 @@
   line-height: 1;
   color: var(--tone-ink);
   font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
+.cGrade {
+  font-family: "Pretendard", sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #fff;
+}
+.gradeSS { background: linear-gradient(135deg, #ff00ff, #8a2be2); box-shadow: 0 0 6px rgba(255, 0, 255, 0.4); }
+.gradeS { background: linear-gradient(135deg, #ff8c00, #ff4500); box-shadow: 0 0 4px rgba(255, 140, 0, 0.4); }
+.gradeA { background: var(--positive); }
+.gradeB { background: var(--gold); color: #000; }
+.gradeC { background: var(--ink-faint); }
+.gradeD { background: var(--negative); }
 
 /* 표본이 없거나 표시 하한 미달인 칸 - 지우지 않고 회색 + 점선으로 남긴다.
    격자 모양이 선수마다 같아야 하기 때문이다(조은후와 워니가 같은 22칸). */

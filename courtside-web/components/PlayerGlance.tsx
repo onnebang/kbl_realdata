@@ -101,6 +101,15 @@ function meterKind(m: GlanceMetric): MeterKind {
 // 칸
 // ---------------------------------------------------------------------------
 
+function getGrade(pct: number): string {
+  if (pct >= 95) return "SS";
+  if (pct >= 85) return "S";
+  if (pct >= 70) return "A";
+  if (pct >= 50) return "B";
+  if (pct >= 30) return "C";
+  return "D";
+}
+
 function GlanceCell({ m }: { m: GlanceMetric }) {
   const kind = meterKind(m);
   // neutral(USG%·림 비중·3점 비중)은 좋고나쁨이 없는 스타일 지표다 - 퍼센타일이 있어도 색을 쓰지 않는다.
@@ -152,7 +161,12 @@ function GlanceCell({ m }: { m: GlanceMetric }) {
       )}
       <div className={styles.cFoot}>
         <span className={styles.cFootText}>{foot}</span>
-        {m.percentile != null ? <span className={styles.cPct}>{m.percentile}</span> : null}
+        {m.percentile != null ? (
+          <span className={styles.cPct}>
+            <span className={`${styles.cGrade} ${styles[`grade${getGrade(m.percentile)}`]}`}>{getGrade(m.percentile)}</span>
+            {Math.round(m.percentile)}
+          </span>
+        ) : null}
       </div>
     </div>
   );
@@ -172,7 +186,10 @@ function HeadlineCell({ h, neutral }: { h: GlanceHeadline; neutral: boolean }) {
         <div className={styles.meterFill} style={{ width: `${h.percentile}%` }} />
         <div className={styles.meterMid} />
       </div>
-      <div className={styles.hlRank}>{rankTail(h)}</div>
+      <div className={styles.hlRank}>
+        <span className={`${styles.cGrade} ${styles[`grade${getGrade(h.percentile)}`]}`}>{getGrade(h.percentile)}</span>
+        {rankTail(h)}
+      </div>
     </div>
   );
 }

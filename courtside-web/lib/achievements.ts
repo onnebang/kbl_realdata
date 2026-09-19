@@ -12,6 +12,7 @@ export interface Rival {
   name: string;
   val: number;
   rank: number;
+  photoUrl?: string | null;
 }
 
 export interface StackData {

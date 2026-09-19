@@ -353,20 +353,20 @@
 .rivalRankLabel {
   font-size: 0.65rem;
   font-weight: 800;
-  color: rgba(var(--ink-rgb), 0.5);
+  color: var(--ink-faint, #8d93a3);
 }
 
 .rivalNameLabel {
   font-size: 0.7rem;
   font-weight: 700;
-  color: var(--ink);
+  color: var(--ink, #f2f3f7);
   line-height: 1.2;
 }
 
 .rivalValLabel {
   font-size: 0.8rem;
   font-weight: 900;
-  color: rgba(var(--ink-rgb), 0.8);
+  color: var(--ink-soft, #a8aebe);
 }
 
 .rivalNode.isMe {
