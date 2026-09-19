@@ -60,7 +60,7 @@ def get_achievement_data():
     query = """
     SELECT 
         p.pcode, p.pname as name, g.season_name, g.game_date,
-        gps.gmkey,
+        gps.gmkey, gps.tcode,
         gps.play_min, gps.play_sec,
         gps.score as pts,
         gps.ast,
@@ -177,7 +177,7 @@ def get_achievement_data():
             "name": name,
             "career": {
                 "stacks": career_stacks,
-                "missions": [] # Ready for future
+                "missions": [] # Will be populated later
             },
             "seasons": {}
         }
@@ -286,6 +286,55 @@ def get_achievement_data():
             "stacks": season_stacks,
             "missions": list(unique_missions)
         }
+
+    # Populate career missions
+    for pcode_raw, career_group in df.groupby('pcode'):
+        pcode = str(pcode_raw)
+        
+        career_missions = []
+        games_played = len(career_group)
+        num_teams = career_group['tcode'].nunique()
+        num_seasons = career_group['season_name'].nunique()
+        
+        total_blk = career_group['blk'].sum()
+        total_stl = career_group['stl'].sum()
+        total_threep = career_group['threep'].sum()
+        total_pts = career_group['pts'].sum()
+        
+        if games_played >= 500:
+            career_missions.append({"id": "iron_man_career", "name": "장수 거북이", "desc": "통산 500경기 이상 출장", "category": "milestone"})
+        
+        if num_teams >= 5:
+            career_missions.append({"id": "journeyman", "name": "저니맨", "desc": "커리어 동안 5개 이상의 다른 팀에서 출장", "category": "easter_egg"})
+            
+        if num_teams == 1 and num_seasons >= 10:
+            career_missions.append({"id": "franchise_star", "name": "낭만 (프랜차이즈 스타)", "desc": "한 팀에서만 10시즌 이상 출장", "category": "milestone"})
+            
+        if total_blk >= 500:
+            career_missions.append({"id": "block_master", "name": "블록 장인", "desc": "통산 500블록 이상 달성", "category": "milestone"})
+            
+        if total_stl >= 500:
+            career_missions.append({"id": "steal_master", "name": "스틸 장인", "desc": "통산 500스틸 이상 달성", "category": "milestone"})
+            
+        if total_threep >= 1000:
+            career_missions.append({"id": "three_point_master", "name": "3점슛 장인", "desc": "통산 1,000개 이상의 3점슛 성공", "category": "milestone"})
+            
+        if total_pts >= 10000:
+            career_missions.append({"id": "ten_k_scorer", "name": "1만 득점 클럽", "desc": "통산 10,000득점 달성", "category": "milestone"})
+            
+        td_count = 0
+        for _, row in career_group.iterrows():
+            tens = sum(1 for stat in [row['pts'], row['ast'], row['reb'], row['stl'], row['blk']] if stat >= 10)
+            if tens >= 3: td_count += 1
+            
+        if td_count >= 10:
+            career_missions.append({"id": "triple_double_machine", "name": "트리플 더블 머신", "desc": "통산 트리플 더블 10회 이상 달성", "category": "impact"})
+            
+        unique_career_missions = { a['id']: a for a in career_missions }.values()
+        
+        if pcode in output:
+            output[pcode]["career"]["missions"] = list(unique_career_missions)
+
 
     out_real = os.path.join(os.path.dirname(__file__), OUT_PATH)
     os.makedirs(os.path.dirname(out_real), exist_ok=True)

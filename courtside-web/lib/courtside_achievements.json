@@ -26510,7 +26510,26 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2006-2007": {
@@ -33428,7 +33447,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2006-2007": {
@@ -42094,7 +42120,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2006-2007": {
@@ -53953,7 +53992,26 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "block_master",
+          "name": "블록 장인",
+          "desc": "통산 500블록 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2006-2007": {
@@ -90755,7 +90813,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2006-2007": {
@@ -126321,7 +126392,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2006-2007": {
@@ -131362,7 +131446,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2006-2007": {
@@ -148043,7 +148140,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2011-2012": {
@@ -178953,7 +179057,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2008-2009": {
@@ -185895,7 +186012,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2006-2007": {
@@ -209772,7 +209902,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2006-2007": {
@@ -218930,7 +219073,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2006-2007": {
@@ -287080,7 +287236,26 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2006-2007": {
@@ -300704,7 +300879,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2006-2007": {
@@ -343015,7 +343197,26 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2007-2008": {
@@ -359341,7 +359542,26 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2007-2008": {
@@ -366921,7 +367141,26 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2007-2008": {
@@ -373071,7 +373310,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2007-2008": {
@@ -384617,7 +384863,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2007-2008": {
@@ -390080,7 +390333,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2007-2008": {
@@ -394406,7 +394672,26 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2007-2008": {
@@ -400550,7 +400835,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2007-2008": {
@@ -405662,7 +405954,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2007-2008": {
@@ -432381,7 +432680,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2007-2008": {
@@ -461020,7 +461326,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2008-2009": {
@@ -479596,7 +479915,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2008-2009": {
@@ -485744,7 +486076,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2008-2009": {
@@ -502755,7 +503094,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2008-2009": {
@@ -504667,7 +505013,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2008-2009": {
@@ -513045,7 +513398,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2008-2009": {
@@ -516976,7 +517336,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2008-2009": {
@@ -534992,7 +535359,32 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        },
+        {
+          "id": "ten_k_scorer",
+          "name": "1만 득점 클럽",
+          "desc": "통산 10,000득점 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2008-2009": {
@@ -559769,7 +560161,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2009-2010": {
@@ -566755,7 +567160,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2009-2010": {
@@ -572456,7 +572868,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2009-2010": {
@@ -602374,7 +602793,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2009-2010": {
@@ -616056,7 +616482,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2009-2010": {
@@ -652015,7 +652448,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        },
+        {
+          "id": "block_master",
+          "name": "블록 장인",
+          "desc": "통산 500블록 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2010-2011": {
@@ -655815,7 +656261,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2010-2011": {
@@ -664842,7 +665295,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2010-2011": {
@@ -676798,7 +677258,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2010-2011": {
@@ -682072,7 +682545,26 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        },
+        {
+          "id": "three_point_master",
+          "name": "3점슛 장인",
+          "desc": "통산 1,000개 이상의 3점슛 성공",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2010-2011": {
@@ -706651,7 +707143,20 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2011-2012": {
@@ -721166,7 +721671,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2011-2012": {
@@ -738908,7 +739420,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2011-2012": {
@@ -748570,7 +749095,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2011-2012": {
@@ -752812,7 +753344,20 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2011-2012": {
@@ -759274,7 +759819,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2011-2012": {
@@ -765006,7 +765558,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2011-2012": {
@@ -768897,7 +769456,20 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2011-2012": {
@@ -774714,7 +775286,20 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2011-2012": {
@@ -783088,7 +783673,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2011-2012": {
@@ -811909,7 +812501,20 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2012-2013": {
@@ -820488,7 +821093,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2012-2013": {
@@ -825858,7 +826470,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2012-2013": {
@@ -830151,7 +830770,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2012-2013": {
@@ -835829,7 +836455,20 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2012-2013": {
@@ -841161,7 +841800,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2012-2013": {
@@ -846920,7 +847566,20 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2012-2013": {
@@ -864243,7 +864902,26 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2012-2013": {
@@ -873343,7 +874021,32 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "block_master",
+          "name": "블록 장인",
+          "desc": "통산 500블록 이상 달성",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        },
+        {
+          "id": "ten_k_scorer",
+          "name": "1만 득점 클럽",
+          "desc": "통산 10,000득점 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2012-2013": {
@@ -885923,7 +886626,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2012-2013": {
@@ -903430,7 +904140,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2012-2013": {
@@ -925139,7 +925856,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2012-2013": {
@@ -982831,7 +983555,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2015-2016": {
@@ -1023573,7 +1024304,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2013-2014": {
@@ -1036172,7 +1036910,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2013-2014": {
@@ -1042664,7 +1043409,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2013-2014": {
@@ -1065685,7 +1066437,20 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        },
+        {
+          "id": "steal_master",
+          "name": "스틸 장인",
+          "desc": "통산 500스틸 이상 달성",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2013-2014": {
@@ -1103444,7 +1104209,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2014-2015": {
@@ -1108038,7 +1108810,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2014-2015": {
@@ -1114835,7 +1115614,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2014-2015": {
@@ -1160589,7 +1161375,14 @@
           ]
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "franchise_star",
+          "name": "낭만 (프랜차이즈 스타)",
+          "desc": "한 팀에서만 10시즌 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2015-2016": {
@@ -1197810,7 +1198603,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2016-2017": {
@@ -1313218,7 +1314018,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "journeyman",
+          "name": "저니맨",
+          "desc": "커리어 동안 5개 이상의 다른 팀에서 출장",
+          "category": "easter_egg"
+        }
+      ]
     },
     "seasons": {
       "2017-2018": {
@@ -1763416,7 +1764223,14 @@
           "rivals_active": []
         }
       },
-      "missions": []
+      "missions": [
+        {
+          "id": "iron_man_career",
+          "name": "장수 거북이",
+          "desc": "통산 500경기 이상 출장",
+          "category": "milestone"
+        }
+      ]
     },
     "seasons": {
       "2006-2007": {

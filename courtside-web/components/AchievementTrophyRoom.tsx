@@ -18,7 +18,7 @@ const STAT_LABELS: Record<string, string> = {
   gp: "출장 경기"
 };
 
-const ALL_ACHIEVEMENTS: Achievement[] = [
+const SEASON_ACHIEVEMENTS: Achievement[] = [
   { id: "double_double_machine_gold", name: "더블 더블 머신 (Gold)", desc: "시즌 20회 더블더블 달성", category: "milestone" },
   { id: "double_double_machine_silver", name: "더블 더블 머신 (Silver)", desc: "시즌 10회 더블더블 달성", category: "milestone" },
   { id: "double_double_machine_bronze", name: "더블 더블 머신 (Bronze)", desc: "시즌 5회 더블더블 달성", category: "milestone" },
@@ -52,6 +52,17 @@ const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: "pacifist", name: "평화주의자", desc: "30분 이상 출전, 파울 0개", category: "easter_egg" },
   { id: "black_hole", name: "블랙홀", desc: "야투율 20% 미만으로 야투 15개 이상 시도", category: "easter_egg" },
   { id: "ft_phobia", name: "자유투 공포증", desc: "한 경기 자유투 5개 이상 시도하여 0구 성공", category: "easter_egg" }
+];
+
+const CAREER_ACHIEVEMENTS: Achievement[] = [
+  { id: "iron_man_career", name: "장수 거북이", desc: "통산 500경기 이상 출장", category: "milestone" },
+  { id: "journeyman", name: "저니맨", desc: "커리어 동안 5개 이상의 다른 팀에서 출장", category: "easter_egg" },
+  { id: "franchise_star", name: "낭만 (프랜차이즈 스타)", desc: "한 팀에서만 10시즌 이상 출장", category: "milestone" },
+  { id: "block_master", name: "블록 장인", desc: "통산 500블록 이상 달성", category: "milestone" },
+  { id: "steal_master", name: "스틸 장인", desc: "통산 500스틸 이상 달성", category: "milestone" },
+  { id: "three_point_master", "name": "3점슛 장인", desc: "통산 1,000개 이상의 3점슛 성공", category: "milestone" },
+  { id: "ten_k_scorer", name: "1만 득점 클럽", desc: "통산 10,000득점 달성", category: "milestone" },
+  { id: "triple_double_machine", name: "트리플 더블 머신", desc: "통산 트리플 더블 10회 이상 달성", category: "impact" }
 ];
 
 export default function AchievementTrophyRoom({ pcode }: Props) {
@@ -248,7 +259,7 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
           </div>
         ) : (
           <div className={styles.iconGrid}>
-            {ALL_ACHIEVEMENTS.map(ach => {
+            {(activeTab === "season" ? SEASON_ACHIEVEMENTS : CAREER_ACHIEVEMENTS).map(ach => {
               const unlocked = unlockedIds.has(ach.id);
               return (
                 <div 
