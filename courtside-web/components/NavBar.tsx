@@ -19,7 +19,7 @@ const MAIN_LINKS = [
 // 맨 앞에 둔다(요청: "시즌별 리더보드 추가 / 선수별 조합").
 const ANALYSIS_LINKS = [
   // { href: "/rankings/ovr", label: "OVR 랭킹 (2K)" },
-  { href: "/rankings/legends", label: "명예의 전당 (리빙 레전드)" },
+  // { href: "/rankings/legends", label: "명예의 전당 (리빙 레전드)" },
   { href: "/lineups", label: "선수별 조합" },
   { href: "/season-browser", label: "시즌 브라우저" },
   { href: "/leaderboards/season", label: "시즌 리더보드" },
