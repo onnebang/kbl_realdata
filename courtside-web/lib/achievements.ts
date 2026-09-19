@@ -16,8 +16,16 @@ export interface CareerQuest {
   completed: boolean;
 }
 
+export interface PlayerRanks {
+  [key: string]: {
+    all_time: number;
+    active: number | null;
+  };
+}
+
 export interface PlayerAchievements {
   name: string;
+  ranks?: PlayerRanks;
   career_quests: CareerQuest[];
   seasons: Record<string, Achievement[]>;
 }
