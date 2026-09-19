@@ -4,22 +4,6 @@
   border-radius: var(--r-card);
   padding: 24px;
   border: 1px solid rgba(var(--line-rgb), 0.16);
-  /* 이 카드는 다크 히어로(color: --hero-ink) 안에 있지만 배경은 테마 --surface다(라이트=흰색).
-     글자색을 안 정한 요소가 히어로의 밝은 글자색을 상속하면 라이트에서 흰 바탕에 흰 글씨가 된다. */
-  color: var(--ink);
-  /* 팀 색은 --hero-team(원색) 대신 lib/teamAccent.ts의 두 테마 쌍을 쓴다 - 서버는 테마를 모르므로
-     page.tsx가 라이트/다크 두 색(--ti-l/--ti-d, --tb-l/--tb-d)을 같이 내려보내고 여기서 고른다.
-     ink = 글자·칩 배경(4.5:1), bar = 막대·테두리 같은 비텍스트(3:1), fill-ink = ink 배경 위 글자색. */
-  --tr-ink: var(--ti-l, var(--ink));
-  --tr-bar: var(--tb-l, var(--ink));
-  --tr-fill-ink: #fff;
-}
-@media (prefers-color-scheme: dark) {
-  .trophyRoom {
-    --tr-ink: var(--ti-d, var(--ink));
-    --tr-bar: var(--tb-d, var(--ink));
-    --tr-fill-ink: #0b0d12;
-  }
 }
 
 .header {
@@ -32,7 +16,7 @@
 .title {
   font-size: var(--fs-400);
   font-weight: 800;
-  color: var(--tr-ink);
+  color: var(--hero-team, var(--ink));
   margin: 0;
 }
 
@@ -45,25 +29,23 @@
 }
 
 .tabBtn {
-  font-family: inherit;
   background: transparent;
   border: none;
-  color: rgba(var(--line-rgb), 0.5);
+  color: rgba(var(--ink-rgb), 0.5);
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+  transition: all 0.2s;
 }
 
 .tabBtn.active {
-  background: var(--tr-ink);
-  color: var(--tr-fill-ink);
+  background: var(--hero-team, rgba(var(--ink-rgb), 0.2));
+  color: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* Sub-tabs */
 .subTabs {
   display: flex;
   gap: 20px;
@@ -73,10 +55,9 @@
 }
 
 .subTabBtn {
-  font-family: inherit;
   background: transparent;
   border: none;
-  color: rgba(var(--line-rgb), 0.4);
+  color: rgba(var(--ink-rgb), 0.4);
   font-size: 0.95rem;
   font-weight: 700;
   padding: 4px 8px;
@@ -86,7 +67,7 @@
 }
 
 .subTabBtn.active {
-  color: var(--tr-ink);
+  color: var(--hero-team, var(--ink));
 }
 
 .subTabBtn.active::after {
@@ -96,7 +77,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: var(--tr-bar);
+  background: var(--hero-team, var(--ink));
   border-radius: 3px 3px 0 0;
 }
 
@@ -109,7 +90,6 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Season Selector */
 .seasonSelector {
   margin-bottom: 20px;
   display: flex;
@@ -118,7 +98,6 @@
 }
 
 .seasonSelect {
-  font-family: inherit;
   padding: 8px 12px;
   border-radius: 8px;
   background: var(--surface);
@@ -126,10 +105,10 @@
   color: var(--ink);
   font-weight: 600;
   font-size: 0.9rem;
+  outline: none;
   cursor: pointer;
 }
 
-/* Icon Grid (Missions) */
 .iconGrid {
   display: flex;
   flex-wrap: wrap;
@@ -232,7 +211,6 @@
 .hexagonCard:hover::before {
   opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0);
 }
-
 .hexagonCard:hover::after {
   opacity: 1; visibility: visible; transform: translateX(-50%) translateY(-100%);
 }
@@ -241,15 +219,15 @@
 .questList {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 40px; /* Increased gap to fit avatars on bar */
 }
 
 .questItem {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   background: rgba(var(--line-rgb), 0.03);
-  padding: 16px;
+  padding: 20px;
   border-radius: 12px;
   border: 1px solid rgba(var(--line-rgb), 0.08);
 }
@@ -267,108 +245,137 @@
 }
 
 .questName {
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 800;
   color: var(--ink);
   display: flex;
   align-items: center;
 }
 
+/* ── Tier Effects ── */
 .questTier {
   font-size: 0.75rem;
-  background: var(--tr-ink);
-  color: var(--tr-fill-ink);
-  padding: 2px 8px;
+  padding: 2px 10px;
   border-radius: 12px;
   margin-left: 8px;
-  font-weight: 700;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tierBronze { background: linear-gradient(135deg, #cd7f32, #8b4513); color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+.tierSilver { background: linear-gradient(135deg, #e0e0e0, #9e9e9e); color: #333; text-shadow: 1px 1px 2px rgba(255,255,255,0.5); }
+.tierGold { background: linear-gradient(135deg, #ffd700, #b8860b); color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); box-shadow: 0 0 8px rgba(255, 215, 0, 0.4); }
+.tierPlatinum { background: linear-gradient(135deg, #e5e4e2, #a0b2c6); color: #1a1a1a; box-shadow: 0 0 10px rgba(160, 178, 198, 0.5); }
+.tierDiamond { background: linear-gradient(135deg, #b9f2ff, #4facfe); color: #002d5c; font-style: italic; box-shadow: 0 0 12px rgba(79, 172, 254, 0.6); }
+.tierMaster { background: linear-gradient(135deg, #ff7eb3, #ff758c); color: #fff; box-shadow: 0 0 12px rgba(255, 117, 140, 0.6); animation: pulse 2s infinite; }
+.tierGrandmaster { background: linear-gradient(135deg, #f12711, #f5af19); color: #fff; box-shadow: 0 0 15px rgba(241, 39, 17, 0.7); font-style: italic; animation: pulse 1.5s infinite; }
+.tierLegend { background: linear-gradient(135deg, #8e2de2, #4a00e0); color: #fff; text-shadow: 0 0 5px #fff; box-shadow: 0 0 20px rgba(142, 45, 226, 0.8); animation: pulse 1s infinite; }
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
 }
 
 .questNumbers {
   font-size: 0.9rem;
-  color: rgba(var(--line-rgb), 0.7);
+  color: rgba(var(--ink-rgb), 0.7);
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.progressBarContainer {
-  height: 10px;
+/* ── Rival Tracker ON Progress Bar ── */
+.progressBarTrack {
+  height: 12px;
   background: rgba(var(--line-rgb), 0.1);
-  border-radius: 5px;
-  overflow: hidden;
+  border-radius: 6px;
   position: relative;
+  margin-top: 16px;
+  margin-bottom: 24px;
 }
 
 .progressBarFill {
   height: 100%;
-  background: var(--tr-bar);
-  border-radius: 5px;
+  background: linear-gradient(90deg, var(--hero-team, #d9640a), rgba(var(--hero-team-rgb, 217,100,10), 0.7));
+  border-radius: 6px;
   transition: width 0.5s ease-out;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
-/* ── Rival Tracker ── */
-.rivalTracker {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  overflow-x: auto;
-  padding: 8px 4px;
-  scrollbar-width: none; /* Firefox */
-}
-
-.rivalTracker::-webkit-scrollbar {
-  display: none; /* Safari and Chrome */
-}
-
-.rivalItem {
+/* Rival Avatars positioned absolutely on the track */
+.rivalNode {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 60px;
-  gap: 4px;
-  position: relative;
-}
-
-.rivalItem.isMe .rivalAvatar {
-  border: 2px solid var(--tr-bar);
-  /* 예전 --hero-team-rgb는 어디서도 정의되지 않아 글로우가 항상 주황이었다. */
-  box-shadow: 0 0 8px color-mix(in srgb, var(--tr-bar) 40%, transparent);
-}
-
-.rivalItem.isMe .rivalName {
-  color: var(--tr-ink);
-  font-weight: 800;
-}
-
-.rivalRank {
-  font-size: var(--fs-100);
-  font-weight: 700;
-  color: rgba(var(--line-rgb), 0.5);
+  z-index: 10;
+  transition: left 0.5s ease-out;
 }
 
 .rivalAvatar {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: rgba(var(--line-rgb), 0.1);
+  border: 2px solid var(--surface);
+  background: var(--surface);
   object-fit: cover;
-  border: 1px solid rgba(var(--line-rgb), 0.2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s;
+  cursor: pointer;
 }
 
-.rivalName {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: rgba(var(--line-rgb), 0.8);
+.rivalNode:hover .rivalAvatar {
+  transform: scale(1.2);
+  z-index: 20;
+}
+
+/* Label below the avatar */
+.rivalLabel {
+  position: absolute;
+  top: 100%;
+  margin-top: 4px;
+  background: rgba(var(--surface-rgb), 0.9);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--ink);
   white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  max-width: 100%;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  pointer-events: none;
+  z-index: 20;
+  text-align: center;
 }
 
-.rivalVal {
-  font-size: var(--fs-100);
-  color: rgba(var(--line-rgb), 0.6);
-  font-variant-numeric: tabular-nums;
+.rivalNode:hover .rivalLabel {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Distinguish "Me" node */
+.rivalNode.isMe {
+  z-index: 15;
+}
+
+.rivalNode.isMe .rivalAvatar {
+  border-color: var(--hero-team, #d9640a);
+  width: 38px;
+  height: 38px;
+  box-shadow: 0 0 10px rgba(var(--hero-team-rgb, 217,100,10), 0.6);
+}
+
+.rivalNode.isMe .rivalLabel {
+  opacity: 1;
+  visibility: visible;
+  color: var(--hero-team, #d9640a);
 }
 
 .rivalToggle {
@@ -377,15 +384,15 @@
 }
 
 .rivalToggleBtn {
-  font-family: inherit;
   background: transparent;
   border: 1px solid rgba(var(--line-rgb), 0.2);
-  color: rgba(var(--line-rgb), 0.5);
-  font-size: var(--fs-100);
-  padding: 2px 8px;
+  color: rgba(var(--ink-rgb), 0.5);
+  font-size: 0.7rem;
+  padding: 4px 10px;
   border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  transition: all 0.2s;
+  font-weight: 600;
 }
 
 .rivalToggleBtn.active {
@@ -393,19 +400,4 @@
   color: var(--ink);
   border-color: rgba(var(--line-rgb), 0.4);
   font-weight: 700;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tabContent {
-    animation: none;
-  }
-  .tabBtn,
-  .subTabBtn,
-  .rivalToggleBtn,
-  .progressBarFill,
-  .hexagonCard,
-  .hexagonCard::before,
-  .hexagonCard::after {
-    transition: none;
-  }
 }

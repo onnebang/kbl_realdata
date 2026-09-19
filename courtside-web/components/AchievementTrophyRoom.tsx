@@ -54,43 +54,6 @@ const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: "ft_phobia", name: "자유투 공포증", desc: "한 경기 자유투 5개 이상 시도하여 0구 성공", category: "easter_egg" }
 ];
 
-function RivalTracker({ rivals, myPcode }: { rivals?: Rival[], myPcode: string }) {
-  if (!rivals || rivals.length === 0) return null;
-
-  return (
-    <div className={styles.rivalTracker}>
-      {rivals.map((r, i) => {
-        const isMe = String(r.pcode) === String(myPcode);
-        return (
-          <div key={`${r.pcode}-${i}`} className={`${styles.rivalItem} ${isMe ? styles.isMe : ""}`}>
-            <span className={styles.rivalRank}>{r.rank}위</span>
-            {/* 이름이 바로 옆에 글자로 있어 아바타는 장식이다 - alt를 비워 같은 이름이 두 번 읽히지 않게 한다.
-                width/height는 .rivalAvatar(40×40)와 같다(CLS 방지). 화면 밖(가로 스크롤)에 있는 것이 많아 lazy. */}
-            <img
-              src={`https://kbl.or.kr/images/players/Portrait/${r.pcode}.png`}
-              alt=""
-              width={40}
-              height={40}
-              loading="lazy"
-              decoding="async"
-              className={styles.rivalAvatar}
-              onError={(e) => {
-                // 폴백 이미지까지 실패하면 같은 src를 다시 넣어 error가 무한 반복되므로 한 번만 바꾼다.
-                const img = e.currentTarget;
-                if (img.dataset.fellBack) return;
-                img.dataset.fellBack = "1";
-                img.src = "https://kbl.or.kr/images/common/no_player.jpg";
-              }}
-            />
-            <span className={styles.rivalName}>{r.name}</span>
-            <span className={styles.rivalVal}>{r.val.toLocaleString()}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function AchievementTrophyRoom({ pcode }: Props) {
   const [activeTab, setActiveTab] = useState<"career" | "season">("season");
   const [activeSubTab, setActiveSubTab] = useState<"stacks" | "missions">("stacks");
@@ -125,19 +88,15 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
   return (
     <div className={styles.trophyRoom}>
       <div className={styles.header}>
-        <h2 className={styles.title}><span aria-hidden="true">🏆</span> 트로피 룸</h2>
+        <h3 className={styles.title}>🏆 트로피 룸</h3>
         <div className={styles.tabs}>
           <button 
-            type="button"
-            aria-pressed={activeTab === "season"}
             className={`${styles.tabBtn} ${activeTab === "season" ? styles.active : ""}`}
             onClick={() => setActiveTab("season")}
           >
             시즌
           </button>
           <button 
-            type="button"
-            aria-pressed={activeTab === "career"}
             className={`${styles.tabBtn} ${activeTab === "career" ? styles.active : ""}`}
             onClick={() => setActiveTab("career")}
           >
@@ -148,16 +107,12 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
       
       <div className={styles.subTabs}>
         <button 
-          type="button"
-          aria-pressed={activeSubTab === "stacks"}
           className={`${styles.subTabBtn} ${activeSubTab === "stacks" ? styles.active : ""}`}
           onClick={() => setActiveSubTab("stacks")}
         >
           스택형 기록
         </button>
         <button 
-          type="button"
-          aria-pressed={activeSubTab === "missions"}
           className={`${styles.subTabBtn} ${activeSubTab === "missions" ? styles.active : ""}`}
           onClick={() => setActiveSubTab("missions")}
         >
@@ -168,7 +123,6 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
       {activeTab === "season" && seasonsList.length > 0 && (
         <div className={styles.seasonSelector}>
           <select 
-            aria-label="시즌 선택"
             className={styles.seasonSelect} 
             value={selectedSeason} 
             onChange={(e) => setSelectedSeason(e.target.value)}
@@ -184,18 +138,32 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
         {activeSubTab === "stacks" ? (
           <div className={styles.questList}>
             {Object.keys(stacksData).length === 0 && (
-              <div style={{ color: "var(--ink-faint)", textAlign: "center" }}>기록이 없습니다.</div>
+              <div style={{ color: "rgba(255,255,255,0.5)", textAlign: "center" }}>기록이 없습니다.</div>
             )}
             {Object.entries(stacksData).map(([key, stack]) => {
-              const pct = Math.min(100, (stack.val / stack.target) * 100);
               
               let myRank = stack.rank;
-              let rivals = stack.rivals;
+              let rivals = stack.rivals || [];
               
               if (activeTab === "career") {
                 myRank = careerRivalType === "alltime" ? stack.rank_alltime : stack.rank_active;
-                rivals = careerRivalType === "alltime" ? stack.rivals_alltime : stack.rivals_active;
+                rivals = (careerRivalType === "alltime" ? stack.rivals_alltime : stack.rivals_active) || [];
               }
+
+              // Calculate track scale based on max value to show
+              // max_val is either target, or the max rival's val, whichever is bigger, so they all fit on the graph line
+              const maxVal = Math.max(stack.target, ...rivals.map(r => r.val), stack.val);
+              
+              // Base progress fill for the player
+              const myPct = (stack.val / maxVal) * 100;
+
+              // Ensure we have "myself" in the nodes list. If my pcode isn't in rivals for some reason, add it.
+              const nodes = [...rivals];
+              if (!nodes.find(r => String(r.pcode) === String(pcode))) {
+                nodes.push({ pcode, name: player.name, val: stack.val, rank: myRank || 0 });
+              }
+
+              const tierClass = styles[`tier${stack.tier}`] || "";
 
               return (
                 <div key={key} className={styles.questItem}>
@@ -203,19 +171,15 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                     <div className={styles.questNameRow}>
                       <span className={styles.questName}>
                         {STAT_LABELS[key] || key}
-                        {stack.tier && <span className={styles.questTier}>{stack.tier}</span>}
+                        {stack.tier && <span className={`${styles.questTier} ${tierClass}`}>{stack.tier}</span>}
                       </span>
                       {activeTab === "career" && (
                         <div className={styles.rivalToggle}>
                           <button 
-                            type="button"
-                            aria-pressed={careerRivalType === "alltime"}
                             className={`${styles.rivalToggleBtn} ${careerRivalType === "alltime" ? styles.active : ""}`}
                             onClick={() => setCareerRivalType("alltime")}
                           >올타임</button>
                           <button 
-                            type="button"
-                            aria-pressed={careerRivalType === "active"}
                             className={`${styles.rivalToggleBtn} ${careerRivalType === "active" ? styles.active : ""}`}
                             onClick={() => setCareerRivalType("active")}
                           >현역</button>
@@ -224,18 +188,40 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                     </div>
                     <div className={styles.questNumbers}>
                       {stack.val.toLocaleString()} / <span style={{opacity: 0.6}}>{stack.target.toLocaleString()}</span>
-                      {myRank && <span style={{marginLeft: "8px", color: "var(--tr-ink)"}}>[{myRank}위]</span>}
+                      {myRank && <span style={{marginLeft: "8px", color: "var(--hero-team, #d9640a)"}}>[{myRank}위]</span>}
                     </div>
                   </div>
                   
-                  <div className={styles.progressBarContainer}>
+                  <div className={styles.progressBarTrack}>
                     <div 
                       className={styles.progressBarFill} 
-                      style={{ width: `${pct}%` }} 
+                      style={{ width: `${myPct}%` }} 
                     />
+                    
+                    {/* Render Rival Nodes directly on the track */}
+                    {nodes.map((r, i) => {
+                      const isMe = String(r.pcode) === String(pcode);
+                      const leftPct = (r.val / maxVal) * 100;
+                      return (
+                        <div 
+                          key={`${r.pcode}-${i}`} 
+                          className={`${styles.rivalNode} ${isMe ? styles.isMe : ""}`}
+                          style={{ left: `${leftPct}%` }}
+                        >
+                          <img 
+                            src={`https://kbl.or.kr/images/players/Portrait/${r.pcode}.png`} 
+                            alt={r.name} 
+                            className={styles.rivalAvatar}
+                            onError={(e) => { e.currentTarget.src = 'https://kbl.or.kr/images/common/no_player.jpg'; }}
+                          />
+                          <div className={styles.rivalLabel}>
+                            {r.rank}위 {r.name}<br/>
+                            {r.val.toLocaleString()}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                  
-                  <RivalTracker rivals={rivals} myPcode={pcode} />
                 </div>
               );
             })}
@@ -244,27 +230,21 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
           <div className={styles.iconGrid}>
             {ALL_ACHIEVEMENTS.map(ach => {
               const unlocked = unlockedIds.has(ach.id);
-              const isEasterEgg = ach.category === "easter_egg";
-              
-              const title = !unlocked && isEasterEgg ? "???" : ach.name;
-              const desc = !unlocked && isEasterEgg ? "달성 조건이 숨겨져 있습니다." : ach.desc;
-
               return (
                 <div key={ach.id} className={styles.hexWrapper}>
                   <div 
                     className={`${styles.hexagonCard} ${unlocked ? styles.unlocked : styles.locked}`}
-                    role="img"
-                    aria-label={`${title} - ${desc} (${unlocked ? "달성" : "미달성"})`}
-                    data-tooltip-title={title}
-                    data-tooltip-desc={desc}
+                    // Tooltip shows regardless of whether it's locked!
+                    data-tooltip-title={ach.name}
+                    data-tooltip-desc={ach.desc}
                   >
                     <div className={styles.hexInner}>
                       {unlocked ? (
-                         <span className={styles.icon} aria-hidden="true">
+                         <span className={styles.icon}>
                            {ach.category === "milestone" ? "🏅" : ach.category === "impact" ? "🔥" : ach.category === "bench" ? "⚡" : "👀"}
                          </span>
                       ) : (
-                         <span className={styles.iconLocked} aria-hidden="true">🔒</span>
+                         <span className={styles.iconLocked}>🔒</span>
                       )}
                     </div>
                   </div>
