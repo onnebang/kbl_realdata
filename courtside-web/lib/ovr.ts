@@ -4,6 +4,7 @@ export interface OvrSeasonRecord {
   pcode: string;
   name: string;
   season: string;
+  /** 그 시즌 소속팀의 teams.name(시즌 중 이적이면 더 많이 뛴 팀). 공백 시즌 보간 행은 공백 직전 팀. */
   team?: string;
   position?: string;
   OVR: number;

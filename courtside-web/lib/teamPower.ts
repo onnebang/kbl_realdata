@@ -64,7 +64,7 @@ export function getAllTeamPowers(season?: string): TeamPower[] {
   return powers;
 }
 
-/** teamName은 courtside_ovr_history.json의 team 필드(kbl540 team_name_current)와 같은
+/** teamName은 courtside_ovr_history.json의 team 필드(다음 시즌 행은 season_roster의 팀, 지난 시즌 행은 그 시즌 소속팀)와 같은
  * 표기여야 매칭된다 - 연고 이동으로 개명한 팀은 호출부에서 displayTeamName()의 결과를
  * 넘겨야 한다(Supabase teams.name은 옛 이름일 수 있음). */
 export function getTeamPowerByName(teamName: string, season?: string): TeamPower | null {

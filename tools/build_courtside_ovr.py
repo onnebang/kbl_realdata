@@ -106,6 +106,61 @@ def rookie_floor_for(draft_rank):
     return 58 - min(pick - 1, 4)  # 1라운드: 1순위 58 ~ 5순위 이후 54
 
 
+def load_tcode_names():
+    """Supabase teams의 tcode -> 팀 이름(현재 연고 표기). 사이트가 팀 색·약어를 이 이름으로 찾는다
+    (OvrTrendChart teamByName = teams.name 기준)라서 여기서도 같은 이름을 써야 매칭된다. 접속이
+    안 되면 빈 dict - load_season_teams가 경기 기록에 적힌 당시 팀명으로 대신한다."""
+    try:
+        import psycopg2
+        from import_roster import load_database_url
+        conn = psycopg2.connect(load_database_url())
+        cur = conn.cursor()
+        cur.execute("select tcode, name from teams")
+        result = {tcode: name for tcode, name in cur.fetchall()}
+        conn.close()
+        return result
+    except Exception as e:
+        print(f"경고: teams 조회 실패({e}) - 시즌별 팀은 경기 기록의 당시 팀명으로 대체")
+        return {}
+
+
+def load_season_teams():
+    """(pcode, season_name) -> 그 시즌에 가장 많이 뛴 팀 이름.
+
+    예전엔 모든 시즌에 kbl540 카드의 team_name_current(= 그 선수의 "지금" 팀)를 그대로 찍었다.
+    이적한 선수(예: 290407 김선형 - 2011~2025 서울 SK, 2025-26 수원 KT)는 옛 시즌까지 전부
+    현재 팀으로 표시됐고, 그 때문에 차트의 이적 구간·팀 색이 한 번도 작동하지 않았다.
+    한 시즌에 팀이 둘이면(시즌 중 트레이드) 출전 경기 수가 많은 쪽, 같으면 더 늦게 뛴 쪽.
+    팀 이름은 teams.name(현재 연고 표기, 사이트와 같은 이름). teams에 없는 옛 구단(해체·개명 전
+    코드)은 그 시즌 경기 기록에 적힌 당시 팀명을 쓴다."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        played = pd.read_sql_query(
+            "SELECT gps.pcode, g.season_name, gps.tcode, COUNT(*) AS gp, MAX(g.game_date) AS last_date"
+            " FROM player_game_stats gps JOIN games g ON gps.gmkey = g.gmkey"
+            " WHERE g.season_category IN ('정규시즌', '플레이오프', '챔프전')"
+            "   AND g.season_name NOT LIKE '%D리그%'"
+            " GROUP BY gps.pcode, g.season_name, gps.tcode",
+            conn,
+        )
+        era_names = pd.read_sql_query(
+            "SELECT season_name, home_tcode AS tcode, home_name AS name FROM games"
+            " UNION SELECT season_name, away_tcode, away_name FROM games",
+            conn,
+        )
+    finally:
+        conn.close()
+    tcode_names = load_tcode_names()
+    era = {}
+    for r in era_names.itertuples():
+        era.setdefault((r.season_name, r.tcode), r.name)
+    played = played.sort_values(['gp', 'last_date'], ascending=False).drop_duplicates(['pcode', 'season_name'])
+    return {
+        (r.pcode, r.season_name): tcode_names.get(r.tcode) or era.get((r.season_name, r.tcode))
+        for r in played.itertuples()
+    }
+
+
 def load_teams_and_positions():
     path = os.path.join(os.path.dirname(__file__), KBL540_PLAYERS_PATH)
     if not os.path.exists(path):
@@ -448,13 +503,20 @@ def compute_ovr(target_season='2024-2025'):
 
     # 팀과 포지션 정보 로드
     teams, positions = load_teams_and_positions()
+    # 시즌별 팀 - 없으면(경기 기록에 팀이 없는 예외) 예전처럼 현재 팀으로 폴백한다.
+    season_team = load_season_teams()
+    global_df['team'] = [
+        season_team.get((p, s)) or teams.get(p, "Unknown")
+        for p, s in zip(global_df['pcode'], global_df['season_name'])
+    ]
+    print(f"시즌별 팀 매핑: {sum((p, s) in season_team and bool(season_team[(p, s)]) for p, s in zip(global_df['pcode'], global_df['season_name']))}/{len(global_df)}행")
 
     for _, row in global_df.iterrows():
         out_data.append({
             "pcode": row['pcode'],
             "name": row['name'],
             "season": row['season_name'],
-            "team": teams.get(row['pcode'], "Unknown"),
+            "team": row['team'],
             "position": positions.get(row['pcode'], "Unknown"),
             "OVR": int(row['OVR']),
             "OFF": int(row['OFF']),
@@ -493,7 +555,7 @@ def compute_ovr(target_season='2024-2025'):
                         "pcode": pcode,
                         "name": after['name'],
                         "season": f"{missing_start}-{missing_start + 1}",
-                        "team": teams.get(pcode, "Unknown"),
+                        "team": before['team'],
                         "position": positions.get(pcode, "Unknown"),
                         "OVR": int(round(before['OVR'] + (after['OVR'] - before['OVR']) * frac)),
                         "OFF": int(round(before['OFF'] + (after['OFF'] - before['OFF']) * frac)),
