@@ -90,16 +90,23 @@ export default async function PlayersPage({ searchParams }: { searchParams: Prom
 
   const ovrCache = getOvrHistoryCache();
   const ovrMap = new Map<string, { ovr: number; diff: number | null }>();
+  const ovrMapByName = new Map<string, { ovr: number; diff: number | null }>();
   const byPcode = new Map<string, typeof ovrCache>();
   for (const r of ovrCache) {
-    if (!byPcode.has(r.pcode)) byPcode.set(r.pcode, []);
-    byPcode.get(r.pcode)!.push(r);
+    // If there's no pcode but they have an OVR record, we group by name
+    const key = r.pcode || r.name;
+    if (!byPcode.has(key)) byPcode.set(key, []);
+    byPcode.get(key)!.push(r);
   }
-  for (const [pcode, hist] of byPcode) {
+  for (const [key, hist] of byPcode) {
     if (hist.length > 0) {
       const current = hist[hist.length - 1].OVR;
       const diff = hist.length > 1 ? current - hist[hist.length - 2].OVR : null;
-      ovrMap.set(pcode, { ovr: current, diff });
+      if (hist[0].pcode) {
+        ovrMap.set(hist[0].pcode, { ovr: current, diff });
+      } else {
+        ovrMapByName.set(hist[0].name, { ovr: current, diff });
+      }
     }
   }
 
@@ -108,8 +115,10 @@ export default async function PlayersPage({ searchParams }: { searchParams: Prom
     .map((t) => {
       const filteredPlayers = nq ? t.players.filter((p) => normalize(p.name).includes(nq)) : [...t.players];
       filteredPlayers.sort((a, b) => {
-        const aOvr = a.pcode ? ovrMap.get(a.pcode)?.ovr ?? -1 : -1;
-        const bOvr = b.pcode ? ovrMap.get(b.pcode)?.ovr ?? -1 : -1;
+        const aData = a.pcode ? ovrMap.get(a.pcode) : ovrMapByName.get(a.name);
+        const bData = b.pcode ? ovrMap.get(b.pcode) : ovrMapByName.get(b.name);
+        const aOvr = aData?.ovr ?? -1;
+        const bOvr = bData?.ovr ?? -1;
         return bOvr - aOvr || a.name.localeCompare(b.name);
       });
       return { ...t, players: filteredPlayers };
@@ -124,8 +133,10 @@ export default async function PlayersPage({ searchParams }: { searchParams: Prom
   if (isOvrSort) {
     flatPlayers = shown.flatMap(t => t.players);
     flatPlayers.sort((a, b) => {
-      const aOvr = a.pcode ? ovrMap.get(a.pcode)?.ovr ?? -1 : -1;
-      const bOvr = b.pcode ? ovrMap.get(b.pcode)?.ovr ?? -1 : -1;
+      const aData = a.pcode ? ovrMap.get(a.pcode) : ovrMapByName.get(a.name);
+      const bData = b.pcode ? ovrMap.get(b.pcode) : ovrMapByName.get(b.name);
+      const aOvr = aData?.ovr ?? -1;
+      const bOvr = bData?.ovr ?? -1;
       return bOvr - aOvr || a.name.localeCompare(b.name);
     });
   }
@@ -182,7 +193,7 @@ export default async function PlayersPage({ searchParams }: { searchParams: Prom
           </div>
           <div className={styles.playerGrid}>
             {flatPlayers.map((p) => {
-               const ovrData = p.pcode ? ovrMap.get(p.pcode) : null;
+               const ovrData = p.pcode ? ovrMap.get(p.pcode) : ovrMapByName.get(p.name);
                return <PlayerRow key={`${p.pcode ?? "new"}-${p.name}`} p={p} prev={prev} ovr={ovrData?.ovr ?? null} ovrDiff={ovrData?.diff ?? null} />;
             })}
           </div>
@@ -197,7 +208,7 @@ export default async function PlayersPage({ searchParams }: { searchParams: Prom
             </Link>
             <div className={styles.playerGrid}>
               {t.players.map((p) => {
-                 const ovrData = p.pcode ? ovrMap.get(p.pcode) : null;
+                 const ovrData = p.pcode ? ovrMap.get(p.pcode) : ovrMapByName.get(p.name);
                  return <PlayerRow key={`${p.pcode ?? "new"}-${p.name}`} p={p} prev={prev} ovr={ovrData?.ovr ?? null} ovrDiff={ovrData?.diff ?? null} />;
               })}
             </div>
