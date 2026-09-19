@@ -99,15 +99,19 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
     return PADDING_TOP + innerHeight - ((clamped - MIN_OVR) / yRange) * innerHeight;
   };
 
-  // 예상/추정(다음 시즌 예상 + 군 복무·부상 등 공백 시즌 보간) 구간은 확정 구간과 선을
-  // 분리해 점선으로 그린다. 공백 보간은 커리어 중간에도 낄 수 있어서 두 점 사이 구간마다
-  // 따로 실선/점선을 정한다(둘 중 하나라도 projected면 그 구간은 점선).
-  const anyProjected = history.some((r) => r.projected);
+  // 공백 시즌 보간(군 복무·부상 등)만 확정 구간과 선을 분리해 점선·빈 배지로 그린다. 보간은 커리어
+  // 중간에도 낄 수 있어서 두 점 사이 구간마다 따로 실선/점선을 정한다(둘 중 하나라도 보간이면 점선).
+  // 마지막 레코드(다음 시즌, 26-27)는 projected여도 선수 카드와 같이 확정값처럼 그린다(2026-09-19
+  // 결정). 보간은 실측 시즌 "사이"에만 생기므로 projected 중 마지막이 아닌 것이 곧 보간이다
+  // (데이터 실측: 마지막인 193건은 전부 2026-2027, 중간인 361건이 보간, 마지막이 2연속인 선수 0명).
+  const isGap = (i: number) => !!history[i].projected && i < history.length - 1;
+  // (CSS의 *Projected 클래스는 예전 이름 그대로다 - 지금은 공백 보간 구간의 점선·빈 배지 스타일.)
+  const anyGap = history.some((_, i) => isGap(i));
   // 이적 여부 - 팀 구분을 선 색으로 보여줄지 자체를 여기서 판단(전부 같은 팀이면 굳이
   // 세그먼트마다 색을 나눌 필요가 없다).
   const hasTeamChange = teamByName && history.some((r, i) => i > 0 && r.team && r.team !== history[i - 1].team);
 
-  // Area Path (Fill) - 전체 구간(예상 포함) 채우기
+  // Area Path (Fill) - 전체 구간(보간 포함) 채우기
   const areaPath = `
     M ${getX(0)},${HEIGHT - PADDING_BOTTOM}
     ${history.map((r, i) => `L ${getX(i)},${getY(r.OVR)}`).join(" ")}
@@ -121,7 +125,7 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
   for (let i = 0; i < history.length - 1; i++) {
     lineSegments.push({
       path: `M ${getX(i)},${getY(history[i].OVR)} L ${getX(i + 1)},${getY(history[i + 1].OVR)}`,
-      dashed: !!(history[i].projected || history[i + 1].projected),
+      dashed: isGap(i) || isGap(i + 1),
       color: hasTeamChange ? colorForTeam(history[i + 1].team) : teamColor,
     });
   }
@@ -141,6 +145,28 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
   // 따라다니는 구조 자체가 문제였다). 그래프 위에 떠다니는 대신 헤더 밑 고정된 자리에
   // 표시해서, 데이터가 몇 개든 겹칠 여지 자체를 없앤다.
   const hovered = hoverIdx !== null ? history[hoverIdx] : null;
+  const hoveredIsGap = hoverIdx !== null && isGap(hoverIdx);
+
+  // 키보드·터치: 호버 전용이던 시즌 상세를 방향키(←/→/Home/End)와 탭으로도 연다. 상태(hoverIdx)는
+  // 마우스 호버와 공유해서 강조·상세 표시가 같은 경로를 탄다. Esc는 선택 해제.
+  const last = history.length - 1;
+  const onKeyDown = (e: React.KeyboardEvent<SVGSVGElement>) => {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (step) {
+      e.preventDefault();
+      setHoverIdx((cur) => (cur === null ? (step > 0 ? 0 : last) : Math.max(0, Math.min(last, cur + step))));
+    } else if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      setHoverIdx(e.key === "Home" ? 0 : last);
+    } else if (e.key === "Escape") {
+      setHoverIdx(null);
+    }
+  };
+  // 스크린리더용 문구 - 위 hoverDetail과 같은 내용을 "항상 DOM에 있는" live 영역으로 내보낸다
+  // (hoverDetail은 조건부 렌더라 스스로는 live 영역이 못 된다).
+  const spoken = hovered
+    ? `${hovered.season} 시즌${hoveredIsGap ? " (보간)" : ""} OVR ${hovered.OVR}, OFF ${hovered.OFF}, DEF ${hovered.DEF}${hovered.team ? `, ${hovered.team}` : ""}`
+    : "";
 
   return (
     <div className={styles.container} style={{ "--chart-color": teamColor } as React.CSSProperties}>
@@ -149,7 +175,7 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
         {hovered ? (
           <div className={styles.hoverDetail}>
             <span className={styles.hoverSeason}>
-              {hovered.season}{hovered.projected ? " (예상)" : ""}
+              {hovered.season}{hoveredIsGap ? " (보간)" : ""}
             </span>
             <span className={styles.hoverOvr} style={{ background: tierColor(hovered.OVR) }}>
               OVR {hovered.OVR}
@@ -162,15 +188,25 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
           <p className={styles.subtitle}>
             역대 시즌 오버롤(OVR) 변화 추이 · 배지 색=시즌 등급
             {hasTeamChange ? " · 선 색=소속팀" : ""}
-            {anyProjected ? " · 점선=예상(다음 시즌 또는 공백 시즌 보간)" : ""}
+            {anyGap ? " · 점선=공백 시즌 보간" : ""}
           </p>
         )}
+        <p className={styles.srOnly} aria-live="polite" aria-atomic="true">{spoken}</p>
       </div>
 
       <div className={styles.chartWrapper}>
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className={styles.svgChart}
+          role="group"
+          aria-label={`시즌별 OVR 추이 차트, ${history.length}개 시즌. 좌우 방향키로 시즌을 옮기며 상세를 봅니다.`}
+          tabIndex={0}
+          onKeyDown={onKeyDown}
+          // 키보드로 들어왔을 때만(:focus-visible) 가장 최근 시즌을 미리 골라 준다 - 마우스 클릭 포커스는 제외.
+          onFocus={(e) => {
+            if (e.currentTarget.matches(":focus-visible")) setHoverIdx((cur) => cur ?? last);
+          }}
+          onBlur={() => setHoverIdx(null)}
           onMouseLeave={() => setHoverIdx(null)}
         >
           <defs>
@@ -223,7 +259,7 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
             const cx = getX(i);
             const cy = getY(record.OVR);
             const isHovered = hoverIdx === i;
-            const isProjected = !!record.projected;
+            const isGapSeason = isGap(i);
             const stagger = dense && i % 2 === 1 ? staggerGap : 0;
             const badgeCy = Math.max(cy - badgeR - 14 - stagger, badgeR + 4);
             const pointColor = hasTeamChange ? colorForTeam(record.team) : teamColor;
@@ -232,7 +268,7 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
             const abbr = isTransition ? abbrForTeam(record.team) : null;
 
             return (
-              <g key={i} onMouseEnter={() => setHoverIdx(i)}>
+              <g key={i} onMouseEnter={() => setHoverIdx(i)} onClick={() => setHoverIdx(i)}>
                 {/* 툴팁을 띄우기 위한 넓은 감지 영역 */}
                 <rect
                   x={cx - spacing / 2}
@@ -252,7 +288,7 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
                   style={{ fontSize: isHovered ? xLabelFont * 1.15 : xLabelFont }}
                   className={`${styles.xAxisLabel} ${isHovered ? styles.xAxisLabelActive : ""}`}
                 >
-                  {formatSeason(record.season)}{isProjected ? "*" : ""}
+                  {formatSeason(record.season)}{isGapSeason ? "*" : ""}
                 </text>
 
                 {/* 이적 전환 칩 - 이 시즌부터 바뀐 팀의 약어(요청: "팀 구분을 색상 또는
@@ -284,7 +320,7 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
                   cx={cx}
                   cy={cy}
                   r={isHovered ? 6 : 4}
-                  className={`${styles.dataPoint} ${isHovered ? styles.dataPointActive : ""} ${isProjected ? styles.dataPointProjected : ""}`}
+                  className={`${styles.dataPoint} ${isHovered ? styles.dataPointActive : ""} ${isGapSeason ? styles.dataPointProjected : ""}`}
                   style={{ stroke: isHovered ? undefined : pointColor }}
                 />
 
@@ -298,14 +334,14 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
                   cx={cx}
                   cy={badgeCy}
                   r={badgeR}
-                  className={`${styles.ovrBadge} ${isProjected ? styles.ovrBadgeProjected : ""} ${isHovered ? styles.ovrBadgeActive : ""}`}
-                  style={isProjected ? { stroke: tColor } : { fill: tColor }}
+                  className={`${styles.ovrBadge} ${isGapSeason ? styles.ovrBadgeProjected : ""} ${isHovered ? styles.ovrBadgeActive : ""}`}
+                  style={isGapSeason ? { stroke: tColor } : { fill: tColor }}
                 />
                 <text
                   x={cx}
                   y={badgeCy}
                   fontSize={badgeFont}
-                  className={`${styles.ovrBadgeText} ${isProjected ? styles.ovrBadgeTextProjected : ""}`}
+                  className={`${styles.ovrBadgeText} ${isGapSeason ? styles.ovrBadgeTextProjected : ""}`}
                 >
                   {record.OVR}
                 </text>
@@ -314,9 +350,9 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
           })}
         </svg>
       </div>
-      {anyProjected && (
+      {anyGap && (
         <p className={styles.projectedNote}>
-          * 다음 시즌(경기 기록 없음, 작년 기록 기반 예상) 또는 군 복무·부상 등 공백 시즌(앞뒤 실측값 보간)
+          * 군 복무·부상 등 공백 시즌(경기 기록 없음, 앞뒤 실측값으로 보간한 값)
         </p>
       )}
     </div>

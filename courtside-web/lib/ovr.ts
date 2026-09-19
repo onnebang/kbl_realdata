@@ -16,7 +16,9 @@ export interface OvrSeasonRecord {
     playmaking: number;
     defense: number;
   };
-  /** true면 아직 경기 기록이 없는 다음 시즌의 예상치(작년 기록 기반 나이 곡선 추정) - 실측 아님. */
+  /** true면 경기 기록 없이 추정한 값 - 마지막 레코드(다음 시즌)는 작년 기록 기반 나이 곡선 추정, 그 밖의 레코드는
+   *  군 복무·부상 등 공백 시즌의 앞뒤 실측 보간. 화면(OvrTrendChart)은 마지막 레코드를 선수 카드와 같이 확정값처럼
+   *  그리고 보간만 점선·"보간"으로 표시한다(2026-09-19 결정). */
   projected?: boolean;
 }
 
