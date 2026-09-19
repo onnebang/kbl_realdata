@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Achievement, Rival, StackData, PlayerAchievements } from "../lib/achievements";
 import { supabase } from "../lib/supabase";
+import { PlayerPhoto } from "./PlayerPhoto";
 import styles from "./AchievementTrophyRoom.module.css";
 
 interface Props {
@@ -327,11 +328,11 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                             key={`node-${r.pcode}`} 
                             className={`${styles.rivalNode} ${isMe ? styles.isMe : ""}`}
                           >
-                            <img 
+                            <PlayerPhoto 
                               src={r.photoUrl || `https://kbl.or.kr/images/players/Portrait/${r.pcode}.png`} 
                               alt={r.name} 
+                              size={32}
                               className={styles.rivalAvatar}
-                              onError={(e) => { e.currentTarget.src = 'https://kbl.or.kr/images/common/no_player.jpg'; }}
                             />
                             <div className={styles.rivalLabel}>
                               <div className={styles.rivalRankLabel}>[{r.rank}위]</div>
