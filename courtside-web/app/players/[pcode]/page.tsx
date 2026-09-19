@@ -892,8 +892,8 @@ export default async function PlayerPage({
               같이 실어야 시즌을 바꿔도 두 토글 상태가 살아남는다. 값은 검증을 통과한 것만. */}
           {w && <input type="hidden" name="w" value={String(windowN)} />}
           {rate && <input type="hidden" name="rate" value={formUnit} />}
-          <label>시즌</label>
-          <select name="season" defaultValue={shotSeason ?? undefined} className={styles.heatSelect} disabled={!seasonNames.length}>
+          <label htmlFor="shot-season">시즌</label>
+          <select id="shot-season" name="season" defaultValue={shotSeason ?? undefined} className={styles.heatSelect} disabled={!seasonNames.length}>
             {seasonNames.length ? (
               [...seasonNames].reverse().map((sn) => (
                 <option key={sn} value={sn}>

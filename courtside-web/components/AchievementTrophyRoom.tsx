@@ -64,12 +64,23 @@ function RivalTracker({ rivals, myPcode }: { rivals?: Rival[], myPcode: string }
         return (
           <div key={`${r.pcode}-${i}`} className={`${styles.rivalItem} ${isMe ? styles.isMe : ""}`}>
             <span className={styles.rivalRank}>{r.rank}위</span>
-            {/* Using a placeholder image for generic avatar, ideally hook up to your player images URL */}
-            <img 
-              src={`https://kbl.or.kr/images/players/Portrait/${r.pcode}.png`} 
-              alt={r.name} 
+            {/* 이름이 바로 옆에 글자로 있어 아바타는 장식이다 - alt를 비워 같은 이름이 두 번 읽히지 않게 한다.
+                width/height는 .rivalAvatar(40×40)와 같다(CLS 방지). 화면 밖(가로 스크롤)에 있는 것이 많아 lazy. */}
+            <img
+              src={`https://kbl.or.kr/images/players/Portrait/${r.pcode}.png`}
+              alt=""
+              width={40}
+              height={40}
+              loading="lazy"
+              decoding="async"
               className={styles.rivalAvatar}
-              onError={(e) => { e.currentTarget.src = 'https://kbl.or.kr/images/common/no_player.jpg'; }}
+              onError={(e) => {
+                // 폴백 이미지까지 실패하면 같은 src를 다시 넣어 error가 무한 반복되므로 한 번만 바꾼다.
+                const img = e.currentTarget;
+                if (img.dataset.fellBack) return;
+                img.dataset.fellBack = "1";
+                img.src = "https://kbl.or.kr/images/common/no_player.jpg";
+              }}
             />
             <span className={styles.rivalName}>{r.name}</span>
             <span className={styles.rivalVal}>{r.val.toLocaleString()}</span>
@@ -114,15 +125,19 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
   return (
     <div className={styles.trophyRoom}>
       <div className={styles.header}>
-        <h3 className={styles.title}>🏆 트로피 룸</h3>
+        <h3 className={styles.title}><span aria-hidden="true">🏆</span> 트로피 룸</h3>
         <div className={styles.tabs}>
           <button 
+            type="button"
+            aria-pressed={activeTab === "season"}
             className={`${styles.tabBtn} ${activeTab === "season" ? styles.active : ""}`}
             onClick={() => setActiveTab("season")}
           >
             시즌
           </button>
           <button 
+            type="button"
+            aria-pressed={activeTab === "career"}
             className={`${styles.tabBtn} ${activeTab === "career" ? styles.active : ""}`}
             onClick={() => setActiveTab("career")}
           >
@@ -133,12 +148,16 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
       
       <div className={styles.subTabs}>
         <button 
+          type="button"
+          aria-pressed={activeSubTab === "stacks"}
           className={`${styles.subTabBtn} ${activeSubTab === "stacks" ? styles.active : ""}`}
           onClick={() => setActiveSubTab("stacks")}
         >
           스택형 기록
         </button>
         <button 
+          type="button"
+          aria-pressed={activeSubTab === "missions"}
           className={`${styles.subTabBtn} ${activeSubTab === "missions" ? styles.active : ""}`}
           onClick={() => setActiveSubTab("missions")}
         >
@@ -149,6 +168,7 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
       {activeTab === "season" && seasonsList.length > 0 && (
         <div className={styles.seasonSelector}>
           <select 
+            aria-label="시즌 선택"
             className={styles.seasonSelect} 
             value={selectedSeason} 
             onChange={(e) => setSelectedSeason(e.target.value)}
@@ -188,10 +208,14 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                       {activeTab === "career" && (
                         <div className={styles.rivalToggle}>
                           <button 
+                            type="button"
+                            aria-pressed={careerRivalType === "alltime"}
                             className={`${styles.rivalToggleBtn} ${careerRivalType === "alltime" ? styles.active : ""}`}
                             onClick={() => setCareerRivalType("alltime")}
                           >올타임</button>
                           <button 
+                            type="button"
+                            aria-pressed={careerRivalType === "active"}
                             className={`${styles.rivalToggleBtn} ${careerRivalType === "active" ? styles.active : ""}`}
                             onClick={() => setCareerRivalType("active")}
                           >현역</button>
@@ -229,16 +253,18 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                 <div key={ach.id} className={styles.hexWrapper}>
                   <div 
                     className={`${styles.hexagonCard} ${unlocked ? styles.unlocked : styles.locked}`}
+                    role="img"
+                    aria-label={`${title} - ${desc} (${unlocked ? "달성" : "미달성"})`}
                     data-tooltip-title={title}
                     data-tooltip-desc={desc}
                   >
                     <div className={styles.hexInner}>
                       {unlocked ? (
-                         <span className={styles.icon}>
+                         <span className={styles.icon} aria-hidden="true">
                            {ach.category === "milestone" ? "🏅" : ach.category === "impact" ? "🔥" : ach.category === "bench" ? "⚡" : "👀"}
                          </span>
                       ) : (
-                         <span className={styles.iconLocked}>🔒</span>
+                         <span className={styles.iconLocked} aria-hidden="true">🔒</span>
                       )}
                     </div>
                   </div>

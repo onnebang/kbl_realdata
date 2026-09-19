@@ -128,9 +128,10 @@ export function CourtHeroExpand({
               <div className={styles.tabs}>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <select 
+                    aria-label="슛 보기 필터"
                     value={filterStr} 
                     onChange={(e) => handleFilterChange(e.target.value)}
-                    style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'var(--surface)', color: 'var(--ink)', fontSize: '12px', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
+                    style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'var(--surface)', color: 'var(--ink)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
                   >
                     <option value="all">전체 보기 (시즌별 재생)</option>
                     {dims.includes("season") && (

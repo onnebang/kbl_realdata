@@ -100,6 +100,25 @@ a {
   text-decoration: none;
 }
 
+/* 본문 건너뛰기 링크 - 키보드 포커스가 오기 전에는 화면 밖(transform이라 레이아웃에 영향 없음). */
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 12px;
+  z-index: 1000;
+  padding: 8px 14px;
+  border: 1px solid rgba(var(--line-rgb), 0.35);
+  border-radius: var(--r-inset);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-200);
+  font-weight: 700;
+  transform: translateY(-120%);
+}
+.skip-link:focus-visible {
+  transform: translateY(12px);
+}
+
 /* ── 내비 ──────────────────────────────────────────────────────────────────────
    실측: 12개 링크가 한 줄 overflow-x라 375px에서 3.5개만 닿고 스크롤 단서가 없었다.
    링크를 두 무리로 나눈다 - 주요 5개(경기 목록~감독)는 항상 탭, 분석 7개(리더보드류)는

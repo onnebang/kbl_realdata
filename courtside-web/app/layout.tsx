@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { preconnect } from "react-dom";
 import "./globals.css";
 import { NavBar } from "@/components/NavBar";
 import { SITE_URL } from "@/lib/site";
@@ -14,12 +15,26 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image" },
 };
 
+// 브라우저 UI(주소창 등) 색을 페이지 배경(--bg)과 맞춘다 - 다크 테마는 globals.css의 미디어쿼리 하나뿐이라
+// 같은 조건으로 두 색을 준다.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f5f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f1115" },
+  ],
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
+  // 팀 로고·라이벌 아바타가 kbl.or.kr에서 바로 로드된다(TeamBadge, AchievementTrophyRoom) - 연결을 미리 맺는다.
+  preconnect("https://kbl.or.kr");
   return (
     <html lang="ko">
       <body>
+        <a href="#main" className="skip-link">
+          본문으로 건너뛰기
+        </a>
         <NavBar />
-        {children}
+        <main id="main">{children}</main>
       </body>
     </html>
   );
