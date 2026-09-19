@@ -1,0 +1,675 @@
+{
+  "name": "이훈재",
+  "career": {
+    "stacks": {
+      "pts": {
+        "val": 11,
+        "tier": "Bronze",
+        "target": 500,
+        "rank_alltime": 855,
+        "rivals_alltime": [
+          {
+            "pcode": "245043",
+            "name": "송태영",
+            "val": 12,
+            "rank": 848
+          },
+          {
+            "pcode": "245061",
+            "name": "제로드 워드",
+            "val": 12,
+            "rank": 848
+          },
+          {
+            "pcode": "290764",
+            "name": "이대혁",
+            "val": 11,
+            "rank": 855
+          },
+          {
+            "pcode": "210016",
+            "name": "이훈재",
+            "val": 11,
+            "rank": 855
+          },
+          {
+            "pcode": "290535",
+            "name": "김기성",
+            "val": 11,
+            "rank": 855
+          },
+          {
+            "pcode": "230033",
+            "name": "존다지",
+            "val": 11,
+            "rank": 855
+          },
+          {
+            "pcode": "290678",
+            "name": "테렌스 로버츠",
+            "val": 11,
+            "rank": 855
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      },
+      "reb": {
+        "val": 8,
+        "tier": "Bronze",
+        "target": 300,
+        "rank_alltime": 822,
+        "rivals_alltime": [
+          {
+            "pcode": "225011",
+            "name": "김훈",
+            "val": 8,
+            "rank": 822
+          },
+          {
+            "pcode": "291754",
+            "name": "손준",
+            "val": 8,
+            "rank": 822
+          },
+          {
+            "pcode": "291589",
+            "name": "인승찬",
+            "val": 8,
+            "rank": 822
+          },
+          {
+            "pcode": "210016",
+            "name": "이훈재",
+            "val": 8,
+            "rank": 822
+          },
+          {
+            "pcode": "290356",
+            "name": "남궁준수",
+            "val": 8,
+            "rank": 822
+          },
+          {
+            "pcode": "291691",
+            "name": "알렉스 카바노",
+            "val": 8,
+            "rank": 822
+          },
+          {
+            "pcode": "210058",
+            "name": "장영재",
+            "val": 8,
+            "rank": 822
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      },
+      "ast": {
+        "val": 1,
+        "tier": "Bronze",
+        "target": 300,
+        "rank_alltime": 867,
+        "rivals_alltime": [
+          {
+            "pcode": "290906",
+            "name": "조쉬 달라드",
+            "val": 2,
+            "rank": 831
+          },
+          {
+            "pcode": "291749",
+            "name": "서동원",
+            "val": 1,
+            "rank": 867
+          },
+          {
+            "pcode": "210027",
+            "name": "클리프 리드",
+            "val": 1,
+            "rank": 867
+          },
+          {
+            "pcode": "210016",
+            "name": "이훈재",
+            "val": 1,
+            "rank": 867
+          },
+          {
+            "pcode": "291865",
+            "name": "김선우",
+            "val": 1,
+            "rank": 867
+          },
+          {
+            "pcode": "291858",
+            "name": "송한준",
+            "val": 1,
+            "rank": 867
+          },
+          {
+            "pcode": "290764",
+            "name": "이대혁",
+            "val": 1,
+            "rank": 867
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      },
+      "threep": {
+        "val": 0,
+        "tier": "Bronze",
+        "target": 100,
+        "rank_alltime": 778,
+        "rivals_alltime": [
+          {
+            "pcode": "290245",
+            "name": "제임스 피터스",
+            "val": 0,
+            "rank": 778
+          },
+          {
+            "pcode": "290244",
+            "name": "스티브 토마스",
+            "val": 0,
+            "rank": 778
+          },
+          {
+            "pcode": "290240",
+            "name": "오기석",
+            "val": 0,
+            "rank": 778
+          },
+          {
+            "pcode": "210016",
+            "name": "이훈재",
+            "val": 0,
+            "rank": 778
+          },
+          {
+            "pcode": "650016",
+            "name": "가이 루커",
+            "val": 0,
+            "rank": 778
+          },
+          {
+            "pcode": "290262",
+            "name": "로버트 써머스",
+            "val": 0,
+            "rank": 778
+          },
+          {
+            "pcode": "290228",
+            "name": "유희선",
+            "val": 0,
+            "rank": 778
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      },
+      "stl": {
+        "val": 4,
+        "tier": "Bronze",
+        "target": 100,
+        "rank_alltime": 745,
+        "rivals_alltime": [
+          {
+            "pcode": "291312",
+            "name": "덴젤 보울스",
+            "val": 4,
+            "rank": 745
+          },
+          {
+            "pcode": "290355",
+            "name": "임창한",
+            "val": 4,
+            "rank": 745
+          },
+          {
+            "pcode": "291878",
+            "name": "조나단 윌리엄스",
+            "val": 4,
+            "rank": 745
+          },
+          {
+            "pcode": "210016",
+            "name": "이훈재",
+            "val": 4,
+            "rank": 745
+          },
+          {
+            "pcode": "290385",
+            "name": "호동규",
+            "val": 4,
+            "rank": 745
+          },
+          {
+            "pcode": "291871",
+            "name": "베니 보트라이트",
+            "val": 4,
+            "rank": 745
+          },
+          {
+            "pcode": "291843",
+            "name": "박민재",
+            "val": 3,
+            "rank": 772
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      },
+      "blk": {
+        "val": 1,
+        "tier": "Bronze",
+        "target": 100,
+        "rank_alltime": 698,
+        "rivals_alltime": [
+          {
+            "pcode": "290986",
+            "name": "맹상훈",
+            "val": 1,
+            "rank": 698
+          },
+          {
+            "pcode": "291304",
+            "name": "이윤수",
+            "val": 1,
+            "rank": 698
+          },
+          {
+            "pcode": "291300",
+            "name": "곽동기",
+            "val": 1,
+            "rank": 698
+          },
+          {
+            "pcode": "210016",
+            "name": "이훈재",
+            "val": 1,
+            "rank": 698
+          },
+          {
+            "pcode": "215028",
+            "name": "양경민",
+            "val": 1,
+            "rank": 698
+          },
+          {
+            "pcode": "290385",
+            "name": "호동규",
+            "val": 1,
+            "rank": 698
+          },
+          {
+            "pcode": "290384",
+            "name": "방경수",
+            "val": 1,
+            "rank": 698
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      },
+      "gp": {
+        "val": 1,
+        "tier": "Bronze",
+        "target": 100,
+        "rank_alltime": 992,
+        "rivals_alltime": [
+          {
+            "pcode": "215025",
+            "name": "제이슨 윌리포드",
+            "val": 1,
+            "rank": 992
+          },
+          {
+            "pcode": "220028",
+            "name": "최명도",
+            "val": 1,
+            "rank": 992
+          },
+          {
+            "pcode": "650016",
+            "name": "가이 루커",
+            "val": 1,
+            "rank": 992
+          },
+          {
+            "pcode": "210016",
+            "name": "이훈재",
+            "val": 1,
+            "rank": 992
+          },
+          {
+            "pcode": "210028",
+            "name": "조동기",
+            "val": 1,
+            "rank": 992
+          },
+          {
+            "pcode": "210027",
+            "name": "클리프 리드",
+            "val": 1,
+            "rank": 992
+          },
+          {
+            "pcode": "210017",
+            "name": "심상문",
+            "val": 1,
+            "rank": 992
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      }
+    },
+    "missions": []
+  },
+  "seasons": {
+    "1998-1999": {
+      "stacks": {
+        "pts": {
+          "val": 11,
+          "tier": "Bronze",
+          "target": 100,
+          "rank": 5,
+          "rivals": [
+            {
+              "pcode": "215025",
+              "name": "제이슨 윌리포드",
+              "val": 20,
+              "rank": 2
+            },
+            {
+              "pcode": "240023",
+              "name": "김재열",
+              "val": 15,
+              "rank": 3
+            },
+            {
+              "pcode": "230060",
+              "name": "이인규",
+              "val": 13,
+              "rank": 4
+            },
+            {
+              "pcode": "210016",
+              "name": "이훈재",
+              "val": 11,
+              "rank": 5
+            },
+            {
+              "pcode": "230033",
+              "name": "존다지",
+              "val": 11,
+              "rank": 5
+            },
+            {
+              "pcode": "210036",
+              "name": "황문용",
+              "val": 10,
+              "rank": 7
+            },
+            {
+              "pcode": "210027",
+              "name": "클리프 리드",
+              "val": 8,
+              "rank": 8
+            }
+          ]
+        },
+        "reb": {
+          "val": 8,
+          "tier": "Bronze",
+          "target": 100,
+          "rank": 3,
+          "rivals": [
+            {
+              "pcode": "210027",
+              "name": "클리프 리드",
+              "val": 9,
+              "rank": 1
+            },
+            {
+              "pcode": "215025",
+              "name": "제이슨 윌리포드",
+              "val": 9,
+              "rank": 1
+            },
+            {
+              "pcode": "210016",
+              "name": "이훈재",
+              "val": 8,
+              "rank": 3
+            },
+            {
+              "pcode": "210033",
+              "name": "박규훈",
+              "val": 5,
+              "rank": 4
+            },
+            {
+              "pcode": "230033",
+              "name": "존다지",
+              "val": 4,
+              "rank": 5
+            },
+            {
+              "pcode": "210051",
+              "name": "김유택",
+              "val": 3,
+              "rank": 6
+            }
+          ]
+        },
+        "ast": {
+          "val": 1,
+          "tier": "Bronze",
+          "target": 100,
+          "rank": 6,
+          "rivals": [
+            {
+              "pcode": "210035",
+              "name": "표명일",
+              "val": 2,
+              "rank": 4
+            },
+            {
+              "pcode": "210051",
+              "name": "김유택",
+              "val": 2,
+              "rank": 4
+            },
+            {
+              "pcode": "210027",
+              "name": "클리프 리드",
+              "val": 1,
+              "rank": 6
+            },
+            {
+              "pcode": "210016",
+              "name": "이훈재",
+              "val": 1,
+              "rank": 6
+            },
+            {
+              "pcode": "230028",
+              "name": "신현식",
+              "val": 1,
+              "rank": 6
+            },
+            {
+              "pcode": "230060",
+              "name": "이인규",
+              "val": 1,
+              "rank": 6
+            },
+            {
+              "pcode": "230018",
+              "name": "이현주",
+              "val": 1,
+              "rank": 6
+            }
+          ]
+        },
+        "threep": {
+          "val": 0,
+          "tier": "Bronze",
+          "target": 30,
+          "rank": 9,
+          "rivals": [
+            {
+              "pcode": "210028",
+              "name": "조동기",
+              "val": 0,
+              "rank": 9
+            },
+            {
+              "pcode": "210030",
+              "name": "봉하민",
+              "val": 0,
+              "rank": 9
+            },
+            {
+              "pcode": "210018",
+              "name": "김동언",
+              "val": 0,
+              "rank": 9
+            },
+            {
+              "pcode": "210016",
+              "name": "이훈재",
+              "val": 0,
+              "rank": 9
+            },
+            {
+              "pcode": "210017",
+              "name": "심상문",
+              "val": 0,
+              "rank": 9
+            },
+            {
+              "pcode": "210027",
+              "name": "클리프 리드",
+              "val": 0,
+              "rank": 9
+            },
+            {
+              "pcode": "210051",
+              "name": "김유택",
+              "val": 0,
+              "rank": 9
+            }
+          ]
+        },
+        "stl": {
+          "val": 4,
+          "tier": "Bronze",
+          "target": 30,
+          "rank": 1,
+          "rivals": [
+            {
+              "pcode": "210016",
+              "name": "이훈재",
+              "val": 4,
+              "rank": 1
+            },
+            {
+              "pcode": "215020",
+              "name": "정인교",
+              "val": 4,
+              "rank": 1
+            },
+            {
+              "pcode": "215025",
+              "name": "제이슨 윌리포드",
+              "val": 2,
+              "rank": 3
+            },
+            {
+              "pcode": "230033",
+              "name": "존다지",
+              "val": 1,
+              "rank": 4
+            }
+          ]
+        },
+        "blk": {
+          "val": 1,
+          "tier": "Bronze",
+          "target": 30,
+          "rank": 2,
+          "rivals": [
+            {
+              "pcode": "210027",
+              "name": "클리프 리드",
+              "val": 2,
+              "rank": 1
+            },
+            {
+              "pcode": "210016",
+              "name": "이훈재",
+              "val": 1,
+              "rank": 2
+            },
+            {
+              "pcode": "210017",
+              "name": "심상문",
+              "val": 0,
+              "rank": 3
+            },
+            {
+              "pcode": "210018",
+              "name": "김동언",
+              "val": 0,
+              "rank": 3
+            },
+            {
+              "pcode": "210028",
+              "name": "조동기",
+              "val": 0,
+              "rank": 3
+            }
+          ]
+        },
+        "gp": {
+          "val": 1,
+          "tier": "Bronze",
+          "target": 10,
+          "rank": 1,
+          "rivals": [
+            {
+              "pcode": "210016",
+              "name": "이훈재",
+              "val": 1,
+              "rank": 1
+            },
+            {
+              "pcode": "210017",
+              "name": "심상문",
+              "val": 1,
+              "rank": 1
+            },
+            {
+              "pcode": "210018",
+              "name": "김동언",
+              "val": 1,
+              "rank": 1
+            },
+            {
+              "pcode": "210027",
+              "name": "클리프 리드",
+              "val": 1,
+              "rank": 1
+            }
+          ]
+        }
+      },
+      "missions": []
+    }
+  }
+}

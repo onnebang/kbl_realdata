@@ -1,0 +1,729 @@
+{
+  "name": "이동건",
+  "career": {
+    "stacks": {
+      "pts": {
+        "val": 28,
+        "tier": "Bronze",
+        "target": 500,
+        "rank_alltime": 784,
+        "rivals_alltime": [
+          {
+            "pcode": "290369",
+            "name": "신정섭",
+            "val": 29,
+            "rank": 781
+          },
+          {
+            "pcode": "235033",
+            "name": "김택훈",
+            "val": 29,
+            "rank": 781
+          },
+          {
+            "pcode": "291209",
+            "name": "김한솔",
+            "val": 29,
+            "rank": 781
+          },
+          {
+            "pcode": "290504",
+            "name": "이동건",
+            "val": 28,
+            "rank": 784
+          },
+          {
+            "pcode": "291283",
+            "name": "김무성",
+            "val": 28,
+            "rank": 784
+          },
+          {
+            "pcode": "290355",
+            "name": "임창한",
+            "val": 28,
+            "rank": 784
+          },
+          {
+            "pcode": "291589",
+            "name": "인승찬",
+            "val": 28,
+            "rank": 784
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      },
+      "reb": {
+        "val": 11,
+        "tier": "Bronze",
+        "target": 300,
+        "rank_alltime": 799,
+        "rivals_alltime": [
+          {
+            "pcode": "225032",
+            "name": "강기중",
+            "val": 11,
+            "rank": 799
+          },
+          {
+            "pcode": "290906",
+            "name": "조쉬 달라드",
+            "val": 11,
+            "rank": 799
+          },
+          {
+            "pcode": "291843",
+            "name": "박민재",
+            "val": 11,
+            "rank": 799
+          },
+          {
+            "pcode": "290504",
+            "name": "이동건",
+            "val": 11,
+            "rank": 799
+          },
+          {
+            "pcode": "291283",
+            "name": "김무성",
+            "val": 11,
+            "rank": 799
+          },
+          {
+            "pcode": "255043",
+            "name": "박준용",
+            "val": 11,
+            "rank": 799
+          },
+          {
+            "pcode": "290384",
+            "name": "방경수",
+            "val": 11,
+            "rank": 799
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      },
+      "ast": {
+        "val": 8,
+        "tier": "Bronze",
+        "target": 300,
+        "rank_alltime": 720,
+        "rivals_alltime": [
+          {
+            "pcode": "291078",
+            "name": "정준수",
+            "val": 8,
+            "rank": 720
+          },
+          {
+            "pcode": "291756",
+            "name": "이대균",
+            "val": 8,
+            "rank": 720
+          },
+          {
+            "pcode": "291648",
+            "name": "표승빈",
+            "val": 8,
+            "rank": 720
+          },
+          {
+            "pcode": "290504",
+            "name": "이동건",
+            "val": 8,
+            "rank": 720
+          },
+          {
+            "pcode": "255083",
+            "name": "한상웅",
+            "val": 8,
+            "rank": 720
+          },
+          {
+            "pcode": "650031",
+            "name": "앤서니 마일즈",
+            "val": 8,
+            "rank": 720
+          },
+          {
+            "pcode": "291697",
+            "name": "제레미아 틸먼",
+            "val": 8,
+            "rank": 720
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      },
+      "threep": {
+        "val": 3,
+        "tier": "Bronze",
+        "target": 100,
+        "rank_alltime": 641,
+        "rivals_alltime": [
+          {
+            "pcode": "245043",
+            "name": "송태영",
+            "val": 3,
+            "rank": 641
+          },
+          {
+            "pcode": "290155",
+            "name": "세드릭 웨버",
+            "val": 3,
+            "rank": 641
+          },
+          {
+            "pcode": "291584",
+            "name": "모리구치 히사시",
+            "val": 3,
+            "rank": 641
+          },
+          {
+            "pcode": "290504",
+            "name": "이동건",
+            "val": 3,
+            "rank": 641
+          },
+          {
+            "pcode": "291179",
+            "name": "윌리엄 다니엘스",
+            "val": 3,
+            "rank": 641
+          },
+          {
+            "pcode": "290367",
+            "name": "로드 벤슨",
+            "val": 3,
+            "rank": 641
+          },
+          {
+            "pcode": "291603",
+            "name": "문가온",
+            "val": 3,
+            "rank": 641
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      },
+      "stl": {
+        "val": 2,
+        "tier": "Bronze",
+        "target": 100,
+        "rank_alltime": 796,
+        "rivals_alltime": [
+          {
+            "pcode": "290520",
+            "name": "케니 로슨",
+            "val": 2,
+            "rank": 796
+          },
+          {
+            "pcode": "291209",
+            "name": "김한솔",
+            "val": 2,
+            "rank": 796
+          },
+          {
+            "pcode": "291202",
+            "name": "장태빈",
+            "val": 2,
+            "rank": 796
+          },
+          {
+            "pcode": "290504",
+            "name": "이동건",
+            "val": 2,
+            "rank": 796
+          },
+          {
+            "pcode": "291482",
+            "name": "주현우",
+            "val": 2,
+            "rank": 796
+          },
+          {
+            "pcode": "291587",
+            "name": "박선웅",
+            "val": 2,
+            "rank": 796
+          },
+          {
+            "pcode": "290326",
+            "name": "케빈 마틴",
+            "val": 2,
+            "rank": 796
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      },
+      "blk": {
+        "val": 0,
+        "tier": "Bronze",
+        "target": 100,
+        "rank_alltime": 774,
+        "rivals_alltime": [
+          {
+            "pcode": "290513",
+            "name": "원지승",
+            "val": 0,
+            "rank": 774
+          },
+          {
+            "pcode": "290508",
+            "name": "이동하",
+            "val": 0,
+            "rank": 774
+          },
+          {
+            "pcode": "290506",
+            "name": "장동영",
+            "val": 0,
+            "rank": 774
+          },
+          {
+            "pcode": "290504",
+            "name": "이동건",
+            "val": 0,
+            "rank": 774
+          },
+          {
+            "pcode": "290492",
+            "name": "박석환",
+            "val": 0,
+            "rank": 774
+          },
+          {
+            "pcode": "290484",
+            "name": "박성은",
+            "val": 0,
+            "rank": 774
+          },
+          {
+            "pcode": "291769",
+            "name": "이찬영",
+            "val": 0,
+            "rank": 774
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      },
+      "gp": {
+        "val": 32,
+        "tier": "Bronze",
+        "target": 100,
+        "rank_alltime": 644,
+        "rivals_alltime": [
+          {
+            "pcode": "290473",
+            "name": "로드니 화이트",
+            "val": 32,
+            "rank": 644
+          },
+          {
+            "pcode": "291850",
+            "name": "이유진",
+            "val": 32,
+            "rank": 644
+          },
+          {
+            "pcode": "291474",
+            "name": "다니엘 오셰푸",
+            "val": 32,
+            "rank": 644
+          },
+          {
+            "pcode": "290504",
+            "name": "이동건",
+            "val": 32,
+            "rank": 644
+          },
+          {
+            "pcode": "650029",
+            "name": "키마니 프렌드",
+            "val": 32,
+            "rank": 644
+          },
+          {
+            "pcode": "290793",
+            "name": "한성원",
+            "val": 32,
+            "rank": 644
+          },
+          {
+            "pcode": "245078",
+            "name": "마르코 킬링스워스",
+            "val": 32,
+            "rank": 644
+          }
+        ],
+        "rank_active": null,
+        "rivals_active": []
+      }
+    },
+    "missions": []
+  },
+  "seasons": {
+    "2012-2013": {
+      "stacks": {
+        "pts": {
+          "val": 28,
+          "tier": "Bronze",
+          "target": 100,
+          "rank": 143,
+          "rivals": [
+            {
+              "pcode": "290455",
+              "name": "안정환",
+              "val": 34,
+              "rank": 139
+            },
+            {
+              "pcode": "290412",
+              "name": "김현민",
+              "val": 32,
+              "rank": 141
+            },
+            {
+              "pcode": "290349",
+              "name": "조셉 테일러",
+              "val": 29,
+              "rank": 142
+            },
+            {
+              "pcode": "290504",
+              "name": "이동건",
+              "val": 28,
+              "rank": 143
+            },
+            {
+              "pcode": "230083",
+              "name": "노경석",
+              "val": 27,
+              "rank": 144
+            },
+            {
+              "pcode": "290124",
+              "name": "정의한",
+              "val": 19,
+              "rank": 145
+            },
+            {
+              "pcode": "245052",
+              "name": "석명준",
+              "val": 17,
+              "rank": 146
+            }
+          ]
+        },
+        "reb": {
+          "val": 11,
+          "tier": "Bronze",
+          "target": 100,
+          "rank": 140,
+          "rivals": [
+            {
+              "pcode": "290455",
+              "name": "안정환",
+              "val": 12,
+              "rank": 138
+            },
+            {
+              "pcode": "255053",
+              "name": "이한권",
+              "val": 12,
+              "rank": 138
+            },
+            {
+              "pcode": "230083",
+              "name": "노경석",
+              "val": 11,
+              "rank": 140
+            },
+            {
+              "pcode": "290504",
+              "name": "이동건",
+              "val": 11,
+              "rank": 140
+            },
+            {
+              "pcode": "290278",
+              "name": "박성훈",
+              "val": 10,
+              "rank": 142
+            },
+            {
+              "pcode": "255076",
+              "name": "임효성",
+              "val": 10,
+              "rank": 142
+            },
+            {
+              "pcode": "290294",
+              "name": "변현수",
+              "val": 8,
+              "rank": 144
+            }
+          ]
+        },
+        "ast": {
+          "val": 8,
+          "tier": "Bronze",
+          "target": 100,
+          "rank": 129,
+          "rivals": [
+            {
+              "pcode": "290545",
+              "name": "김상규",
+              "val": 9,
+              "rank": 125
+            },
+            {
+              "pcode": "240074",
+              "name": "한정원",
+              "val": 8,
+              "rank": 129
+            },
+            {
+              "pcode": "290503",
+              "name": "박지훈",
+              "val": 8,
+              "rank": 129
+            },
+            {
+              "pcode": "290504",
+              "name": "이동건",
+              "val": 8,
+              "rank": 129
+            },
+            {
+              "pcode": "290418",
+              "name": "김민섭",
+              "val": 8,
+              "rank": 129
+            },
+            {
+              "pcode": "290124",
+              "name": "정의한",
+              "val": 7,
+              "rank": 133
+            },
+            {
+              "pcode": "290549",
+              "name": "김민욱",
+              "val": 7,
+              "rank": 133
+            }
+          ]
+        },
+        "threep": {
+          "val": 3,
+          "tier": "Bronze",
+          "target": 30,
+          "rank": 107,
+          "rivals": [
+            {
+              "pcode": "220050",
+              "name": "전형수",
+              "val": 4,
+              "rank": 99
+            },
+            {
+              "pcode": "650014",
+              "name": "김도수",
+              "val": 4,
+              "rank": 99
+            },
+            {
+              "pcode": "290434",
+              "name": "김현호",
+              "val": 4,
+              "rank": 99
+            },
+            {
+              "pcode": "290504",
+              "name": "이동건",
+              "val": 3,
+              "rank": 107
+            },
+            {
+              "pcode": "290124",
+              "name": "정의한",
+              "val": 3,
+              "rank": 107
+            },
+            {
+              "pcode": "230083",
+              "name": "노경석",
+              "val": 3,
+              "rank": 107
+            },
+            {
+              "pcode": "290436",
+              "name": "이지원",
+              "val": 2,
+              "rank": 110
+            }
+          ]
+        },
+        "stl": {
+          "val": 2,
+          "tier": "Bronze",
+          "target": 30,
+          "rank": 145,
+          "rivals": [
+            {
+              "pcode": "290291",
+              "name": "김명훈",
+              "val": 2,
+              "rank": 145
+            },
+            {
+              "pcode": "245052",
+              "name": "석명준",
+              "val": 2,
+              "rank": 145
+            },
+            {
+              "pcode": "240074",
+              "name": "한정원",
+              "val": 2,
+              "rank": 145
+            },
+            {
+              "pcode": "290504",
+              "name": "이동건",
+              "val": 2,
+              "rank": 145
+            },
+            {
+              "pcode": "290520",
+              "name": "케니 로슨",
+              "val": 2,
+              "rank": 145
+            },
+            {
+              "pcode": "290352",
+              "name": "이민재",
+              "val": 1,
+              "rank": 152
+            },
+            {
+              "pcode": "650010",
+              "name": "박상률",
+              "val": 1,
+              "rank": 152
+            }
+          ]
+        },
+        "blk": {
+          "val": 0,
+          "tier": "Bronze",
+          "target": 30,
+          "rank": 128,
+          "rivals": [
+            {
+              "pcode": "290278",
+              "name": "박성훈",
+              "val": 0,
+              "rank": 128
+            },
+            {
+              "pcode": "290478",
+              "name": "장민국",
+              "val": 0,
+              "rank": 128
+            },
+            {
+              "pcode": "290484",
+              "name": "박성은",
+              "val": 0,
+              "rank": 128
+            },
+            {
+              "pcode": "290504",
+              "name": "이동건",
+              "val": 0,
+              "rank": 128
+            },
+            {
+              "pcode": "290506",
+              "name": "장동영",
+              "val": 0,
+              "rank": 128
+            },
+            {
+              "pcode": "290521",
+              "name": "존 토마스",
+              "val": 0,
+              "rank": 128
+            },
+            {
+              "pcode": "290508",
+              "name": "이동하",
+              "val": 0,
+              "rank": 128
+            }
+          ]
+        },
+        "gp": {
+          "val": 32,
+          "tier": "Platinum",
+          "target": 40,
+          "rank": 113,
+          "rivals": [
+            {
+              "pcode": "290544",
+              "name": "김지완",
+              "val": 33,
+              "rank": 110
+            },
+            {
+              "pcode": "290677",
+              "name": "스캇 메리트",
+              "val": 33,
+              "rank": 110
+            },
+            {
+              "pcode": "215053",
+              "name": "김주성",
+              "val": 33,
+              "rank": 110
+            },
+            {
+              "pcode": "290504",
+              "name": "이동건",
+              "val": 32,
+              "rank": 113
+            },
+            {
+              "pcode": "290124",
+              "name": "정의한",
+              "val": 32,
+              "rank": 113
+            },
+            {
+              "pcode": "240044",
+              "name": "은희석",
+              "val": 32,
+              "rank": 113
+            },
+            {
+              "pcode": "290556",
+              "name": "김종범",
+              "val": 32,
+              "rank": 113
+            }
+          ]
+        }
+      },
+      "missions": []
+    }
+  }
+}

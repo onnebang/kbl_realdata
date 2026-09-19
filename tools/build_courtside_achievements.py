@@ -4,7 +4,7 @@ import json
 import os
 
 DB_PATH = '../raw/kbl_realdata.db'
-OUT_PATH = '../courtside-web/lib/courtside_achievements.json'
+OUT_DIR = '../courtside-web/public/data/achievements'
 
 CAREER_MILESTONES = {
     'pts': [500, 1000, 2000, 3000, 5000, 7000, 10000, 15000],
@@ -83,9 +83,6 @@ def get_achievement_data():
     df['total_min'] = df['play_min'] + df['play_sec'] / 60.0
 
     stat_cols = ['pts', 'reb', 'ast', 'threep', 'stl', 'blk', 'gp']
-    
-    # Construct unique photo_url for each player
-    photo_map = {pcode: f"https://kbl.or.kr/images/players/Portrait/{pcode}.png" for pcode in df['pcode'].unique()}
 
     # 1. Career Totals (All-Time)
     career_totals = df.groupby(['pcode', 'name']).agg({
@@ -111,14 +108,12 @@ def get_achievement_data():
         # All-Time
         ct_sorted = career_totals.sort_values(by=col, ascending=False).copy()
         ct_sorted['rank'] = ct_sorted[col].rank(method='min', ascending=False).astype(int)
-        ct_sorted['photoUrl'] = ct_sorted['pcode'].map(photo_map)
-        career_lb_alltime[col] = ct_sorted[['pcode', 'name', col, 'rank', 'photoUrl']].rename(columns={col: 'val'}).to_dict('records')
+        career_lb_alltime[col] = ct_sorted[['pcode', 'name', col, 'rank']].rename(columns={col: 'val'}).to_dict('records')
         
         # Active
         act_sorted = active_totals.sort_values(by=col, ascending=False).copy()
         act_sorted['rank'] = act_sorted[col].rank(method='min', ascending=False).astype(int)
-        act_sorted['photoUrl'] = act_sorted['pcode'].map(photo_map)
-        career_lb_active[col] = act_sorted[['pcode', 'name', col, 'rank', 'photoUrl']].rename(columns={col: 'val'}).to_dict('records')
+        career_lb_active[col] = act_sorted[['pcode', 'name', col, 'rank']].rename(columns={col: 'val'}).to_dict('records')
 
     # 3. Season Totals
     season_totals = df.groupby(['season_name', 'pcode', 'name']).agg({
@@ -138,8 +133,7 @@ def get_achievement_data():
         for col in stat_cols:
             st_sorted = season_df.sort_values(by=col, ascending=False).copy()
             st_sorted['rank'] = st_sorted[col].rank(method='min', ascending=False).astype(int)
-            st_sorted['photoUrl'] = st_sorted['pcode'].map(photo_map)
-            season_lbs[season_name][col] = st_sorted[['pcode', 'name', col, 'rank', 'photoUrl']].rename(columns={col: 'val'}).to_dict('records')
+            season_lbs[season_name][col] = st_sorted[['pcode', 'name', col, 'rank']].rename(columns={col: 'val'}).to_dict('records')
 
     # 4. Generate JSON Output
     output = {}
@@ -342,12 +336,15 @@ def get_achievement_data():
             output[pcode]["career"]["missions"] = list(unique_career_missions)
 
 
-    out_real = os.path.join(os.path.dirname(__file__), OUT_PATH)
-    os.makedirs(os.path.dirname(out_real), exist_ok=True)
-    with open(out_real, 'w', encoding='utf-8') as f:
-        json.dump(output, f, ensure_ascii=False, indent=2)
+    out_dir_real = os.path.join(os.path.dirname(__file__), OUT_DIR)
+    os.makedirs(out_dir_real, exist_ok=True)
+    
+    for pcode, data in output.items():
+        out_path = os.path.join(out_dir_real, f"{pcode}.json")
+        with open(out_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
-    print(f"[SUCCESS] Generated matrix achievements data at {out_real}")
+    print(f"[SUCCESS] Generated matrix achievements data per player at {out_dir_real}")
 
 if __name__ == "__main__":
     get_achievement_data()

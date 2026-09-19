@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Achievement, Rival, StackData, getPlayerAchievements } from "../lib/achievements";
+import { useEffect, useState } from "react";
+import { Achievement, Rival, StackData, PlayerAchievements } from "../lib/achievements";
+import { supabase } from "../lib/supabase";
 import styles from "./AchievementTrophyRoom.module.css";
 
 interface Props {
@@ -72,12 +73,91 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
   // For career rival toggle
   const [careerRivalType, setCareerRivalType] = useState<"alltime" | "active">("alltime");
   
-  const player = getPlayerAchievements(pcode);
+  const [player, setPlayer] = useState<PlayerAchievements | null>(null);
+  const [loading, setLoading] = useState(true);
   
   // Season selector state
+  const [selectedSeason, setSelectedSeason] = useState<string>("");
   const seasonsList = player?.seasons ? Object.keys(player.seasons).sort((a,b) => b.localeCompare(a)) : [];
-  const [selectedSeason, setSelectedSeason] = useState<string>(seasonsList[0] || "");
 
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function loadData() {
+      try {
+        setLoading(true);
+        const res = await fetch(`/data/achievements/${pcode}.json`);
+        if (!res.ok) {
+          if (isMounted) setLoading(false);
+          return;
+        }
+        const data: PlayerAchievements = await res.json();
+        
+        // Collect all rival pcodes
+        const pcodesToFetch = new Set<string>();
+        
+        const processStacks = (stacks: Record<string, StackData>) => {
+          Object.values(stacks).forEach(stack => {
+            if (stack.rivals) stack.rivals.forEach(r => pcodesToFetch.add(String(r.pcode)));
+            if (stack.rivals_alltime) stack.rivals_alltime.forEach(r => pcodesToFetch.add(String(r.pcode)));
+            if (stack.rivals_active) stack.rivals_active.forEach(r => pcodesToFetch.add(String(r.pcode)));
+          });
+        };
+        
+        if (data.career?.stacks) processStacks(data.career.stacks);
+        if (data.seasons) {
+          Object.values(data.seasons).forEach(season => {
+            if (season.stacks) processStacks(season.stacks);
+          });
+        }
+        
+        // Fetch photos from Supabase
+        const photoMap = new Map<string, string | null>();
+        if (pcodesToFetch.size > 0) {
+            const pcodeArray = Array.from(pcodesToFetch);
+            for (let i = 0; i < pcodeArray.length; i += 200) {
+                const chunk = pcodeArray.slice(i, i + 200);
+                const { data: pData } = await supabase.from("players").select("pcode, photo_url").in("pcode", chunk);
+                if (pData) {
+                    pData.forEach(p => photoMap.set(String(p.pcode), p.photo_url));
+                }
+            }
+        }
+        
+        // Inject photoUrl into rivals
+        const injectPhotos = (stacks: Record<string, StackData>) => {
+            Object.values(stacks).forEach(stack => {
+                if (stack.rivals) stack.rivals.forEach(r => r.photoUrl = photoMap.get(String(r.pcode)) || null);
+                if (stack.rivals_alltime) stack.rivals_alltime.forEach(r => r.photoUrl = photoMap.get(String(r.pcode)) || null);
+                if (stack.rivals_active) stack.rivals_active.forEach(r => r.photoUrl = photoMap.get(String(r.pcode)) || null);
+            });
+        };
+        
+        if (data.career?.stacks) injectPhotos(data.career.stacks);
+        if (data.seasons) {
+            Object.values(data.seasons).forEach(season => {
+                if (season.stacks) injectPhotos(season.stacks);
+            });
+        }
+        
+        if (isMounted) {
+            setPlayer(data);
+            const sList = Object.keys(data.seasons || {}).sort((a,b) => b.localeCompare(a));
+            if (sList.length > 0) setSelectedSeason(sList[0]);
+            setLoading(false);
+        }
+      } catch (err) {
+        console.error("Failed to load achievements", err);
+        if (isMounted) setLoading(false);
+      }
+    }
+    
+    loadData();
+    
+    return () => { isMounted = false; };
+  }, [pcode]);
+
+  if (loading) return <div className={styles.trophyRoom} style={{ padding: "40px", textAlign: "center", color: "rgba(255,255,255,0.5)" }}>데이터를 불러오는 중입니다...</div>;
   if (!player) return null;
 
   const unlockedIds = new Set<string>();
