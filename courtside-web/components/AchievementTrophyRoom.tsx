@@ -294,7 +294,7 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                         const leftPct = (r.val / maxVal) * 100;
                         return (
                           <div 
-                            key={`marker-${r.pcode}`}
+                            key={`marker-${r.pcode}-${i}`}
                             className={`${styles.trackMarker} ${isMe ? styles.isMe : ""}`}
                             style={{ left: `${leftPct}%` }}
                           />
@@ -310,7 +310,7 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                         const endX = ((i + 0.5) / totalNodes) * 100;
                         return (
                           <path 
-                            key={`path-${r.pcode}`}
+                            key={`path-${r.pcode}-${i}`}
                             d={`M ${startX} 0 C ${startX} 50, ${endX} 50, ${endX} 100`}
                             className={`${styles.svgLine} ${isMe ? styles.isMe : ""}`}
                             vectorEffect="non-scaling-stroke"
@@ -325,7 +325,7 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                         const isMe = String(r.pcode) === String(pcode);
                         return (
                           <div 
-                            key={`node-${r.pcode}`} 
+                            key={`node-${r.pcode}-${i}`} 
                             className={`${styles.rivalNode} ${isMe ? styles.isMe : ""}`}
                           >
                             {r.photoUrl ? (

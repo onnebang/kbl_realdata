@@ -72,7 +72,11 @@ def get_achievement_data():
         gps.fg, gps.fg_a, gps.threep, gps.threep_a, gps.ft, gps.ft_a
     FROM player_game_stats gps
     JOIN games g ON gps.gmkey = g.gmkey
-    JOIN (SELECT DISTINCT pcode, pname FROM player_game_stats) p ON gps.pcode = p.pcode
+    JOIN (
+        SELECT pcode, MAX(pname) as pname 
+        FROM player_game_stats 
+        GROUP BY pcode
+    ) p ON gps.pcode = p.pcode
     WHERE g.season_category = '정규시즌'
     ORDER BY g.game_date ASC
     """
