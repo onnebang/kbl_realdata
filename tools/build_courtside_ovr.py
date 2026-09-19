@@ -609,7 +609,13 @@ def compute_ovr(target_season='2024-2025'):
             return val
             
         minutes_bonus = min(2.0, row['total_min'] / 1000.0)
-        return int(min(val, cap + minutes_bonus))
+        final_cap = cap + minutes_bonus
+        if val <= final_cap:
+            return int(val)
+        else:
+            # 소프트 캡 (초과분의 30%만 인정)
+            excess = val - final_cap
+            return int(round(final_cap + excess * 0.3))
 
     # ── Role Player Cap (저점유율 스페셜리스트 하드 상한선) ──
     # 오재현과 같이 압도적인 수비/3점 지표를 가졌으나 공격 점유율(Usage)이 낮은 선수가
@@ -895,8 +901,10 @@ def compute_ovr(target_season='2024-2025'):
                 final_cap = cap + minutes_bonus
                 
                 if proj_ovr > final_cap:
-                    diff = proj_ovr - final_cap
-                    proj_ovr = final_cap
+                    excess = proj_ovr - final_cap
+                    soft_capped_ovr = int(round(final_cap + excess * 0.3))
+                    diff = proj_ovr - soft_capped_ovr
+                    proj_ovr = soft_capped_ovr
                     proj_off -= diff
                     proj_def -= diff
                     proj_outside -= diff
@@ -905,6 +913,24 @@ def compute_ovr(target_season='2024-2025'):
                     proj_athletic -= diff
                     proj_defense -= diff
                     proj_rebounding -= diff
+                    
+        # ── Role Player Cap (for projected data) ──
+        proj_usg = last.get('usage', 20.0)
+        proj_role = last.get('role', 'All-Around')
+        if proj_usg <= 18.0 and proj_role not in ['Playmaker', 'Paint Beast', 'Glass Cleaner', 'Point Center', 'All-Around'] and not pd.isna(proj_usg):
+            minutes_bonus = min(1.0, last['total_min'] / 1000.0)
+            final_cap = 81.0 + minutes_bonus
+            if proj_ovr > final_cap:
+                diff = proj_ovr - final_cap
+                proj_ovr = int(round(final_cap))
+                proj_off -= diff
+                proj_def -= diff
+                proj_outside -= diff
+                proj_inside -= diff
+                proj_playmaking -= diff
+                proj_athletic -= diff
+                proj_defense -= diff
+                proj_rebounding -= diff
 
         out_data.append({
             "pcode": pcode,
