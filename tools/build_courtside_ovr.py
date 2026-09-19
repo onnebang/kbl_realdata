@@ -353,74 +353,57 @@ def compute_ovr(target_season='2024-2025'):
     for col in ['attr_outside_mapped', 'attr_inside_mapped', 'attr_playmaking_mapped', 'attr_athletic_mapped', 'attr_defense_mapped', 'attr_rebounding_mapped']:
         global_df.loc[garbage_mask, col] = 45.0
 
-    # ── 2. 모던 롤(Role) 판별 및 가중치 적용 ──
-    def determine_role(row):
+    # ── 2. 모던 롤(Role) 판별 및 Multi-Role Max 가중치 적용 ──
+    # NBA 2K 엔진 스타일: 모든 스페셜리스트 롤의 가중치를 전부 계산해보고, 가장 점수가 높게 나오는 롤을
+    # 해당 선수의 "Best Fit Role"로 선정하여 원시 OVR(raw_ovr)로 삼는다.
+    # 이를 통해 보이지 않는 곳에서 헌신하는 3&D나 락다운 디펜더 등 스페셜리스트들이 시스템 사각지대에서 깎이지 않도록 보호한다.
+    
+    ROLE_WEIGHTS = {
+        'Point Center': (0.05, 0.25, 0.25, 0.05, 0.15, 0.25),
+        'Stretch Big': (0.25, 0.20, 0.05, 0.05, 0.20, 0.25),
+        'Paint Beast': (0.00, 0.35, 0.00, 0.10, 0.20, 0.35),
+        'Playmaker': (0.25, 0.05, 0.35, 0.15, 0.15, 0.05),
+        '3&D Wing': (0.30, 0.05, 0.05, 0.15, 0.35, 0.10),
+        'Scoring Threat': (0.35, 0.25, 0.15, 0.15, 0.10, 0.00),
+        'All-Around': (0.20, 0.20, 0.15, 0.15, 0.15, 0.15),
+        'Sharpshooter': (0.45, 0.05, 0.15, 0.10, 0.15, 0.10),
+        'Slasher': (0.05, 0.40, 0.10, 0.25, 0.10, 0.10),
+        'Lockdown Defender': (0.10, 0.10, 0.10, 0.20, 0.40, 0.10),
+        'Glass Cleaner': (0.00, 0.20, 0.05, 0.15, 0.20, 0.40),
+    }
+
+    def calc_best_role(row):
+        best_ovr = 0.0
+        best_role = 'All-Around'
+        
         pos = str(row['position']).upper()
-        g_games = max(1, row['g'])
+        is_big = ('C' in pos) or ('F' in pos and row['reb'] >= 6.0)
         
-        # tpm (총합)만 경기수로 나누고, 나머지는 이미 AVG 이므로 그대로 사용
-        tpm = row['tpm'] / g_games
-        ast = row['ast']
-        pts = row['pts']
-        stl = row['stl']
-        blk = row['blk']
-        reb = row['reb']
-        
-        is_big = ('C' in pos) or ('F' in pos and reb >= 6.0)
-        
-        # 포인트 센터: 빅맨인데 어시스트 3.0개 이상 (아셈 마레이, 요키치 롤)
-        if is_big and ast >= 3.0:
-            return 'Point Center'
-            
-        # 스트레치 빅: 빅맨인데 3점슛 1.0개 이상
-        if is_big and tpm >= 1.0:
-            return 'Stretch Big'
-            
-        # 페인트존 짐승: 빅맨인데 3점슛 1.0개 미만
-        if is_big and tpm < 1.0:
-            return 'Paint Beast'
-            
-        # 퓨어 플레이메이커: 어시스트 4.5 이상 가드
-        if ast >= 4.5:
-            return 'Playmaker'
-            
-        # 3&D 윙: 3점 1.5개 이상 + 수비 지표 준수
-        if tpm >= 1.5 and (stl >= 1.0 or blk >= 0.5):
-            return '3&D Wing'
-            
-        # 스코어링 스렛: 득점 볼륨이 높은 에이스
-        if pts >= 14.0:
-            return 'Scoring Threat'
-            
-        return 'All-Around'
-
-    global_df['role'] = global_df.apply(determine_role, axis=1)
-
-    def calc_role_ovr(row):
-        role = row['role']
-        if role == 'Point Center':
-            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.05, 0.25, 0.25, 0.05, 0.15, 0.25
-        elif role == 'Stretch Big':
-            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.25, 0.20, 0.05, 0.05, 0.20, 0.25
-        elif role == 'Paint Beast':
-            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.00, 0.35, 0.00, 0.10, 0.20, 0.35
-        elif role == 'Playmaker':
-            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.25, 0.05, 0.35, 0.15, 0.15, 0.05
-        elif role == '3&D Wing':
-            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.30, 0.05, 0.05, 0.15, 0.35, 0.10
-        elif role == 'Scoring Threat':
-            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.35, 0.25, 0.15, 0.15, 0.10, 0.00
-        else: # All-Around
-            w_out, w_in, w_pm, w_ath, w_def, w_reb = 0.20, 0.20, 0.15, 0.15, 0.15, 0.15
-            
-        return (row['attr_outside_mapped'] * w_out + 
+        for role, weights in ROLE_WEIGHTS.items():
+            # 빅맨 전용 롤 제한
+            if not is_big and role in ['Point Center', 'Stretch Big', 'Paint Beast', 'Glass Cleaner']:
+                continue
+            # 가드/윙 전용 롤 제한
+            if is_big and role in ['Playmaker', 'Sharpshooter']:
+                continue
+                
+            w_out, w_in, w_pm, w_ath, w_def, w_reb = weights
+            ovr = (
+                row['attr_outside_mapped'] * w_out + 
                 row['attr_inside_mapped'] * w_in + 
                 row['attr_playmaking_mapped'] * w_pm + 
                 row['attr_athletic_mapped'] * w_ath + 
                 row['attr_defense_mapped'] * w_def + 
-                row['attr_rebounding_mapped'] * w_reb)
+                row['attr_rebounding_mapped'] * w_reb
+            )
+            
+            if ovr > best_ovr:
+                best_ovr = ovr
+                best_role = role
                 
-    global_df['raw_ovr'] = global_df.apply(calc_role_ovr, axis=1)
+        return pd.Series([best_role, best_ovr])
+
+    global_df[['role', 'raw_ovr']] = global_df.apply(calc_best_role, axis=1)
 
     # ── 3. 고급 지표 및 보정치 가감 (OVR Buffs & Penalties) ──
     nats = load_nationalities()
