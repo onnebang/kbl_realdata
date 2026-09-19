@@ -17,7 +17,7 @@ export default function PlayerAwards({ pcode }: Props) {
   
   return (
     <div className={styles.awardsContainer}>
-      <div className={styles.header}>AWARDS AND HONORS</div>
+      <h2 className={styles.header}>AWARDS AND HONORS</h2>
       <div className={styles.list}>
         {awards.map((award, i) => (
           <div key={i} className={styles.awardItem}>

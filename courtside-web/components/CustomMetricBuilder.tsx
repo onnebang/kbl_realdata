@@ -49,6 +49,7 @@ export default function CustomMetricBuilder({ players }: { players: MetricPlayer
               </div>
               <input
                 type="range"
+                aria-label={c.label}
                 min={-2}
                 max={2}
                 step={0.1}

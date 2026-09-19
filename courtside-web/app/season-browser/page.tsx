@@ -41,7 +41,7 @@ export default async function SeasonBrowserPage({
           </div>
 
           <form className={styles.seasonForm}>
-            <select name="season" defaultValue={activeSeason}>
+            <select name="season" aria-label="시즌 선택" defaultValue={activeSeason}>
               {seasons.map((s) => (
                 <option key={s} value={s}>
                   {formatSeasonShort(s)} 시즌

@@ -13,7 +13,7 @@ export interface TeamMeta {
 interface OvrTrendChartProps {
   history: OvrSeasonRecord[];
   teamColor?: string;
-  /** 시즌별 소속팀(record.team, kbl540 team_name_current 표기) -> 팀 컬러/약어. 이적한
+  /** 시즌별 소속팀(record.team = 그 시즌 소속팀의 teams.name) -> 팀 컬러/약어. 이적한
    * 선수의 구간별 팀 색·전환 칩을 그리는 데 쓴다. 없으면 팀 구분 없이 teamColor 하나로만
    * 그림. Map이 아니라 평범한 객체 - 서버->클라이언트 컴포넌트 경계를 넘는 props는 Map
    * 직렬화가 실측상 조용히 깨졌다(자세한 이유는 호출부 주석). */
@@ -171,7 +171,7 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
   return (
     <div className={styles.container} style={{ "--chart-color": teamColor } as React.CSSProperties}>
       <div className={styles.header}>
-        <h3 className={styles.title}>SEASON OVR TREND</h3>
+        <h2 className={styles.title}>SEASON OVR TREND</h2>
         {hovered ? (
           <div className={styles.hoverDetail}>
             <span className={styles.hoverSeason}>

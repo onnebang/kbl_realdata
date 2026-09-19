@@ -835,7 +835,7 @@ export default async function TeamPage({
 
       {/* 시즌 셀렉터(기존 기능 유지 - ?season= 쿼리 파라미터 관례) */}
       <form className={styles.seasonForm}>
-        <select name="season" defaultValue={factSeason} className={styles.seasonSelect}>
+        <select name="season" aria-label="시즌 선택" defaultValue={factSeason} className={styles.seasonSelect}>
           {seasons.map((s) => (
             <option key={s} value={s}>
               {s} 시즌

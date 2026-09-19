@@ -21,7 +21,7 @@ export default async function CustomMetricPage({ searchParams }: { searchParams:
       </div>
 
       <form style={{ marginTop: 18, display: "flex", gap: 8 }}>
-        <select name="season" defaultValue={activeSeason}>
+        <select name="season" aria-label="시즌 선택" defaultValue={activeSeason}>
           {seasons.map((s) => (
             <option key={s} value={s}>
               {s} 시즌

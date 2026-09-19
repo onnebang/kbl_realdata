@@ -176,9 +176,16 @@
   margin-right: 1px;
 }
 .careerLink {
+  position: relative;
   color: var(--home);
   text-decoration: none;
   border-bottom: 1px solid transparent;
+}
+/* 15px 높이 링크 - 눌리는 영역만 24px 이상으로(레이아웃 불변). */
+.careerLink::after {
+  content: "";
+  position: absolute;
+  inset: -5px -4px;
 }
 .careerLink .careerNum {
   color: var(--home);

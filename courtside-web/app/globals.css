@@ -1002,10 +1002,17 @@ table.data-table td:nth-child(2) {
 }
 
 .back-link {
+  position: relative;
   display: inline-block;
   font-size: 12.5px;
   color: var(--ink-soft);
   margin-bottom: 14px;
+}
+/* 21px 높이 링크 - 눌리는 영역만 넓힌다(레이아웃 불변). */
+.back-link::after {
+  content: "";
+  position: absolute;
+  inset: -4px -6px;
 }
 
 .back-link:hover {

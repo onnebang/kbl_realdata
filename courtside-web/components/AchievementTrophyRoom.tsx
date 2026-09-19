@@ -125,7 +125,7 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
   return (
     <div className={styles.trophyRoom}>
       <div className={styles.header}>
-        <h3 className={styles.title}><span aria-hidden="true">🏆</span> 트로피 룸</h3>
+        <h2 className={styles.title}><span aria-hidden="true">🏆</span> 트로피 룸</h2>
         <div className={styles.tabs}>
           <button 
             type="button"

@@ -40,10 +40,11 @@ export default function SeasonBrowserBoard({ games }: { games: SeasonGameRow[] }
         <input
           type="text"
           placeholder="팀 이름으로 검색 (예: KT, 서울SK)"
+          aria-label="팀 이름 검색"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select value={category} onChange={(e) => setCategory(e.target.value as typeof category)}>
+        <select aria-label="경기 구분" value={category} onChange={(e) => setCategory(e.target.value as typeof category)}>
           <option value="ALL">전체</option>
           <option value="정규시즌">정규시즌</option>
           <option value="플레이오프">플레이오프</option>

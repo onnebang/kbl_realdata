@@ -125,9 +125,16 @@
   line-height: 1.35;
 }
 .name {
+  position: relative;
   font-weight: 700;
   color: var(--ink);
   text-decoration: none;
+}
+/* 글자 높이가 15px라 터치 표적이 작다 - 보이는 모양·줄 간격은 두고 눌리는 영역만 24px 이상으로. */
+.name::after {
+  content: "";
+  position: absolute;
+  inset: -5px -3px;
 }
 .name:hover,
 .name:focus-visible {

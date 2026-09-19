@@ -228,6 +228,9 @@
   line-height: 1.02;
   margin: 0 0 10px;
   letter-spacing: -0.01em;
+  /* 긴 영문명(성+이름이 여러 단어)이 좁은 화면에서 한 단어만 남거나 넘치지 않게. */
+  text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 .heroMeta {
   display: flex;

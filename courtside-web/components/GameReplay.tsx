@@ -1660,7 +1660,7 @@ export default function GameReplay({
                 >
                   ⏭
                 </button>
-                <select value={speedMs} onChange={(e) => setSpeedMs(Number(e.target.value))} className="replay-speed">
+                <select value={speedMs} onChange={(e) => setSpeedMs(Number(e.target.value))} className="replay-speed" aria-label="재생 속도">
                   <option value={600}>0.5x</option>
                   <option value={300}>1x</option>
                   <option value={120}>2x</option>
@@ -1930,12 +1930,12 @@ export default function GameReplay({
         <div className="report-section" style={{ marginTop: 16 }}>
           <div className="report-section-title">슛 차트 (현재 쿼터까지)</div>
           <div className="replay-shot-filters">
-            <select value={shotOutcome} onChange={(e) => setShotOutcome(e.target.value as typeof shotOutcome)}>
+            <select aria-label="슛 결과 필터" value={shotOutcome} onChange={(e) => setShotOutcome(e.target.value as typeof shotOutcome)}>
               <option value="all">성공+실패</option>
               <option value="make">성공만</option>
               <option value="miss">실패만</option>
             </select>
-            <select value={shotVal} onChange={(e) => setShotVal(e.target.value as typeof shotVal)}>
+            <select aria-label="슛 점수 필터" value={shotVal} onChange={(e) => setShotVal(e.target.value as typeof shotVal)}>
               <option value="all">2점+3점</option>
               <option value="2">2점만</option>
               <option value="3">3점만</option>

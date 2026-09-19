@@ -124,14 +124,14 @@ export default async function HomePage({
         {/* id="games" - 히어로의 "오늘 경기 보기" 버튼이 여기로 스크롤한다. NavBar가
             sticky가 아니라서 scroll-margin-top 보정은 필요 없다(실측). */}
         <form id="games" className="filter-form">
-        <select name="season" defaultValue={activeSeason}>
+        <select name="season" aria-label="시즌 선택" defaultValue={activeSeason}>
           {seasons.map((s) => (
             <option key={s} value={s}>
               {s} 시즌
             </option>
           ))}
         </select>
-        <select name="team" defaultValue={team ?? ""}>
+        <select name="team" aria-label="팀 선택" defaultValue={team ?? ""}>
           <option value="">전체 팀</option>
           {teamOptions.map((t) => (
             <option key={t.tcode} value={t.tcode}>

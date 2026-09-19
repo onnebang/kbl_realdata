@@ -45,6 +45,7 @@
 }
 
 .tabBtn {
+  font-family: inherit;
   background: transparent;
   border: none;
   color: rgba(var(--line-rgb), 0.5);
@@ -72,6 +73,7 @@
 }
 
 .subTabBtn {
+  font-family: inherit;
   background: transparent;
   border: none;
   color: rgba(var(--line-rgb), 0.4);
@@ -116,6 +118,7 @@
 }
 
 .seasonSelect {
+  font-family: inherit;
   padding: 8px 12px;
   border-radius: 8px;
   background: var(--surface);
@@ -338,7 +341,7 @@
 }
 
 .rivalRank {
-  font-size: 0.65rem;
+  font-size: var(--fs-100);
   font-weight: 700;
   color: rgba(var(--line-rgb), 0.5);
 }
@@ -363,7 +366,7 @@
 }
 
 .rivalVal {
-  font-size: 0.7rem;
+  font-size: var(--fs-100);
   color: rgba(var(--line-rgb), 0.6);
   font-variant-numeric: tabular-nums;
 }
@@ -374,10 +377,11 @@
 }
 
 .rivalToggleBtn {
+  font-family: inherit;
   background: transparent;
   border: 1px solid rgba(var(--line-rgb), 0.2);
   color: rgba(var(--line-rgb), 0.5);
-  font-size: 0.7rem;
+  font-size: var(--fs-100);
   padding: 2px 8px;
   border-radius: 12px;
   cursor: pointer;

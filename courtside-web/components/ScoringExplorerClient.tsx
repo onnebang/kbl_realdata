@@ -175,6 +175,7 @@ export default function ScoringExplorerClient({
       <div className={styles.panel}>
         <div className={styles.controlsRow}>
           <select
+            aria-label="분석 대상 구분"
             className={styles.control}
             value={dim}
             onChange={(e) => handleDimChange(e.target.value as Dimension)}
@@ -191,6 +192,7 @@ export default function ScoringExplorerClient({
               type="text"
               className={`${styles.control} ${styles.entitySearchInput}`}
               placeholder="검색..."
+              aria-label="분석 대상 검색"
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);

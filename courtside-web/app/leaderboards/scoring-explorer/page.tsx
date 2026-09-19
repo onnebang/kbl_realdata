@@ -184,7 +184,7 @@ async function ScatterTab({ activeSeason }: { activeSeason?: string }) {
 
       <form className={styles.seasonForm}>
         <input type="hidden" name="tab" value="scatter" />
-        <select name="season" defaultValue={season} className={styles.seasonSelect}>
+        <select name="season" aria-label="시즌 선택" defaultValue={season} className={styles.seasonSelect}>
           {seasons.map((s) => (
             <option key={s} value={s}>
               {s} 시즌

@@ -647,7 +647,8 @@ export default async function PlayerPage({
   }
   // OVR 트렌드 차트에서 이적 구간을 팀 컬러로 구분하는 데 쓴다(요청: "팀을 이적한 선수들 -
   // 팀 구분은 밑에 그래프 색상을 팀 색상으로, 또는 구단 로고?"). courtside_ovr_history.json의
-  // team 필드는 kbl540 쪽 "team_name_current" 표기라 tcode가 아니라 이름으로 매칭해야 한다 -
+  // team 필드는 그 시즌 소속팀의 teams.name이다(tools/build_courtside_ovr.py load_season_teams - 그 시즌
+  // 가장 많이 뛴 팀의 tcode를 이름으로 바꿔 넣는다). tcode가 아니라 이름이라 이름으로 매칭해야 한다 -
   // 이 페이지가 이미 갖고 있는 teamByTcode(Supabase teams)를 이름 기준으로 다시 인덱싱만 한다.
   // Map이 아니라 평범한 객체로 넘긴다 - 서버 컴포넌트(이 파일)에서 클라이언트 컴포넌트
   // (OvrTrendChart, "use client")로 건너가는 props는 RSC 직렬화를 거치는데, Map 인스턴스는
@@ -749,7 +750,8 @@ export default async function PlayerPage({
               {/* clamp() - 영문명이 길면(예: "LEE JUNG HYUN") 고정 5rem이 좁은 화면에서 넘치거나
                   줄바꿈이 깨졌다(감사 피드백: "카드 밑에 이름 영역이 제대로 안 나옴"). */}
               <h1 className={styles.heroName} style={{ fontSize: 'clamp(2.2rem, 9vw, 5rem)', lineHeight: 0.9, textShadow: '2px 2px 0 var(--hero-accent), 4px 4px 0 rgba(0,0,0,0.5)', textTransform: 'uppercase', fontStyle: 'italic' }}>{info.ename || info.name}</h1>
-              <h2 style={{ fontSize: 'clamp(1.3rem, 5vw, 2rem)', color: '#fff', marginTop: '0.5rem', opacity: 0.9 }}>{info.name}</h2>
+              {/* 한글 이름은 부제일 뿐 섹션 제목이 아니다 - h2로 두면 아래 섹션 제목(h2)과 계층이 섞인다. 굵기는 예전 h2 기본값(700). */}
+              <p style={{ fontSize: 'clamp(1.3rem, 5vw, 2rem)', fontWeight: 700, color: '#fff', marginTop: '0.5rem', opacity: 0.9 }}>{info.name}</p>
               <div className={styles.heroMeta} style={{ marginTop: '1.5rem', fontSize: 'clamp(0.9rem, 3vw, 1.2rem)' }}>
                 <TeamBadge team={headerTeam} size={28} />
                 <span>{status.teamName ?? "-"}</span>
