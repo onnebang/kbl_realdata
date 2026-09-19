@@ -425,15 +425,11 @@ def compute_ovr(target_season='2024-2025'):
     # ── 3. 고급 지표 및 보정치 가감 (OVR Buffs & Penalties) ──
     nats = load_nationalities()
     global_df['nationality'] = global_df['pcode'].map(nats)
-    global_df['is_domestic'] = global_df['nationality'].fillna('대한민국').str.contains('대한민국|한국|필리핀|일본')
+    global_df['is_domestic'] = global_df['nationality'].fillna('대한민국').str.contains('대한민국|한국|국내|일본|필리핀|아시아쿼터')
     
     global_df['raw_ovr_mapped'] = global_df['raw_ovr']
     
-    # Domestic Buff (국내 선수 보정 - 너무 강력해져서 대폭 축소)
-    percentile = global_df['raw_ovr'].rank(method='average', pct=True)
-    domestic_buff = 0.5 * percentile
-    global_df.loc[global_df['is_domestic'], 'raw_ovr_mapped'] += domestic_buff[global_df['is_domestic']]
-    
+
     # 베테랑 보정 및 궂은 일(PIE)
     min_per_game = global_df['total_min'] / np.maximum(1, global_df['g'])
     unsung_hero_mask = (min_per_game >= 20.0) & (global_df['usage'] <= 16.0) & (global_df['total_min'] >= 600)
@@ -465,6 +461,10 @@ def compute_ovr(target_season='2024-2025'):
     global_df['rookie_floor'] = global_df['draft_rank_val'].apply(rookie_floor_for)
     minutes_factor = np.clip(global_df['total_min'] / 400.0, 0.0, 1.0)
     global_df['raw_ovr_mapped'] = global_df['raw_ovr_mapped'] * minutes_factor + global_df['rookie_floor'] * (1.0 - minutes_factor)
+
+    global_df['start_year'] = global_df['season_name'].apply(parse_start_year)
+    debut_year_map = global_df.groupby('pcode')['start_year'].min().to_dict()
+    global_df['pro_year'] = global_df['start_year'] - global_df['pcode'].map(debut_year_map) + 1
 
     # 전설적인 99 보정
     LEGEND_COUNT = 10
@@ -508,7 +508,6 @@ def compute_ovr(target_season='2024-2025'):
     # ── 2. 시즌별 오버롤 스무딩 (OvrCurveModel) 적용 ──
     birth_years = load_birth_years()
     global_df['birth_year'] = global_df['pcode'].map(birth_years)
-    global_df['start_year'] = global_df['season_name'].apply(parse_start_year)
     global_df['age'] = np.where(
         global_df['birth_year'].notna() & global_df['start_year'].notna(),
         global_df['start_year'] - global_df['birth_year'],
@@ -586,6 +585,50 @@ def compute_ovr(target_season='2024-2025'):
     global_df['ATTR_ATHLETIC'] = corrected_athletic.round().astype(int).clip(40, 99)
     global_df['ATTR_DEFENSE'] = corrected_defense.round().astype(int).clip(40, 99)
     global_df['ATTR_REBOUNDING'] = corrected_rebounding.round().astype(int).clip(40, 99)
+
+    # ── Rookie Scale Cap (NBA 2K 기준 1~5년차 국내 선수 하드 상한선) ──
+    # OvrCurveModel의 나이 보너스로 인해 상한선을 뚫고 올라온 선수들의 최종 수치를 깎습니다.
+    def final_rookie_cap(row):
+        val = row['OVR']
+        if not row['is_domestic'] or pd.isna(row['pro_year']):
+            return val
+            
+        pro_year = row['pro_year']
+        if pro_year == 1:
+            cap = 84.0
+        elif pro_year == 2:
+            cap = 86.0
+        elif pro_year == 3:
+            cap = 91.0
+        elif pro_year == 4:
+            cap = 94.0
+        elif pro_year == 5:
+            cap = 96.0
+        else:
+            return val
+            
+        minutes_bonus = min(2.0, row['total_min'] / 1000.0)
+        return int(min(val, cap + minutes_bonus))
+
+
+    # DEBUG START
+    debug_mask = global_df['name'].isin(['에디 다니엘', '강성욱', '이선 알바노'])
+    if debug_mask.any():
+        global_df.loc[debug_mask, ['pcode', 'name', 'season_name', 'pro_year', 'nationality', 'is_domestic', 'OVR']].to_csv('scratch/debug_pro_year.csv', index=False)
+    # DEBUG END
+
+    capped_ovr = global_df.apply(final_rookie_cap, axis=1)
+    diff = capped_ovr - global_df['OVR']
+    
+    global_df['OVR'] = capped_ovr
+    global_df['OFF'] = (global_df['OFF'] + diff).clip(40, 99)
+    global_df['DEF'] = (global_df['DEF'] + diff).clip(40, 99)
+    global_df['ATTR_OUTSIDE'] = (global_df['ATTR_OUTSIDE'] + diff).clip(40, 99)
+    global_df['ATTR_INSIDE'] = (global_df['ATTR_INSIDE'] + diff).clip(40, 99)
+    global_df['ATTR_PLAYMAKING'] = (global_df['ATTR_PLAYMAKING'] + diff).clip(40, 99)
+    global_df['ATTR_ATHLETIC'] = (global_df['ATTR_ATHLETIC'] + diff).clip(40, 99)
+    global_df['ATTR_DEFENSE'] = (global_df['ATTR_DEFENSE'] + diff).clip(40, 99)
+    global_df['ATTR_REBOUNDING'] = (global_df['ATTR_REBOUNDING'] + diff).clip(40, 99)
 
     # ── 3차: 배지 및 빌드(Archetype) 산출 ────────────────────────────────
     def determine_archetype(row):
