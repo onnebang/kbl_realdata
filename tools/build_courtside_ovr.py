@@ -344,9 +344,14 @@ def compute_ovr(target_season='2024-2025'):
     global_df['attr_outside_mapped'] = global_df['attr_outside'].rank(method='average', pct=True).apply(map_percentile)
     global_df['attr_inside_mapped'] = global_df['attr_inside'].rank(method='average', pct=True).apply(map_percentile)
     global_df['attr_playmaking_mapped'] = global_df['attr_playmaking'].rank(method='average', pct=True).apply(map_percentile)
-    global_df['attr_athletic_mapped'] = global_df['attr_athletic'].rank(method='average', pct=True).apply(map_percentile)
-    global_df['attr_defense_mapped'] = global_df['attr_defense'].rank(method='average', pct=True).apply(map_percentile)
-    global_df['attr_rebounding_mapped'] = global_df['attr_rebounding'].rank(method='average', pct=True).apply(map_percentile)
+    global_df['attr_athletic_mapped'] = global_df['attr_athletic'].rank(method='average', pct=True).apply(map_percentile).fillna(45.0)
+    global_df['attr_defense_mapped'] = global_df['attr_defense'].rank(method='average', pct=True).apply(map_percentile).fillna(45.0)
+    global_df['attr_rebounding_mapped'] = global_df['attr_rebounding'].rank(method='average', pct=True).apply(map_percentile).fillna(45.0)
+
+    # 가비지 플레이어(0~5분) 스탯 왜곡(NaN 또는 0값으로 인한 99 OVR 버그) 원천 차단
+    garbage_mask = global_df['total_min'] < 5
+    for col in ['attr_outside_mapped', 'attr_inside_mapped', 'attr_playmaking_mapped', 'attr_athletic_mapped', 'attr_defense_mapped', 'attr_rebounding_mapped']:
+        global_df.loc[garbage_mask, col] = 45.0
 
     # ── 2. 모던 롤(Role) 판별 및 가중치 적용 ──
     def determine_role(row):
@@ -424,9 +429,9 @@ def compute_ovr(target_season='2024-2025'):
     
     global_df['raw_ovr_mapped'] = global_df['raw_ovr']
     
-    # Domestic Buff (국내 선수 +3점 내외 보정)
+    # Domestic Buff (국내 선수 보정 - 너무 강력해져서 대폭 축소)
     percentile = global_df['raw_ovr'].rank(method='average', pct=True)
-    domestic_buff = 2.0 * (percentile ** 1.5)
+    domestic_buff = 0.5 * percentile
     global_df.loc[global_df['is_domestic'], 'raw_ovr_mapped'] += domestic_buff[global_df['is_domestic']]
     
     # 베테랑 보정 및 궂은 일(PIE)
@@ -435,10 +440,10 @@ def compute_ovr(target_season='2024-2025'):
     global_df.loc[unsung_hero_mask, 'raw_ovr_mapped'] += 2.0
     
     # Winning Impact (승률, 마진, WPA, PIE 기반)
-    wpa_boost = global_df['wpaPerGame'] * 2.0
-    win_bonus = (global_df['win_pct'] - 0.5) * 5.0
-    margin_bonus = global_df['margin'] * 0.2
-    pie_bonus = (global_df['pie'] - 10.0) * 0.1 # PIE 평균 10 기준 오버/언더
+    wpa_boost = global_df['wpaPerGame'].fillna(0) * 2.0
+    win_bonus = (global_df['win_pct'].fillna(0.5) - 0.5) * 5.0
+    margin_bonus = global_df['margin'].fillna(0) * 0.2
+    pie_bonus = (global_df['pie'].fillna(10.0) - 10.0) * 0.1 # PIE 평균 10 기준 오버/언더
     
     global_df['raw_ovr_mapped'] += (wpa_boost + win_bonus + margin_bonus + pie_bonus)
 
@@ -562,6 +567,13 @@ def compute_ovr(target_season='2024-2025'):
             ]
             for i, r in zip(idxs, model.process_player(seasons)):
                 out_series.loc[i] = r["calculated_ovr"]
+
+
+    # DEBUG START
+    debug_mask = global_df['pcode'].isin(['291755', '291498'])
+    if debug_mask.any():
+        global_df.loc[debug_mask, ['pcode', 'name', 'season_name', 'total_min', 'attr_outside_mapped', 'raw_ovr', 'raw_ovr_mapped']].to_csv('scratch/debug_global_df.csv', index=False)
+    # DEBUG END
 
     # 최종 결과 산출
     global_df['OVR'] = corrected_ovr.round().astype(int).clip(40, 99)
