@@ -251,12 +251,13 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
             {ALL_ACHIEVEMENTS.map(ach => {
               const unlocked = unlockedIds.has(ach.id);
               return (
-                <div key={ach.id} className={styles.hexWrapper}>
-                  <div 
-                    className={`${styles.hexagonCard} ${unlocked ? styles.unlocked : styles.locked}`}
-                    data-tooltip-title={ach.name}
-                    data-tooltip-desc={ach.desc}
-                  >
+                <div 
+                  key={ach.id} 
+                  className={styles.hexWrapper}
+                  data-tooltip-title={ach.name}
+                  data-tooltip-desc={ach.desc}
+                >
+                  <div className={`${styles.hexagonCard} ${unlocked ? styles.unlocked : styles.locked}`}>
                     <div className={styles.hexInner}>
                       {unlocked ? (
                          <span className={styles.icon}>
