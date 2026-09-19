@@ -173,13 +173,18 @@
   stroke-dasharray: 5 3;
 }
 
+/* 확정 배지는 밝은 금속색(금/은/동/회색)으로 채워지므로 어두운 글자, 예상 배지는 속이 비어
+   어두운 바탕이라 흰 글자. */
 .ovrBadgeText {
-  fill: #ffffff;
+  fill: #0d0d0d;
   font-weight: 800;
   font-family: "Big Shoulders Display", "IBM Plex Mono", sans-serif;
   text-anchor: middle;
   dominant-baseline: central;
   pointer-events: none;
+}
+.ovrBadgeTextProjected {
+  fill: #ffffff;
 }
 
 /* 이적 전환 칩의 팀 약어 글자 - 배경 원(팀 컬러)이 이미 inline style로 들어오니 글자

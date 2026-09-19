@@ -4,6 +4,22 @@
   border-radius: var(--r-card);
   padding: 24px;
   border: 1px solid rgba(var(--line-rgb), 0.16);
+  /* 이 카드는 다크 히어로(color: --hero-ink) 안에 있지만 배경은 테마 --surface다(라이트=흰색).
+     글자색을 안 정한 요소가 히어로의 밝은 글자색을 상속하면 라이트에서 흰 바탕에 흰 글씨가 된다. */
+  color: var(--ink);
+  /* 팀 색은 --hero-team(원색) 대신 lib/teamAccent.ts의 두 테마 쌍을 쓴다 - 서버는 테마를 모르므로
+     page.tsx가 라이트/다크 두 색(--ti-l/--ti-d, --tb-l/--tb-d)을 같이 내려보내고 여기서 고른다.
+     ink = 글자·칩 배경(4.5:1), bar = 막대·테두리 같은 비텍스트(3:1), fill-ink = ink 배경 위 글자색. */
+  --tr-ink: var(--ti-l, var(--ink));
+  --tr-bar: var(--tb-l, var(--ink));
+  --tr-fill-ink: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  .trophyRoom {
+    --tr-ink: var(--ti-d, var(--ink));
+    --tr-bar: var(--tb-d, var(--ink));
+    --tr-fill-ink: #0b0d12;
+  }
 }
 
 .header {
@@ -16,7 +32,7 @@
 .title {
   font-size: var(--fs-400);
   font-weight: 800;
-  color: var(--hero-team, var(--ink));
+  color: var(--tr-ink);
   margin: 0;
 }
 
@@ -31,7 +47,7 @@
 .tabBtn {
   background: transparent;
   border: none;
-  color: rgba(var(--ink-rgb), 0.5);
+  color: rgba(var(--line-rgb), 0.5);
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 0.85rem;
@@ -41,8 +57,8 @@
 }
 
 .tabBtn.active {
-  background: var(--hero-team, rgba(var(--ink-rgb), 0.2));
-  color: #fff;
+  background: var(--tr-ink);
+  color: var(--tr-fill-ink);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
@@ -58,7 +74,7 @@
 .subTabBtn {
   background: transparent;
   border: none;
-  color: rgba(var(--ink-rgb), 0.4);
+  color: rgba(var(--line-rgb), 0.4);
   font-size: 0.95rem;
   font-weight: 700;
   padding: 4px 8px;
@@ -68,7 +84,7 @@
 }
 
 .subTabBtn.active {
-  color: var(--hero-team, var(--ink));
+  color: var(--tr-ink);
 }
 
 .subTabBtn.active::after {
@@ -78,7 +94,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: var(--hero-team, var(--ink));
+  background: var(--tr-bar);
   border-radius: 3px 3px 0 0;
 }
 
@@ -258,8 +274,8 @@
 
 .questTier {
   font-size: 0.75rem;
-  background: var(--hero-team, rgba(var(--ink-rgb), 0.1));
-  color: #fff;
+  background: var(--tr-ink);
+  color: var(--tr-fill-ink);
   padding: 2px 8px;
   border-radius: 12px;
   margin-left: 8px;
@@ -268,7 +284,7 @@
 
 .questNumbers {
   font-size: 0.9rem;
-  color: rgba(var(--ink-rgb), 0.7);
+  color: rgba(var(--line-rgb), 0.7);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
@@ -283,7 +299,7 @@
 
 .progressBarFill {
   height: 100%;
-  background: var(--hero-team, #d9640a);
+  background: var(--tr-bar);
   border-radius: 5px;
   transition: width 0.5s ease-out;
 }
@@ -312,19 +328,20 @@
 }
 
 .rivalItem.isMe .rivalAvatar {
-  border: 2px solid var(--hero-team, #d9640a);
-  box-shadow: 0 0 8px rgba(var(--hero-team-rgb, 217,100,10), 0.4);
+  border: 2px solid var(--tr-bar);
+  /* 예전 --hero-team-rgb는 어디서도 정의되지 않아 글로우가 항상 주황이었다. */
+  box-shadow: 0 0 8px color-mix(in srgb, var(--tr-bar) 40%, transparent);
 }
 
 .rivalItem.isMe .rivalName {
-  color: var(--hero-team, #d9640a);
+  color: var(--tr-ink);
   font-weight: 800;
 }
 
 .rivalRank {
   font-size: 0.65rem;
   font-weight: 700;
-  color: rgba(var(--ink-rgb), 0.5);
+  color: rgba(var(--line-rgb), 0.5);
 }
 
 .rivalAvatar {
@@ -339,7 +356,7 @@
 .rivalName {
   font-size: 0.75rem;
   font-weight: 600;
-  color: rgba(var(--ink-rgb), 0.8);
+  color: rgba(var(--line-rgb), 0.8);
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -348,7 +365,7 @@
 
 .rivalVal {
   font-size: 0.7rem;
-  color: rgba(var(--ink-rgb), 0.6);
+  color: rgba(var(--line-rgb), 0.6);
   font-variant-numeric: tabular-nums;
 }
 
@@ -360,7 +377,7 @@
 .rivalToggleBtn {
   background: transparent;
   border: 1px solid rgba(var(--line-rgb), 0.2);
-  color: rgba(var(--ink-rgb), 0.5);
+  color: rgba(var(--line-rgb), 0.5);
   font-size: 0.7rem;
   padding: 2px 8px;
   border-radius: 12px;

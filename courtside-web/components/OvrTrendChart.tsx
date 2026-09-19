@@ -20,16 +20,16 @@ interface OvrTrendChartProps {
   teamByName?: Record<string, TeamMeta>;
 }
 
-// 오버롤 등급별 배지 색 - 요청("오버롤 별로 색상을 다르게 표시해서 좀더 위압감을 주도록")에
-// 따라 배지의 주 색상 채널은 이제 팀이 아니라 "이 시즌이 얼마나 강했는가"다(2K 레이팅 카드의
-// 브론즈/실버/골드/다이아 색띠와 같은 발상). 팀 구분은 선/점/전환 칩으로 옮겼다(아래).
+// 오버롤 등급별 배지 색 - 배지의 주 색상 채널은 팀이 아니라 "이 시즌이 얼마나 강했는가"다
+// (팀 구분은 선/점/전환 칩이 맡는다, 아래). 등급선·색은 선수 카드·랭킹 페이지와 같다
+// (lib/teamPower.ts tierClass = 95/85/75, app/rankings/rankings.module.css의 .tier*).
+// 이 파일은 클라이언트 컴포넌트라 그 모듈(./ovr = 서버 전용)을 import할 수 없어 값을 복제한다 -
+// 카드·랭킹의 등급선을 바꾸면 여기도 같이 바꿀 것.
 const OVR_TIERS: { min: number; color: string }[] = [
-  { min: 90, color: "#ffb020" }, // 레전드
-  { min: 85, color: "#c34cf0" }, // 엘리트
-  { min: 80, color: "#3d8bff" }, // 우수
-  { min: 75, color: "#22c98a" }, // 준수
-  { min: 70, color: "#8fae4a" }, // 평균
-  { min: 0, color: "#7a7f8a" }, // 그 이하
+  { min: 95, color: "#ffd700" }, // 금
+  { min: 85, color: "#c0c0c0" }, // 은
+  { min: 75, color: "#cd7f32" }, // 동
+  { min: 0, color: "#8b949e" }, // 그 이하
 ];
 function tierColor(ovr: number): string {
   return (OVR_TIERS.find((t) => ovr >= t.min) ?? OVR_TIERS[OVR_TIERS.length - 1]).color;
@@ -305,7 +305,7 @@ export default function OvrTrendChart({ history, teamColor = "#542582", teamByNa
                   x={cx}
                   y={badgeCy}
                   fontSize={badgeFont}
-                  className={styles.ovrBadgeText}
+                  className={`${styles.ovrBadgeText} ${isProjected ? styles.ovrBadgeTextProjected : ""}`}
                 >
                   {record.OVR}
                 </text>

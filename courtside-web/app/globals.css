@@ -4,6 +4,9 @@
 /* courtside_template.html의 디자인 토큰 그대로 이식 - 이번 세션 내내 쓰던 브랜드 색상/
    타이포 체계를 실제 웹앱에서도 그대로 유지. */
 :root {
+  /* 다크는 아래 prefers-color-scheme 블록으로 자동 전환 - 선언이 없으면 select·스크롤바 같은
+     네이티브 UI가 다크 테마에서도 밝게 남는다. */
+  color-scheme: light dark;
   --bg: #f4f5f8;
   --surface: #ffffff;
   --surface-soft: #eceef3;

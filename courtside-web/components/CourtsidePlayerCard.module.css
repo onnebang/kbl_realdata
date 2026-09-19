@@ -9,7 +9,8 @@
   container-type: inline-size;
   border-radius: var(--r-card);
   overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+  /* 1px 링: 팀 색이 거의 검정(KT #1A1A1A)이면 카드가 딥다크 히어로와 같은 색이라 윤곽이 사라진다. */
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.12);
   background: linear-gradient(135deg, var(--team-color, #1a1a1a) 0%, #000000 100%);
   transition: transform 0.3s ease;
 }

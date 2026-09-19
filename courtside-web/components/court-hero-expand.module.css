@@ -1,4 +1,4 @@
-/* 히어로 위에 뜨는 확장 버튼 - 히어로는 항상 딥다크(위임적 다크, 테마 무관)라 흰 계열로 고정. */
+/* 3D 슈팅 뷰어를 여는 알약 버튼 - 색은 전부 테마 토큰(--surface/--ink)이라 라이트·다크를 따라간다. */
 .trigger {
   display: inline-flex;
   align-items: center;
@@ -16,7 +16,8 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 .trigger:hover {
-  background: var(--bg-body);
+  /* 예전 var(--bg-body)는 어디서도 정의된 적이 없어 호버 배경이 통째로 무효(투명)였다. */
+  background: var(--surface-soft);
 }
 
 .overlay {

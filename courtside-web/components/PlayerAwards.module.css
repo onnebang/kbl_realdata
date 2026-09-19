@@ -6,7 +6,7 @@
   font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0.05em;
-  color: var(--hero-team, #fff);
+  color: var(--hero-accent, var(--hero-team, #fff));
   margin-bottom: 12px;
   text-transform: uppercase;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);

@@ -164,7 +164,7 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
         {activeSubTab === "stacks" ? (
           <div className={styles.questList}>
             {Object.keys(stacksData).length === 0 && (
-              <div style={{ color: "rgba(255,255,255,0.5)", textAlign: "center" }}>기록이 없습니다.</div>
+              <div style={{ color: "var(--ink-faint)", textAlign: "center" }}>기록이 없습니다.</div>
             )}
             {Object.entries(stacksData).map(([key, stack]) => {
               const pct = Math.min(100, (stack.val / stack.target) * 100);
@@ -200,7 +200,7 @@ export default function AchievementTrophyRoom({ pcode }: Props) {
                     </div>
                     <div className={styles.questNumbers}>
                       {stack.val.toLocaleString()} / <span style={{opacity: 0.6}}>{stack.target.toLocaleString()}</span>
-                      {myRank && <span style={{marginLeft: "8px", color: "var(--hero-team, #d9640a)"}}>[{myRank}위]</span>}
+                      {myRank && <span style={{marginLeft: "8px", color: "var(--tr-ink)"}}>[{myRank}위]</span>}
                     </div>
                   </div>
                   

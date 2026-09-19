@@ -24,12 +24,12 @@
 .sectionTitle {
   font-size: 0.95rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
   margin-bottom: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.16);
 }
 
 .dashTable {
@@ -43,7 +43,7 @@
 .dashTable td {
   padding: 8px 12px;
   text-align: right;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.08);
 }
 
 .dashTable th:first-child,
@@ -59,28 +59,28 @@
 
 .dashTable th {
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--ink-faint);
   font-size: 0.8rem;
 }
 
 .dashTable td {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
   font-weight: 500;
 }
 
 .dashTable tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--line-rgb), 0.04);
 }
 
 .labelCol {
-  color: #fff !important;
+  color: var(--ink) !important;
   font-weight: 600 !important;
 }
 
 /* Empty state */
 .empty {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--ink-faint);
   text-align: center;
   padding: 32px 0;
 }

@@ -51,6 +51,7 @@ import { buildCareerStripSvg, buildCareerStripRowsSvg, CELL_MAX_W, GAP_RESERVE }
 import { getPlayerForm, type PlayerForm } from "@/lib/playerForm";
 import { getPlayerGlance, type PlayerGlance } from "@/lib/playerGlance";
 import { displayTeamName } from "@/lib/teamNames";
+import { accentFor, usesAccent, contrastRatio, teamInkStyle, teamBarStyle } from "@/lib/teamAccent";
 import { TeamBadge } from "@/components/TeamBadge";
 import { PlayerGlanceCard } from "@/components/PlayerGlance";
 import { PlayerFormPanel, resolveFormUnit } from "@/components/PlayerForm";
@@ -602,6 +603,17 @@ export default async function PlayerPage({
   const dnaMix = computeShootingDna(careerShots);
   const constellationSvg = buildConstellationSvg(careerShots);
   const teamColor = headerTeam?.color ?? "#d9640a";
+  // 히어로는 라이트/다크 모두 딥다크 배경이라 KT(#1A1A1A)·KCC·삼성·LG처럼 명도가 낮은 팀 색은 글자·
+  // 활성 탭·차트 선에서 사라진다(KT는 1.12:1). 그 위에 올라가는 요소만 lib/teamAccent.ts의 밝은
+  // 틴트(--hero-accent)를 쓰고, 카드 그라디언트·배지·별자리 점은 팀 원색(--hero-team) 그대로 둔다.
+  // 명도가 충분한 팀은 accent == 원색이라 아무것도 바뀌지 않는다.
+  const heroAccent = accentFor(status.tcode ?? "", teamColor);
+  // 활성 탭처럼 accent를 "배경"으로 깔고 그 위에 글자를 얹는 자리용 - 보정이 들어간 팀만 흰색/다크
+  // 중 대비가 높은 쪽을 고른다(안 들어간 팀은 변수를 안 내려 CSS 기본값 흰색 그대로).
+  const heroAccentOn =
+    usesAccent(status.tcode ?? "", teamColor) && (contrastRatio(heroAccent, "#0b0d12") ?? 0) > (contrastRatio(heroAccent, "#ffffff") ?? 0)
+      ? "#0b0d12"
+      : undefined;
 
   // 득점 분석(요청 - ESPN 르브론 제임스 득점 인포그래픽) - careerRows 하나로 전부 집계.
   // 팀명은 현재 연고 기준(PRESEASON_SEASON)으로 통일 - "그 경기 당시 이름"이 아니라
@@ -619,7 +631,9 @@ export default async function PlayerPage({
   
   // OVR 히스토리 데이터 
   const ovrHistory = getPlayerOvrHistory(pcode);
-  // 가장 최신(마지막) OVR 기록 (Courtside 카드용)
+  // 가장 최신(마지막) OVR 기록 (Courtside 카드용). 26-27 시즌 값이면 그 값을 카드의 공식 OVR로
+  // 쓴다 - "예상" 표기 없이 확정값으로 보이는 게 의도다(2026-09-19 결정). 히어로 스탯 블록은 별개로
+  // 마지막 출전 시즌(statSeason) 기준이라 캡션이 다르다.
   const latestOvr = ovrHistory.length > 0 ? ovrHistory[ovrHistory.length - 1] : null;
 
   // ── 커리어 결 띠 ─────────────────────────────────────────────────────────────────────
@@ -640,8 +654,9 @@ export default async function PlayerPage({
   // 실측상 조용히 빈 값처럼 동작했다(에러 없이 통과하지만 .get()이 아무것도 못 찾음) -
   // 평범한 객체/배열만 이 경계를 확실하게 넘는다.
   const teamMetaByName: Record<string, { abbr: string; color: string; logoUrl: string | null }> = {};
-  for (const t of teamByTcode.values()) {
-    teamMetaByName[t.name] = { abbr: t.abbr, color: t.color, logoUrl: t.logoUrl };
+  // 차트는 항상 #0d0d0d 패널이라 선·점·이적 칩 색도 accent(명도 낮은 팀만 밝게, 나머지는 원색 그대로).
+  for (const [tc, t] of teamByTcode) {
+    teamMetaByName[t.name] = { abbr: t.abbr, color: accentFor(tc, t.color), logoUrl: t.logoUrl };
   }
   // 히어로 발치 밴드: 폭 800 · 높이 72(= 라벨 줄 13 + 막대 47 + 레일 12)를 요청하면 빌더가
   // 구간별 글자에 맞춰 라벨 줄과 최종 뷰박스 높이를 잡는다(막대 47은 그대로 남는다).
@@ -718,7 +733,7 @@ export default async function PlayerPage({
       </Link>
 
       {/* ── 인포그래픽 포스터 스타일 Hero (Courtside Player Card + 헥스빈 아트) ── */}
-      <section className={styles.hero} style={{ "--hero-team": teamColor, display: "flex", flexDirection: "column", gap: "2rem", overflow: "visible" } as CSSProperties}>
+      <section className={styles.hero} style={{ "--hero-team": teamColor, "--hero-accent": heroAccent, "--hero-accent-on": heroAccentOn, ...teamInkStyle(teamColor), ...teamBarStyle(teamColor), display: "flex", flexDirection: "column", gap: "2rem", overflow: "visible" } as CSSProperties}>
         {/* 오른쪽 배경 비주얼 (헥스빈/별자리 아트) - 크기 및 위치 조정 */}
         <svg className={styles.heroArt} viewBox="345 27 375 357" preserveAspectRatio="xMidYMid slice" aria-hidden dangerouslySetInnerHTML={{ __html: constellationSvg }} style={{ right: 0, left: "auto", width: "50%", opacity: 0.8 }} />
         <div className={styles.heroScrim} style={{ background: "linear-gradient(to right, #0a0a0a 40%, transparent 100%)" }} />
@@ -730,10 +745,10 @@ export default async function PlayerPage({
             
             {/* 왼쪽: 기존 선수 메타 정보 (타이포그래피 위주) */}
             <div className={styles.heroTextSide}>
-              <div className={styles.heroKicker} style={{ letterSpacing: '0.2em', color: 'var(--hero-team)', fontWeight: 800, marginBottom: '1rem' }}>COURTSIDE PLAYER PROFILE</div>
+              <div className={styles.heroKicker} style={{ letterSpacing: '0.2em', color: 'var(--hero-accent)', fontWeight: 800, marginBottom: '1rem' }}>COURTSIDE PLAYER PROFILE</div>
               {/* clamp() - 영문명이 길면(예: "LEE JUNG HYUN") 고정 5rem이 좁은 화면에서 넘치거나
                   줄바꿈이 깨졌다(감사 피드백: "카드 밑에 이름 영역이 제대로 안 나옴"). */}
-              <h1 className={styles.heroName} style={{ fontSize: 'clamp(2.2rem, 9vw, 5rem)', lineHeight: 0.9, textShadow: '2px 2px 0 var(--hero-team), 4px 4px 0 rgba(0,0,0,0.5)', textTransform: 'uppercase', fontStyle: 'italic' }}>{info.ename || info.name}</h1>
+              <h1 className={styles.heroName} style={{ fontSize: 'clamp(2.2rem, 9vw, 5rem)', lineHeight: 0.9, textShadow: '2px 2px 0 var(--hero-accent), 4px 4px 0 rgba(0,0,0,0.5)', textTransform: 'uppercase', fontStyle: 'italic' }}>{info.ename || info.name}</h1>
               <h2 style={{ fontSize: 'clamp(1.3rem, 5vw, 2rem)', color: '#fff', marginTop: '0.5rem', opacity: 0.9 }}>{info.name}</h2>
               <div className={styles.heroMeta} style={{ marginTop: '1.5rem', fontSize: 'clamp(0.9rem, 3vw, 1.2rem)' }}>
                 <TeamBadge team={headerTeam} size={28} />
@@ -743,7 +758,7 @@ export default async function PlayerPage({
                 {status.backNum && (
                   <>
                     <span className={styles.heroMetaDot}>·</span>
-                    <span style={{ color: 'var(--hero-team)', fontWeight: 'bold' }}>
+                    <span style={{ color: 'var(--hero-accent)', fontWeight: 'bold' }}>
                       {status.backNumAsLastSeason && status.backNumSeason ? `${shortSeason(status.backNumSeason)} ` : ""}#{status.backNum}
                     </span>
                   </>
@@ -811,7 +826,7 @@ export default async function PlayerPage({
           <PlayerHeroTabs
             ovrTrend={
               ovrHistory.length > 0 ? (
-                <OvrTrendChart history={ovrHistory} teamColor={teamColor} teamByName={teamMetaByName} />
+                <OvrTrendChart history={ovrHistory} teamColor={heroAccent} teamByName={teamMetaByName} />
               ) : null
             }
             awards={getPlayerAwards(pcode).length > 0 ? <PlayerAwards pcode={pcode} /> : null}

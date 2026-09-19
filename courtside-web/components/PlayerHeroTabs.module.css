@@ -34,8 +34,10 @@
 }
 
 .tabActive {
-  background: var(--hero-team, #d9640a);
-  color: #fff;
+  /* --hero-accent = 딥다크 히어로 위에서 보이도록 명도를 보정한 팀 색(page.tsx heroAccent).
+     --hero-accent-on은 보정이 들어간 팀에서만 내려오는 글자색(밝은 accent 위 흰 글자가 약해서). */
+  background: var(--hero-accent, var(--hero-team, #d9640a));
+  color: var(--hero-accent-on, #fff);
 }
 
 .panelActive {
