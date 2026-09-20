@@ -747,6 +747,18 @@ def compute_ovr(target_season='2024-2025'):
     diff = role_capped_ovr - global_df['OVR']
     global_df['OVR'] = role_capped_ovr
     
+    # ── 하드코딩 예외 처리 (특정 선수의 태업/비효율 극강 보정) ──
+    # 오누아쿠: 23-24시즌 이후 태업 및 비효율 극강으로 인한 강제 페널티 부여
+    def apply_onuaku_final_penalty(row):
+        val = row['OVR']
+        if '오누아쿠' in str(row['name']) and str(row['season_name']) >= '2023-2024':
+            val -= 5.0 # 강제 -5 페널티
+        return val
+
+    onuaku_capped = global_df.apply(apply_onuaku_final_penalty, axis=1)
+    diff += (onuaku_capped - global_df['OVR'])
+    global_df['OVR'] = onuaku_capped
+    
     global_df['OFF'] = (global_df['OFF'] + diff).clip(40, 99)
     global_df['DEF'] = (global_df['DEF'] + diff).clip(40, 99)
     global_df['ATTR_OUTSIDE'] = (global_df['ATTR_OUTSIDE'] + diff).clip(40, 99)
