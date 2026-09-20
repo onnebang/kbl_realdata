@@ -229,11 +229,17 @@ def compute_ovr(target_season='2024-2025'):
         gps.pcode, g.season_name,
         COUNT(gps.gmkey) as g,
         SUM(gps.play_min + gps.play_sec/60.0) as total_min,
+        SUM((gps.play_min + gps.play_sec/60.0) * IFNULL(gps.pace, 70.0) / 40.0) as total_possessions,
         AVG(gps.score) as pts,
+        SUM(gps.score) as total_pts,
         AVG(gps.ast) as ast,
+        SUM(gps.ast) as total_ast,
         AVG(gps.rb) as reb,
+        SUM(gps.rb) as total_reb,
         AVG(gps.stl) as stl,
+        SUM(gps.stl) as total_stl,
         AVG(gps.bs) as blk,
+        SUM(gps.bs) as total_blk,
         AVG(gps.to_) as tov,
         SUM(gps.per * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as per,
         SUM(gps.pie * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as pie,
@@ -243,9 +249,12 @@ def compute_ovr(target_season='2024-2025'):
         SUM(gps.threep) as tpm, SUM(gps.threep_a) as tpa,
         SUM(gps.ft) as ftm, SUM(gps.ft_a) as fta,
         AVG(gps.offr) as offr, AVG(gps.defr) as defr,
+        SUM(gps.offr) as total_offr, SUM(gps.defr) as total_defr,
         SUM(gps.dk) as dkm, SUM(gps.dk_a) as dka,
         AVG(gps.fb) as fb_pts, AVG(gps.pp) as paint_pts,
+        SUM(gps.fb) as total_fb_pts, SUM(gps.pp) as total_paint_pts,
         AVG(gps.sast) as sast, AVG(gps.dfl) as dfl,
+        SUM(gps.sast) as total_sast, SUM(gps.dfl) as total_dfl,
         AVG(gps.ast_rt) as ast_rt, AVG(gps.ast_to) as ast_to,
         AVG(gps.oreb_rt) as oreb_rt, AVG(gps.dreb_rt) as dreb_rt, AVG(gps.tov_rt) as tov_rt,
         SUM(gps.defrtg * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as def_rtg,
@@ -316,18 +325,50 @@ def compute_ovr(target_season='2024-2025'):
     global_df['position'] = global_df['pcode'].map(positions).fillna('Unknown')
     
     # ── 세부 카테고리 (NBA 2K 스타일) 원시 점수 계산 ──
+    # 포제션 필터 (0 분모 방지)
+    global_df['total_possessions'] = global_df['total_possessions'].replace(0, 1)
+    
+    # Per-75 스탯 환산
+    global_df['pts_per75'] = (global_df['total_pts'] / global_df['total_possessions']) * 75
+    global_df['ast_per75'] = (global_df['total_ast'] / global_df['total_possessions']) * 75
+    global_df['reb_per75'] = (global_df['total_reb'] / global_df['total_possessions']) * 75
+    global_df['stl_per75'] = (global_df['total_stl'] / global_df['total_possessions']) * 75
+    global_df['blk_per75'] = (global_df['total_blk'] / global_df['total_possessions']) * 75
+    
+    global_df['tpm_per75'] = (global_df['tpm'] / global_df['total_possessions']) * 75
+    global_df['ftm_per75'] = (global_df['ftm'] / global_df['total_possessions']) * 75
+    global_df['paint_pts_per75'] = (global_df['total_paint_pts'] / global_df['total_possessions']) * 75
+    global_df['dkm_per75'] = (global_df['dkm'] / global_df['total_possessions']) * 75
+    global_df['fb_pts_per75'] = (global_df['total_fb_pts'] / global_df['total_possessions']) * 75
+    global_df['sast_per75'] = (global_df['total_sast'] / global_df['total_possessions']) * 75
+    global_df['dfl_per75'] = (global_df['total_dfl'] / global_df['total_possessions']) * 75
+    global_df['offr_per75'] = (global_df['total_offr'] / global_df['total_possessions']) * 75
+    global_df['defr_per75'] = (global_df['total_defr'] / global_df['total_possessions']) * 75
+
+    # 효율성 지표
+    global_df['threep_pct'] = np.where(global_df['tpa'] > 0, global_df['tpm'] / global_df['tpa'], 0)
+    global_df['fg_pct'] = np.where(global_df['fga'] > 0, global_df['fgm'] / global_df['fga'], 0)
+    global_df['ft_pct'] = np.where(global_df['fta'] > 0, global_df['ftm'] / global_df['fta'], 0)
+    global_df['ft_rate'] = np.where(global_df['fga'] > 0, global_df['fta'] / global_df['fga'], 0)
+
     # 1. Outside Scoring
-    global_df['attr_outside'] = (global_df['tpm'] * 4.0) + (global_df['ts_pct'] * 30.0) + (global_df['ftm'] * 1.5)
+    # 볼륨(tpm_per75)에 효율(3P%)을 가중치로 부여. TS% 추가.
+    global_df['attr_outside'] = (global_df['tpm_per75'] * 4.0 * (global_df['threep_pct'] / 0.33)) + (global_df['ts_pct'] * 30.0) + (global_df['ftm_per75'] * 1.5 * global_df['ft_pct'])
+    
     # 2. Inside Scoring
-    global_df['attr_inside'] = (global_df['paint_pts'] * 2.0) + (global_df['dkm'] * 5.0) + (np.where(global_df['fga'] > 0, global_df['fta'] / global_df['fga'], 0) * 20.0)
+    global_df['attr_inside'] = (global_df['paint_pts_per75'] * 2.0 * (global_df['fg_pct'] / 0.5)) + (global_df['dkm_per75'] * 5.0) + (global_df['ft_rate'] * 20.0)
+    
     # 3. Playmaking
-    global_df['attr_playmaking'] = (global_df['ast'] * 3.0) + (global_df['sast'] * 2.0) + (global_df['ast_to'] * 5.0) + (global_df['ast_rt'] * 0.2)
+    global_df['attr_playmaking'] = (global_df['ast_per75'] * 3.0) + (global_df['sast_per75'] * 2.0) + (global_df['ast_to'] * 5.0) + (global_df['ast_rt'] * 0.2)
+    
     # 4. Athleticism
-    global_df['attr_athletic'] = (global_df['fb_pts'] * 3.0) + (global_df['total_min'] / max(1, global_df['g'].max()) * 0.5) + (global_df['blk'] * 5.0) + (global_df['stl'] * 5.0)
+    global_df['attr_athletic'] = (global_df['fb_pts_per75'] * 3.0) + (global_df['total_min'] / max(1, global_df['g'].max()) * 0.5) + (global_df['blk_per75'] * 5.0) + (global_df['stl_per75'] * 5.0)
+    
     # 5. Defense
-    global_df['attr_defense'] = (global_df['stl'] * 4.0) + (global_df['blk'] * 4.0) + (global_df['dfl'] * 3.0) - (global_df['def_rtg'] * 0.3)
+    global_df['attr_defense'] = (global_df['stl_per75'] * 4.0) + (global_df['blk_per75'] * 4.0) + (global_df['dfl_per75'] * 3.0) - (global_df['def_rtg'] * 0.3)
+    
     # 6. Rebounding
-    global_df['attr_rebounding'] = (global_df['offr'] * 3.0) + (global_df['defr'] * 2.0) + (global_df['oreb_rt'] * 0.3) + (global_df['dreb_rt'] * 0.2)
+    global_df['attr_rebounding'] = (global_df['offr_per75'] * 3.0) + (global_df['defr_per75'] * 2.0) + (global_df['oreb_rt'] * 0.3) + (global_df['dreb_rt'] * 0.2)
 
     # ── 1. 1차 매핑: 백분위 기반으로 2K 스케일 (45~99) ──
     anchors = [(0.000, 60), (0.040, 69), (0.220, 74), (0.620, 79), (0.840, 84), (0.940, 89), (0.985, 94), (1.000, 99)]
@@ -401,11 +442,62 @@ def compute_ovr(target_season='2024-2025'):
         # 점수 순으로 내림차순 정렬
         role_scores.sort(key=lambda x: x[1], reverse=True)
         
-        # 대표 롤은 가장 점수가 높은 1등 롤로 지정
-        best_role = role_scores[0][0]
+        # ── 하드 캡 (최소 자격 요건) 검사 ──
+        best_role = 'All-Around'
+        
+        tpm = row['tpm'] / max(1, row['g'])
+        pts = row['pts']
+        ast = row['ast']
+        stl = row['stl']
+        reb = row['reb']
+        
+        for role_name, score in role_scores:
+            if role_name == 'Sharpshooter':
+                if row['attr_outside_mapped'] >= 80 or tpm >= 2.0:
+                    best_role = role_name
+                    break
+            elif role_name == 'Lockdown Defender':
+                if row['attr_defense_mapped'] >= 80 or stl >= 1.5:
+                    best_role = role_name
+                    break
+            elif role_name == '3&D Wing':
+                if row['attr_outside_mapped'] >= 75 and row['attr_defense_mapped'] >= 75:
+                    best_role = role_name
+                    break
+            elif role_name == 'Playmaker':
+                if row['attr_playmaking_mapped'] >= 80 or ast >= 5.0:
+                    best_role = role_name
+                    break
+            elif role_name == 'Slasher':
+                if row['attr_inside_mapped'] >= 80 or (row['attr_athletic_mapped'] >= 80 and row['attr_inside_mapped'] >= 75):
+                    best_role = role_name
+                    break
+            elif role_name == 'Paint Beast':
+                if row['attr_inside_mapped'] >= 80 and row['attr_rebounding_mapped'] >= 75:
+                    best_role = role_name
+                    break
+            elif role_name == 'Glass Cleaner':
+                if row['attr_rebounding_mapped'] >= 80 or reb >= 8.0:
+                    best_role = role_name
+                    break
+            elif role_name == 'Stretch Big':
+                if row['attr_outside_mapped'] >= 75 and tpm >= 1.0:
+                    best_role = role_name
+                    break
+            elif role_name == 'Point Center':
+                if row['attr_playmaking_mapped'] >= 75 or ast >= 3.5:
+                    best_role = role_name
+                    break
+            elif role_name == 'Scoring Threat':
+                if pts >= 14.0:
+                    best_role = role_name
+                    break
+            elif role_name == 'All-Around':
+                best_role = role_name
+                break
         
         # 최종 OVR은 상위 3개 롤의 평균값 (원툴 선수 방지)
-        top_3_avg = sum([score for role, score in role_scores[:3]]) / min(3, len(role_scores))
+        top_3_avg = sum([score for r, score in role_scores[:3]]) / min(3, len(role_scores))
                 
         return pd.Series([best_role, top_3_avg])
 
@@ -660,29 +752,21 @@ def compute_ovr(target_season='2024-2025'):
     global_df['ATTR_REBOUNDING'] = (global_df['ATTR_REBOUNDING'] + diff).clip(40, 99)
 
     # ── 3차: 배지 및 빌드(Archetype) 산출 ────────────────────────────────
-    def determine_archetype(row):
-        pts = row['pts']
-        reb = row['reb']
-        ast = row['ast']
-        stl = row['stl']
-        blk = row['blk']
-        tpm = row['tpm'] / max(1, row['g'])
-        
-        if pts >= 18 and ast >= 5: return "오펜시브 엔진"
-        if ast >= 6: return "퓨어 플레이메이커"
-        if reb >= 10 and tpm >= 1.5: return "스트레치 빅"
-        if reb >= 10 and blk >= 1.5: return "림 프로텍터"
-        if reb >= 9: return "글래스 클리너"
-        if tpm >= 2.0 and (stl >= 1.2 or blk >= 0.8): return "3&D 윙"
-        if tpm >= 2.5: return "샤프슈터"
-        if pts >= 15 and tpm < 1.0: return "슬래셔"
-        if row['DEF'] >= 85: return "락다운 디펜더"
-        if pts >= 12: return "샷 크리에이터"
-        if row['OVR'] >= 85: return "올어라운드 스렛"
-        
-        return "롤 플레이어"
-
-    global_df['archetype'] = global_df.apply(determine_archetype, axis=1)
+    ROLE_KOR_MAP = {
+        'Point Center': '포인트 센터',
+        'Stretch Big': '스트레치 빅',
+        'Paint Beast': '페인트존 장인',
+        'Glass Cleaner': '글래스 클리너',
+        'Playmaker': '플레이메이커',
+        'Sharpshooter': '샤프슈터',
+        'Slasher': '슬래셔',
+        '3&D Wing': '3&D 윙',
+        'Lockdown Defender': '락다운 디펜더',
+        'Scoring Threat': '스코어링 스렛',
+        'All-Around': '올어라운드'
+    }
+    
+    global_df['archetype'] = global_df['role'].map(ROLE_KOR_MAP)
 
     def calc_badge(val, bronze, silver, gold, hof):
         if val >= hof: return 4
