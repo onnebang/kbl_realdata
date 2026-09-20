@@ -334,6 +334,7 @@ def compute_ovr(target_season='2024-2025'):
     global_df['reb_per75'] = (global_df['total_reb'] / global_df['total_possessions']) * 75
     global_df['stl_per75'] = (global_df['total_stl'] / global_df['total_possessions']) * 75
     global_df['blk_per75'] = (global_df['total_blk'] / global_df['total_possessions']) * 75
+    global_df['tov_per75'] = (global_df['tov'] / global_df['total_possessions']) * 75
     
     global_df['tpm_per75'] = (global_df['tpm'] / global_df['total_possessions']) * 75
     global_df['ftm_per75'] = (global_df['ftm'] / global_df['total_possessions']) * 75
@@ -352,14 +353,18 @@ def compute_ovr(target_season='2024-2025'):
     global_df['ft_rate'] = np.where(global_df['fga'] > 0, global_df['fta'] / global_df['fga'], 0)
 
     # 1. Outside Scoring
-    # 볼륨(tpm_per75)에 효율(3P%)을 가중치로 부여. TS% 추가.
-    global_df['attr_outside'] = (global_df['tpm_per75'] * 4.0 * (global_df['threep_pct'] / 0.33)) + (global_df['ts_pct'] * 30.0) + (global_df['ftm_per75'] * 1.5 * global_df['ft_pct'])
+    # 볼륨(tpm_per75)에 효율(3P%)을 가중치로 부여. TS% 추가. 턴오버 치명적 페널티(Multiplier)
+    tov_multiplier = np.maximum(0.3, 1.0 - (global_df['tov_per75'] / 8.0)) # 턴오버 4개면 50% 타격
+    global_df['attr_outside'] = ((global_df['tpm_per75'] * 4.0 * (global_df['threep_pct'] / 0.33)) + (global_df['ts_pct'] * 30.0) + (global_df['ftm_per75'] * 1.5 * global_df['ft_pct'])) * tov_multiplier
     
     # 2. Inside Scoring
-    global_df['attr_inside'] = (global_df['paint_pts_per75'] * 2.0 * (global_df['fg_pct'] / 0.5)) + (global_df['dkm_per75'] * 5.0) + (global_df['ft_rate'] * 20.0)
+    # 핵어샤크 방지 (자유투 기하급수 페널티 Multiplier) 및 턴오버 치명적 페널티 부여
+    ft_penalty_multiplier = np.where(global_df['fta'] > 0, np.maximum(0.2, (global_df['ft_pct']**3) / 0.3), 1.0)
+    global_df['attr_inside'] = ((global_df['paint_pts_per75'] * 2.0 * (global_df['fg_pct'] / 0.5)) + (global_df['dkm_per75'] * 5.0) + (global_df['ft_rate'] * 20.0)) * tov_multiplier * ft_penalty_multiplier
     
     # 3. Playmaking
-    global_df['attr_playmaking'] = (global_df['ast_per75'] * 3.0) + (global_df['sast_per75'] * 2.0) + (global_df['ast_to'] * 5.0) + (global_df['ast_rt'] * 0.2)
+    # 무리한 턴오버(tov_per75)를 강하게 페널티 부여
+    global_df['attr_playmaking'] = (global_df['ast_per75'] * 3.0) + (global_df['sast_per75'] * 2.0) + (global_df['ast_to'] * 5.0) + (global_df['ast_rt'] * 0.2) - (global_df['tov_per75'] * 3.0)
     
     # 4. Athleticism
     global_df['attr_athletic'] = (global_df['fb_pts_per75'] * 3.0) + (global_df['total_min'] / max(1, global_df['g'].max()) * 0.5) + (global_df['blk_per75'] * 5.0) + (global_df['stl_per75'] * 5.0)
