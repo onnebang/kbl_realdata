@@ -22,6 +22,24 @@ NEUTRAL_AGE = 26
 # 같은 값이어야 한다(그쪽이 로스터/이적 화면 기준 시즌).
 PROJECTION_SEASON = '2026-2027'
 
+# DB엔 시즌 전체가 아니라 단 1경기만 적재된 고아 시즌(1998-99, 2004-05)이 있다 - 그대로 두면 그 1경기에
+# 나온 선수(이상민·문경은·추승균 등)가 "커리어 첫 시즌 OVR 51" 같은 가짜 시즌을 갖고, 공백 보간이
+# 그 뒤 2005-06까지 지어냈다. 개막 직후(5경기 미만)만 잠깐 빠지므로 진행 중 시즌엔 영향이 거의 없다.
+MIN_SEASON_GAMES = 5
+FULL_SEASON_SQL = (
+    "g.season_name IN (SELECT season_name FROM games WHERE season_category = '정규시즌'"
+    f" GROUP BY season_name HAVING COUNT(*) >= {MIN_SEASON_GAMES})"
+)
+
+# 평판 가산 가중치(수상 id -> 1회당 OVR 가산). 회당 값은 예전 calculate_reputation_boost와 같고, 시즌 인지형으로
+# 바뀌면서 dpoy·allstar_mvp만 새로 넣었다(둘 다 스탯에 다 안 잡히는 "그 해의 얼굴" 신호인데 빠져 있었음).
+REPUTATION_WEIGHTS = {
+    'regular_mvp': 1.5, 'po_mvp': 1.0, 'dpoy': 1.0, 'champ': 0.5, 'allstar_mvp': 0.5,
+    'month_mvp': 0.2, 'round_mvp': 0.1, 'allstar': 0.1,
+}
+NATIONAL_TEAM_WEIGHT = 0.3  # nt_* 대회 1회당
+REPUTATION_CAP = 5.0
+
 # 박스스코어에는 없는 외부 신호(국가대표 발탁 등)를 다음 시즌 예상치에만 명시적으로
 # 가산한다 - roster_departure(은퇴/미계약처럼 경기 기록만으로는 알 수 없는 사실을 사람이
 # 확인해 적재하는 테이블)와 같은 패턴. 나이 곡선/스무딩 파라미터를 손대는 시도는 "어릴수록
@@ -204,11 +222,18 @@ def load_next_season_roster(season):
         return {}
 
 
+def load_awards():
+    path = os.path.join(os.path.dirname(__file__), '..', 'courtside-web', 'lib', 'courtside_awards.json')
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding='utf-8') as f:
+        return json.load(f)
+
+
 def parse_start_year(season_name):
-    try:
-        return int(str(season_name).split('-')[0])
-    except (ValueError, IndexError):
-        return None
+    """'2018-2019' / '2018-19' / '2018 Asian Games' / '1997' -> 시작연도(첫 4자리 숫자)."""
+    m = re.match(r'\s*(\d{4})', str(season_name))
+    return int(m.group(1)) if m else None
 
 
 def compute_ovr(target_season='2024-2025'):
@@ -264,6 +289,7 @@ def compute_ovr(target_season='2024-2025'):
     JOIN games g ON gps.gmkey = g.gmkey
     WHERE g.season_category IN ('정규시즌', '플레이오프', '챔프전')
       AND g.season_name NOT LIKE '%D리그%'
+      AND """ + FULL_SEASON_SQL + """
     GROUP BY gps.pcode, g.season_name
     """
 
@@ -272,6 +298,13 @@ def compute_ovr(target_season='2024-2025'):
         name_df = pd.read_sql_query(
             "SELECT gps.pcode, gps.pname, g.season_name"
             " FROM player_game_stats gps JOIN games g ON gps.gmkey = g.gmkey",
+            conn,
+        )
+        # WPA 리더보드는 pcode 없이 (등록명, 팀 tcode)만 갖고 있다 - 그 조합을 pcode로 잇는 다리.
+        team_df = pd.read_sql_query(
+            "SELECT gps.pcode, gps.pname, g.season_name, gps.tcode"
+            " FROM player_game_stats gps JOIN games g ON gps.gmkey = g.gmkey"
+            " GROUP BY gps.pcode, gps.pname, g.season_name, gps.tcode",
             conn,
         )
     except Exception as e:
@@ -298,27 +331,27 @@ def compute_ovr(target_season='2024-2025'):
 
 
     # WPA 데이터 로드
+    # 예전엔 (시즌, 표시 이름)으로 조인했다 - 같은 시즌에 동명이인이 둘이면(이정현 x2, 김주성 x2 등) 행이
+    # 곱절로 불어나(133행 중복) 차트에 같은 시즌 점이 둘씩 찍혔고, WPA도 두 사람 값이 뒤섞였다. 팀까지 맞춰
+    # pcode에 정확히 붙이고, 시즌 중 트레이드로 항목이 둘이면 경기 수 가중평균한다.
+    global_df['wpaPerGame'] = 0.0
     wpa_path = os.path.join(os.path.dirname(__file__), '..', 'raw', 'analysis', 'wpa_season_leaderboard.json')
     if os.path.exists(wpa_path):
         with open(wpa_path, 'r', encoding='utf-8') as f:
             wpa_data = json.load(f)
-        
-        # DataFrame 형태로 변환: season, name, wpaPerGame
-        wpa_records = []
-        if 'bySeason' in wpa_data:
-            for season, players in wpa_data['bySeason'].items():
-                for p in players:
-                    wpa_records.append({'season_name': season, 'name': p['player'], 'wpaPerGame': p.get('wpaPerGame', 0)})
-        wpa_df = pd.DataFrame(wpa_records)
-        
-        # Merge WPA to global_df
+        wpa_df = pd.DataFrame([
+            {'season_name': season, 'pname': p['player'], 'tcode': str(p['team']),
+             'games': p.get('games', 0), 'wpaPerGame': p.get('wpaPerGame', 0)}
+            for season, players in wpa_data.get('bySeason', {}).items() for p in players
+        ])
         if not wpa_df.empty:
-            global_df = pd.merge(global_df, wpa_df, on=['season_name', 'name'], how='left')
+            j = team_df.merge(wpa_df, on=['season_name', 'pname', 'tcode'])
+            j['w'] = j['games'] * j['wpaPerGame']
+            wpa_by_pcode = j.groupby(['pcode', 'season_name']).agg(w=('w', 'sum'), n=('games', 'sum'))
+            wpa_by_pcode['wpaPerGame'] = wpa_by_pcode['w'] / wpa_by_pcode['n'].where(wpa_by_pcode['n'] > 0)
+            global_df = global_df.drop(columns='wpaPerGame').merge(
+                wpa_by_pcode[['wpaPerGame']].reset_index(), on=['pcode', 'season_name'], how='left')
             global_df['wpaPerGame'] = global_df['wpaPerGame'].fillna(0)
-        else:
-            global_df['wpaPerGame'] = 0.0
-    else:
-        global_df['wpaPerGame'] = 0.0
 
     # 포지션 데이터를 먼저 로드하여 병합 (가중치 계산용)
     teams, positions = load_teams_and_positions()
@@ -527,7 +560,34 @@ def compute_ovr(target_season='2024-2025'):
     margin_bonus = global_df['margin'].fillna(0) * 0.2
     pie_bonus = (global_df['pie'].fillna(10.0) - 10.0) * 0.1 # PIE 평균 10 기준 오버/언더
     
-    global_df['raw_ovr_mapped'] += (wpa_boost + win_bonus + margin_bonus + pie_bonus)
+    # 평판 가산(인기·당대의 파워): 스탯 밖의 신호(수상·올스타·국대·우승)를 OVR에 얹는다.
+    # 시즌 인지형 - 그 시즌 시작연도 이하에 받은 것만 센다. 예전엔 커리어 전체 합계를 모든 시즌에 똑같이
+    # 얹어서, 2018-19 MVP의 +1.5가 2010-11 신인 시즌에도 붙었다(성장 곡선이 실제보다 평평해지고 어린
+    # 시즌이 부풀려짐). 대회·시상식은 그 시즌 시작연도로 잡는다(2018 아시안게임 = 2018-19 시즌 개막 직전).
+    # 한번 쌓인 명성은 은퇴까지 유지하되, 하락기 감쇠는 어차피 OvrCurveModel이 처리한다.
+    awards_data = load_awards()
+    reputation_events = {}  # pcode -> [(시작연도, 가중치)]
+    for pcode, p_awards in awards_data.items():
+        events = []
+        for a in p_awards:
+            w = REPUTATION_WEIGHTS.get(a['id'], NATIONAL_TEAM_WEIGHT if a['id'].startswith('nt_') else 0.0)
+            if not w:
+                continue
+            for y in a.get('years', []):
+                start = parse_start_year(y)
+                if start is not None:
+                    events.append((start, w))
+        if events:
+            reputation_events[pcode] = events
+
+    def reputation_boost(pcode, start_year):
+        boost = sum(w for y, w in reputation_events.get(pcode, ()) if y <= start_year)
+        return min(boost, REPUTATION_CAP)
+
+    global_df['start_year'] = global_df['season_name'].apply(parse_start_year)
+    global_df['rep_boost'] = [reputation_boost(p, y) for p, y in zip(global_df['pcode'], global_df['start_year'])]
+
+    global_df['raw_ovr_mapped'] += (wpa_boost + win_bonus + margin_bonus + pie_bonus + global_df['rep_boost'])
 
     # ── 4. 가비지 타임 패널티 ──
     def apply_garbage_penalty(row):
@@ -548,8 +608,12 @@ def compute_ovr(target_season='2024-2025'):
     minutes_factor = np.clip(global_df['total_min'] / 400.0, 0.0, 1.0)
     global_df['raw_ovr_mapped'] = global_df['raw_ovr_mapped'] * minutes_factor + global_df['rookie_floor'] * (1.0 - minutes_factor)
 
-    global_df['start_year'] = global_df['season_name'].apply(parse_start_year)
-    debut_year_map = global_df.groupby('pcode')['start_year'].min().to_dict()
+    # 프로 몇 년차인지는 "DB에 처음 나온 시즌"으로 센다. 단 DB 자체가 2006-07에 시작(그 전은 1경기짜리 고아
+    # 시즌뿐)해서, 그 시즌에 이미 뛰던 선수(양동근·김주성·서장훈·주희정 등)의 진짜 데뷔 연도는 알 수 없다 -
+    # 예전엔 이들을 전부 "1년차"로 잡아 신인 캡(74→90)이 2006~2011년 시즌을 눌렀다(양동근 80→83→86→89→92
+    # 로 매년 오르는 계단이 실은 캡이 풀리는 모양). 첫 시즌이 DB 시작 시즌인 선수는 데뷔 연도 미상 = 캡 대상 제외.
+    first_start = global_df.groupby('pcode')['start_year'].min()
+    debut_year_map = first_start[first_start > global_df['start_year'].min()].to_dict()
     global_df['pro_year'] = global_df['start_year'] - global_df['pcode'].map(debut_year_map) + 1
 
     # 전설적인 99 보정
@@ -666,11 +730,6 @@ def compute_ovr(target_season='2024-2025'):
                 out_series.loc[i] = r["calculated_ovr"]
 
 
-    # DEBUG START
-    debug_mask = global_df['pcode'].isin(['291755', '291498'])
-    if debug_mask.any():
-        global_df.loc[debug_mask, ['pcode', 'name', 'season_name', 'total_min', 'attr_outside_mapped', 'raw_ovr', 'raw_ovr_mapped']].to_csv('scratch/debug_global_df.csv', index=False)
-    # DEBUG END
 
     # 최종 결과 산출
     global_df['OVR'] = corrected_ovr.round().astype(int).clip(40, 99)
@@ -734,18 +793,13 @@ def compute_ovr(target_season='2024-2025'):
         return int(min(val, cap + minutes_bonus))
 
 
-    # DEBUG START
-    debug_mask = global_df['name'].isin(['에디 다니엘', '강성욱', '이선 알바노'])
-    if debug_mask.any():
-        global_df.loc[debug_mask, ['pcode', 'name', 'season_name', 'pro_year', 'nationality', 'is_domestic', 'OVR']].to_csv('scratch/debug_pro_year.csv', index=False)
-    # DEBUG END
 
-    capped_ovr = global_df.apply(final_rookie_cap, axis=1)
-    global_df['OVR'] = capped_ovr
-    
-    role_capped_ovr = global_df.apply(final_role_player_cap, axis=1)
-    diff = role_capped_ovr - global_df['OVR']
-    global_df['OVR'] = role_capped_ovr
+    # 캡으로 깎인 만큼은 OFF/DEF/세부 능력치에도 똑같이 빼야 한다(예상치 행은 이미 그렇게 함). 예전엔 role
+    # 캡 분만 전파해서 신인 캡에 걸린 선수는 OVR 78인데 OFF 88 같은 불일치가 났다.
+    pre_cap_ovr = global_df['OVR']
+    global_df['OVR'] = global_df.apply(final_rookie_cap, axis=1)
+    global_df['OVR'] = global_df.apply(final_role_player_cap, axis=1)
+    diff = global_df['OVR'] - pre_cap_ovr
     
     # ── 하드코딩 예외 처리 (특정 선수의 태업/비효율 극강 보정) ──
     # 오누아쿠: 23-24시즌 이후 태업 및 비효율 극강으로 인한 강제 페널티 부여
@@ -960,9 +1014,12 @@ def compute_ovr(target_season='2024-2025'):
             ]
             return model.project_forward(seasons, extra_years=1)
 
-        proj_ovr = round(project_one('raw_ovr_mapped'))
-        proj_off = round(project_one('raw_off_mapped'))
-        proj_def = round(project_one('raw_def_mapped'))
+        # 마지막 확정 시즌 이후~예상 시즌 개막 전에 새로 쌓인 평판(예: 2026 아시안게임 발탁)만 얹는다.
+        rep_delta = (reputation_boost(pcode, parse_start_year(PROJECTION_SEASON))
+                     - reputation_boost(pcode, last['start_year']))
+        proj_ovr = round(project_one('raw_ovr_mapped') + rep_delta)
+        proj_off = round(project_one('raw_off_mapped') + rep_delta)
+        proj_def = round(project_one('raw_def_mapped') + rep_delta)
         proj_outside = round(project_one('attr_outside_mapped'))
         proj_inside = round(project_one('attr_inside_mapped'))
         proj_playmaking = round(project_one('attr_playmaking_mapped'))
@@ -985,7 +1042,7 @@ def compute_ovr(target_season='2024-2025'):
         # ── Rookie Scale Cap (for projected data) ──
         if last['is_domestic'] and pd.notna(last['start_year']):
             proj_start_year = parse_start_year(PROJECTION_SEASON)
-            proj_pro_year = proj_start_year - debut_year_map[pcode] + 1
+            proj_pro_year = proj_start_year - debut_year_map.get(pcode, -10**6) + 1
             if 1 <= proj_pro_year <= 5:
                 if proj_pro_year == 1:
                     cap = 74.0
