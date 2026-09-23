@@ -64,7 +64,10 @@ def load_candidates():
     rows = con.execute(
         "SELECT gps.pcode, gps.pname, MIN(g.season_name), MAX(g.season_name), COUNT(*)"
         " FROM player_game_stats gps JOIN games g ON gps.gmkey = g.gmkey"
-        " WHERE g.season_category IN ('정규시즌', '플레이오프', '챔프전') AND g.season_name NOT LIKE '%D리그%'"
+        # '챔프전'은 DB에 없는 철자라 0건 매칭이었다 - 챔피언결정전만 나온 (선수,시즌)이
+        # 44건 있고, 통산 경기 수도 그만큼 과소 집계돼 동명이인 판별 근거가 흔들렸다
+        # (2026-09-24, build_courtside_ovr.py에서 같은 오타를 고치다 발견).
+        " WHERE g.season_category IN ('정규시즌', '플레이오프', '챔피언결정전') AND g.season_name NOT LIKE '%D리그%'"
         " GROUP BY gps.pcode, gps.pname"
     ).fetchall()
     con.close()
