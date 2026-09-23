@@ -59,7 +59,7 @@ export default async function PlayerRankingsPage({
       
       <div className={styles.list}>
         {players.map((p, index) => (
-          <Link href={`/player/${p.pcode}`} key={p.pcode} style={{ textDecoration: 'none' }}>
+          <Link href={`/players/${p.pcode}`} key={p.pcode} style={{ textDecoration: 'none' }}>
             <div className={styles.card}>
               <div className={styles.rank}>{index + 1}</div>
               <div className={styles.ovrBlock}>

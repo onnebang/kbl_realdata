@@ -66,7 +66,7 @@ export default async function TeamRankingsPage() {
             <div className={styles.rosterTitle}>STARTING 5</div>
             <div className={styles.rosterList}>
               {t.topPlayers.map(p => (
-                <Link href={`/player/${p.pcode}`} key={p.pcode} style={{ textDecoration: 'none' }}>
+                <Link href={`/players/${p.pcode}`} key={p.pcode} style={{ textDecoration: 'none' }}>
                   <div className={styles.rosterItem}>
                     <span className={styles.rosterName}>{p.name} <span style={{fontSize: '0.8rem', color: '#8b949e'}}>{p.position}</span></span>
                     <span className={`${styles.rosterOvr} ${tierClass(p.OVR)}`}>{p.OVR}</span>

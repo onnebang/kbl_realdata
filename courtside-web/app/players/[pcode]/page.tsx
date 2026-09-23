@@ -830,6 +830,9 @@ export default async function PlayerPage({
                   offOvr={latestOvr.OFF}
                   defOvr={latestOvr.DEF}
                   photoUrl={info.photoUrl}
+                  attributes={latestOvr.attributes}
+                  archetype={latestOvr.archetype}
+                  badges={latestOvr.badges}
                 />
               </div>
             )}

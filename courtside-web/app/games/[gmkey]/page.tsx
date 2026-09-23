@@ -16,6 +16,7 @@ import { buildMatchupInsights, gradeMatchupInsights, type PreviewInsight, type P
 import { getDepartedByTeam, prevSeasonName } from "@/lib/preseason";
 import { getScheduleContext, scheduleSummary } from "@/lib/scheduleContext";
 import { TeamBadge } from "@/components/TeamBadge";
+import { getTeamPowerByName } from "@/lib/teamPower";
 import GameReplay from "@/components/GameReplay";
 import { InsightCard } from "@/components/InsightCard";
 import { deriveGameStatus } from "@/lib/gameStatus";
@@ -491,6 +492,10 @@ export default async function GamePage({
   // Supabase를 그대로 쳤음 - box-score API 라우트가 이미 쓰는 패턴을 그대로 가져옴.
   const ttl = gameTtl(status);
 
+  // 매치업 배너 PWR 배지용 - 동기 함수(캐시된 JSON 읽기)라 Promise.all에 안 넣고 그냥 호출.
+  const homePower = game.home_team ? getTeamPowerByName(game.home_team.name) : null;
+  const awayPower = game.away_team ? getTeamPowerByName(game.away_team.name) : null;
+
   // 본체(팀스탯·박스스코어·이벤트·액션라벨)는 그대로 던진다 - 없으면 그릴 화면이 없다.
   // 프리뷰 지표와 슛 로그는 패널 재료라 실패해도 그 패널만 빈다.
   const [teamStats, playerStats, events, pregameFeatures, actionLabels, shots] = await Promise.all([
@@ -774,6 +779,9 @@ export default async function GamePage({
               size={36}
             />
             <span className="matchup-banner-name">{game.home_team?.name ?? game.gmkey}</span>
+            {/* 요청("실시간 라이브 중계에서도 오버롤 시스템... 지금 파워에서 누가 더 강력한지
+                직관적으로") - 승률 모델과는 별개로, 로스터 오버롤 기반 팀 파워만 배지로 상시 노출. */}
+            {homePower && <span className="matchup-banner-pwr" title="팀 파워(로스터 오버롤)">PWR {homePower.ovr}</span>}
             {/* 예정 경기는 스코어 자리를 아예 비움(0-0이나 빈칸처럼 보이는 것 방지) - 가운데 VS만 */}
             {status !== "scheduled" && <LiveScore side="home" initial={game.home_score} />}
           </div>
@@ -781,6 +789,7 @@ export default async function GamePage({
           <div className="matchup-banner-side away" style={{ background: game.away_team?.color ?? "#888" }}>
             {status !== "scheduled" && <LiveScore side="away" initial={game.away_score} />}
             <span className="matchup-banner-name">{game.away_team?.name ?? ""}</span>
+            {awayPower && <span className="matchup-banner-pwr" title="팀 파워(로스터 오버롤)">PWR {awayPower.ovr}</span>}
             <TeamBadge
               team={game.away_team ? { name: game.away_team.name, abbr: game.away_team.abbr, color: "#ffffff33", logoUrl: game.away_team.logo_url } : null}
               size={36}

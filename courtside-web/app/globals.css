@@ -802,6 +802,19 @@ select {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
+/* 팀 파워 배지(요청: "라이브 중계에도 오버롤 붙여서 직관적으로") - 스코어보다 눈에 덜 띄게,
+   이름 옆 작은 라벨로. IBM Plex Mono로 숫자 트랙을 다른 스코어보드 숫자류와 맞춘다. */
+.matchup-banner-pwr {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+}
+
 /* 팀 페이지 배너(app/teams/[tcode]) - 이 팀 전용 페이지라는 느낌을 주려고 팀컬러를
    배경 전체에 씀(다른 페이지는 전부 중립 --surface 톤이라 여기만 예외). */
 .team-page-banner {

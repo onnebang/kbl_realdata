@@ -9,7 +9,7 @@ import { TeamBadge } from "@/components/TeamBadge";
 import { getTeamPlayedRegCount, type TeamFixture, type StandingsRow } from "@/lib/matchups";
 import { getAllTeams } from "@/lib/playerProfile";
 import { displayTeamName } from "@/lib/teamNames";
-import { getTeamPowerByName } from "@/lib/teamPower";
+import { getTeamPowerByName, getAllTeamPowers } from "@/lib/teamPower";
 import { buildConstellationSvg } from "@/lib/playerDataScience";
 import {
   getTeamSeasonShots,
@@ -160,6 +160,59 @@ function PanelTitle({ title, chips = [] }: { title: string; chips?: (string | nu
 // 선수 퍼센타일 프로필과 같은 색 규칙(상위 --positive / 하위 --negative / 중간 --gold).
 function percentileColor(p: number) {
   return p >= 70 ? "var(--positive)" : p <= 30 ? "var(--negative)" : "var(--gold)";
+}
+
+// ── 팀 파워 사다리 - 4팩터 패널과 같은 .pctRow 시각 언어를 재사용, 새 CSS 없이 리그 10팀을
+// 한눈에(요청: "팀끼리 파워를 좀더 느낌있게 표시"). 전체 카드 보기는 이미 /rankings/teams에
+// 있어서(lib/teamPower.ts 공용 계산) 여긴 그 데이터를 압축 막대로만 보여주고 링크로 보낸다.
+function TeamPowerLadderPanel({
+  powers, currentTeamName, teamByName, accent,
+}: {
+  powers: ReturnType<typeof getAllTeamPowers>;
+  currentTeamName: string;
+  teamByName: Map<string, { abbr: string; color: string; logoUrl: string | null }>;
+  accent: string;
+}) {
+  if (powers.length === 0) return <div className="empty-note">팀 파워 데이터 없음</div>;
+  const lo = Math.min(...powers.map((p) => p.ovr)) - 2;
+  const hi = Math.max(...powers.map((p) => p.ovr)) + 2;
+  const avg = powers.reduce((s, p) => s + p.ovr, 0) / powers.length;
+  const avgPct = ((avg - lo) / (hi - lo)) * 100;
+  return (
+    <>
+      <div className={styles.pctGrid}>
+        {powers.map((p, i) => {
+          const meta = teamByName.get(p.teamName);
+          const isCurrent = p.teamName === currentTeamName;
+          const fillPct = Math.max(((p.ovr - lo) / (hi - lo)) * 100, 3);
+          return (
+            <div className={styles.pctRow} key={p.teamName}>
+              <div className={styles.pctLabel} style={isCurrent ? { color: accent } : undefined}>
+                {i + 1}. {meta?.abbr ?? p.teamName}
+              </div>
+              <div className={styles.pctTrack}>
+                <div
+                  className={styles.pctFill}
+                  style={{ width: `${fillPct}%`, background: isCurrent ? accent : percentileColor(100 - (i / (powers.length - 1)) * 100) }}
+                />
+                <div className={styles.pctMid} style={{ left: `${avgPct}%` }} />
+              </div>
+              <div className={styles.pctValue}>
+                OFF {p.off} · DEF {p.def}
+              </div>
+              <div className={styles.pctNum} style={{ color: isCurrent ? accent : undefined }}>
+                {p.ovr}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className={styles.pctNote}>
+        {powers[0]?.season} 로스터 오버롤(주전 5명 70% + 다음 4명 30% 가중) · 세로선 = 리그 평균({avg.toFixed(1)}) ·{" "}
+        <Link href="/rankings/teams">전체 카드로 보기 →</Link>
+      </div>
+    </>
+  );
 }
 
 // ── 4팩터 vs 리그 - 선수 퍼센타일 바와 같은 시각 언어의 가로 바 8줄(공격 4 + 수비 4) ──
@@ -716,6 +769,12 @@ export default async function TeamPage({
   // team 필드가 그 선수의 "현재" 소속 기준이라 과거 시즌 기준 팀 매칭은 애초에 부정확함).
   const teamPower = getTeamPowerByName(teamName);
 
+  // 요청("팀 자세히보기에서 게임 같은 느낌으로 팀끼리 파워 비교") - /rankings/teams가 이미
+  // 10팀 전체를 카드로 보여주니 그걸 다시 만들지 않고, 이 페이지엔 같은 데이터(getAllTeamPowers)로
+  // 압축된 막대 사다리만 붙이고 전체 보기는 그 페이지로 링크한다.
+  const allPowers = teamPower ? getAllTeamPowers(teamPower.season) : [];
+  const powerByTeamName = new Map([...oppByTcode.values()].map((t) => [t.name, t]));
+
   const constellationSvg = shots.length ? buildConstellationSvg(shots) : null;
 
   // 히어로 전적/순위: 사실이므로 factSeason에서 한 경기라도 치렀으면 factSeason, 아니면 estSeason.
@@ -891,6 +950,19 @@ export default async function TeamPage({
               </Link>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── 0. 팀 파워 사다리(요청: "게임 같은 느낌으로 팀끼리 파워 비교") ── */}
+      {teamPower && (
+        <div className={styles.panel}>
+          <PanelTitle title="리그 파워 사다리" />
+          <TeamPowerLadderPanel
+            powers={allPowers}
+            currentTeamName={teamName}
+            teamByName={powerByTeamName}
+            accent={accent}
+          />
         </div>
       )}
 
