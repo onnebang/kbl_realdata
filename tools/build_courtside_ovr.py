@@ -266,6 +266,7 @@ def compute_ovr(target_season='2024-2025'):
         AVG(gps.bs) as blk,
         SUM(gps.bs) as total_blk,
         AVG(gps.to_) as tov,
+        SUM(gps.to_) as total_tov,
         SUM(gps.per * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as per,
         SUM(gps.pie * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as pie,
         SUM(MAX(MIN(gps.netrtg, 50), -50) * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as net_rtg,
@@ -367,7 +368,10 @@ def compute_ovr(target_season='2024-2025'):
     global_df['reb_per75'] = (global_df['total_reb'] / global_df['total_possessions']) * 75
     global_df['stl_per75'] = (global_df['total_stl'] / global_df['total_possessions']) * 75
     global_df['blk_per75'] = (global_df['total_blk'] / global_df['total_possessions']) * 75
-    global_df['tov_per75'] = (global_df['tov'] / global_df['total_possessions']) * 75
+    # tov_per75 예전엔 AVG(경기당 평균)를 시즌 전체 포제션으로 나눠서(75 곱셈까지) 경기 수만큼
+    # 한 번 더 나눈 효과가 나 턴오버 페널티가 사실상 꺼져 있었다(2026-09-22 커밋에서 발견, 검증 후
+    # 2026-09-23 적용) - 다른 per75 스탯과 똑같이 SUM(total_tov)을 써야 맞다.
+    global_df['tov_per75'] = (global_df['total_tov'] / global_df['total_possessions']) * 75
     
     global_df['tpm_per75'] = (global_df['tpm'] / global_df['total_possessions']) * 75
     global_df['ftm_per75'] = (global_df['ftm'] / global_df['total_possessions']) * 75
