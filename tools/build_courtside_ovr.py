@@ -71,6 +71,10 @@ MANUAL_OVR_OVERRIDES = {
                'reason': '김경원 - 눈에 띄는 활약 없는 저분 백업, 82는 과함(20년차 KBL 팬 피드백, 2026-09-23 - 목표치 미확정, 추가 조정 가능)'},
     '291699': {'delta': 7, 'from_season': None,
                'reason': '칼 타마요 - 필리핀 국가대표급 실력 대비 저평가, 많은 상향 필요(20년차 KBL 팬 피드백, 2026-09-23)'},
+    '290790': {'delta': 2, 'from_season': '2025-2026',
+               'reason': '정효근 - 나이 감안해도 너무 낮음, 81 정도가 적당(20년차 KBL 팬 피드백, 2026-09-24)'},
+    '291760': {'delta': -4, 'from_season': None,
+               'reason': '이민서 - 보여준 게 없음, 69 정도가 적당(20년차 KBL 팬 피드백, 2026-09-24)'},
 }
 
 
@@ -236,7 +240,15 @@ def load_next_season_roster(season):
     global_df에는 그 pcode 행 자체가 없어 이름을 따로 들고 있어야 한다). 개막 전 스탯이
     0개인 시즌에 예상 OVR을 만들 대상을 정하는 데 쓴다. DB 접속이 안 되면(로컬/오프라인)
     빈 dict로 조용히 건너뛴다 - 예상 OVR은 있으면 좋은 부가 기능이지 본 파이프라인의
-    필수 요건이 아니다."""
+    필수 요건이 아니다.
+
+    r.pcode가 NULL인 행(KBL 공식 pcode를 아직 못 받은 신규 영입/드래프트 - 2026-09-24
+    확인 시점에 15명)도 그냥 버리지 않는다 - 예전엔 "and r.pcode is not null"로 걸러서
+    이런 선수는 로스터에 있는데도 예상 OVR 자체가 안 생겼다(유저 제보). "tbd_이름" 형태의
+    임시 키를 줘서 완전 신인 바닥치(rookie_floor_for)라도 받게 한다 - 진짜 KBL pcode가
+    아니라서 선수 프로필 페이지(/players/[pcode])는 그 선수 photo_url 등을 찾는 Supabase
+    조회가 비어 notFound()로 빠진다(그래프/명단엔 나오는데 프로필만 404) - 진짜 pcode가
+    배정되면 이 임시 키는 자동으로 안 쓰인다(정상 경로로 흡수됨)."""
     try:
         import psycopg2
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -245,10 +257,13 @@ def load_next_season_roster(season):
         cur = conn.cursor()
         cur.execute(
             "select r.pcode, t.name, r.player_name from season_roster r join teams t using (tcode)"
-            " where r.season_name = %s and r.pcode is not null",
+            " where r.season_name = %s",
             (season,),
         )
-        result = {pcode: {"team": team, "name": name} for pcode, team, name in cur.fetchall()}
+        result = {}
+        for pcode, team, name in cur.fetchall():
+            key = pcode if pcode else f"tbd_{name}"
+            result[key] = {"team": team, "name": name}
         conn.close()
         return result
     except Exception as e:

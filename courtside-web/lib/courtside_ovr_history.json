@@ -77109,16 +77109,16 @@
     "team": "원주 DB",
     "position": "FD",
     "role": "Lockdown Defender",
-    "OVR": 79,
-    "OFF": 77,
-    "DEF": 83,
+    "OVR": 81,
+    "OFF": 79,
+    "DEF": 85,
     "attributes": {
-      "outside": 77,
-      "inside": 75,
-      "playmaking": 78,
-      "athletic": 80,
-      "defense": 80,
-      "rebounding": 79
+      "outside": 79,
+      "inside": 77,
+      "playmaking": 80,
+      "athletic": 82,
+      "defense": 82,
+      "rebounding": 81
     },
     "archetype": "락다운 디펜더",
     "badges": {
@@ -77135,16 +77135,16 @@
     "season": "2026-2027",
     "team": "원주 DB",
     "position": "FD",
-    "OVR": 78,
-    "OFF": 76,
-    "DEF": 83,
+    "OVR": 80,
+    "OFF": 78,
+    "DEF": 85,
     "attributes": {
-      "outside": 76,
-      "inside": 74,
-      "playmaking": 76,
-      "athletic": 79,
-      "defense": 78,
-      "rebounding": 78
+      "outside": 78,
+      "inside": 76,
+      "playmaking": 78,
+      "athletic": 81,
+      "defense": 80,
+      "rebounding": 80
     },
     "archetype": "락다운 디펜더",
     "badges": {
@@ -113702,16 +113702,16 @@
     "team": "서울 SK",
     "position": "GD",
     "role": "Lockdown Defender",
-    "OVR": 73,
-    "OFF": 71,
-    "DEF": 76,
+    "OVR": 69,
+    "OFF": 67,
+    "DEF": 72,
     "attributes": {
-      "outside": 78,
-      "inside": 82,
-      "playmaking": 87,
-      "athletic": 78,
-      "defense": 90,
-      "rebounding": 74
+      "outside": 74,
+      "inside": 78,
+      "playmaking": 83,
+      "athletic": 74,
+      "defense": 86,
+      "rebounding": 70
     },
     "archetype": "락다운 디펜더",
     "badges": {
@@ -113728,16 +113728,16 @@
     "season": "2026-2027",
     "team": "서울 SK",
     "position": "GD",
-    "OVR": 75,
-    "OFF": 73,
-    "DEF": 77,
+    "OVR": 71,
+    "OFF": 69,
+    "DEF": 73,
     "attributes": {
-      "outside": 79,
-      "inside": 83,
-      "playmaking": 89,
-      "athletic": 80,
-      "defense": 92,
-      "rebounding": 75
+      "outside": 75,
+      "inside": 79,
+      "playmaking": 85,
+      "athletic": 76,
+      "defense": 88,
+      "rebounding": 71
     },
     "archetype": "락다운 디펜더",
     "badges": {
@@ -117756,5 +117756,395 @@
       "defense": 2
     },
     "projected": false
+  },
+  {
+    "pcode": "tbd_강현수",
+    "name": "강현수",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_다리우스 베즐리",
+    "name": "다리우스 베즐리",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_루이스 킹",
+    "name": "루이스 킹",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_박준형",
+    "name": "박준형",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_송재환",
+    "name": "송재환",
+    "season": "2026-2027",
+    "team": "원주 DB",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_스코티 제임스",
+    "name": "스코티 제임스",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_아치 굿윈",
+    "name": "아치 굿윈",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_안세준",
+    "name": "안세준",
+    "season": "2026-2027",
+    "team": "서울 삼성",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_양준",
+    "name": "양준",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_우상현",
+    "name": "우상현",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_제리 아바디아노",
+    "name": "제리 아바디아노",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_조혁재",
+    "name": "조혁재",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_존 무니",
+    "name": "존 무니",
+    "season": "2026-2027",
+    "team": "안양 정관장",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_지용현",
+    "name": "지용현",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "tbd_트레이 포터",
+    "name": "트레이 포터",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "archetype": "롤 플레이어",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
   }
 ]
