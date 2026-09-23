@@ -472,6 +472,36 @@ def roster_window_minutes(window_entries, player_stats_by_game, tcode):
     return {pcode: total / n_games for pcode, total in totals.items()}
 
 
+# 엔트리에 있는데 최근 ROLL_WINDOW 경기 출전 기록이 없는 선수(신인/복귀/장기결장 복귀)에게
+# 줄 최소 가중치. 0으로 두면 "명단에 있는데 없는 사람"이 되어 체격/시너지 가중평균의 분모가
+# 그 선수만큼 비고, 그러면 결장자를 뺀 효과와 구분이 안 된다.
+LINEUP_MIN_WEIGHT = 5.0
+# 선발 5인 가산. "결장자 반영 중심"이라 선발 보정은 일부러 약하게 둔다 - 선발이 누구냐보다
+# 누가 빠졌냐가 근거가 훨씬 확실한 신호이고, 이 모델은 애초에 라인업으로 학습된 적이 없다.
+LINEUP_STARTER_BOOST = 1.3
+
+
+def apply_lineup_to_roster(roster_minutes, dressed, starters):
+    """과거 출전분 기반 로스터 가중치를, 그 경기 실제 12인 엔트리로 보정한다.
+
+    KBL 규정상 12인(선발 5 + 벤치 7)을 경기 30분 전까지 제출한다. 그 명단이 나오면
+    (a) 엔트리에 없는 선수 = 그날 결장 -> 가중치에서 제외, (b) 선발 5인 -> 소폭 가산.
+    (a)가 이 보정의 핵심이다 - 주축이 빠진 걸 반영하는 건 근거가 확실한 반면, 선발이
+    누구냐로 승률을 크게 흔드는 건 이 모델이 뒷받침하지 못한다.
+
+    dressed/starters가 비면 원본을 그대로 돌려준다(라인업 미발표 시 기존 동작 유지).
+    """
+    if not dressed:
+        return roster_minutes
+    dressed, starters = set(dressed), set(starters or ())
+    out = {p: m for p, m in roster_minutes.items() if p in dressed}
+    for p in dressed:
+        out.setdefault(p, LINEUP_MIN_WEIGHT)
+    for p in starters:
+        out[p] = out.get(p, LINEUP_MIN_WEIGHT) * LINEUP_STARTER_BOOST
+    return out
+
+
 def bio_synergy_features(roster_minutes, bio, onoff_snapshot, game_date, prefix):
     pairs_age, pairs_ht, pairs_wt, pairs_vert, pairs_wing, pairs_synergy = [], [], [], [], [], []
     # coverage를 "팀 로테이션 전체 출전시간 대비 값이 있는 비율"로 일관되게 재려면, 값이

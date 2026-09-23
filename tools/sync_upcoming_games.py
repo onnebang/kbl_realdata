@@ -151,7 +151,7 @@ def upsert_games(cur, schedule_games):
     return len(rows)
 
 
-def compute_prediction_rows(ctx, model_bundle, schedule_games):
+def compute_prediction_rows(ctx, model_bundle, schedule_games, lineups=None):
     """predict_upcoming_games.team_features_now를 그대로 재사용해 피처+승률을 계산 -
     DB 연결 없이 순수 계산만(migrate_game_events_to_supabase.py에서 실제로 겪은 함정:
     무거운 계산 동안 연결을 유휴로 열어두면 Supabase 풀러가 끊음 - 그래서 연결은 계산이
@@ -168,8 +168,13 @@ def compute_prediction_rows(ctx, model_bundle, schedule_games):
     rows = []
     skipped = 0
     for g in schedule_games:
-        home_feats = pug.team_features_now(g["tcodeH"], "home", ctx, g["gameDate"])
-        away_feats = pug.team_features_now(g["tcodeA"], "away", ctx, g["gameDate"])
+        # lineups가 있으면(= 12인 엔트리 발표됨) 그 경기의 팀별 엔트리를 넘긴다.
+        # 없으면 None이 흘러가 기존 경로와 동일하게 동작한다.
+        lu = (lineups or {}).get(g["gmkey"]) or {}
+        home_feats = pug.team_features_now(g["tcodeH"], "home", ctx, g["gameDate"],
+                                           lineup=lu.get(g["tcodeH"]))
+        away_feats = pug.team_features_now(g["tcodeA"], "away", ctx, g["gameDate"],
+                                           lineup=lu.get(g["tcodeA"]))
         if home_feats is None or away_feats is None:
             skipped += 1  # 시즌 극초반 표본 부족 - 예측 보류(predict_upcoming_games와 동일)
             continue

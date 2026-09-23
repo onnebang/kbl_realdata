@@ -29,7 +29,7 @@ OUT_PATH = os.path.join(ANALYSIS_DIR, "upcoming_predictions.json")
 LOOKAHEAD_DAYS = 3
 
 
-def team_features_now(tcode, prefix, ctx, today_str):
+def team_features_now(tcode, prefix, ctx, today_str, lineup=None):
     hist = ctx["timelines"].get(tcode, [])
     feats = ett.rolling_features(hist)
     if feats is None:
@@ -37,6 +37,10 @@ def team_features_now(tcode, prefix, ctx, today_str):
 
     window = hist[-ett.ROLL_WINDOW:]
     roster = ett.roster_window_minutes(window, ctx["player_stats_by_game"], tcode)
+    # lineup이 주어지면(= 그 경기 12인 엔트리가 발표됨) 결장자를 빼고 선발을 소폭 가산한다.
+    # None이면 아무 일도 안 일어나므로 기존 호출부 동작은 그대로다.
+    if lineup:
+        roster = ett.apply_lineup_to_roster(roster, lineup.get("dressed"), lineup.get("starters"))
     bs = ett.bio_synergy_features(roster, ctx["bio"], ctx["latest_onoff"], today_str, prefix)
     form = {f"{prefix}_{k}": v for k, v in ett.multi_window_form(hist).items()}
     age_curve = {f"{prefix}_{k}": v for k, v in ett.age_curve_team_feature(roster, ctx["bio"], ctx["age_curves"], today_str).items()}
