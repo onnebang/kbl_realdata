@@ -40,15 +40,49 @@ REPUTATION_WEIGHTS = {
 NATIONAL_TEAM_WEIGHT = 0.3  # nt_* 대회 1회당
 REPUTATION_CAP = 5.0
 
-# 박스스코어에는 없는 외부 신호(국가대표 발탁 등)를 다음 시즌 예상치에만 명시적으로
-# 가산한다 - roster_departure(은퇴/미계약처럼 경기 기록만으로는 알 수 없는 사실을 사람이
-# 확인해 적재하는 테이블)와 같은 패턴. 나이 곡선/스무딩 파라미터를 손대는 시도는 "어릴수록
-# 보너스가 크다"는 구조 때문에 데뷔 시즌이 최근 시즌보다 높아지는 역전을 낳아 되돌렸다
-# (2026-09-18) - 대신 확정된 과거 시즌은 그대로 두고, 아직 경기가 없는 예상치에만 사람이
-# 사유를 남기고 가산하는 이 방식으로 대체한다. 사용자 확인 후에만 추가/제거할 것.
-PROJECTION_REPUTATION_BOOST = {
-    '291752': {'boost': 1, 'reason': '2026 국가대표 발탁(김보배) - 박스스코어에 없는 외부 신호, 2026-09-18 사용자 확인'},
+# 박스스코어 + 공식 수상 실적(REPUTATION_WEIGHTS)으로는 못 잡는 신호(태업, 플레이 스타일
+# 호오, 국제 위상, "이 정도면 유저가 납득한다" 같은 눈대중)를 사람이 확인한 뒤 얹는 표.
+# 예전엔 이 용도로 애드혹 코드가 두 군데 따로 있었다(오누아쿠 전용 함수, 김보배 전용
+# 프로젝션 부스트) - pcode 키 delta 하나로 통합. 나이 곡선/스무딩 파라미터를 손대는 시도는
+# "어릴수록 보너스가 크다"는 구조 때문에 데뷔 시즌이 최근 시즌보다 높아지는 역전을 낳아
+# 되돌렸다(2026-09-18) - 그래서 여기서 사람이 직접 얹는다. 사용자 확인 후에만 추가/제거할 것.
+#   delta: OVR/OFF/DEF 및 모든 attribute에 균일하게 더할 값(음수 가능)
+#   from_season: 이 시즌부터(포함) 확정 시즌에 적용. None이면 그 선수의 전체 커리어.
+#     PROJECTION_SEASON을 주면 다음 시즌 예상치부터만(그 전 확정 이력은 안 건드림).
+#     예상치는 별도 표 없이 이 표를 그대로 재사용한다(아래 프로젝션 블록).
+MANUAL_OVR_OVERRIDES = {
+    '291261': {'delta': -5, 'from_season': '2023-2024',
+               'reason': '오누아쿠 - 23-24시즌 이후 태업 및 비효율 극강(2026-09-20)'},
+    '291752': {'delta': 1, 'from_season': PROJECTION_SEASON,
+               'reason': '김보배 - 2026 국가대표 발탁, 박스스코어에 없는 외부 신호(2026-09-18)'},
+    '291640': {'delta': -3, 'from_season': PROJECTION_SEASON,
+               'reason': '유기상 - 3년 성장 추세 외삽이 과함, 86 정도로 타협(20년차 KBL 팬 피드백, 2026-09-23)'},
+    '291576': {'delta': -1, 'from_season': PROJECTION_SEASON,
+               'reason': '양준석 - 위와 동일 사유, 86 정도로 타협(20년차 KBL 팬 피드백, 2026-09-23)'},
+    '291488': {'delta': 3, 'from_season': '2025-2026',
+               'reason': '이정현(소노) - 25-26 소노를 챔피언결정전 준우승까지 이끈 국내 최고 선수 중 하나, 인기·위상이 정규 수상 실적보다 큼, 89~91 목표(20년차 KBL 팬 피드백, 2026-09-23)'},
+    '291511': {'delta': 2, 'from_season': '2025-2026',
+               'reason': '이선 알바노 - 이정현과 동급 슈퍼스타 취급(20년차 KBL 팬 피드백, 2026-09-23)'},
+    '291785': {'delta': 6, 'from_season': None,
+               'reason': '헨리 엘런슨 - 25-26 라운드 MVP급 활약 + 연장 계약, 90~94 목표(20년차 KBL 팬 피드백, 2026-09-23)'},
+    '291368': {'delta': -4, 'from_season': '2025-2026',
+               'reason': '오재현 - 수비형/슛난사 스타일이라 유저 공감대가 낮음, 79~82가 적당(20년차 KBL 팬 피드백, 2026-09-23)'},
+    '291275': {'delta': -3, 'from_season': '2025-2026',
+               'reason': '김경원 - 눈에 띄는 활약 없는 저분 백업, 82는 과함(20년차 KBL 팬 피드백, 2026-09-23 - 목표치 미확정, 추가 조정 가능)'},
+    '291699': {'delta': 7, 'from_season': None,
+               'reason': '칼 타마요 - 필리핀 국가대표급 실력 대비 저평가, 많은 상향 필요(20년차 KBL 팬 피드백, 2026-09-23)'},
 }
+
+
+def manual_override_delta(pcode, season):
+    """MANUAL_OVR_OVERRIDES에서 이 (pcode, season)에 적용할 delta. 없거나 from_season보다
+    이전 시즌이면 0."""
+    ov = MANUAL_OVR_OVERRIDES.get(pcode)
+    if not ov:
+        return 0.0
+    if ov['from_season'] is not None and str(season) < ov['from_season']:
+        return 0.0
+    return float(ov['delta'])
 
 
 def load_birth_years():
@@ -806,17 +840,11 @@ def compute_ovr(target_season='2024-2025'):
     global_df['OVR'] = global_df.apply(final_role_player_cap, axis=1)
     diff = global_df['OVR'] - pre_cap_ovr
     
-    # ── 하드코딩 예외 처리 (특정 선수의 태업/비효율 극강 보정) ──
-    # 오누아쿠: 23-24시즌 이후 태업 및 비효율 극강으로 인한 강제 페널티 부여
-    def apply_onuaku_final_penalty(row):
-        val = row['OVR']
-        if '오누아쿠' in str(row['name']) and str(row['season_name']) >= '2023-2024':
-            val -= 5.0 # 강제 -5 페널티
-        return val
-
-    onuaku_capped = global_df.apply(apply_onuaku_final_penalty, axis=1)
-    diff += (onuaku_capped - global_df['OVR'])
-    global_df['OVR'] = onuaku_capped
+    # ── 하드코딩 예외 처리 (밸런스 수동 보정, MANUAL_OVR_OVERRIDES) ──
+    manual_diff = global_df.apply(
+        lambda row: manual_override_delta(row['pcode'], row['season_name']), axis=1)
+    global_df['OVR'] = (global_df['OVR'] + manual_diff).clip(40, 99)
+    diff += manual_diff
     
     global_df['OFF'] = (global_df['OFF'] + diff).clip(40, 99)
     global_df['DEF'] = (global_df['DEF'] + diff).clip(40, 99)
@@ -1033,17 +1061,17 @@ def compute_ovr(target_season='2024-2025'):
         proj_defense = round(project_one('attr_defense_mapped'))
         proj_rebounding = round(project_one('attr_rebounding_mapped'))
 
-        boost = PROJECTION_REPUTATION_BOOST.get(pcode)
-        if boost:
-            proj_ovr += boost['boost']
-            proj_off += boost['boost']
-            proj_def += boost['boost']
-            proj_outside += boost['boost']
-            proj_inside += boost['boost']
-            proj_playmaking += boost['boost']
-            proj_athletic += boost['boost']
-            proj_defense += boost['boost']
-            proj_rebounding += boost['boost']
+        manual_delta = manual_override_delta(pcode, PROJECTION_SEASON)
+        if manual_delta:
+            proj_ovr += manual_delta
+            proj_off += manual_delta
+            proj_def += manual_delta
+            proj_outside += manual_delta
+            proj_inside += manual_delta
+            proj_playmaking += manual_delta
+            proj_athletic += manual_delta
+            proj_defense += manual_delta
+            proj_rebounding += manual_delta
 
         # ── Rookie Scale Cap (for projected data) ──
         if last['is_domestic'] and pd.notna(last['start_year']):
