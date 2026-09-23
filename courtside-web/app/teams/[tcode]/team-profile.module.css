@@ -172,6 +172,21 @@
 .heroStatRow > div:first-child .heroStatVal {
   font-size: var(--fs-800);
 }
+/* PWR 카드 느낌(요청: "팀 파워도 오버롤카드처럼") - CourtsidePlayerCard의 .ovrValue 등급 발광을
+   같은 언어로. 리그 10팀 안에서의 순위 사분위로 등급을 매긴다(팀 파워 자체가 75~90 정도로
+   좁게 모여 있어서, 선수 OVR용 절대 임계값을 그대로 쓰면 다 같은 등급이 되어 버림). */
+.heroStatValPwrElite {
+  color: var(--gold);
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--gold) 55%, transparent));
+}
+.heroStatValPwrGood {
+  color: var(--positive);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--positive) 45%, transparent));
+}
+.heroStatValPwrLow {
+  color: var(--negative);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--negative) 40%, transparent));
+}
 /* "W-L · 25-26 정규시즌" - 한글이 섞이므로 모노(한글 글리프 없음)를 쓰지 않는다. */
 .heroStatLabel {
   font-family: "Pretendard", system-ui, -apple-system, sans-serif;

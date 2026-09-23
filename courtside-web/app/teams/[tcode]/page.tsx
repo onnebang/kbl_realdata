@@ -162,6 +162,18 @@ function percentileColor(p: number) {
   return p >= 70 ? "var(--positive)" : p <= 30 ? "var(--negative)" : "var(--gold)";
 }
 
+// PWR 히어로 숫자의 등급 발광(요청: "팀 파워도 오버롤카드처럼") - 리그 안 순위 사분위 기준.
+function pwrTierStyle(powers: ReturnType<typeof getAllTeamPowers>, teamName: string): string {
+  if (powers.length === 0) return "";
+  const rank = powers.findIndex((p) => p.teamName === teamName);
+  if (rank < 0) return "";
+  const pct = rank / Math.max(1, powers.length - 1); // 0 = 1위, 1 = 꼴찌
+  if (pct <= 0.2) return styles.heroStatValPwrElite;
+  if (pct <= 0.5) return styles.heroStatValPwrGood;
+  if (pct >= 0.8) return styles.heroStatValPwrLow;
+  return "";
+}
+
 // ── 팀 파워 사다리 - 4팩터 패널과 같은 .pctRow 시각 언어를 재사용, 새 CSS 없이 리그 10팀을
 // 한눈에(요청: "팀끼리 파워를 좀더 느낌있게 표시"). 전체 카드 보기는 이미 /rankings/teams에
 // 있어서(lib/teamPower.ts 공용 계산) 여긴 그 데이터를 압축 막대로만 보여주고 링크로 보낸다.
@@ -859,7 +871,7 @@ export default async function TeamPage({
           <div className={styles.heroStatRow}>
             {teamPower && (
               <div>
-                <div className={styles.heroStatVal}>{teamPower.ovr}</div>
+                <div className={`${styles.heroStatVal} ${pwrTierStyle(allPowers, teamName)}`}>{teamPower.ovr}</div>
                 <div className={styles.heroStatLabel}>
                   PWR · {seasonShort(teamPower.season)} 로스터 오버롤(OFF {teamPower.off} · DEF {teamPower.def})
                 </div>
