@@ -31,6 +31,21 @@ FULL_SEASON_SQL = (
     f" GROUP BY season_name HAVING COUNT(*) >= {MIN_SEASON_GAMES})"
 )
 
+# shot_log(raw/kbl_realdata.db)의 x,y로 미드레인지 슈팅을 뽑아내는 좌표 보정값 - shot_log의
+# 자체 zone 컬럼('1'/'2')은 골밑/3점 같은 슛 종류가 아니라 그냥 "어느 쪽 골대에서 쐈나"였다
+# (두 zone FG%가 46.5%/46.4%로 동일 - 2026-09-24 발견). 대신 골대 좌표를 양쪽 밀집구역
+# 중심으로 잡고(코트 절반씩 x<150/x>575, y 150~250 구간 슛의 평균 좌표), 그 골대까지 거리로
+# 페인트/미드레인지/3점을 나눴다. 반경은 실측 정답(pp_a=페인트 시도, threep_a=3점 시도)에
+# 제일 가깝게 맞는 값을 그리드서치로 찾음(선수-경기당 평균 오차: 페인트 0.20개, 3점 0.12개
+# - 둘 다 원 안에 들어오면 기존 스탯이랑 사실상 일치). 미드레인지(그 사이)는 기존
+# player_game_stats에 아예 없던 신호 - 페인트 포인트(pp)와 3점(threep)은 이미 있었지만
+# "그 사이의 롱2"는 이번에 처음 분리됨.
+HOOP_L = (82.76, 202.58)
+HOOP_R = (643.82, 203.94)
+PAINT_RADIUS = 70
+THREE_RADIUS = 145
+LEAGUE_AVG_MIDRANGE_PCT = 0.373  # 실측 리그 평균(위 반경 기준), 2026-09-24
+
 # 평판 가산 가중치(수상 id -> 1회당 OVR 가산). 회당 값은 예전 calculate_reputation_boost와 같고, 시즌 인지형으로
 # 바뀌면서 dpoy·allstar_mvp만 새로 넣었다(둘 다 스탯에 다 안 잡히는 "그 해의 얼굴" 신호인데 빠져 있었음).
 REPUTATION_WEIGHTS = {
@@ -361,6 +376,12 @@ def compute_ovr(target_season='2024-2025'):
             " GROUP BY gps.pcode, gps.pname, g.season_name, gps.tcode",
             conn,
         )
+        shots_df = pd.read_sql_query(
+            "SELECT s.pcode, g.season_name, s.x, s.y, s.made"
+            " FROM shot_log s JOIN games g ON s.gmkey = g.gmkey"
+            " WHERE g.season_category IN ('정규시즌', '플레이오프', '챔프전')",
+            conn,
+        )
     except Exception as e:
         print(f"DB Query failed: {e}")
         conn.close()
@@ -382,6 +403,20 @@ def compute_ovr(target_season='2024-2025'):
     # TS% Calculation
     global_df['ts_pct'] = np.where((global_df['fga'] + 0.44 * global_df['fta']) > 0,
                             (global_df['pts'] * global_df['g']) / (2 * (global_df['fga'] + 0.44 * global_df['fta'])), 0)
+
+    # 미드레인지 슈팅(shot_log 좌표 기반, HOOP_L/HOOP_R/PAINT_RADIUS/THREE_RADIUS 참고)
+    dist_l = np.hypot(shots_df['x'] - HOOP_L[0], shots_df['y'] - HOOP_L[1])
+    dist_r = np.hypot(shots_df['x'] - HOOP_R[0], shots_df['y'] - HOOP_R[1])
+    shots_df['dist'] = np.minimum(dist_l, dist_r)
+    mid_shots = shots_df[(shots_df['dist'] > PAINT_RADIUS) & (shots_df['dist'] <= THREE_RADIUS)]
+    mid_agg = mid_shots.groupby(['pcode', 'season_name']).agg(
+        mid_fgm=('made', 'sum'), mid_fga=('made', 'count')
+    ).reset_index()
+    global_df = global_df.merge(mid_agg, on=['pcode', 'season_name'], how='left')
+    global_df['mid_fgm'] = global_df['mid_fgm'].fillna(0)
+    global_df['mid_fga'] = global_df['mid_fga'].fillna(0)
+    global_df['midrange_pct'] = np.where(
+        global_df['mid_fga'] > 0, global_df['mid_fgm'] / global_df['mid_fga'], LEAGUE_AVG_MIDRANGE_PCT)
 
 
     # WPA 데이터 로드
@@ -435,6 +470,7 @@ def compute_ovr(target_season='2024-2025'):
     global_df['dfl_per75'] = (global_df['total_dfl'] / global_df['total_possessions']) * 75
     global_df['offr_per75'] = (global_df['total_offr'] / global_df['total_possessions']) * 75
     global_df['defr_per75'] = (global_df['total_defr'] / global_df['total_possessions']) * 75
+    global_df['midrange_per75'] = (global_df['mid_fga'] / global_df['total_possessions']) * 75
 
     # 효율성 지표
     global_df['threep_pct'] = np.where(global_df['tpa'] > 0, global_df['tpm'] / global_df['tpa'], 0)
@@ -444,8 +480,12 @@ def compute_ovr(target_season='2024-2025'):
 
     # 1. Outside Scoring
     # 볼륨(tpm_per75)에 효율(3P%)을 가중치로 부여. TS% 추가. 턴오버 치명적 페널티(Multiplier)
+    # 미드레인지(shot_log 기반, 2026-09-24 추가)는 볼륨*효율로 3점과 같은 형태로 더한다 - 다만
+    # 리그 평균 자체가 3점(0.33)보다 낮고(0.373) 한 개당 기대득점도 2점이라 가중치(1.5)는 3점의
+    # 절반 이하로 낮게 잡았다 - 미드레인지 볼륨 자체를 보상하는 게 아니라, "같은 볼륨이면 잘 넣는
+    # 사람이 못 넣는 사람보다 낫다"는 스킬 신호만 반영(선택 자체의 좋고 나쁨은 TS%가 이미 반영).
     tov_multiplier = np.maximum(0.3, 1.0 - (global_df['tov_per75'] / 8.0)) # 턴오버 4개면 50% 타격
-    global_df['attr_outside'] = ((global_df['tpm_per75'] * 4.0 * (global_df['threep_pct'] / 0.33)) + (global_df['ts_pct'] * 30.0) + (global_df['ftm_per75'] * 1.5 * global_df['ft_pct'])) * tov_multiplier
+    global_df['attr_outside'] = ((global_df['tpm_per75'] * 4.0 * (global_df['threep_pct'] / 0.33)) + (global_df['midrange_per75'] * 1.5 * (global_df['midrange_pct'] / LEAGUE_AVG_MIDRANGE_PCT)) + (global_df['ts_pct'] * 30.0) + (global_df['ftm_per75'] * 1.5 * global_df['ft_pct'])) * tov_multiplier
     
     # 2. Inside Scoring
     # 핵어샤크 방지 (자유투 기하급수 페널티 Multiplier) 및 턴오버 치명적 페널티 부여
