@@ -4,7 +4,7 @@ import { PlayerPhoto } from "@/components/PlayerPhoto";
 import type { CSSProperties } from "react";
 import { TeamBadge } from "@/components/TeamBadge";
 import { PRESEASON_SEASON, getSeasonDirectory, shortSeason, prevSeasonName, type DirectoryPlayer } from "@/lib/preseason";
-import { getOvrHistoryCache } from "@/lib/ovr";
+import { getOvrHistoryCache, isRealPcode } from "@/lib/ovr";
 import styles from "@/components/Directory.module.css";
 
 // 선수 디렉터리(요청: "상단 메뉴에 선수 자세히 보기") - 이 시즌 확정 로스터 전원을 팀별로 늘어놓고
@@ -98,12 +98,18 @@ export default async function PlayersPage({ searchParams }: { searchParams: Prom
     if (!byPcode.has(key)) byPcode.set(key, []);
     byPcode.get(key)!.push(r);
   }
-  for (const [key, hist] of byPcode) {
+  for (const [, hist] of byPcode) {
     if (hist.length > 0) {
       const current = hist[hist.length - 1].OVR;
       const diff = hist.length > 1 ? current - hist[hist.length - 2].OVR : null;
-      if (hist[0].pcode) {
-        ovrMap.set(hist[0].pcode, { ovr: current, diff });
+      // build_courtside_ovr.py는 KBL pcode를 아직 못 받은 신입에게 "tbd_<이름>" 임시 키를
+      // 준다. 진짜 pcode가 아니므로 이름으로 이어야 한다 - 예전엔 이 선수들의 pcode가 아예
+      // null이라 아래 분기가 맞았는데, 임시 키가 생기면서 truthy가 되어 전부 ovrMap으로
+      // 갔고 ovrMapByName이 영영 비었다. 그 결과 디렉터리에서 pcode가 null인 바로 그
+      // 선수들(2026-27 신규 영입 15명)이 OVR을 "-"로 달고 맨 뒤로 밀렸다.
+      const histPcode = hist[0].pcode;
+      if (isRealPcode(histPcode)) {
+        ovrMap.set(histPcode, { ovr: current, diff });
       } else {
         ovrMapByName.set(hist[0].name, { ovr: current, diff });
       }

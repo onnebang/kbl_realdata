@@ -1,5 +1,19 @@
 import rawHistory from "./courtside_ovr_history.json";
 
+/**
+ * KBL 공식 pcode를 아직 못 받은 선수(신규 영입/신인)에게 build_courtside_ovr.py가 붙이는
+ * 임시 키의 접두사 - `tbd_<이름>` 꼴이다. **라우팅 가능한 pcode가 아니다**:
+ * `/players/tbd_존무니`는 players 테이블 조회가 비어 404가 되고, 프로필 사진도 없다.
+ * 그래서 화면에서는 pcode가 없는 선수로 취급하고 이름으로 이어야 한다.
+ * 진짜 pcode가 배정되면 이 키는 자동으로 안 쓰인다(정상 경로로 흡수됨).
+ */
+export const TBD_PCODE_PREFIX = "tbd_";
+
+/** 그 pcode가 KBL이 실제로 발급한 것인지(= 프로필 링크를 걸어도 되는지). */
+export function isRealPcode(pcode: string | null | undefined): boolean {
+  return !!pcode && !pcode.startsWith(TBD_PCODE_PREFIX);
+}
+
 export interface OvrSeasonRecord {
   pcode: string;
   name: string;
