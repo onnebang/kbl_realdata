@@ -65,20 +65,25 @@ REPUTATION_CAP = 5.0
 #   from_season: 이 시즌부터(포함) 확정 시즌에 적용. None이면 그 선수의 전체 커리어.
 #     PROJECTION_SEASON을 주면 다음 시즌 예상치부터만(그 전 확정 이력은 안 건드림).
 #     예상치는 별도 표 없이 이 표를 그대로 재사용한다(아래 프로젝션 블록).
+# 2026-09-24 재조준: 나이 감쇠 보호막(ovr_curve_model.protection_*)이 들어가면서 노장
+# 자연값이 내려갔다 - '지는 별' 수동 하향(김선형·김종규)은 모델이 스스로 하게 되어
+# 삭제했고(김선형 84->78), 목표치를 명시한 항목들은 자연값 기준으로 delta를 다시
+# 맞췄다. 모델을 고칠 때마다 이 표도 같이 재조준해야 한다 - delta는 절대값이 아니라
+# '자연값과의 차이'라서, 모델이 움직이면 조준점도 같이 움직인다.
 MANUAL_OVR_OVERRIDES = {
     '291261': {'delta': -5, 'from_season': '2023-2024',
                'reason': '오누아쿠 - 23-24시즌 이후 태업 및 비효율 극강(2026-09-20)'},
     '291752': {'delta': 1, 'from_season': PROJECTION_SEASON,
                'reason': '김보배 - 2026 국가대표 발탁, 박스스코어에 없는 외부 신호(2026-09-18)'},
-    '291640': {'delta': -3, 'from_season': PROJECTION_SEASON,
+    '291640': {'delta': -1, 'from_season': PROJECTION_SEASON,
                'reason': '유기상 - 3년 성장 추세 외삽이 과함, 86 정도로 타협(20년차 KBL 팬 피드백, 2026-09-23)'},
     '291576': {'delta': -1, 'from_season': PROJECTION_SEASON,
                'reason': '양준석 - 위와 동일 사유, 86 정도로 타협(20년차 KBL 팬 피드백, 2026-09-23)'},
-    '291488': {'delta': 3, 'from_season': '2025-2026',
+    '291488': {'delta': 2, 'from_season': '2025-2026',
                'reason': '이정현(소노) - 25-26 소노를 챔피언결정전 준우승까지 이끈 국내 최고 선수 중 하나, 인기·위상이 정규 수상 실적보다 큼, 89~91 목표(20년차 KBL 팬 피드백, 2026-09-23)'},
     '291511': {'delta': 2, 'from_season': '2025-2026',
                'reason': '이선 알바노 - 이정현과 동급 슈퍼스타 취급(20년차 KBL 팬 피드백, 2026-09-23)'},
-    '291785': {'delta': 6, 'from_season': None,
+    '291785': {'delta': 5, 'from_season': None,
                'reason': '헨리 엘런슨 - 25-26 라운드 MVP급 활약 + 연장 계약, 90~94 목표(20년차 KBL 팬 피드백, 2026-09-23)'},
     '291368': {'delta': -4, 'from_season': '2025-2026',
                'reason': '오재현 - 수비형/슛난사 스타일이라 유저 공감대가 낮음, 79~82가 적당(20년차 KBL 팬 피드백, 2026-09-23)'},
@@ -92,12 +97,8 @@ MANUAL_OVR_OVERRIDES = {
                          '다음 시즌 예상이 훨씬 활용도 낮은 신인 김보배(82)/이유진(79)보다 낮게 나옴 - '
                          '검증된 베테랑이 무검증 신인 아래로 깔리는 걸 막을 만큼 상향. 등급표 임계값(85) '
                          '자체를 낮추는 건 전체 선수에 영향 주는 별도 검토 필요라 안 건드림.'},
-    '291760': {'delta': -4, 'from_season': None,
+    '291760': {'delta': -6, 'from_season': None,
                'reason': '이민서 - 보여준 게 없음, 69 정도가 적당(20년차 KBL 팬 피드백, 2026-09-24)'},
-    '290407': {'delta': -2, 'from_season': '2025-2026',
-               'reason': '김선형 - 지는 별, 조금 하향(20년차 KBL 팬 피드백, 2026-09-24)'},
-    '290750': {'delta': -2, 'from_season': '2025-2026',
-               'reason': '김종규 - 지는 별, 조금 하향(20년차 KBL 팬 피드백, 2026-09-24)'},
     '290904': {'delta': -6, 'from_season': None,
                'reason': '박봉진 - 커리어 대부분 분당 2분 안팎 저분 백업, 68은 과함(DB 팬 피드백, '
                          '2026-09-24 - 목표치 미확정, 추가 조정 가능)'},
@@ -226,7 +227,7 @@ def load_season_teams():
         played = pd.read_sql_query(
             "SELECT gps.pcode, g.season_name, gps.tcode, COUNT(*) AS gp, MAX(g.game_date) AS last_date"
             " FROM player_game_stats gps JOIN games g ON gps.gmkey = g.gmkey"
-            " WHERE g.season_category IN ('정규시즌', '플레이오프', '챔프전')"
+            " WHERE g.season_category IN ('정규시즌', '플레이오프', '챔피언결정전')"
             "   AND g.season_name NOT LIKE '%D리그%'"
             " GROUP BY gps.pcode, g.season_name, gps.tcode",
             conn,
@@ -255,15 +256,30 @@ def load_teams_and_positions():
         return {}, {}
     with open(path, encoding='utf-8') as f:
         cards = json.load(f)
-    teams = {}
-    positions = {}
+    # kbl540 카드는 (선수, 시즌, 팀)당 한 장이라 한 pcode에 여러 장이 있다(3138장 /
+    # 고유 pcode 825개, 498명이 2~14장). 예전엔 그냥 덮어써서 '파일에 마지막으로 나온
+    # 카드'가 이겼는데, **파일 순서가 시간순이 아니다** - 라건아(290524)는 마지막 카드가
+    # season_code 23(2013-14 현대모비스)이라 최신 팀인 한국가스공사(47)가 아니라 가장
+    # 오래된 팀이 뽑혔다. position도 71명이 카드마다 엇갈리고(C vs FD 등), 그중 34명은
+    # 어느 카드가 이기느냐로 is_big이 뒤집힌다 - is_big은 어떤 아키타입이 후보에
+    # 들어가는지를 정해 raw_ovr까지 바꾸므로(찰스 로드·김주성·자밀 워니·함지훈·오세근 등)
+    # 배열 순서에 성적이 달린 셈이었다. season_code(시즌마다 +2) 최대값으로 고른다.
+    latest = {}
     for c in cards:
         pcode = c.get('pcode')
-        team = c.get('team_name_current')
-        pos = c.get('position')
-        if pcode:
-            if team: teams[pcode] = team
-            if pos: positions[pcode] = pos
+        if not pcode:
+            continue
+        sc = c.get('season_code')
+        sc = sc if isinstance(sc, int) else -1
+        if pcode not in latest or sc > latest[pcode][0]:
+            latest[pcode] = (sc, c)
+    teams = {}
+    positions = {}
+    for pcode, (_, c) in latest.items():
+        if c.get('team_name_current'):
+            teams[pcode] = c['team_name_current']
+        if c.get('position'):
+            positions[pcode] = c['position']
     return teams, positions
 
 def load_next_season_roster(season):
@@ -330,6 +346,9 @@ def compute_ovr(target_season='2024-2025'):
     # 취득을 위해 귀화하며 개명)가 시즌마다 유령 중복 카드로 갈라졌다(같은 시즌인데 두 줄,
     # 값도 살짝 다름 - 실은 동점자 백분위 처리에서 갈린 것뿐이었다). pcode+season만으로 묶고,
     # 표시 이름은 아래에서 이 pcode의 "가장 최근 시즌에 쓰인 이름" 하나로 통일한다.
+    # season_category는 DB에 '챔피언결정전'으로 들어있다 - 예전엔 '챔프전'으로 적어둬서
+    # 이 IN 절이 0건 매칭했고, 챔프전 42경기가 OVR 집계에서 통째로 빠져 있었다
+    # (2026-09-24 발견). 리그에서 제일 중요한 경기들이라 영향이 작지 않다.
     global_query = """
     SELECT
         gps.pcode, g.season_name,
@@ -362,14 +381,22 @@ def compute_ovr(target_season='2024-2025'):
         SUM(gps.fb) as total_fb_pts, SUM(gps.pp) as total_paint_pts,
         AVG(gps.sast) as sast, AVG(gps.dfl) as dfl,
         SUM(gps.sast) as total_sast, SUM(gps.dfl) as total_dfl,
-        AVG(gps.ast_rt) as ast_rt, AVG(gps.ast_to) as ast_to,
-        AVG(gps.oreb_rt) as oreb_rt, AVG(gps.dreb_rt) as dreb_rt, AVG(gps.tov_rt) as tov_rt,
+        -- 이 다섯은 '비율' 스탯이라 경기당 단순평균을 내면 2분 뛴 경기가 35분 뛴 경기와
+        -- 똑같은 표를 행사한다 - 바로 아래 def_rtg나 위쪽 per/pie/usage처럼 출전시간
+        -- 가중평균이어야 맞다. 예전엔 AVG였고, 그래서 291210 김준형 2023-24(2경기
+        -- 총 8.8분)가 oreb_rt 단순평균 222.20(가중평균은 16.90)으로 리바운드 능력치
+        -- 83을 받았다. total_min<5 쓰레기값 차단선이 있지만 8.8분은 통과한다.
+        SUM(gps.ast_rt * (gps.play_min + gps.play_sec/60.0)) / SUM((gps.play_min + gps.play_sec/60.0)) as ast_rt,
+        SUM(gps.ast_to * (gps.play_min + gps.play_sec/60.0)) / SUM((gps.play_min + gps.play_sec/60.0)) as ast_to,
+        SUM(gps.oreb_rt * (gps.play_min + gps.play_sec/60.0)) / SUM((gps.play_min + gps.play_sec/60.0)) as oreb_rt,
+        SUM(gps.dreb_rt * (gps.play_min + gps.play_sec/60.0)) / SUM((gps.play_min + gps.play_sec/60.0)) as dreb_rt,
+        SUM(gps.tov_rt * (gps.play_min + gps.play_sec/60.0)) / SUM((gps.play_min + gps.play_sec/60.0)) as tov_rt,
         SUM(gps.defrtg * (gps.play_min + gps.play_sec/60.0)) / SUM(gps.play_min + gps.play_sec/60.0) as def_rtg,
         AVG(CASE WHEN gps.tcode = g.home_tcode THEN g.home_score - g.away_score ELSE g.away_score - g.home_score END) as margin,
         AVG(CASE WHEN (CASE WHEN gps.tcode = g.home_tcode THEN g.home_score - g.away_score ELSE g.away_score - g.home_score END) > 0 THEN 1.0 ELSE 0.0 END) as win_pct
     FROM player_game_stats gps
     JOIN games g ON gps.gmkey = g.gmkey
-    WHERE g.season_category IN ('정규시즌', '플레이오프', '챔프전')
+    WHERE g.season_category IN ('정규시즌', '플레이오프', '챔피언결정전')
       AND g.season_name NOT LIKE '%D리그%'
       AND """ + FULL_SEASON_SQL + """
     GROUP BY gps.pcode, g.season_name
@@ -392,7 +419,7 @@ def compute_ovr(target_season='2024-2025'):
         shots_df = pd.read_sql_query(
             "SELECT s.pcode, g.season_name, s.x, s.y, s.made"
             " FROM shot_log s JOIN games g ON s.gmkey = g.gmkey"
-            " WHERE g.season_category IN ('정규시즌', '플레이오프', '챔프전')",
+            " WHERE g.season_category IN ('정규시즌', '플레이오프', '챔피언결정전')",
             conn,
         )
     except Exception as e:
@@ -447,6 +474,17 @@ def compute_ovr(target_season='2024-2025'):
             for season, players in wpa_data.get('bySeason', {}).items() for p in players
         ])
         if not wpa_df.empty:
+            # WPA 리더보드엔 pcode가 없어 (시즌, 등록명, 팀)으로 붙일 수밖에 없다. 이 키는
+            # 지금 데이터에선 딱 한 번 충돌한다 - 2010-11 '앤서니 존슨'(06) 두 명(290346,
+            # 290431). WPA 데이터가 2011-12부터라 지금은 안 닿지만, 커버리지를 과거로
+            # 넓히면 두 사람 WPA가 조용히 섞인다. 조용히 틀리느니 시끄럽게 죽게 한다.
+            dup_keys = team_df[team_df.duplicated(['season_name', 'pname', 'tcode'], keep=False)]
+            clash = dup_keys.merge(wpa_df, on=['season_name', 'pname', 'tcode'])
+            if not clash.empty:
+                raise SystemExit(
+                    'WPA 조인 키 충돌: 같은 (시즌, 이름, 팀)에 pcode가 둘 이상인데 WPA 데이터가 있음 - '
+                    '해당 선수 WPA가 섞임. 수동 확인 필요:\n'
+                    + clash[['season_name', 'pname', 'tcode', 'pcode']].to_string())
             j = team_df.merge(wpa_df, on=['season_name', 'pname', 'tcode'])
             j['w'] = j['games'] * j['wpaPerGame']
             wpa_by_pcode = j.groupby(['pcode', 'season_name']).agg(w=('w', 'sum'), n=('games', 'sum'))
@@ -510,7 +548,12 @@ def compute_ovr(target_season='2024-2025'):
     global_df['attr_playmaking'] = (global_df['ast_per75'] * 3.0) + (global_df['sast_per75'] * 2.0) + (global_df['ast_to'] * 5.0) + (global_df['ast_rt'] * 0.2) - (global_df['tov_per75'] * 3.0)
     
     # 4. Athleticism
-    global_df['attr_athletic'] = (global_df['fb_pts_per75'] * 3.0) + (global_df['total_min'] / max(1, global_df['g'].max()) * 0.5) + (global_df['blk_per75'] * 5.0) + (global_df['stl_per75'] * 5.0)
+    # 출전시간 항은 예전엔 시즌 총 출전분을 '데이터셋 전체 최대 경기수'(64)라는 무관한
+    # 상수로 나눴다 - 형제 항 셋은 전부 per-75인데 이것만 볼륨 스탯이라, 많이 뛴 것
+    # 자체가 운동능력 백분위의 절반을 설명했다(라건아 2016-17: 이 항 하나가 원점수의
+    # 50.5%). 자기 경기수로 나눠 '경기당 출전분'으로 바꾼다 - 지구력 신호는 남기되
+    # 시즌 길이에 비례해 무한히 커지지 않는다.
+    global_df['attr_athletic'] = (global_df['fb_pts_per75'] * 3.0) + (global_df['total_min'] / global_df['g'].clip(lower=1) * 0.5) + (global_df['blk_per75'] * 5.0) + (global_df['stl_per75'] * 5.0)
     
     # 5. Defense
     global_df['attr_defense'] = (global_df['stl_per75'] * 4.0) + (global_df['blk_per75'] * 4.0) + (global_df['dfl_per75'] * 3.0) - (global_df['def_rtg'] * 0.3)

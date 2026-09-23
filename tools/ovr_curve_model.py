@@ -74,6 +74,19 @@ class OvrCurveModel:
     ovr_floor: float = 40.0
     ovr_ceiling: float = 99.0
 
+    # 3-b) 명성 보호막의 나이 감쇠.
+    # 위 TIERS는 커리어 피크 한 번으로 정해지고 **나이를 전혀 안 봤다** - _tier_for()의
+    # 입력이 raw_peak뿐이라, 29세에 89를 찍은 선수는 38세가 되어도 같은 보호(저항 0.70,
+    # 부진방어 0.55, 하한 peak*0.80)를 그대로 받았다. 실측:
+    #   실측 raw 89->60(-29점)인 노장의 모델 출력은 89->74.6(-14.4점, 실측의 50%만 반영)
+    #   38세에 실측 60 vs 모델 74.6 -> 14.6점 괴리. 하한선 71.2 밑으로는 영영 못 내려감.
+    # 이게 "지는 별" 수동 하향(김선형·김종규 등)이 계속 필요했던 구조적 이유다.
+    # 보호막의 원래 목적은 **전성기 한 시즌 부진**을 막는 것이지(이정현이 피크 87인데
+    # 한 해 부진으로 58까지 떨어졌던 제보가 출발점) 은퇴 직전까지 실측을 부정하는 게
+    # 아니므로, 하락기 진입 후 fade_years에 걸쳐 residual까지 걷는다.
+    protection_fade_years: int = 10
+    protection_residual: float = 0.25
+
     def _tier_for(self, career_peak: float) -> tuple[float, float, float]:
         """career_peak(지금까지의 최고 calculated_ovr)에 맞는
         (하락 저항력, 부진 방어력, peak 대비 최소 유지 비율) 반환."""
@@ -81,6 +94,13 @@ class OvrCurveModel:
             if career_peak >= min_peak:
                 return aging_resistance, perf_buffer, min_retention
         return 0.0, 0.0, 0.0
+
+    def _protection_scale(self, age: int) -> float:
+        """나이에 따른 보호막 배율(1.0 = 전성기까진 그대로, 이후 residual까지 선형 감쇠)."""
+        if age <= self.peak_hi:
+            return 1.0
+        frac = min(1.0, (age - self.peak_hi) / max(1, self.protection_fade_years))
+        return 1.0 - (1.0 - self.protection_residual) * frac
 
     def _reliability(self, games: float | None) -> float:
         """경기수 -> 이 시즌 스무딩 가중치에 곱할 신뢰도(0.5~1.0). games 정보가 없으면
@@ -141,6 +161,11 @@ class OvrCurveModel:
             # 그래도 스무딩된 career_peak을 쓴다(한 시즌 반짝만으로 방어선 자체가 부풀지 않게).
             raw_peak = max(raw_peak, raw)
             aging_resistance, perf_buffer, min_retention = self._tier_for(raw_peak)
+            # 등급이 준 보호를 나이로 한 번 깎는다 - 전성기까진 배율 1.0이라 영향 없음.
+            prot = self._protection_scale(age)
+            aging_resistance *= prot
+            perf_buffer *= prot
+            min_retention *= prot
 
             smoothed = self._weighted_recent(raw_history, games_history)
 
