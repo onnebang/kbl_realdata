@@ -18,7 +18,7 @@ function fmtDate(d: string) {
 
 export default function SeasonBrowserBoard({ games }: { games: SeasonGameRow[] }) {
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState<"ALL" | "정규시즌" | "플레이오프">("ALL");
+  const [category, setCategory] = useState<"ALL" | "정규시즌" | "플레이오프" | "챔피언결정전">("ALL");
   const [selected, setSelected] = useState<SeasonGameRow | null>(null);
 
   const rows = useMemo(() => {
@@ -48,6 +48,7 @@ export default function SeasonBrowserBoard({ games }: { games: SeasonGameRow[] }
           <option value="ALL">전체</option>
           <option value="정규시즌">정규시즌</option>
           <option value="플레이오프">플레이오프</option>
+          <option value="챔피언결정전">챔피언결정전</option>
         </select>
       </div>
 
@@ -63,6 +64,7 @@ export default function SeasonBrowserBoard({ games }: { games: SeasonGameRow[] }
                 <div>
                   <div className={styles.grDate}>{fmtDate(g.game_date)}</div>
                   {g.season_category === "플레이오프" && <span className={styles.grCat}>PO</span>}
+                  {g.season_category === "챔피언결정전" && <span className={styles.grCat}>CP</span>}
                 </div>
                 <div className={styles.grMatchup}>
                   <span className={styles.grTeam}>
