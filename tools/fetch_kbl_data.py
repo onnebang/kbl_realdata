@@ -40,8 +40,23 @@ ENDPOINTS = {
     "text-cast": "/match/{gmkey}/text-cast?quarterList=Q1,Q2,Q3,Q4,X1,X2,X3,X4",
 }
 
+# 추적 대상 경기 분류. 예전엔 이 목록이 daily_batch/live_collector/sync_upcoming_games/
+# predict_upcoming_games/generate_daily_report 5곳에 따로 박혀 있어서, 카테고리가 하나
+# 늘 때마다 일부만 갱신되는 사고가 반복됐다 - CP(챔피언결정전)는 3곳에서, OM(오픈매치=
+# 프리시즌)은 2곳에서 빠져 있었다(2026-09-24 발견). 여기 한 곳만 고치면 되도록 모은다.
+#   TRACKED    : 수집/폴링 대상 전부
+#   PREDICTABLE: 승률 예측 대상 - 올스타(AS)는 팀이 섞여 예측이 무의미해서 뺀다
+# D리그는 seasonName 자체가 달라 별도 취급이라 여기 없다.
+TRACKED_CATEGORIES = {"R", "PO", "CP", "CU", "AS", "OM"}
+PREDICTABLE_CATEGORIES = TRACKED_CATEGORIES - {"AS"}
+
 DELAY_SEC = 0.35
-MAX_RETRIES = 4
+# 절전/최대절전에서 깨어난 직후엔 네트워크 스택이 올라오는 데 30~60초가 걸린다 - 예전
+# 백오프(1.5/3/4.5초 = 총 9초)로는 4번을 다 태우고도 DNS가 아직 안 붙어 getaddrinfo로
+# 죽었고, daily_batch가 06:00에 통째로 날아간 적이 3번 있다(2026-08-31, 09-02, 09-05).
+# 총 대기를 60초로 늘려 기상 직후 1회 실행도 살아남게 한다. API가 진짜 죽어 있으면
+# 그만큼 늦게 실패할 뿐이라 손해가 없다.
+MAX_RETRIES = 6
 
 
 def api_get(path):
@@ -56,7 +71,7 @@ def api_get(path):
         except Exception as e:  # noqa: BLE001
             last_err = e
             if attempt < MAX_RETRIES - 1:
-                time.sleep(1.5 * (attempt + 1))
+                time.sleep(min(30, 2 * 2 ** attempt))   # 2,4,8,16,30 = 총 60초
     raise last_err
 
 

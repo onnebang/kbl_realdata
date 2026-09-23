@@ -31,10 +31,15 @@ import argparse
 import datetime
 import os
 import sys
+import time
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 
-CATEGORIES = {"R", "PO", "CU"}  # predict_upcoming_games.fetch_upcoming_schedule과 동일 스코프
+CATEGORIES = {"R", "PO", "CP", "CU", "OM"}  # predict_upcoming_games.fetch_upcoming_schedule과 동일 스코프
+# CP(챔피언결정전) 추가(2026-09-24) - 빠져 있어서 챔프전이 games 테이블에 미경기로 안 들어갔고,
+# 그래서 라이브 폴링 대상도, 사이트 예정 경기도 되지 못했다(25-26 챔프전 5경기가 Supabase에 0건).
+# OM(오픈매치) 추가(2026-09-24) - 2026-27 프리시즌 실측 확인, 같은 이유로 빠지면 오늘(9/24)
+# 개막 프리시즌 경기가 라이브 대상이 못 됨.
 DEFAULT_LOOKAHEAD_DAYS = 120
 
 # 시즌코드 -> 시즌이름: 47 = "2025-2026", 시즌마다 +2 (seasons 테이블 실측으로 확인:
@@ -72,7 +77,18 @@ def get_conn():
     if not url:
         print("DATABASE_URL 환경변수가 없음(tools/.env.supabase도 없음).", file=sys.stderr)
         sys.exit(1)
-    return psycopg2.connect(url)
+    # api_get과 같은 이유로 재시도한다 - 기상 직후엔 DNS가 아직 안 붙어
+    # "could not translate host name ... pooler.supabase.com" 으로 죽는다(2026-09-22 관측).
+    # live_collector는 10분 뒤 재기동으로 자가치유되지만 daily_batch는 24시간을 잃는다.
+    last_err = None
+    for attempt in range(6):
+        try:
+            return psycopg2.connect(url)
+        except psycopg2.OperationalError as e:
+            last_err = e
+            if attempt < 5:
+                time.sleep(min(30, 2 * 2 ** attempt))   # 2,4,8,16,30 = 총 60초
+    raise last_err
 
 
 def fetch_upcoming(days):
@@ -207,7 +223,7 @@ def main():
 
     print(f"[sync_upcoming] KBL 스케줄 조회(오늘~{args.days}일)...", flush=True)
     schedule_games = fetch_upcoming(args.days)
-    print(f"[sync_upcoming] 예정 경기(R/PO/CU) {len(schedule_games)}건", flush=True)
+    print(f"[sync_upcoming] 예정 경기({','.join(sorted(CATEGORIES))}) {len(schedule_games)}건", flush=True)
     if not schedule_games:
         print("[sync_upcoming] 동기화할 예정 경기 없음 - 종료.", flush=True)
         return

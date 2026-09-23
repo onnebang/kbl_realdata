@@ -60,7 +60,8 @@ def fetch_recent_results(days=RECENT_DAYS):
         games = fkd.fetch_game_list(past.strftime("%Y%m%d"), today.strftime("%Y%m%d"))
     except Exception:
         return []
-    ended = [g for g in games if g.get("isEnded") == 1 and g.get("seasonCategory") in ("R", "PO", "CU", "AS")]
+    ended = [g for g in games if g.get("isEnded") == 1
+             and g.get("seasonCategory") in fkd.TRACKED_CATEGORIES]
     ended.sort(key=lambda g: (g["gameDate"], g["gmkey"]), reverse=True)
     return ended
 

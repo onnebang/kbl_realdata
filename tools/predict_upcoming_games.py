@@ -110,7 +110,8 @@ def fetch_upcoming_schedule(lookahead_days=LOOKAHEAD_DAYS):
     today = datetime.date.today()
     future = today + datetime.timedelta(days=lookahead_days)
     all_games = fkd.fetch_game_list(today.strftime("%Y%m%d"), future.strftime("%Y%m%d"))
-    return [g for g in all_games if g.get("isEnded") == 0 and g.get("seasonCategory") in ("R", "PO", "CU")]
+    return [g for g in all_games if g.get("isEnded") == 0
+            and g.get("seasonCategory") in fkd.PREDICTABLE_CATEGORIES]
 
 
 def predict(ctx, model_bundle, schedule_games):
@@ -163,7 +164,8 @@ def main():
 
     print("예정 경기 조회 중...", flush=True)
     schedule_games = fetch_upcoming_schedule()
-    print(f"  {LOOKAHEAD_DAYS}일 내 예정 경기(R/PO/CU) {len(schedule_games)}건", flush=True)
+    cats = "/".join(sorted(fkd.PREDICTABLE_CATEGORIES))
+    print(f"  {LOOKAHEAD_DAYS}일 내 예정 경기({cats}) {len(schedule_games)}건", flush=True)
     if not schedule_games:
         with open(OUT_PATH, "w", encoding="utf-8") as f:
             json.dump([], f, ensure_ascii=False, indent=1)

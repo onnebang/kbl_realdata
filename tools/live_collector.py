@@ -106,7 +106,8 @@ KST = datetime.timezone(datetime.timedelta(hours=9))
 REGULATION_SEC = 4 * 600
 
 # 라이브 대상으로 볼 경기 분류 - daily_batch.py의 CATEGORIES와 같은 스코프.
-CATEGORIES = {"R", "PO", "CU", "AS"}
+# OM(오픈매치) 추가(2026-09-24) - 2026-27 시즌 프리시즌 실측 확인, daily_batch.py 참고.
+CATEGORIES = {"R", "PO", "CP", "CU", "AS", "OM"}
 
 # 피리어드 시작/종료 액션 코드. schema_supabase.sql의 action_codes 시드는 001='경기 시작',
 # 009='경기 종료'로 라벨링해뒀지만 **실제 데이터는 쿼터마다 한 쌍씩** 나온다(저장된 200경기

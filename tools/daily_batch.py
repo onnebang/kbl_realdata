@@ -51,7 +51,16 @@ import sys
 import fetch_kbl_data as fkd
 from python_runtime import resolve_python
 
-CATEGORIES = {"R", "PO", "CP", "CU", "AS"}  # 시즌 개막 후엔 정규+플옵+챔프전+컵+올스타까지 (D리그/오픈매치 제외)
+# 이 배치가 유일한 복구 경로인데 예전엔 "어제~오늘"만 봐서, 하루 넘는 장애(PC 절전,
+# 배터리 차단, 기상 직후 DNS 실패)는 영원히 복구가 안 됐다 - 실제로 최근 31일 중 5일이
+# 커버리지 0이었다(2026-08-29/30/31, 09-10/11). fetch_one_game(force=True)라 이미 받은
+# 경기를 다시 받아도 결과가 같으므로(idempotent), 창을 3일로 넓히는 비용은 스케줄 API
+# 조회 1회뿐이다.
+RECOVERY_DAYS = 3
+# OM(오픈매치) 추가(2026-09-24) - 2026-27 시즌 개막 전 프리시즌 경기가 seasonCategory="OM"
+# ("OPEN MATCH DAY")로 온다는 걸 실측으로 확인(그 전엔 미관측이라 "제외" 주석이 있었음).
+# D리그만 계속 제외 - D리그는 seasonName 자체가 다르게 잡혀 별도 취급.
+CATEGORIES = {"R", "PO", "CP", "CU", "AS", "OM"}  # 정규+플옵+챔프전+컵+올스타+오픈매치
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 
@@ -93,8 +102,7 @@ def run(date=None, failures=None):
         from_date = to_date = date
     else:
         today = datetime.date.today()
-        yesterday = today - datetime.timedelta(days=1)
-        from_date = yesterday.strftime("%Y%m%d")
+        from_date = (today - datetime.timedelta(days=RECOVERY_DAYS)).strftime("%Y%m%d")
         to_date = today.strftime("%Y%m%d")
 
     print(f"[daily_batch] {from_date} ~ {to_date} 확인 중...", flush=True)
