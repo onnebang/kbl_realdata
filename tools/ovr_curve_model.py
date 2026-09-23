@@ -30,6 +30,15 @@ class OvrCurveModel:
     #    있는 만큼만 쓰고 그 가중치 합으로 나눠 재정규화한다.
     weights: tuple = (0.50, 0.30, 0.20)
 
+    # 1-b) 출전 경기 수 신뢰도 - 부상/결장으로 반 시즌도 못 뛴 해가 풀타임 시즌과 똑같이
+    # 50% 가중치를 그대로 받아가는 문제(유저 제보: 최준용 18경기, 송교창 9경기, 하윤기
+    # 28경기 시즌 이후 다음 해까지 급락). full_season_games 경기를 채우면 신뢰도 1.0,
+    # 그 밑으로는 games/full_season_games만큼 깎이되 min_reliability 밑으로는 안 깎는다
+    # (몇 경기 안 뛰었어도 그 안에서 보여준 기록 자체를 0 취급하진 않음). 이 값으로
+    # weights를 재조정해서, 반 시즌짜리 해가 직전 풀타임 시즌들을 덜 밀어내게 한다.
+    full_season_games: int = 45
+    min_reliability: float = 0.5
+
     # 2) 나이 구간
     growth_lo: int = 18
     growth_hi: int = 23   # 이 나이까지는 성장기, 24세부터 전성기 시작
@@ -73,10 +82,27 @@ class OvrCurveModel:
                 return aging_resistance, perf_buffer, min_retention
         return 0.0, 0.0, 0.0
 
-    def _weighted_recent(self, raws: list[float]) -> float:
-        """raws[-1]이 당해 시즌. 최근 self.weights 길이만큼(기본 3시즌) 가중평균."""
+    def _reliability(self, games: float | None) -> float:
+        """경기수 -> 이 시즌 스무딩 가중치에 곱할 신뢰도(0.5~1.0). games 정보가 없으면
+        기존 동작 그대로(=1.0, 항상 풀타임 취급)."""
+        if games is None:
+            return 1.0
+        return max(self.min_reliability, min(1.0, games / self.full_season_games))
+
+    def _weighted_recent(self, raws: list[float], games: list[float | None] | None = None) -> float:
+        """raws[-1]이 당해 시즌. 최근 self.weights 길이만큼(기본 3시즌) 가중평균.
+        games가 주어지면 경기수 신뢰도로 각 시즌 가중치를 눌러서, 반 시즌짜리 해가
+        직전 풀타임 시즌과 똑같은 발언권을 갖지 않게 한다."""
         window = raws[-len(self.weights):][::-1]  # [당해, 전년, 2년전, ...]
-        used_weights = self.weights[: len(window)]
+        base_weights = self.weights[: len(window)]
+        if games is not None:
+            games_window = games[-len(self.weights):][::-1]
+            rel = [self._reliability(g) for g in games_window]
+            used_weights = [w * r for w, r in zip(base_weights, rel)]
+            if sum(used_weights) <= 0:
+                used_weights = base_weights
+        else:
+            used_weights = base_weights
         total_w = sum(used_weights)
         return sum(v * w for v, w in zip(window, used_weights)) / total_w
 
@@ -96,6 +122,7 @@ class OvrCurveModel:
         각 항목에 calculated_ovr을 채운 새 리스트를 반환한다(원본은 건드리지 않음)."""
         out = []
         raw_history: list[float] = []
+        games_history: list[float | None] = []
         career_peak = 0.0   # 하한선 기준값(스무딩까지 거친 calculated_ovr의 역대 최고치)
         raw_peak = 0.0      # 등급 판정 기준값(그 시즌 raw_performance 자체의 역대 최고치)
 
@@ -104,6 +131,7 @@ class OvrCurveModel:
             raw = row["raw_performance"]
             potential = row.get("potential", 1.0)
             raw_history.append(raw)
+            games_history.append(row.get("games"))
 
             # 등급은 "실제로 증명한 한 시즌 최고 활약(raw_peak)"으로 정한다 - calculated_ovr
             # 기준으로 등급을 매기면, 3시즌 가중평균이 그 시즌 raw 정점 자체를 이미 깎아놔서
@@ -114,7 +142,7 @@ class OvrCurveModel:
             raw_peak = max(raw_peak, raw)
             aging_resistance, perf_buffer, min_retention = self._tier_for(raw_peak)
 
-            smoothed = self._weighted_recent(raw_history)
+            smoothed = self._weighted_recent(raw_history, games_history)
 
             if age <= self.peak_hi:
                 mult = self._age_multiplier(age, potential)
@@ -346,6 +374,26 @@ def demo():
     crash_drop_pct = 1 - crash_result[-1]["calculated_ovr"] / max(r["calculated_ovr"] for r in crash_result)
     assert crash_drop_pct > legend_drop_pct * 2, (
         f"등급별 낙폭 차이가 충분히 안 갈림: legend {legend_drop_pct:.1%} vs crash {crash_drop_pct:.1%}"
+    )
+
+    # 검증 4: 경기수 신뢰도 - 똑같이 raw_performance가 떨어진 시즌이라도, 부상으로 9경기만
+    # 뛴 시즌은 풀타임(45경기+) 시즌보다 스무딩 값을 덜 끌어내려야 한다(유저 제보: 9경기
+    # 부진 시즌 하나가 정상 시즌만큼 다음 시즌 OVR까지 끌어내림).
+    reliability_base = [
+        {"season": "s1", "age": 26, "raw_performance": 83, "games": 54},
+        {"season": "s2", "age": 27, "raw_performance": 83, "games": 54},
+        {"season": "s3", "age": 28, "raw_performance": 70, "games": 54},
+    ]
+    reliability_injured = [
+        {**reliability_base[0]},
+        {**reliability_base[1]},
+        {**reliability_base[2], "games": 9},
+    ]
+    full_result = model.process_player(reliability_base)[-1]["calculated_ovr"]
+    injured_result = model.process_player(reliability_injured)[-1]["calculated_ovr"]
+    assert injured_result > full_result, (
+        f"경기수 신뢰도가 적용되지 않음: 9경기 부진 시즌({injured_result})이 "
+        f"풀타임 부진 시즌({full_result})만큼 떨어짐"
     )
 
     print(f"\n검증 통과: 최상위 등급 방어(피크 대비 -{legend_drop_pct:.1%}) vs "

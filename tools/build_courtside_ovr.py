@@ -727,6 +727,7 @@ def compute_ovr(target_season='2024-2025'):
                     "age": int(group.loc[i, 'age_for_model']),
                     "raw_performance": group.loc[i, mapped_col],
                     "play_style": play_style,
+                    "games": int(group.loc[i, 'g']),
                 }
                 for i in idxs
             ]
@@ -1013,7 +1014,8 @@ def compute_ovr(target_season='2024-2025'):
         def project_one(mapped_col):
             seasons = [
                 {"season": r['season_name'], "age": int(r['age_for_model']),
-                 "raw_performance": r[mapped_col], "play_style": play_style}
+                 "raw_performance": r[mapped_col], "play_style": play_style,
+                 "games": int(r['g'])}
                 for _, r in hist.iterrows()
             ]
             return model.project_forward(seasons, extra_years=1)
