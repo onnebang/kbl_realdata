@@ -1,5 +1,11 @@
 node_modules/
-raw/
+raw/*
+# 라이브 승률 모델(sklearn 1.9/numpy 2.x pickle, ~116KB) - GitHub Actions 러너엔 로컬 raw/가
+# 없어서(gitignore 대상) live_collector.py가 이 파일 없이는 못 돈다. 나머지 raw/(800MB+
+# SQLite·원본 로그)는 그대로 제외.
+!raw/analysis
+raw/analysis/*
+!raw/analysis/live_winprob_model.joblib
 .expo/
 dist/
 *.log
