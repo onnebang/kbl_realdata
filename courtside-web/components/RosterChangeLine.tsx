@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { shortSeason, type RosterChange } from "@/lib/preseason";
 import styles from "@/app/preseason/preseason.module.css";
+import { PlayerPhoto } from "@/components/PlayerPhoto";
 
 // 로스터 변화 한 줄(칩 + 이름 + 마지막 시즌 성적 + 출처/행선지) - /preseason의 팀 카드와
 // /teams/[tcode]의 "이번 시즌 로스터 변화" 패널이 같은 컴포넌트를 쓴다(문구·판정 표기가
@@ -77,6 +78,7 @@ export function ChangeLine({ r, abbrOf }: { r: RosterChange; abbrOf: (tcode: str
     <div className={styles.changeRow}>
       <span className={`${styles.chip} ${chip.cls}`}>{changeChipLabel(r)}</span>
       <div>
+        {r.photoUrl && <PlayerPhoto src={r.photoUrl} size={24} className={styles.changePhoto} />}
         {r.pcode ? (
           <Link href={`/players/${r.pcode}`} className={styles.changeName}>
             {r.name}

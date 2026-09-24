@@ -244,7 +244,18 @@ export type RosterChange = {
   note: string | null;
   /** 이탈 사유(roster_departure에서 확인된 경우에만). military/overseas/unsigned/retired/other. */
   reason: string | null;
+  photoUrl: string | null;
 };
+
+/** pcode 목록 -> photo_url 맵. computeSeasonDirectory/computeRosterChangeReport가 공유(200개씩 배치 조회). */
+async function fetchPhotosByPcode(pcodes: string[]): Promise<Map<string, string | null>> {
+  const photo = new Map<string, string | null>();
+  for (let i = 0; i < pcodes.length; i += 200) {
+    const { data } = await supabase.from("players").select("pcode, photo_url").in("pcode", pcodes.slice(i, i + 200));
+    for (const p of data ?? []) photo.set(p.pcode as string, (p.photo_url as string | null) ?? null);
+  }
+  return photo;
+}
 
 export type TeamRosterChanges = {
   team: TeamInfo;
@@ -297,6 +308,12 @@ async function computeRosterChangeReport(season: string): Promise<RosterChangeRe
     getTeams(season),
     supabase.from("roster_changes").select("*").eq("season_name", season).order("prev_ppg", { ascending: false, nullsFirst: false }),
   ]);
+  // 요청(2026-09-24): "삼성/정관장 로스터에 사진이 안 보인다" - RosterChange에 photoUrl이
+  // 아예 없어서(/teams/[tcode]의 "이번 시즌 로스터 변화" 패널이 이 타입을 씀) /players
+  // 디렉터리(사진 정상)와 달리 이 패널은 처음부터 사진을 못 그렸다. computeSeasonDirectory와
+  // 같은 fetchPhotosByPcode로 통일.
+  const rcPcodes = [...new Set((res.data ?? []).map((r) => r.pcode as string | null).filter((p): p is string => !!p))];
+  const rcPhoto = await fetchPhotosByPcode(rcPcodes);
   const rows: RosterChange[] = (res.data ?? []).map((r) => ({
     season: r.season_name as string,
     tcode: r.tcode as string,
@@ -314,6 +331,7 @@ async function computeRosterChangeReport(season: string): Promise<RosterChangeRe
     mpg: num(r.prev_mpg),
     note: (r.note as string | null) ?? null,
     reason: (r.reason as string | null) ?? null,
+    photoUrl: r.pcode ? (rcPhoto.get(r.pcode as string) ?? null) : null,
   }));
 
   const byTeam = new Map<string, TeamRosterChanges>();
@@ -448,11 +466,7 @@ async function computeSeasonDirectory(season: string): Promise<DirectoryTeam[]> 
   }
 
   const pcodes = [...new Set(roster.map((r) => r.pcode as string | null).filter((p): p is string => !!p))];
-  const photo = new Map<string, string | null>();
-  for (let i = 0; i < pcodes.length; i += 200) {
-    const { data } = await supabase.from("players").select("pcode, photo_url").in("pcode", pcodes.slice(i, i + 200));
-    for (const p of data ?? []) photo.set(p.pcode as string, (p.photo_url as string | null) ?? null);
-  }
+  const photo = await fetchPhotosByPcode(pcodes);
 
   const byTeam = new Map<string, DirectoryTeam>();
   for (const r of roster) {

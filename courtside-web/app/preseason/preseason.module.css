@@ -489,6 +489,13 @@
 .stayDetails[open] > .staySummary::before {
   content: "▾ ";
 }
+/* 이름 앞 작은 사진(2026-09-24 추가) - 사진 없는 선수(신입 등)는 그냥 렌더 안 함, 자리는 안 비움
+   (이 줄이 이미 칩+통계로 빽빽해서 빈 원을 넣으면 오히려 더 산만함). */
+.changePhoto {
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+}
 /* 이 줄의 정체(선수 이름) - /preseason 팀 카드와 /teams/[tcode] 로스터 변화 패널이 이 컴포넌트를
    공유한다(components/RosterChangeLine.tsx). 본문 단(--fs-300)으로 올려 두 화면 모두 개선된다. */
 .changeName {
