@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
 import styles from "./CourtsidePlayerCard.module.css";
 
 // 2K 스타일 선수 카드. 처음 버전(git blame: feat "implement 2K style infographic player
@@ -77,68 +80,95 @@ export default function CourtsidePlayerCard({
   const [enameFirst, ...enameRestParts] = displayEname.split(" ");
   const enameRest = enameRestParts.join(" ") || name;
 
-  return (
-    <div className={styles.card} style={{ "--team-color": teamColor } as React.CSSProperties}>
-      {/* 배경에 흐리게 깔리는 대형 OVR 숫자 */}
-      <div className={`${styles.bgOvr} ${tierClass(ovr)}`} aria-hidden="true">
-        {ovr}
-      </div>
+  // 능력치가 있을 때만 뒷면(육각형 레이더)이 존재 - 예전엔 사진 위에 겹쳐 그려서 사진과 능력치
+  // 둘 다 잘 안 보인다는 제보(2026-09-25)가 있었다. 카드 뒤집기로 분리.
+  const [flipped, setFlipped] = useState(false);
 
-      <div className={styles.header}>
-        <div className={styles.ovrBlock}>
-          <span className={`${styles.ovrValue} ${tierClass(ovr)}`}>{ovr}</span>
-          <span className={styles.ovrLabel}>OVR</span>
-        </div>
-        <div className={styles.nameBlock}>
-          <span className={styles.nameFirst}>{enameFirst}</span>
-          <span className={styles.nameLast}>{enameRest}</span>
-          {archetype && <span className={styles.archetype}>{archetype}</span>}
-          {badges && (
-            <div className={styles.badgeRow}>
-              {badges.finishing > 0 && <span className={`${styles.badge} ${badgeClass(badges.finishing)}`} title="Finishing">F</span>}
-              {badges.shooting > 0 && <span className={`${styles.badge} ${badgeClass(badges.shooting)}`} title="Shooting">S</span>}
-              {badges.playmaking > 0 && <span className={`${styles.badge} ${badgeClass(badges.playmaking)}`} title="Playmaking">P</span>}
-              {badges.defense > 0 && <span className={`${styles.badge} ${badgeClass(badges.defense)}`} title="Defense">D</span>}
+  return (
+    <div className={styles.cardShell}>
+      <div className={styles.card} style={{ "--team-color": teamColor } as React.CSSProperties}>
+        <div className={`${styles.cardInner} ${flipped ? styles.flipped : ""}`}>
+          <div className={styles.front}>
+            {/* 배경에 흐리게 깔리는 대형 OVR 숫자 */}
+            <div className={`${styles.bgOvr} ${tierClass(ovr)}`} aria-hidden="true">
+              {ovr}
+            </div>
+
+            <div className={styles.header}>
+              <div className={styles.ovrBlock}>
+                <span className={`${styles.ovrValue} ${tierClass(ovr)}`}>{ovr}</span>
+                <span className={styles.ovrLabel}>OVR</span>
+              </div>
+              <div className={styles.nameBlock}>
+                <span className={styles.nameFirst}>{enameFirst}</span>
+                <span className={styles.nameLast}>{enameRest}</span>
+                {archetype && <span className={styles.archetype}>{archetype}</span>}
+                {badges && (
+                  <div className={styles.badgeRow}>
+                    {badges.finishing > 0 && <span className={`${styles.badge} ${badgeClass(badges.finishing)}`} title="Finishing">F</span>}
+                    {badges.shooting > 0 && <span className={`${styles.badge} ${badgeClass(badges.shooting)}`} title="Shooting">S</span>}
+                    {badges.playmaking > 0 && <span className={`${styles.badge} ${badgeClass(badges.playmaking)}`} title="Playmaking">P</span>}
+                    {badges.defense > 0 && <span className={`${styles.badge} ${badgeClass(badges.defense)}`} title="Defense">D</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className={styles.photoWrap}>
+              <Image
+                src={photoUrl || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"}
+                alt={name}
+                fill
+                sizes="(max-width: 800px) 260px, 340px"
+                className={styles.photo}
+              />
+            </div>
+
+            <div className={styles.statsBar}>
+              <div className={styles.statCell}>
+                <span className={styles.statLabel}>OFFENSE</span>
+                <span className={`${styles.statPill} ${tierClass(offOvr)}`}>{offOvr}</span>
+              </div>
+              <div className={styles.statCell}>
+                <span className={styles.statLabel}>DEFENSE</span>
+                <span className={`${styles.statPill} ${tierClass(defOvr)}`}>{defOvr}</span>
+              </div>
+              <div className={styles.statCell}>
+                <span className={styles.statLabel}>TEAM / NUM</span>
+                <span className={styles.teamNumPill}>
+                  {team}
+                  <span className={styles.teamNumDivider}>|</span>#{number}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {attributes && (
+            <div className={styles.back}>
+              <div className={styles.backHeader}>
+                <span className={`${styles.backOvr} ${tierClass(ovr)}`}>{ovr}</span>
+                <span className={styles.backName}>{enameRest}</span>
+              </div>
+              <div className={styles.backRadar}>
+                <OvrRadarChart attributes={attributes} ovr={ovr} />
+              </div>
             </div>
           )}
         </div>
+
+        <div className={styles.frame} aria-hidden="true" />
       </div>
 
-      <div className={styles.photoWrap}>
-        <Image
-          src={photoUrl || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"}
-          alt={name}
-          fill
-          sizes="(max-width: 800px) 260px, 340px"
-          className={styles.photo}
-        />
-        {/* 능력치 레이더 차트 오버레이 */}
-        {attributes && (
-          <div className={styles.radarWrap}>
-            <OvrRadarChart attributes={attributes} ovr={ovr} />
-          </div>
-        )}
-      </div>
-
-      <div className={styles.statsBar}>
-        <div className={styles.statCell}>
-          <span className={styles.statLabel}>OFFENSE</span>
-          <span className={`${styles.statPill} ${tierClass(offOvr)}`}>{offOvr}</span>
-        </div>
-        <div className={styles.statCell}>
-          <span className={styles.statLabel}>DEFENSE</span>
-          <span className={`${styles.statPill} ${tierClass(defOvr)}`}>{defOvr}</span>
-        </div>
-        <div className={styles.statCell}>
-          <span className={styles.statLabel}>TEAM / NUM</span>
-          <span className={styles.teamNumPill}>
-            {team}
-            <span className={styles.teamNumDivider}>|</span>#{number}
-          </span>
-        </div>
-      </div>
-
-      <div className={styles.frame} aria-hidden="true" />
+      {attributes && (
+        <button
+          type="button"
+          className={styles.flipBtn}
+          onClick={() => setFlipped((f) => !f)}
+          aria-label={flipped ? "카드 앞면 보기" : "카드 뒷면 보기 (능력치 육각형)"}
+        >
+          {flipped ? "앞면 보기" : "뒷면 보기"} ↻
+        </button>
+      )}
     </div>
   );
 }

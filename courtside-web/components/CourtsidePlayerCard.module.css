@@ -2,13 +2,25 @@
    .hero와 같은 "위임적 다크" 관례). 폭이 카드 안의 모든 치수 기준이 되도록 container query
    단위(cqw)를 써서 부모가 얼마나 줄이든(모바일 등) 비율 그대로 작아진다 - transform: scale()로
    부모가 억지로 축소하던 예전 방식과 달리 레이아웃 폭 자체가 줄어들어 좁은 화면에서 넘치지 않는다. */
+/* 카드 + "뒷면 보기" 버튼을 함께 담는 껍데기. width는 예전에 .card가 직접 갖던 값(container
+   query 기준폭)을 그대로 옮겨왔다 - .card 자체는 이제 셸 안에서 100%로 채운다. */
+.cardShell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(340px, 100%);
+}
+
 .card {
   position: relative;
-  width: min(340px, 100%);
+  width: 100%;
   aspect-ratio: 400 / 550;
   container-type: inline-size;
   border-radius: var(--r-card);
   overflow: hidden;
+  /* 3D 뒤집기 효과(rotateY)를 위한 원근감 - 자식(.cardInner)이 이 값을 기준으로 회전한다. */
+  perspective: 1400px;
   /* 1px 링: 팀 색이 거의 검정(KT #1A1A1A)이면 카드가 딥다크 히어로와 같은 색이라 윤곽이 사라진다. */
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.12);
   background: linear-gradient(135deg, var(--team-color, #1a1a1a) 0%, #000000 100%);
@@ -18,16 +30,78 @@
   transform: scale(1.02);
 }
 
-.radarWrap {
+/* 뒤집기 회전판 - 앞/뒷면을 담아 통째로 180도 돈다. 카드 실물처럼(트레이딩 카드 뒤집기 요청)
+   보이도록 preserve-3d + 앞/뒷면 각각 backface-visibility:hidden 조합. */
+.cardInner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+}
+.cardInner.flipped {
+  transform: rotateY(180deg);
+}
+
+.front,
+.back {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -40%);
-  width: 90%;
-  height: auto;
-  z-index: 15; /* Behind the photo but above the background */
-  opacity: 0.9;
-  pointer-events: none;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.back {
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4cqw;
+  padding: 10cqw 8cqw;
+}
+
+.backHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.backOvr {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 9cqw;
+  font-weight: 800;
+  font-style: italic;
+  line-height: 1;
+}
+.backName {
+  font-size: max(12px, 4cqw);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+}
+.backRadar {
+  width: 100%;
+  max-width: 280px;
+}
+
+/* "뒷면 보기" 토글 - 이 사이트의 다른 실제 버튼 컨벤션(.btn-primary)은 라이트 테마 대비용이라
+   항상 다크인 이 카드엔 안 맞는다. 카드 자체의 배지/필 스타일(짙은 반투명 + 옅은 테두리)을
+   그대로 가져다 씀. 카드 내부 절대배치 레이아웃이 빽빽해서(헤더/사진/스탯바) 카드 위에
+   겹쳐 놓는 대신 셸 안에서 카드 바로 아래 두어 어떤 선수 데이터로도 겹칠 일이 없게 했다. */
+.flipBtn {
+  font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 6px 14px;
+  border-radius: var(--r-led);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  cursor: pointer;
+}
+.flipBtn:hover {
+  opacity: 0.85;
 }
 
 /* 배경에 흐리게 깔리는 대형 OVR 숫자 - 70cqw = 원본 디자인 비율(400px 카드에서 280px)과 동일 */
