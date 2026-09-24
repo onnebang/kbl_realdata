@@ -111,6 +111,72 @@ MANUAL_OVR_OVERRIDES = {
 }
 
 
+# KBL 기록이 전혀 없는 완전 신인(주로 신규 외국인/아시아쿼터 영입)은 원래 rookie_floor_for()의
+# 바닥치(53~58)로만 간다 - "경기 기록이 없으니 그 이상을 줄 근거가 없다"는 원칙 그대로다. 다만
+# tools/data/import_scouting_2026_2027.csv에 실제 근거(해외 리그 스탯, KBL 팀 상대 연습경기/EASL
+# 실전 기록, 비교 선수)가 있는 선수는 예외 - "근거 없음"이 아니라 "근거가 있는데 안 쓴 것"이 되므로,
+# 그 파일의 등급(tier)·비교 선수(comparable)를 사람이 번역해 OVR/6개 속성을 직접 채운다(2026-09-24,
+# 사용자 제보 + CSV 발견). 델타가 아니라 전체 프로필을 통째로 지정하는 이유 - 이 선수들은 "계산된
+# 값에 보정을 얹는" MANUAL_OVR_OVERRIDES와 달리 계산된 값 자체가 없다(바닥치 53은 6개 속성이
+# 전부 같아서 편평하고, 신인 스카우팅은 포지션별로 강점이 다르므로 델타 하나로는 못 살린다).
+# key: season_roster.pcode가 NULL이라 load_next_season_roster()가 만드는 "tbd_이름" 임시 키.
+SCOUTED_ROOKIE_PROFILES = {
+    'tbd_다리우스 베즐리': {
+        'OVR': 90, 'OFF': 90, 'DEF': 88,
+        'attributes': {'outside': 84, 'inside': 82, 'playmaking': 74, 'athletic': 93, 'defense': 86, 'rebounding': 85},
+        'archetype': 'Slasher',
+        'reason': 'NBA 5시즌 237경기(20-21 OKC 주전 13.7점 7.2리바) + 2026 푸에르토리코 대표팀 12.5점 '
+                  '10.4리바 FG54% 3P41% + 9/2·9/5 일본 연습경기 13점/18점. 특급, "오마리 스펠맨(peak 89) '
+                  '전성기 운동능력 상위 호환"',
+    },
+    'tbd_스코티 제임스': {
+        'OVR': 91, 'OFF': 91, 'DEF': 87,
+        'attributes': {'outside': 85, 'inside': 88, 'playmaking': 76, 'athletic': 84, 'defense': 86, 'rebounding': 90},
+        'archetype': 'Stretch Big',
+        'reason': '중국 CBA(KBL보다 상위리그) 톈진 4시즌 158경기 22.2점 11.9리바, 24-25 24.6점 14.0리바 '
+                  '3P 41.3%, 일본 전훈 4일만에 17점 10리바. 특급, "자밀 워니급(peak 96) 1옵션 + 41% 외곽" '
+                  '- CBA에서 워니 전담 수비 경험도 있음',
+    },
+    'tbd_존 무니': {
+        'OVR': 85, 'OFF': 84, 'DEF': 84,
+        'attributes': {'outside': 68, 'inside': 88, 'playmaking': 70, 'athletic': 78, 'defense': 82, 'rebounding': 90},
+        'archetype': 'Paint Beast',
+        'reason': '일본 B1 통산 213경기 14.9점 11.4리바(23-24 리바운드왕), EASL 실전으로 KBL과 직접 붙은 '
+                  '기록 있음 - vs 정관장 22점 22리바 2연승, EASL 결승 vs SK 워니 상대 우승(72-69). 상급, '
+                  '"아셈 마레이(peak 90)에 미드레인지를 더한 형태"',
+    },
+    'tbd_아치 굿윈': {
+        'OVR': 86, 'OFF': 89, 'DEF': 76,
+        'attributes': {'outside': 76, 'inside': 85, 'playmaking': 76, 'athletic': 90, 'defense': 74, 'rebounding': 70},
+        'archetype': 'Slasher',
+        'reason': '대만 P.리그+ 25-26 득점왕(26.4점, 한 경기 51점) + EASL 25-26 득점왕·올-서드팀(29.3점) '
+                  '+ EASL 실전으로 SK 원정 35점(워니·안영준·오재현 상대). NBA 1라운드 출신. 상급',
+    },
+    'tbd_루이스 킹': {
+        'OVR': 83, 'OFF': 84, 'DEF': 78,
+        'attributes': {'outside': 82, 'inside': 76, 'playmaking': 74, 'athletic': 80, 'defense': 76, 'rebounding': 74},
+        'archetype': 'Scoring Threat',
+        'reason': '푸에르토리코 BSN 25-26 43경기 15.8점 6.5리바 3.9어시 FG46% 3P41%(리그 올스타), G리그 '
+                  '5시즌 183경기, 9/1 SK 연습경기 19점(워니·힉스·안영준·오재현 상대). 상급, "패리스 배스(peak '
+                  '90)형 외곽 슬래셔"',
+    },
+    'tbd_트레이 포터': {
+        'OVR': 76, 'OFF': 70, 'DEF': 82,
+        'attributes': {'outside': 55, 'inside': 76, 'playmaking': 60, 'athletic': 78, 'defense': 86, 'rebounding': 82},
+        'archetype': 'Glass Cleaner',
+        'reason': '일본 B1 알티리 치바 25-26 58경기 11.7점 7.9리바 1.1블록 FG60%(2대2·풋백 위주), B2 시절 '
+                  '블록왕. 역할(3단계 중 최하), 20분 내외 골밑 한정 역할 - "오누아쿠(2024-25 85) 수비 지향 버전"',
+    },
+    'tbd_제리 아바디아노': {
+        'OVR': 70, 'OFF': 64, 'DEF': 76,
+        'attributes': {'outside': 62, 'inside': 60, 'playmaking': 68, 'athletic': 76, 'defense': 80, 'rebounding': 62},
+        'archetype': 'Lockdown Defender',
+        'reason': '필리핀 MPBL 2026 16경기 9.6점 1.9리바 2.6어시(16.1분), 코칭스태프 평가 "압박수비·활동량 '
+                  '스페셜리스트". 아쿼중급, "론제이 아바리엔토스(79)보다 수비 기반" - 득점력은 더 낮게 봄',
+    },
+}
+
+
 def manual_override_delta(pcode, season):
     """MANUAL_OVR_OVERRIDES에서 이 (pcode, season)에 적용할 delta. 없거나 from_season보다
     이전 시즌이면 0."""
@@ -1126,6 +1192,7 @@ def compute_ovr(target_season='2024-2025'):
     for pcode in to_project:
         hist = global_df[global_df['pcode'] == pcode].sort_values('season_name')
         if hist.empty:
+            scouted = SCOUTED_ROOKIE_PROFILES.get(pcode)
             floor = rookie_floor_for(draft_ranks.get(pcode))
             out_data.append({
                 "pcode": pcode,
@@ -1133,14 +1200,14 @@ def compute_ovr(target_season='2024-2025'):
                 "season": PROJECTION_SEASON,
                 "team": next_season_roster.get(pcode, {}).get("team", "Unknown"),
                 "position": positions.get(pcode, "Unknown"),
-                "OVR": floor,
-                "OFF": floor,
-                "DEF": floor,
-                "attributes": {
+                "OVR": scouted["OVR"] if scouted else floor,
+                "OFF": scouted["OFF"] if scouted else floor,
+                "DEF": scouted["DEF"] if scouted else floor,
+                "attributes": dict(scouted["attributes"]) if scouted else {
                     "outside": floor, "inside": floor, "playmaking": floor,
                     "athletic": floor, "defense": floor, "rebounding": floor
                 },
-                "archetype": "롤 플레이어",
+                "archetype": scouted["archetype"] if scouted else "롤 플레이어",
                 "badges": {"finishing": 0, "shooting": 0, "playmaking": 0, "defense": 0},
                 "projected": True,
             })
