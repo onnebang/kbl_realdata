@@ -14,6 +14,14 @@ import styles from "./PreseasonShift.module.css";
 // 요청: "26-27시즌에는 용병제도가 조금 변경 ... 1쿼, 4쿼는 용병 2인 출전 불가, 아쿼는 가능,
 // 2~3쿼는 아쿼+용병 2인 중에 2인 출전 가능(용병 2명 조합도 가능)".
 //
+// 정정(2026-09-24, 사용자 제보 - 첫 요청 자체가 착각이었음, 오늘 오픈매치 실측으로 확인):
+// 2·3쿼터는 "세 명 중 두 명"이 아니라 세 명(아시아쿼터+외국인 2명) 전원 동시 출전 가능.
+// 제한이 있는 건 1·4쿼터뿐(외국인 2명은 함께 못 서고, 아시아쿼터는 둘 중 누구와도 같이 설 수
+// 있음 - 종전과 동일). 2·3쿼터는 "둘 중 하나를 골라 아시아쿼터와 짝짓는" 문제가 아니라
+// 셋 다 세울 수 있는 문제라, 아래 "여지"/"지수"의 서술도 "교체 경합"이 아니라 "추가 투입"으로
+// 다시 썼다(계산식 자체는 안 바꿈 - room=지난 시즌 아시아쿼터의 2·3쿼터 출전분, gap=외국인
+// 2옵션과 아시아쿼터의 PER 차. 둘 다 실측값이라 '경합'이든 '추가'든 그대로 유효, 뜻만 다름).
+//
 // 이 섹션의 축은 "2·3쿼터가 승부처다"가 아니라 "외국인 슬롯이 늘어난다"이다 - 실측이 그렇게
 // 말한다. 자세한 근거는 lib/importRule.ts 머리말과 tools/build_import_slots.py에.
 
@@ -65,8 +73,8 @@ function SlotCard({ t, prev, cur }: { t: TeamImportRule; prev: string; cur: stri
       {t.noAq && <div className={styles.seatNone} style={{ padding: "5px 0 0" }}>아시아쿼터 미등록</div>}
       <div className={styles.slotFoot}>
         <span>
-          여지 <span className={styles.slotFootVal}>{fmt1(t.room)}분</span>
-          <span className={styles.slotFootMuted}> ({prev} 아시아쿼터의 2·3쿼터 출전)</span>
+          추가 가능 <span className={styles.slotFootVal}>{fmt1(t.room)}분</span>
+          <span className={styles.slotFootMuted}> ({prev} 아시아쿼터의 2·3쿼터 출전 - 그 시간만큼 이제 외국인을 더 붙일 수 있음)</span>
         </span>
         {/* 두 격차는 기준이 다르다 - 라벨 없이 붙여 두면 서로 모순처럼 읽힌다.
             SK: 작년 두 자리는 -0.3이었는데 올해 등록 조합은 +4.8이다. */}
@@ -104,12 +112,12 @@ export function ImportRule({ report, num }: { report: ImportRuleReport; num: num
     <div className={panel.panel}>
       <div className={panel.panelTitle}>
         <span className={panel.sectionNum}>{num}</span>
-        {cur} 외국인 출전 규정 변경 - 40분에서 최대 {40 + NEW_WINDOW_MINUTES}분으로
+        {cur} 외국인 출전 규정 변경 - 2·3쿼터는 셋 다 동시 출전 가능
       </div>
       <p className={panel.panelLede}>
-        1쿼터·4쿼터는 종전대로 외국인 2명이 함께 설 수 없고(아시아쿼터는 가능), 2·3쿼터에는 등록된 세 명 중 두 명이 동시에 뜁니다 - 외국인
-        2명 조합도 됩니다. 이 변화의 크기는 &quot;2·3쿼터가 승부처가 된다&quot;가 아니라 &quot;외국인이 코트에 서 있을 수 있는 시간이
-        늘어난다&quot;에 있습니다.
+        1쿼터·4쿼터는 종전대로 외국인 2명이 함께 설 수 없고(아시아쿼터는 둘 중 누구와도 가능), 2·3쿼터에는 그 제한 자체가 없어져
+        아시아쿼터+외국인 2명 <b>셋 다</b> 동시에 설 수 있습니다. 이 변화의 크기는 &quot;2·3쿼터가 승부처가 된다&quot;가 아니라
+        &quot;외국인이 코트에 서 있을 수 있는 시간이 늘어난다&quot;에 있습니다.
       </p>
 
       <div className={styles.figureRow}>
@@ -136,13 +144,14 @@ export function ImportRule({ report, num }: { report: ImportRuleReport; num: num
           </div>
         </div>
         <div className={styles.figure}>
-          <div className={styles.figureLabel}>새로 열리는 외국인 시간</div>
+          <div className={styles.figureLabel}>제한이 없어지는 구간</div>
           <div className={styles.figureVal}>
-            +{NEW_WINDOW_MINUTES}
+            {NEW_WINDOW_MINUTES}
             <span className={styles.figureUnit}>분</span>
           </div>
           <div className={styles.figureSub}>
-            팀당 상한 기준(2·3쿼터 20분 × 1명). 2·3쿼터는 팀당 득점의 {(report.midShare * 100).toFixed(1)}%로 정확히 절반입니다.
+            2·3쿼터 전체(팀당). 이 20분 동안은 세 자리 모두 동시 출전에 제한이 없습니다. 2·3쿼터는 팀당 득점의{" "}
+            {(report.midShare * 100).toFixed(1)}%로 정확히 절반입니다.
           </div>
         </div>
       </div>
@@ -171,15 +180,15 @@ export function ImportRule({ report, num }: { report: ImportRuleReport; num: num
               return (
                 <div key={q} className={`${styles.qCell} ${open ? styles.qCellOpen : ""}`}>
                   <div className={styles.qCellName}>{q}</div>
-                  {open ? "세 명 중 2" : "외국인 1"}
+                  {open ? "셋 다" : "외국인 1"}
                 </div>
               );
             })}
           </div>
           <div className={styles.ruleText}>
-            2·3쿼터에만 아시아쿼터 1 + 외국인 2 중 두 명이 함께 뜁니다. 1·4쿼터는 종전과 같습니다. 바뀌는 구간이 승부처라서 중요한 게
-            아닙니다 - 쿼터 득실차와 최종 득실차의 상관은 Q2+Q3 {qc["Q2+Q3"] ?? "-"}, Q1+Q4 {qc["Q1+Q4"] ?? "-"}로 사실상 같습니다.
-            정확히 절반이라서 중요합니다.
+            2·3쿼터엔 아시아쿼터 1 + 외국인 2 <b>셋 다</b> 동시에 뜁니다(제한 없음). 1·4쿼터는 종전과 같습니다. 바뀌는 구간이 승부처라서
+            중요한 게 아닙니다 - 쿼터 득실차와 최종 득실차의 상관은 Q2+Q3 {qc["Q2+Q3"] ?? "-"}, Q1+Q4 {qc["Q1+Q4"] ?? "-"}로 사실상
+            같습니다. 정확히 절반이라서 중요합니다.
           </div>
         </div>
       </div>
@@ -191,7 +200,8 @@ export function ImportRule({ report, num }: { report: ImportRuleReport; num: num
         {report.gapTotal > 0 && (
           <>
             {prev} 재료로 보면 {report.teams.length}팀 중 {report.gapPositive}팀에서 &quot;외국인 2옵션 &gt; 아시아쿼터&quot;였습니다(PER 격차 중앙값{" "}
-            {signed1(report.gapMedian)}). 격차가 클수록, 그리고 아시아쿼터가 2·3쿼터를 많이 뛰었을수록 이 규정으로 바꿀 유인이 큽니다.{" "}
+            {signed1(report.gapMedian)}). 격차가 클수록, 그리고 아시아쿼터가 2·3쿼터를 많이 뛰었을수록 그 시간에 2옵션을{" "}
+            <b>추가로</b> 붙였을 때(아시아쿼터를 빼는 게 아니라) 기대되는 보강폭이 큽니다.{" "}
           </>
         )}
         다만 {cur} 등록 선수 중 KBL 기록이 없는 신규 선수가 많아, 실제 조합으로 격차가 산출되는 팀은 {computable.length}팀뿐입니다.
@@ -209,7 +219,7 @@ export function ImportRule({ report, num }: { report: ImportRuleReport; num: num
           {computable
             .map(
               (t) =>
-                `${t.team.abbr} ${signed1(t.gap)} PER × 여지 ${t.room.toFixed(1)}분` +
+                `${t.team.abbr} ${signed1(t.gap)} PER × 추가 가능 ${t.room.toFixed(1)}분` +
                 (t.index != null ? ` = 지수 ${Math.round(t.index)}` : "")
             )
             .join(" · ")}
@@ -229,15 +239,17 @@ export function ImportRule({ report, num }: { report: ImportRuleReport; num: num
       )}
 
       <div className={panel.note}>
-        지수는 (외국인 2옵션 PER − 아시아쿼터 PER) × ({prev} 아시아쿼터의 2·3쿼터 출전분)입니다. <b>무단위이고 순서만 말합니다</b> - 승수나
-        득점으로 환산되지 않습니다({cur}은 아직 0경기입니다). 카드의 지수는 10팀 전부에서 나오는 {prev} 재료 기준이고, 위 각주의 지수는 {cur}{" "}
+        지수는 (외국인 2옵션 PER − 아시아쿼터 PER) × ({prev} 아시아쿼터의 2·3쿼터 출전분)입니다. 2·3쿼터엔 <b>아시아쿼터를 빼는 게
+        아니라 그 옆에 2옵션을 추가로 세울 수 있으므로</b>, 이 지수는 &quot;바꿨을 때의 이득&quot;이 아니라 &quot;그만큼의 시간에 더 강한
+        선수를 추가 투입했을 때 기대되는 순보강폭&quot;의 근사치로 읽어야 합니다. <b>무단위이고 순서만 말합니다</b> - 승수나 득점으로
+        환산되지 않습니다({cur}은 아직 0경기입니다). 카드의 지수는 10팀 전부에서 나오는 {prev} 재료 기준이고, 위 각주의 지수는 {cur}{" "}
         실제 등록 조합 기준입니다.
       </div>
       <div className={panel.note}>
         2옵션 외국인의 분당 지표는 팀-경기당 9~17분짜리 벤치 출전에서 나온 값이라, 출전이 2·3쿼터로 늘어나도 그대로 유지된다는 보장은
-        없습니다 - 격차는 상한에 가깝게 읽어야 합니다. &quot;여지&quot;도 상한선입니다: 팀이 아시아쿼터 대신 국내 선수의 시간을 줄일 수도
-        있습니다. {prev}의 1옵션/2옵션 구분은 등록 구분이 아니라 출전분이 많은 쪽을 1옵션으로 본 운영 정의이며, 아시아쿼터/외국인 구분은 코트
-        위 동시 출전 구조로 복원한 뒤 {cur} 등록 명부 18명과 대조해 100% 일치를 확인했습니다.
+        없습니다 - 격차는 상한에 가깝게 읽어야 합니다. &quot;추가 가능&quot; 분도 상한선입니다: 팀이 그 시간을 그대로 안 쓰고 국내 선수의
+        시간을 줄이는 대신 쓸 수도, 아예 안 쓸 수도 있습니다. {prev}의 1옵션/2옵션 구분은 등록 구분이 아니라 출전분이 많은 쪽을 1옵션으로 본
+        운영 정의이며, 아시아쿼터/외국인 구분은 코트 위 동시 출전 구조로 복원한 뒤 {cur} 등록 명부 18명과 대조해 100% 일치를 확인했습니다.
       </div>
     </div>
   );
