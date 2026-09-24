@@ -180,16 +180,21 @@ async function getEvents(gmkey: string, ttl: number) {
 
 // action_codes(30여 개, 가벼움) 통째로 가져와 code->label 맵 - courtside_template.html의
 // ACTION_LABELS 오브젝트와 같은 역할.
-// 진행중 경기 전용 선수 이름 폴백(2026-09-02). 라이브 수집기는 game_events만 채우고
-// game_player_stats(공식 박스스코어)는 경기가 끝난 뒤 정산 배치가 넣는다. 그래서 경기 중에는
-// buildGameData의 nameMap이 통째로 비어 player_name이 전부 null이 되고, 스코어보드의
-// "지금 이 순간" 줄이 문자 그대로 `null · 수비리바운드`를 렌더했다. 10월엔 모든 라이브 경기에서
-// 보이는 문제라, 이벤트에 등장한 pcode만 players에서 직접 읽어 이름을 채운다(경기당 한 번,
-// 20~30명 규모라 가볍다). 종료된 경기는 박스스코어가 있으니 이 조회 자체를 하지 않는다.
-async function getPlayerNames(pcodes: string[]): Promise<Map<string, string>> {
+// 진행중 경기 전용 선수 정보 폴백(2026-09-02 이름, 2026-09-25 사진 추가 - 제보: "박스스코어가
+// 아예 안 보인다"). 라이브 수집기는 game_events만 채우고 game_player_stats(공식 박스스코어)는
+// 경기가 끝난 뒤 정산 배치가 넣는다. 그래서 경기 중에는 buildGameData의 nameMap이 통째로 비어
+// player_name이 전부 null이 되고("null · 수비리바운드" 렌더 버그), GameReplay의 replayPlayers도
+// 비어서 computeBoxScore(컴포넌트 내부, events만으로 박스스코어를 계산함 - game_player_stats에
+// 의존하지 않음)가 `for (const p of players) box.set(...)`로 선수를 하나도 등록 못 해 이벤트가
+// 있어도 전부 버려진다("경기 종료 후"에도 스탯이 하나도 안 보이는 원인). 이벤트에 등장한 pcode만
+// players에서 직접 읽어 이름+사진을 채운다(경기당 한 번, 20~30명 규모라 가볍다). 종료된 경기는
+// 박스스코어가 있으니 이 조회 자체를 하지 않는다. min_played/is_starter/back_num은 공식
+// 박스스코어 전용 필드라 라이브 중엔 알 수 없음 - null로 둔다(MIN 칸이 "-"로 보이는 게, 틀린
+// 값을 보여주는 것보다 정직하다).
+async function getLivePlayerFallback(pcodes: string[]): Promise<Map<string, { name: string; photoUrl: string | null }>> {
   if (pcodes.length === 0) return new Map();
-  const { data } = await supabase.from("players").select("pcode, name").in("pcode", pcodes);
-  return new Map((data ?? []).map((r) => [r.pcode as string, r.name as string]));
+  const { data } = await supabase.from("players").select("pcode, name, photo_url").in("pcode", pcodes);
+  return new Map((data ?? []).map((r) => [r.pcode as string, { name: r.name as string, photoUrl: (r.photo_url as string | null) ?? null }]));
 }
 
 // action_codes는 30여 개짜리 준-상수 테이블(lib/playerProfile.ts getAllTeams와 같은 부류) -
@@ -239,7 +244,7 @@ function buildGameData(
   playerStats: PlayerStatRow[],
   events: EventRow[],
   actionLabels: Map<string, string>,
-  // 진행중 경기용 이름 폴백(getPlayerNames 주석 참고). 박스스코어가 있으면 빈 맵.
+  // 진행중 경기용 이름 폴백(getLivePlayerFallback 주석 참고). 박스스코어가 있으면 빈 맵.
   fallbackNames: Map<string, string> = new Map()
 ): {
   box: PlayerBox[];
@@ -530,11 +535,16 @@ export default async function GamePage({
   // 불러와 lib/postgameReport.ts(A1-A8 그대로 이식)가 같은 계산을 함.
   // buildGameData - 이 경기 자체와 "직전 경기"(lib/matchupInsights.ts)에 완전히 동일한 규칙으로
   // GameEvent[]/PlayerBox[]를 조립(중복 로직 제거, 위 buildGameData 정의부 주석 참고).
-  // 박스스코어가 아직 없는 진행중 경기에서만 players에서 이름을 보충한다(getPlayerNames 주석).
-  const liveNames =
-    playerStats.length === 0
-      ? await getPlayerNames([...new Set(events.map((e) => e.pcode).filter((p): p is string => !!p))])
-      : new Map<string, string>();
+  // 박스스코어가 아직 없는 진행중 경기에서만 players에서 이름+사진을 보충한다
+  // (getLivePlayerFallback 주석). tcode는 이벤트 자체에 이미 있어서 따로 조회할 필요 없음 -
+  // 같은 선수의 첫 이벤트 tcode를 그대로 씀(경기 중 팀이 바뀔 리 없음).
+  const liveTcodeByPcode = new Map<string, string>();
+  for (const e of events) {
+    if (e.pcode && e.tcode && !liveTcodeByPcode.has(e.pcode)) liveTcodeByPcode.set(e.pcode, e.tcode);
+  }
+  const livePlayerFallback =
+    playerStats.length === 0 ? await getLivePlayerFallback([...liveTcodeByPcode.keys()]) : new Map<string, { name: string; photoUrl: string | null }>();
+  const liveNames = new Map([...livePlayerFallback].map(([pcode, v]) => [pcode, v.name]));
   const { box, derivedEvents, players: currentGamePlayers } = buildGameData(playerStats, events, actionLabels, liveNames);
 
 
@@ -623,15 +633,33 @@ export default async function GamePage({
   // 요청: "선수 기록과 인터랙티브 리플레이의 선수기록이 중복" - 독립 선수기록 패널을
   // 없애고 GameReplay의 boxTable로 흡수시키면서, 그쪽에서도 선발/벤치 구분선을 그리려면
   // is_starter가 필요해서 같이 넘김.
-  const replayPlayers = playerStats.map((p) => ({
-    pcode: p.pcode,
-    name: p.player?.name ?? p.pcode,
-    tcode: p.tcode,
-    isStarter: p.is_starter,
-    photoUrl: p.player?.photo_url ?? null,
-    backNum: p.back_num,
-    minPlayed: p.min_played,
-  }));
+  //
+  // 진행중 경기는 playerStats(공식 박스스코어)가 아직 비어있어 이 목록도 통째로 비었었다 -
+  // GameReplay.computeBoxScore가 `players` 목록에 있는 pcode만 집계하므로(내부에서
+  // `for (const p of players) box.set(p.pcode, ...)`), 목록이 비면 이벤트가 있어도 박스스코어
+  // 전체가 안 그려짐(제보: "점수판은 오르는데 선수 세부 기록이 안 보임"). livePlayerFallback으로
+  // 이벤트에 등장한 pcode를 채워 넣는다 - is_starter/back_num/min_played는 공식 박스스코어
+  // 전용이라 진행중엔 모름(null, MIN 칸은 "-"로 보임).
+  const replayPlayers =
+    playerStats.length > 0
+      ? playerStats.map((p) => ({
+          pcode: p.pcode,
+          name: p.player?.name ?? p.pcode,
+          tcode: p.tcode,
+          isStarter: p.is_starter,
+          photoUrl: p.player?.photo_url ?? null,
+          backNum: p.back_num,
+          minPlayed: p.min_played,
+        }))
+      : [...liveTcodeByPcode].map(([pcode, tcode]) => ({
+          pcode,
+          name: livePlayerFallback.get(pcode)?.name ?? pcode,
+          tcode,
+          isStarter: null,
+          photoUrl: livePlayerFallback.get(pcode)?.photoUrl ?? null,
+          backNum: null,
+          minPlayed: null,
+        }));
 
   // 요청: "라인업 조합별(1~5인) 넷레이팅 표시" - tools/build_synergy_matchup.py가 이미
   // 계산해둔 lineup_combo 테이블을 조회하되, 로스터 전체 조합(수백~수천 개)이 아니라 이
@@ -1105,7 +1133,7 @@ export default async function GamePage({
             actionLabels={Object.fromEntries(actionLabels)}
             /* 이름은 종료 경기라면 players prop(replayPlayers)이 이미 같은 값을 들고 있어서
                따로 보낼 게 없다. 진행중 경기만 박스스코어가 없어 이 폴백이 필요하다
-               (getPlayerNames 주석) - 그래서 이 prop은 예전 그대로 라이브 전용. */
+               (getLivePlayerFallback 주석) - 그래서 이 prop은 예전 그대로 라이브 전용. */
             liveNames={status === "live" ? Object.fromEntries(liveNames) : undefined}
           />
           </WidgetBoundary>
