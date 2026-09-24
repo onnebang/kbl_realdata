@@ -261,6 +261,54 @@ export async function getPregameWinProbs(gmkeys: string[]): Promise<Map<string, 
   );
 }
 
+// 엔트리 반영 승률(요청, 2026-09-25: "승률을 2개를 적어야할것 같아... 승률의 변동이 있다면
+// 어느 부분에서 변동이 있었는지" - 이정현 결장으로 소노 승률이 크게 내려간 사례). 라이브/종료
+// 경기의 카드 승률(getPregameWinProbs)은 game_events event_order=0(라이브 모델, netrtg/synergy
+// 기반 - 엔트리와 무관)을 쓰므로 여긴 건드리지 않는다. 엔트리가 의미를 가지는 건 "예정" 경기뿐 -
+// pregame_features.home_win_prob_lineup(tools/recalc_lineup_winprob.py가 씀)이 있을 때만
+// 반환하고, 없으면(엔트리 미발표) 빈 결과라 기존 단일 승률 표시가 그대로 유지된다.
+export type LineupWinProb = { lineupProb: number; absentHome: string[]; absentAway: string[] };
+export async function getLineupWinProbs(gmkeys: string[]): Promise<Map<string, LineupWinProb>> {
+  if (!gmkeys.length) return new Map();
+  return cachedMap(
+    () => fetchLineupWinProbs(gmkeys),
+    ["homeGames:lineupWinProbs", cacheKey(gmkeys)],
+    TTL.scheduled,
+    [TAG.batch]
+  );
+}
+
+async function fetchLineupWinProbs(gmkeys: string[]): Promise<Map<string, LineupWinProb>> {
+  const map = new Map<string, LineupWinProb>();
+  const { data } = await supabase
+    .from("pregame_features")
+    .select("gmkey, home_win_prob_lineup, lineup_absences")
+    .in("gmkey", gmkeys)
+    .not("home_win_prob_lineup", "is", null);
+  if (!data?.length) return map;
+
+  const allPcodes = new Set<string>();
+  for (const r of data) {
+    const abs = (r.lineup_absences ?? {}) as { home?: string[]; away?: string[] };
+    for (const p of [...(abs.home ?? []), ...(abs.away ?? [])]) allPcodes.add(p);
+  }
+  const nameByPcode = new Map<string, string>();
+  if (allPcodes.size > 0) {
+    const { data: players } = await supabase.from("players").select("pcode, name").in("pcode", [...allPcodes]);
+    for (const p of players ?? []) nameByPcode.set(p.pcode as string, p.name as string);
+  }
+
+  for (const r of data) {
+    const abs = (r.lineup_absences ?? {}) as { home?: string[]; away?: string[] };
+    map.set(r.gmkey as string, {
+      lineupProb: r.home_win_prob_lineup as number,
+      absentHome: (abs.home ?? []).map((p) => nameByPcode.get(p) ?? p),
+      absentAway: (abs.away ?? []).map((p) => nameByPcode.get(p) ?? p),
+    });
+  }
+  return map;
+}
+
 async function fetchPregameWinProbs(gmkeys: string[]): Promise<Map<string, number>> {
   const map = new Map<string, number>();
   for (let i = 0; i < gmkeys.length; i += 200) {

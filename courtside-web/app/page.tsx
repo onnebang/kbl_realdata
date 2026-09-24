@@ -9,6 +9,7 @@ import {
   getGames,
   getPregameWinProbs,
   getLiveWinProbs,
+  getLineupWinProbs,
   getGameMvps,
   getGameTags,
   getSeasonWinPcts,
@@ -81,10 +82,11 @@ export default async function HomePage({
   const liveGmkeys = games.filter((g) => deriveGameStatus(g) === "live").map((g) => g.gmkey);
   // 다섯 조회 전부 선택적 장식이라 각각 soft 폴백(빈 Map) - 어느 하나가 죽어도 카드의 그 칸만
   // 비고 일정은 그대로 그려진다. 폴백은 위 soft()가 console.error를 남긴 뒤에만 돌아온다.
-  const [winProbs, liveProbs, mvps, tags, seasonWinPcts] = await Promise.all([
+  const [winProbs, liveProbs, mvps, lineupWinProbs, tags, seasonWinPcts] = await Promise.all([
     soft("pregameWinProbs", getPregameWinProbs(gmkeys), new Map()),
     soft("liveWinProbs", getLiveWinProbs(liveGmkeys), new Map()),
     soft("gameMvps", getGameMvps(finalGames), new Map()),
+    soft("lineupWinProbs", getLineupWinProbs(gmkeys), new Map()),
     // 태그(짜릿한 역전승 등)는 game_summary_tags에 종료 경기만 들어있다 - 예정/진행중
     // gmkey까지 같이 넘기면 어차피 못 찾을 키로 IN 절만 불린다. 라이브 자동 갱신이
     // 30초마다 이 쿼리를 다시 때리므로 넘기는 키 수를 줄여둔다.
@@ -161,6 +163,10 @@ export default async function HomePage({
           const status = deriveGameStatus(g);
           const homeWon = status === "final" && (g.home_score ?? 0) > (g.away_score ?? 0);
           const homeProb = status === "live" ? liveProbs.get(g.gmkey) ?? winProbs.get(g.gmkey) : winProbs.get(g.gmkey);
+          // 엔트리 반영 승률 - "예정" 상태에만 의미가 있다(위 getLineupWinProbs 주석 참고,
+          // 라이브/종료는 별개의 이벤트 기반 모델을 씀). 엔트리 미발표면 undefined라 기존
+          // 단일 승률 줄만 그대로 보임.
+          const lineupInfo = status === "scheduled" ? lineupWinProbs.get(g.gmkey) : undefined;
           const mvp = mvps.get(g.gmkey);
           const tag = tags.get(g.gmkey);
           const homeWinPct = g.home_team ? seasonWinPcts.get(g.home_team.tcode) : undefined;
@@ -260,13 +266,31 @@ export default async function HomePage({
                 {homeProb != null && (
                   <span className="game-card-meta-item">
                     {/* 원정 쪽은 100에서 홈 반올림값을 빼서 합이 항상 100 - 각자 반올림하면
-                        50%·51%처럼 101%가 되는 경우가 실제로 관측됨(검증 지적). */}
-                    예상 승률 {g.home_team?.abbr} {Math.round(homeProb * 100)}% · {g.away_team?.abbr} {100 - Math.round(homeProb * 100)}%
+                        50%·51%처럼 101%가 되는 경우가 실제로 관측됨(검증 지적). 엔트리 반영
+                        값이 따로 있으면(아래 줄) 이 줄이 "시즌 기준"임을 밝혀 혼동을 막는다. */}
+                    예상 승률{lineupInfo ? "(시즌 기준)" : ""} {g.home_team?.abbr} {Math.round(homeProb * 100)}% ·{" "}
+                    {g.away_team?.abbr} {100 - Math.round(homeProb * 100)}%
                     {/* OPEN MATCH DAY(오픈매치, 2026-27시즌 신설)는 모델이 학습 때 한 번도 못
                         본 경기 유형이라 일반 경기와 신뢰도가 다름 - 제거하지 않고 문구로만
                         명시(사용자 결정, 2026-09-24). */}
                     {g.season_category === "OPEN MATCH DAY" && (
                       <span className="prob-caveat"> · 오픈매치(참고용)</span>
+                    )}
+                  </span>
+                )}
+                {lineupInfo && (
+                  <span className="game-card-meta-item">
+                    {/* 요청(2026-09-25): "승률을 2개를 적어야할것 같아... 어느 부분에서
+                        변동이 있었는지" - 이정현 결장으로 소노 승률이 크게 내려간 사례가
+                        계기. 결장자가 있을 때만 사유를 덧붙인다(핵심 로테이션 전원 출전이면
+                        엔트리 반영값도 시즌 기준과 사실상 같아 사유 문구가 무의미함). */}
+                    엔트리 반영 {g.home_team?.abbr} {Math.round(lineupInfo.lineupProb * 100)}% ·{" "}
+                    {g.away_team?.abbr} {100 - Math.round(lineupInfo.lineupProb * 100)}%
+                    {(lineupInfo.absentHome.length > 0 || lineupInfo.absentAway.length > 0) && (
+                      <span className="prob-caveat">
+                        {" "}
+                        ({[...lineupInfo.absentHome, ...lineupInfo.absentAway].join(", ")} 결장)
+                      </span>
                     )}
                   </span>
                 )}
