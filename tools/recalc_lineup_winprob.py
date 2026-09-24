@@ -5,13 +5,21 @@
 KBL 규정상 12인(선발 5 + 벤치 7)을 경기 30분 전까지 제출한다. 그 명단은 player-stat의
 startFlag로 드러난다(fetch_starting_lineups.py 참고). 명단이 나오면 그 경기의 로스터
 가중치에서 결장자를 빼고 선발을 소폭 가산해(export_training_table.apply_lineup_to_roster)
-같은 모델로 다시 예측하고, pregame_features.home_win_prob을 갱신한다.
+같은 모델로 다시 예측한다.
 
 **왜 결장자 중심인가**
 이 모델(pregame_model.joblib)은 라인업으로 학습된 적이 없다. 팀 단위 롤링 스탯과 로스터
 가중평균으로만 배웠기 때문에, "선발이 누구냐"로 승률을 크게 흔들 근거가 없다. 반면 "누가
 오늘 아예 안 뛴다"는 로스터 가중평균에 직접 반영되는, 근거가 확실한 정보다. 그래서 선발
 가산(LINEUP_STARTER_BOOST)은 일부러 약하게 두고 결장 반영을 주 효과로 삼는다.
+
+**두 값을 같이 남긴다(2026-09-25, 사용자 요청)**
+예전엔 이 스크립트가 pregame_features.home_win_prob을 라인업 반영값으로 덮어써서, "시즌
+전체 기준 AI 예상 승률"이 12인 엔트리가 나오는 순간 영영 사라졌다(제보: "이정현이 빠지니까
+소노 패배가 예상될 정도로 승률이 내려왔었는데, 그 변동을 보여줘야 할 것 같다" - 그런데
+변동폭을 보여줄 "이전" 값 자체가 이미 지워진 상태였음). 이제 home_win_prob은
+sync_upcoming_games.py(엔트리 없이 계산하는 일반 경로)만 건드리고, 이 스크립트는 별도
+컬럼(home_win_prob_lineup, lineup_absences)에만 쓴다 - 두 값이 항상 공존.
 
 **멱등성**
 같은 경기를 여러 번 돌려도 결과는 같다(같은 엔트리 -> 같은 승률). live_collector가
@@ -24,17 +32,23 @@ startFlag로 드러난다(fetch_starting_lineups.py 참고). 명단이 나오면
 """
 import argparse
 import datetime
+import json
 import os
 import sys
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
+import export_training_table as ett     # noqa: E402
 import fetch_kbl_data as fkd            # noqa: E402
 import fetch_starting_lineups as fsl    # noqa: E402
 import sync_upcoming_games as sug       # noqa: E402
 
 KST = datetime.timezone(datetime.timedelta(hours=9))
+# 결장 표기 기준 - 최근 ROLL_WINDOW경기 평균 출전시간 상위 몇 명을 "핵심 로테이션"으로 볼지.
+# roster_continuity()가 이미 같은 목적(top_n=8)으로 쓰는 값과 맞춤 - 벤치 끝자리 결장까지
+# 전부 나열하면 신호보다 잡음이 커진다.
+CORE_ROTATION_SIZE = 8
 
 
 def collect_lineups(games):
@@ -53,10 +67,32 @@ def collect_lineups(games):
     return lineups, pending
 
 
-def stored_probs(cur, gmkeys):
-    cur.execute("select gmkey, home_win_prob from pregame_features where gmkey = any(%s)",
+def stored_lineup_probs(cur, gmkeys):
+    cur.execute("select gmkey, home_win_prob_lineup from pregame_features where gmkey = any(%s)",
                 (list(gmkeys),))
     return {k: (float(v) if v is not None else None) for k, v in cur.fetchall()}
+
+
+def core_rotation_pcodes(tcode, ctx):
+    """최근 ROLL_WINDOW경기 평균 출전시간 상위 CORE_ROTATION_SIZE명 - "빠지면 눈에 띄는" 선수."""
+    hist = ctx["timelines"].get(tcode, [])
+    window = hist[-ett.ROLL_WINDOW:]
+    roster = ett.roster_window_minutes(window, ctx["player_stats_by_game"], tcode)
+    top = sorted(roster.items(), key=lambda x: -x[1])[:CORE_ROTATION_SIZE]
+    return [pcode for pcode, _ in top]
+
+
+def compute_absences(g, lineup, ctx):
+    """{"home": [pcode, ...], "away": [pcode, ...]} - 핵심 로테이션인데 이번 엔트리(dressed)에
+    없는 선수만. 이름은 여기서 안 붙인다 - 프론트가 어차피 players 테이블을 조인해서 표시하니
+    pcode만 남겨 중복 소스를 안 만든다."""
+    out = {}
+    for side, tcode in (("home", g["tcodeH"]), ("away", g["tcodeA"])):
+        dressed = set((lineup.get(tcode) or {}).get("dressed") or [])
+        if not dressed:
+            continue
+        out[side] = [p for p in core_rotation_pcodes(tcode, ctx) if p not in dressed]
+    return out
 
 
 def main():
@@ -106,14 +142,21 @@ def main():
         print("[recalc] 계산된 행 없음 - 종료.", flush=True)
         return
 
+    target_by_gm = {g["gmkey"]: g for g in target}
+    absences_by_gm = {gm: compute_absences(g, lineups[gm], ctx) for gm, g in target_by_gm.items()}
+
     name_by_gm = {g["gmkey"]: (g.get("tnameH"), g.get("tnameA")) for g in target}
+    lineup_rows = []
     for r in after_rows:
         gm, new = r[0], r[-1]
         old_model = before_by_gm.get(gm)
         h, a = name_by_gm.get(gm, ("?", "?"))
         delta = ("%+.1f%%p" % ((new - old_model) * 100)) if old_model is not None else "?"
-        print("  %s %s vs %s: %.1f%% -> %.1f%%  (%s)"
-              % (gm, h, a, (old_model or 0) * 100, new * 100, delta), flush=True)
+        abs_gm = absences_by_gm.get(gm) or {}
+        abs_note = ", ".join(f"{side}:{len(v)}명" for side, v in abs_gm.items() if v) or "없음"
+        print("  %s %s vs %s: %.1f%% -> %.1f%%  (%s)  핵심로테 결장(%s)"
+              % (gm, h, a, (old_model or 0) * 100, new * 100, delta, abs_note), flush=True)
+        lineup_rows.append((gm, new, json.dumps(abs_gm, ensure_ascii=False)))
 
     if args.dry_run:
         print("[recalc] --dry-run - DB 안 씀.", flush=True)
@@ -123,15 +166,15 @@ def main():
     conn = sug.get_conn()
     try:
         cur = conn.cursor()
-        old_stored = stored_probs(cur, [r[0] for r in after_rows])
-        changed = [r for r in after_rows if old_stored.get(r[0]) != r[-1]]
+        old_stored = stored_lineup_probs(cur, [r[0] for r in lineup_rows])
+        changed = [r for r in lineup_rows if old_stored.get(r[0]) != r[1]]
         if not changed:
             print("[recalc] 저장값과 동일 - UPDATE 생략(멱등).", flush=True)
             return
-        sug.upsert_predictions(cur, changed)
+        sug.upsert_lineup_predictions(cur, changed)
         conn.commit()
-        for r in changed:
-            print("  [DB] %s %s -> %s" % (r[0], old_stored.get(r[0]), r[-1]), flush=True)
+        for gm, new, _ in changed:
+            print("  [DB] %s %s -> %s" % (gm, old_stored.get(gm), new), flush=True)
         print("[recalc] %d경기 갱신 완료." % len(changed), flush=True)
     finally:
         conn.close()

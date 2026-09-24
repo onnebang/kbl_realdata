@@ -218,6 +218,21 @@ def upsert_predictions(cur, rows):
     """, rows)
 
 
+def upsert_lineup_predictions(cur, rows):
+    """rows: [(gmkey, home_win_prob_lineup, lineup_absences_json), ...] - recalc_lineup_winprob.py
+    전용. home_win_prob(엔트리 없는 시즌 전체 기준 예측)은 절대 안 건드린다 - 그 값은
+    upsert_predictions()만 쓴다(같은 gmkey 행이라도 컬럼이 갈려서 서로 안 덮어씀)."""
+    from psycopg2.extras import execute_values
+    if not rows:
+        return
+    execute_values(cur, """
+        insert into pregame_features (gmkey, home_win_prob_lineup, lineup_absences) values %s
+        on conflict (gmkey) do update set
+            home_win_prob_lineup = excluded.home_win_prob_lineup,
+            lineup_absences = excluded.lineup_absences
+    """, rows)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=DEFAULT_LOOKAHEAD_DAYS,
