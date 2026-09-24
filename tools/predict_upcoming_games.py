@@ -47,6 +47,7 @@ def team_features_now(tcode, prefix, ctx, today_str, lineup=None):
     continuity = ett.roster_continuity(roster, ctx["season_roster_minutes"], tcode, ctx["current_season_code"])
     foreign_conc, foreign_n = ett.foreign_usage_concentration(roster, ctx["bio"])
     run_vuln = ett.run_vulnerability_features(window)
+    pwr = ett.team_pwr_feature(roster, ctx["ovr_by_pcode_season"], ctx["prev_season_name"], prefix)
 
     last_game_date = hist[-1]["gameDate"]
     d0 = datetime.datetime.strptime(last_game_date, "%Y%m%d")
@@ -67,10 +68,18 @@ def team_features_now(tcode, prefix, ctx, today_str, lineup=None):
         f"{prefix}_rosterContinuity": continuity,
         f"{prefix}_runVulnBigRuns": run_vuln["runVulnBigRuns"],
         f"{prefix}_runVulnWorstRun": run_vuln["runVulnWorstRun"],
+        **pwr,
     }
 
 
-def build_context():
+def build_context(current_season_code=None):
+    """current_season_code를 안 주면(과거엔 항상 이 경로) games[-1] 기준 +2로 추정 - 그 시즌이
+    아직 raw/games에 한 경기도 안 쌓인 "완전히 새 시즌"일 때만 맞는 가정이다. 2026-09-24부터
+    2026-27 시즌 경기(S49G14N1/2/3)가 실제로 raw/games에 들어오기 시작하면서 이 추정이 깨짐
+    (latest_season_code 자체가 이미 49라 49+2=51이라는 존재하지 않는 시즌을 가리키게 됨 - 실전
+    확인함). 그래서 호출부(main())는 이제 스케줄 API가 실제로 돌려주는 seasonCode를 여기로
+    넘긴다 - 그게 있으면 그걸 그대로 쓰고, 없을 때만(check_lineup_recalc.py 같은 스케줄 없는
+    호출) 기존 추정으로 폴백."""
     games = ett.load_all_games()
     if not games:
         raise SystemExit("과거 경기 데이터가 없음 - export_training_table.py가 쓰는 것과 동일한 raw/games가 필요")
@@ -98,8 +107,13 @@ def build_context():
     latest_onoff = ett.latest_player_onoff(games, onoff_timeline)
     age_curves = ett.load_age_curves()
 
-    latest_season_code = games[-1]["seasonCode"]
-    current_season_code = latest_season_code + 2  # KBL 시즌코드는 시즌마다 +2 (build_age_curves.py에서 확인된 패턴)
+    if current_season_code is None:
+        latest_season_code = games[-1]["seasonCode"]
+        current_season_code = latest_season_code + 2  # KBL 시즌코드는 시즌마다 +2 (build_age_curves.py에서 확인된 패턴)
+
+    ovr_by_pcode_season = ett.load_courtside_ovr()
+    season_names = ett.season_name_by_code(games)
+    prev_season_name = season_names.get(current_season_code - 2)  # 팀 PWR 피처용 - 직전 완결 시즌만(누수 방지)
 
     return {
         "games": games, "timelines": timelines, "coach_timelines": coach_timelines,
@@ -107,6 +121,7 @@ def build_context():
         "player_stats_by_game": player_stats_by_game, "season_roster_minutes": season_roster_minutes,
         "latest_manager": latest_manager, "bio": bio, "latest_onoff": latest_onoff,
         "age_curves": age_curves, "current_season_code": current_season_code,
+        "ovr_by_pcode_season": ovr_by_pcode_season, "prev_season_name": prev_season_name,
     }
 
 
@@ -177,7 +192,9 @@ def main():
         return
 
     print("피처 컨텍스트(팀 타임라인/로스터/시너지 등) 구성 중...", flush=True)
-    ctx = build_context()
+    # 스케줄 API가 실제로 돌려준 seasonCode를 그대로 씀 - games[-1]+2 추정은 이 시즌 경기가
+    # 이미 raw/games에 쌓이기 시작하면 깨진다(build_context 주석 참고).
+    ctx = build_context(current_season_code=schedule_games[0].get("seasonCode"))
 
     print("예측 중...", flush=True)
     predictions = predict(ctx, model_bundle, schedule_games)

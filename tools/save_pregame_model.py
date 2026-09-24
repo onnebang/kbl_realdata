@@ -7,6 +7,12 @@
 
 64.3%라는 성능 수치 자체는 tuned_model_results.json의 홀드아웃 평가에서 이미 나온 것 - 이 파일은
 그 수치를 재현하는 게 목적이 아니라 실전 배포용 최종 모델을 만드는 것.
+
+**2026-27 시즌(seasonCode 49) 제외 (2026-09-24, 사용자 요청)** - 2쿼터/3쿼터 용병+아시아쿼터
+3인 동시출전이 이 시즌부터 처음 허용된 완전히 새로운 규정이라, 지금 이 시즌 표본은 몇 경기뿐이고
+그마저 규정 자체가 낯선 전환기 데이터라 모델에 섞으면 소수 표본에 과적합될 위험이 큼. "지금까지
+쌓인(=이전 규정) 데이터로 모델을 만들고, 새 규정 표본이 쌓이면 그때 다시 포함해서 재학습"하는
+전략 - 데이터가 쌓이면 아래 CURRENT_SEASON_EXCLUDE를 지우거나 다음 시즌 코드로 옮기고 재실행할 것.
 """
 import json
 import os
@@ -20,6 +26,7 @@ from tune_hyperparams import FEATURE_KEYS, GAME_LEVEL_KEYS, TABLE_PATH
 BASE = os.path.dirname(os.path.abspath(__file__))
 MODEL_OUT = os.path.join(BASE, "..", "raw", "analysis", "pregame_model.joblib")
 BEST_PARAMS_PATH = os.path.join(BASE, "..", "raw", "analysis", "tuned_model_results.json")
+CURRENT_SEASON_EXCLUDE = 49  # 2026-2027 - 새 Q2/Q3 규정 첫 시즌, 표본 축적 전까지 재학습에서 제외
 
 
 def build_xy(rows):
@@ -34,7 +41,11 @@ def build_xy(rows):
 
 def main():
     with open(TABLE_PATH, encoding="utf-8") as f:
-        rows = json.load(f)
+        all_rows = json.load(f)
+    excluded = [r for r in all_rows if r["seasonCode"] == CURRENT_SEASON_EXCLUDE]
+    rows = [r for r in all_rows if r["seasonCode"] != CURRENT_SEASON_EXCLUDE]
+    if excluded:
+        print(f"시즌 {CURRENT_SEASON_EXCLUDE}(2026-27, 새 규정) {len(excluded)}행 재학습에서 제외", flush=True)
     with open(BEST_PARAMS_PATH, encoding="utf-8") as f:
         results = json.load(f)
     rf_result = next(r for r in results if r["model"] == "RandomForest")

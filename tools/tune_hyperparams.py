@@ -43,8 +43,19 @@ FEATURE_KEYS = [
     "restDays", "venueNetRtg", "coachWinPct", "foreignConcentration", "foreignPlayerCount",
     "last1_netrtg", "last1_winPct", "last3_netrtg", "last3_winPct",
     "last5_netrtg", "last5_winPct", "last10_netrtg", "last10_winPct",
+    "teamPWR",  # 2026-09-24, 사용자 결정: 애블레이션상 RandomForest 홀드아웃이 60.8%->60.1%로
+    # 소폭 하락하고 HistGradientBoosting과는 아예 안 맞지만(위 except ValueError 참고), 이번
+    # 시즌 데이터가 쌓일수록 courtside OVR 정교화 + 재학습으로 나아질 거라는 전제로 그래도
+    # 포함해서 배포하기로 함. export_training_table.py의 team_pwr_feature() 참고 - 직전
+    # 완결 시즌 OVR만 씀(leak-free).
 ]
 GAME_LEVEL_KEYS = ["dayOfWeek", "month", "refHomeWinRate"]  # 팀별이 아니라 그 경기 자체 컨텍스트
+
+# 2026-09-24: 2026-27시즌(seasonCode 49)은 튜닝/홀드아웃에서 제외 - 아직 2경기뿐이라 그대로 두면
+# seasons_sorted[-1]이 49가 되어 "최종 홀드아웃"이 표본 2개짜리가 되고, 그중 한 쪽 레이블만 있으면
+# log_loss가 즉시 터진다(실제로 겪음). save_pregame_model.py의 CURRENT_SEASON_EXCLUDE와 동일한
+# 이유(새 Q2/Q3 규정 전환기 표본 부족) - 데이터 쌓이면 같이 정리.
+CURRENT_SEASON_EXCLUDE = 49
 
 
 def build_xy(rows):
@@ -71,6 +82,10 @@ def season_expanding_cv(seasons_sorted, rows_by_season_idx, min_train_seasons=2)
 def main():
     with open(TABLE_PATH, encoding="utf-8") as f:
         rows = json.load(f)
+    excluded = [r for r in rows if r["seasonCode"] == CURRENT_SEASON_EXCLUDE]
+    rows = [r for r in rows if r["seasonCode"] != CURRENT_SEASON_EXCLUDE]
+    if excluded:
+        print(f"시즌 {CURRENT_SEASON_EXCLUDE}(2026-27, 새 규정) {len(excluded)}행 튜닝에서 제외", flush=True)
 
     seasons_sorted = sorted({r["seasonCode"] for r in rows})
     final_holdout_season = seasons_sorted[-1]
@@ -86,7 +101,13 @@ def main():
     rows_by_season_idx = {}
     for i, r in enumerate(tune_rows):
         rows_by_season_idx.setdefault(r["seasonCode"], []).append(i)
-    cv_splits = season_expanding_cv(tune_pool_seasons, rows_by_season_idx)
+    # min_train_seasons=3(기본 2에서 상향, 2026-09-24) - teamPWR은 courtside OVR 히스토리가
+    # 시작되는 시즌 자체(11=2006-07, 12=2007-08)엔 "그 전 시즌" 데이터가 아예 없어 커버리지
+    # 0%(전부 NaN)다. min_train_seasons=2였을 때 첫 CV 폴드가 [11,12]만으로 학습해서 teamPWR
+    # 열이 통째로 NaN이 되고, HistGradientBoosting의 구간화가 "distinct_values 2개 미만"으로
+    # 즉시 터졌다(실제로 겪음). 시즌 13부터는 커버리지 44%로 정상 - 3으로 올리면 첫 폴드가
+    # [11,12,13]을 다 포함해 해결됨.
+    cv_splits = season_expanding_cv(tune_pool_seasons, rows_by_season_idx, min_train_seasons=3)
     print(f"CV 폴드 수: {len(cv_splits)} (시즌을 하나씩 늘려가며 다음 시즌 검증)", flush=True)
     if not cv_splits:
         print("튜닝 풀 시즌이 너무 적어 CV를 못 만듦 - 시즌이 더 모이면 재실행할 것.", flush=True)
@@ -120,7 +141,15 @@ def main():
         search = RandomizedSearchCV(
             estimator, params, n_iter=25, cv=cv_splits, scoring="neg_log_loss",
             random_state=0, n_jobs=-1)
-        search.fit(X_tune, y_tune)
+        try:
+            search.fit(X_tune, y_tune)
+        except ValueError as e:
+            # 2026-09-24 실제로 겪음 - teamPWR처럼 초기 시즌 커버리지가 0%인 피처가 있으면
+            # HistGradientBoosting의 구간화가 "distinct_values 2개 미만"으로 터짐. 한 모델이
+            # 새 피처와 안 맞는다고 나머지 모델(RandomForest 등) 튜닝까지 통째로 날릴 이유는
+            # 없음 - 실패한 모델만 건너뛰고 계속 진행, 최종 목록엔 성공한 것만 남는다.
+            print(f"[{name}] 학습 실패, 건너뜀: {e}", flush=True)
+            continue
         best = search.best_estimator_
         probs = best.predict_proba(X_holdout)[:, 1]
         acc = accuracy_score(y_holdout, probs >= 0.5)

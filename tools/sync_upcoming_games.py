@@ -245,7 +245,9 @@ def main():
         else:
             model_bundle = joblib.load(pug.MODEL_PATH)
             print("[sync_upcoming] 피처 컨텍스트 구성 중(predict_upcoming_games 재사용)...", flush=True)
-            ctx = pug.build_context()
+            # 스케줄 API의 실제 seasonCode를 씀 - games[-1]+2 추정은 이 시즌 경기가 raw/games에
+            # 쌓이기 시작하면 깨진다(predict_upcoming_games.build_context 주석 참고, 2026-09-24 발견).
+            ctx = pug.build_context(current_season_code=schedule_games[0].get("seasonCode"))
             pred_rows, n_skip = compute_prediction_rows(ctx, model_bundle, schedule_games)
 
     # 2단계: 연결을 짧게 열어 UPSERT만 하고 바로 커밋.

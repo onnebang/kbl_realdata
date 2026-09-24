@@ -3,9 +3,12 @@ raw/*
 # 라이브 승률 모델(sklearn 1.9/numpy 2.x pickle, ~116KB) - GitHub Actions 러너엔 로컬 raw/가
 # 없어서(gitignore 대상) live_collector.py가 이 파일 없이는 못 돈다. 나머지 raw/(800MB+
 # SQLite·원본 로그)는 그대로 제외.
+# pregame_model.joblib도 마찬가지 이유로 필요 - daily_batch.py가 돌리는 predict_upcoming_games.py가
+# 이 파일을 읽는다(2026-09-24, live_winprob_model.joblib만 커밋했던 원래 누락 발견/수정).
 !raw/analysis
 raw/analysis/*
 !raw/analysis/live_winprob_model.joblib
+!raw/analysis/pregame_model.joblib
 .expo/
 dist/
 *.log

@@ -144,12 +144,20 @@ def load_all_games():
         home_tcode, away_tcode = g.get("tcodeH"), g.get("tcodeA")
         if home_tcode not in by_tcode or away_tcode not in by_tcode:
             continue
+        # seasonGrade!=1(써머/윈터리그 등 이벤트성 친선전, 15시즌 전체 12경기뿐)은 제외 - 정규
+        # 시즌코드를 그대로 써서 "그 코드만의 시즌"이 되어버리면 season_expanding_cv에서 표본
+        # 1~2개짜리 검증 폴드가 생기고, 그 폴드가 한 레이블만 가지면 log_loss가 즉시 터진다
+        # (실제로 겪음, 2026-09-24 - tune_hyperparams.py 재실행 중 발견). README가 애초에 이
+        # 데이터셋을 "정규시즌+플레이오프"라고 명시하고 있어 이 필터가 원래 의도에 맞다.
+        if g.get("seasonGrade") not in (None, 1):
+            continue
         teams = meta.get("teams", {})
         judges = g.get("judges") or {}
         games.append({
             "gmkey": gmkey,
             "gameDate": g.get("gameDate"),
             "seasonCode": g.get("seasonCode"),
+            "seasonName": g.get("seasonName"),
             "homeTcode": home_tcode,
             "awayTcode": away_tcode,
             "homeRecord": by_tcode[home_tcode],
@@ -359,6 +367,41 @@ def foreign_usage_concentration(roster_minutes, bio):
     return round(max(foreign_mins) / total, 3), len(foreign_mins)
 
 
+def load_courtside_ovr():
+    """(pcode, seasonName) -> courtside OVR. 팀 파워(PWR) 피처용 원천 데이터 - courtside_ovr_history.json은
+    build_courtside_ovr.py가 만드는 2K식 선수 평가(경기 결과/수상 등을 반영해 시즌이 끝난 뒤 계산됨)라,
+    "이 시즌"의 OVR을 "이 시즌" 경기 예측에 쓰면 결과 정보가 새어들어옴 - 호출부(team_pwr_feature)는
+    반드시 seasonCode - 2(직전 완결 시즌, build_age_curves.py에서 확인된 "시즌마다 +2" 패턴과 동일)로
+    조회해야 leak-free."""
+    path = os.path.join(BASE, "..", "courtside-web", "lib", "courtside_ovr_history.json")
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        rows = json.load(f)
+    return {(r["pcode"], r["season"]): r["OVR"] for r in rows}
+
+
+def season_name_by_code(games):
+    """seasonCode(int, 예: 47) -> seasonName(str, 예: "2025-2026") - courtside_ovr_history.json의
+    'season' 필드와 형식을 맞추기 위한 변환표. games에 이미 있는 정보라 여기서 그냥 뽑아냄."""
+    out = {}
+    for g in games:
+        if g.get("seasonCode") is not None and g.get("seasonName"):
+            out.setdefault(g["seasonCode"], g["seasonName"])
+    return out
+
+
+def team_pwr_feature(roster_minutes, ovr_by_pcode_season, prev_season_name, prefix):
+    """직전 완결 시즌 courtside OVR을, 다른 피처들과 동일하게 '직전 ROLL_WINDOW경기 평균 출전시간'
+    으로 가중평균. prev_season_name이 None이면(데이터셋 첫 시즌이라 그 전 시즌이 없음) 전부 결측."""
+    pairs = []
+    for pcode, mins in roster_minutes.items():
+        ovr = ovr_by_pcode_season.get((pcode, prev_season_name)) if prev_season_name else None
+        pairs.append((ovr, mins))
+    val, cov = weighted_avg(pairs)
+    return {f"{prefix}_teamPWR": val, f"{prefix}_teamPWRCoverage": cov}
+
+
 def build_team_timelines(games, run_vuln_per_game=None):
     """팀코드 -> 그 팀이 뛴 경기를 날짜순으로, 그 경기에서의 자기 팀 records와 승패 포함.
     restDays도 여기서 같이 계산(직전 자기 팀 경기 날짜와의 차이 - 1일, 첫 경기는 None).
@@ -560,6 +603,8 @@ def main():
     with open(os.path.join(ANALYSIS_DIR, "player_onoff_timeline.json"), encoding="utf-8") as f:
         onoff_timeline = json.load(f)  # gmkey -> {pcode: {netRatingPer40, secondsSoFar} | null}
     age_curves = load_age_curves()
+    ovr_by_pcode_season = load_courtside_ovr()
+    season_names = season_name_by_code(games)
 
     rows = []
     for g in games:
@@ -605,6 +650,10 @@ def main():
         home_run_vuln = run_vulnerability_features(home_window)
         away_run_vuln = run_vulnerability_features(away_window)
 
+        prev_season_name = season_names.get(g["seasonCode"] - 2)
+        home_pwr = team_pwr_feature(home_roster, ovr_by_pcode_season, prev_season_name, "home")
+        away_pwr = team_pwr_feature(away_roster, ovr_by_pcode_season, prev_season_name, "away")
+
         ctx = date_context_features(g["gameDate"])
 
         home_won = 1 if g["homeRecord"]["score"] > g["awayRecord"]["score"] else 0
@@ -628,6 +677,7 @@ def main():
                 "home_rosterContinuity": home_continuity,
                 "home_runVulnBigRuns": home_run_vuln["runVulnBigRuns"],
                 "home_runVulnWorstRun": home_run_vuln["runVulnWorstRun"],
+                **home_pwr,
             },
             "away": {
                 **{f"away_{k}": v for k, v in away_feats.items()}, **away_bs, **away_form,
