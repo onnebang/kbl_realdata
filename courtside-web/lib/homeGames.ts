@@ -102,7 +102,16 @@ const GAME_SELECT = `gmkey, game_date, game_start, home_score, away_score, is_en
 type Segment = "live" | "scheduled" | "final";
 const SEGMENTS: readonly Segment[] = ["live", "scheduled", "final"];
 
-type SegmentScope = { seasonName: string | undefined; tcode: string | undefined; today: string };
+type SegmentScope = { seasonName: string | undefined; tcode: string | undefined; today: string; scheduledUntil: string };
+
+// 제보(2026-09-24): "오늘 경기가 안 보인다" - 개막 직후 전체 시즌 일정(277경기, 2027-04-11까지)이
+// 한 번에 동기화되면서, 방금 끝난 경기 3건이 "예정" 구간 277개 뒤(약 10페이지 뒤)로 완전히
+// 밀려버림. 이 파일 상단 주석("개막 직후엔 시즌 전체 일정이 들어있어서...")이 이미 이 상황을
+// 예견했지만, 실제로는 "구간을 나눔"만으로는 안 막아진다 - 예정 구간 자체가 종료 구간보다
+// 압도적으로 크면(277 vs 3) 순서(진행중->예정->종료)상 종료 구간이 첫 페이지에 아예 안 걸림.
+// "예정"을 가까운 미래로만 한정해서 원래 의도(Phase 0 댓글의 "곧 열릴 경기")를 지킨다 - 전체
+// 시즌 일정은 games 테이블에 그대로 남아있어 다른 화면(팀 페이지 등)에는 영향 없음.
+const SCHEDULED_WINDOW_DAYS = 14;
 
 // supabase-js 클라이언트를 Database 제네릭 없이 만들었기 때문에(lib/supabaseServer.ts) 빌더의
 // 정확한 타입을 이름으로 부를 수 없다. 이 파일이 실제로 쓰는 모양만 좁게 선언하고 캐스팅은
@@ -132,6 +141,7 @@ function segmentQuery(seg: Segment, cols: string, head: boolean, scope: SegmentS
       ? sel
           .is("home_score", null)
           .gte("game_date", scope.today)
+          .lte("game_date", scope.scheduledUntil)
           .order("game_date", { ascending: true })
           .order("game_start", { ascending: true })
           .order("gmkey", { ascending: true })
@@ -199,7 +209,10 @@ export async function getGames(
   // KBL 경기 날짜는 한국 시간 기준 - UTC 그대로 자르면 KST 00:00~09:00 사이에 "오늘"이
   // 하루 이르게 잡혀 어제 예정 경기가 잠깐 예정으로 남아 보임(검증 지적). +9h 보정.
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-  const scope: SegmentScope = { seasonName, tcode, today };
+  const scheduledUntil = new Date(Date.now() + 9 * 3600 * 1000 + SCHEDULED_WINDOW_DAYS * 86400 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const scope: SegmentScope = { seasonName, tcode, today, scheduledUntil };
 
   const counts = await Promise.all(SEGMENTS.map(async (seg) => (await segmentQuery(seg, "gmkey", true, scope)).count ?? 0));
   const total = counts.reduce((a, b) => a + b, 0);
