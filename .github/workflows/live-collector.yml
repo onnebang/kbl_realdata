@@ -12,7 +12,8 @@ name: KBL Live Collector
 # 곱게 종료하게 한다. 아주 늦게 끝나는 3연전(13시 시작~21시 이후)은 이 한도에 걸릴 수 있음 -
 # 실제로 문제가 되면 트리거를 하나 더 늦은 시각에 추가하는 걸로 보완할 것.
 #
-# 필요한 시크릿: DATABASE_URL (Supabase 직결, RLS 우회 - tools/.env.supabase와 같은 값).
+# 필요한 시크릿: DATABASE_URL (Supabase 직결, RLS 우회 - tools/.env.supabase와 같은 값),
+# REVALIDATE_TOKEN (경기 종료 정산 직후 courtside-web 캐시 무효화용, daily-batch.yml과 공유).
 
 on:
   schedule:
@@ -26,6 +27,7 @@ jobs:
     timeout-minutes: 355 # GitHub 강제 한도(360분)보다 살짝 짧게 - 로그가 안 잘리고 남게
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      REVALIDATE_TOKEN: ${{ secrets.REVALIDATE_TOKEN }}
       PYTHONUNBUFFERED: "1" # 로그가 잡 종료 전까지 버퍼에 갇혀 안 보이는 것 방지
     steps:
       - uses: actions/checkout@v4
