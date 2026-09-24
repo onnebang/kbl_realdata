@@ -262,6 +262,12 @@ export default async function HomePage({
                     {/* 원정 쪽은 100에서 홈 반올림값을 빼서 합이 항상 100 - 각자 반올림하면
                         50%·51%처럼 101%가 되는 경우가 실제로 관측됨(검증 지적). */}
                     예상 승률 {g.home_team?.abbr} {Math.round(homeProb * 100)}% · {g.away_team?.abbr} {100 - Math.round(homeProb * 100)}%
+                    {/* OPEN MATCH DAY(오픈매치, 2026-27시즌 신설)는 모델이 학습 때 한 번도 못
+                        본 경기 유형이라 일반 경기와 신뢰도가 다름 - 제거하지 않고 문구로만
+                        명시(사용자 결정, 2026-09-24). */}
+                    {g.season_category === "OPEN MATCH DAY" && (
+                      <span className="prob-caveat"> · 오픈매치(참고용)</span>
+                    )}
                   </span>
                 )}
                 {(homeWinPct || awayWinPct) && (
