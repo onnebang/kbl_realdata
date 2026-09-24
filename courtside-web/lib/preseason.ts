@@ -297,7 +297,11 @@ export function getRosterChangeReport(season = PRESEASON_SEASON): Promise<Roster
 }
 
 const cachedRosterChangeReport = cachedFn(computeRosterChangeReport, {
-  name: "rosterChangeReport",
+  // v2(2026-09-24): photoUrl 필드 추가 - unstable_cache는 배포와 무관하게 유지되므로
+  // (cachePolicy.ts 상단 주석) 이름을 안 바꾸면 사진 없던 옛 캐시가 TTL.batchDaily(1시간)
+  // 동안 계속 나간다. 근본 수정(daily_batch가 revalidateTag를 실제로 부르게 하는 것)은
+  // 아직 안 돼 있음 - 이번이 오늘만 두 번째로 이 문제가 사용자에게 보인 사례.
+  name: "rosterChangeReport_v2",
   ttl: TTL.batchDaily,
   tags: (season) => [TAG.batch, TAG.build, TAG.season(season)],
 });
