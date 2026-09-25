@@ -28,9 +28,13 @@ export function PlayerPhoto({
   size: number;
   className?: string;
 }) {
+  // next/image가 과거 400/404 에러 상태를 길게 캐시하고 있을 수 있으므로
+  // 쿼리스트링을 달아 새 URL로 강제 우회한다 (2026-09-25 캐시 버스트).
+  const bustedSrc = src.includes("?") ? `${src}&v=2` : `${src}?v=2`;
+
   return (
     <Image
-      src={src}
+      src={bustedSrc}
       alt={alt}
       width={size}
       height={size}
