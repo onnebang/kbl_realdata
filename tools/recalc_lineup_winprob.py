@@ -132,7 +132,11 @@ def main():
     import joblib
     import predict_upcoming_games as pug
     model_bundle = joblib.load(pug.MODEL_PATH)
-    ctx = pug.build_context()
+    # 스케줄 API의 실제 seasonCode를 넘긴다(2026-09-25) - 안 넘기면 build_context가 games[-1]+2로
+    # 추정하는데, 2026-27 경기가 raw/games에 쌓이기 시작한 뒤론 그게 존재하지 않는 시즌(51)이 돼서
+    # teamPWR(직전 시즌 OVR)/rosterContinuity가 sync_upcoming_games(정상 코드 사용)와 다른 정의로
+    # 계산된다 -> "시즌 기준 vs 엔트리 반영" 승률 차이에 결장 효과 말고 피처 정의 차이가 섞임.
+    ctx = pug.build_context(current_season_code=target[0].get("seasonCode"))
 
     # 같은 컨텍스트로 라인업 반영 전/후를 둘 다 계산해 변동폭을 보여준다.
     before_rows, _ = sug.compute_prediction_rows(ctx, model_bundle, target)
