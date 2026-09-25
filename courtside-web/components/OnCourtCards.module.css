@@ -109,7 +109,7 @@
 }
 
 .card {
-  --ph: clamp(40px, 13cqw, 64px);
+  --ph: 44px;
   position: relative;
   display: grid;
   grid-row: span 6;
@@ -251,6 +251,7 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   color: var(--ink);
+  font-size: 11px;
   font-size: clamp(11px, 2.3cqw, 14px);
   font-weight: 800;
   line-height: 1.2;
@@ -287,6 +288,7 @@
   max-width: 100%;
   padding: 2px 5px;
   border-radius: 8px;
+  font-size: 10px;
   font-size: clamp(10px, 2.2cqw, 12px);
   line-height: 1.15;
   word-break: keep-all;
@@ -302,11 +304,6 @@
   color: var(--ink-soft);
   font-weight: 600;
 }
-/* 보조 스타일은 폭이 넉넉할 때만(컴팩트에선 주 스타일 하나로 충분 - 접근성 이름에는 그대로 들어 있다). */
-.sub {
-  display: none;
-}
-
 /* OFF/DEF - 컴팩트에선 숨김(카드 폭 ~53px에 두 줄이 더 붙으면 카드가 너무 길어진다). */
 .od {
   display: none;
@@ -338,6 +335,7 @@
 }
 .stat b {
   color: var(--ink);
+  font-size: 11px;
   font-size: clamp(11px, 2.7cqw, 16px);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -384,9 +382,6 @@
   .card {
     padding-inline: 4px;
   }
-  .sub {
-    display: inline-block;
-  }
   .od {
     display: flex;
   }
@@ -398,5 +393,12 @@
   }
   .meta {
     font-size: 11px;
+  }
+}
+
+/* 컨테이너 쿼리 단위(cqw)를 아는 브라우저에서만 사진 크기를 패널 폭에 맞춘다(구형 Safari는 44px 고정). */
+@supports (width: 1cqw) {
+  .card {
+    --ph: clamp(40px, 13cqw, 64px);
   }
 }
