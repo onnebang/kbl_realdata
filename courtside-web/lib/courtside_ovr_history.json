@@ -116755,6 +116755,32 @@
     "projected": false
   },
   {
+    "pcode": "291881",
+    "name": "스코티 제임스",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "Unknown",
+    "OVR": 91,
+    "OFF": 91,
+    "DEF": 87,
+    "attributes": {
+      "outside": 85,
+      "inside": 88,
+      "playmaking": 76,
+      "athletic": 84,
+      "defense": 86,
+      "rebounding": 90
+    },
+    "archetype": "Stretch Big",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
     "pcode": "291882",
     "name": "아치 굿윈",
     "season": "2026-2027",
@@ -116786,18 +116812,18 @@
     "season": "2026-2027",
     "team": "안양 정관장",
     "position": "Unknown",
-    "OVR": 53,
-    "OFF": 53,
-    "DEF": 53,
+    "OVR": 85,
+    "OFF": 84,
+    "DEF": 84,
     "attributes": {
-      "outside": 53,
-      "inside": 53,
-      "playmaking": 53,
-      "athletic": 53,
-      "defense": 53,
-      "rebounding": 53
+      "outside": 68,
+      "inside": 88,
+      "playmaking": 70,
+      "athletic": 78,
+      "defense": 82,
+      "rebounding": 90
     },
-    "archetype": "롤 플레이어",
+    "archetype": "Paint Beast",
     "badges": {
       "finishing": 0,
       "shooting": 0,
@@ -116838,18 +116864,18 @@
     "season": "2026-2027",
     "team": "수원 KT",
     "position": "Unknown",
-    "OVR": 53,
-    "OFF": 53,
-    "DEF": 53,
+    "OVR": 81,
+    "OFF": 75,
+    "DEF": 87,
     "attributes": {
-      "outside": 53,
-      "inside": 53,
-      "playmaking": 53,
-      "athletic": 53,
-      "defense": 53,
-      "rebounding": 53
+      "outside": 60,
+      "inside": 81,
+      "playmaking": 65,
+      "athletic": 83,
+      "defense": 91,
+      "rebounding": 87
     },
-    "archetype": "롤 플레이어",
+    "archetype": "Glass Cleaner",
     "badges": {
       "finishing": 0,
       "shooting": 0,
@@ -116864,18 +116890,18 @@
     "season": "2026-2027",
     "team": "울산 현대모비스",
     "position": "Unknown",
-    "OVR": 53,
-    "OFF": 53,
-    "DEF": 53,
+    "OVR": 90,
+    "OFF": 90,
+    "DEF": 88,
     "attributes": {
-      "outside": 53,
-      "inside": 53,
-      "playmaking": 53,
-      "athletic": 53,
-      "defense": 53,
-      "rebounding": 53
+      "outside": 84,
+      "inside": 82,
+      "playmaking": 74,
+      "athletic": 93,
+      "defense": 86,
+      "rebounding": 85
     },
-    "archetype": "롤 플레이어",
+    "archetype": "Slasher",
     "badges": {
       "finishing": 0,
       "shooting": 0,
@@ -116890,18 +116916,18 @@
     "season": "2026-2027",
     "team": "울산 현대모비스",
     "position": "Unknown",
-    "OVR": 53,
-    "OFF": 53,
-    "DEF": 53,
+    "OVR": 70,
+    "OFF": 64,
+    "DEF": 76,
     "attributes": {
-      "outside": 53,
-      "inside": 53,
-      "playmaking": 53,
-      "athletic": 53,
-      "defense": 53,
-      "rebounding": 53
+      "outside": 62,
+      "inside": 60,
+      "playmaking": 68,
+      "athletic": 76,
+      "defense": 80,
+      "rebounding": 62
     },
-    "archetype": "롤 플레이어",
+    "archetype": "Lockdown Defender",
     "badges": {
       "finishing": 0,
       "shooting": 0,
@@ -118146,31 +118172,5 @@
       "defense": 2
     },
     "projected": false
-  },
-  {
-    "pcode": "tbd_스코티 제임스",
-    "name": "스코티 제임스",
-    "season": "2026-2027",
-    "team": "고양 소노",
-    "position": "Unknown",
-    "OVR": 91,
-    "OFF": 91,
-    "DEF": 87,
-    "attributes": {
-      "outside": 85,
-      "inside": 88,
-      "playmaking": 76,
-      "athletic": 84,
-      "defense": 86,
-      "rebounding": 90
-    },
-    "archetype": "Stretch Big",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
   }
 ]
