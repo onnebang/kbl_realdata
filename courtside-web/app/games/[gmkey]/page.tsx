@@ -14,7 +14,7 @@ import { collectAllOnCourtLineups, subComboKeys, type PlayerStartInfo } from "@/
 import { getLineupRatings, getPlayerOnOffRatings, type LineupRating, type PlayerOnOff } from "@/lib/lineupNetRating";
 import { buildMatchupInsights, gradeMatchupInsights, type PreviewInsight, type PriorGameData } from "@/lib/matchupInsights";
 import { getDepartedByTeam, prevSeasonName } from "@/lib/preseason";
-import { getLineupWinProbs } from "@/lib/homeGames";
+import { getLineupWinProbs, type LineupWinProb } from "@/lib/homeGames";
 import { getScheduleContext, scheduleSummary } from "@/lib/scheduleContext";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getTeamPowerByName } from "@/lib/teamPower";
@@ -512,7 +512,9 @@ export default async function GamePage({
     getActionLabels(),
     soft("shots", getShots(gmkey, ttl), []),
     // 12인 엔트리 반영 승률 - 예정 경기에만 쓴다(홈 목록 카드와 같은 규칙, lib/homeGames.ts 주석 참고).
-    status === "scheduled" ? soft("lineupWinProbs", getLineupWinProbs([gmkey]), new Map()) : Promise.resolve(new Map()),
+    status === "scheduled"
+      ? soft("lineupWinProbs", getLineupWinProbs([gmkey]), new Map<string, LineupWinProb>())
+      : Promise.resolve(new Map<string, LineupWinProb>()),
   ]);
 
   const homeTeam = teamStats.find((t) => t.tcode === game.home_team?.tcode);
