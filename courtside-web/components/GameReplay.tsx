@@ -1179,7 +1179,12 @@ export default function GameReplay({
     return acc;
   }, [box, players]);
   const elapsedMin = (row.quarter === "PRE" ? 0 : row.elapsed) / 60;
-  const isDnp = (p: PlayerMeta) => p.minPlayed == null || Number(p.minPlayed) === 0;
+  // 공식 DNP = min_played가 정확히 0(game_player_stats 10만 1천 행 중 null 0건, 0이 12,854건).
+  // minPlayed == null은 "공식 출전시간을 아직 모름"이다 - 진행중/정산 전 경기의 폴백 목록(page.tsx
+  // replayPlayers, 이벤트에 등장한 선수만)이 이 값을 null로 넘기는데, 예전처럼 null도 DNP로 치면
+  // 라이브 중 전원이 "DNP - 감독 결정"으로 뜨고 스탯이 하나도 안 보인다(2026-09-25 발견). 출전시간
+  // 자체는 아래 liveSec(교체 이벤트로 재구성, 실측 오차 0.00분)가 따로 계산한다.
+  const isDnp = (p: PlayerMeta) => p.minPlayed != null && Number(p.minPlayed) === 0;
   const jerseyNum = (p: PlayerMeta) => (p.backNum ? <span className="replay-jersey-num">#{p.backNum}</span> : null);
   const plusMinusCell = (p: PlayerMeta) => {
     const pm = finalPlusMinus.get(p.pcode) ?? 0;
