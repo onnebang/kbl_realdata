@@ -11,7 +11,9 @@ from ovr_curve_model import OvrCurveModel
 from play_styles import STYLE_LABEL, assign_play_styles, styles_json
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'raw', 'kbl_realdata.db')
-KBL540_PLAYERS_PATH = '../../kbl540/kbl540_players_public.json'
+# 절대경로면 os.path.join(dirname(__file__), ...)가 그대로 이 경로를 쓴다 - git worktree에서 돌릴 땐 상대경로가
+# 안 맞아(나이/포지션/국적이 조용히 사라짐) KBL540_PLAYERS_PATH 환경변수로 절대경로를 넘긴다.
+KBL540_PLAYERS_PATH = os.environ.get('KBL540_PLAYERS_PATH', '../../kbl540/kbl540_players_public.json')
 OUT_PATH = '../data/courtside_ovr.json'
 
 # 나이를 모르는 선수(kbl540 카드 풀에 없는 최근 신인 등)에게 줄 중립 나이 - 전성기
@@ -451,11 +453,32 @@ def parse_start_year(season_name):
     return int(m.group(1)) if m else None
 
 
-def compute_ovr(target_season='2024-2025'):
+def _gmkey_in_sql(gmkeys):
+    """게임키 집합 -> SQL IN 리터럴(build_ovr_rounds.py가 DB에서 읽은 내부 키만 넘기지만 형식은 한 번 더 검사)."""
+    bad = [k for k in gmkeys if not re.fullmatch(r'S\d+G\d+N\d+', str(k))]
+    if bad:
+        raise ValueError(f"이상한 gmkey: {bad[:3]}")
+    return "(" + ",".join("'" + str(k) + "'" for k in sorted(gmkeys)) + ")"
+
+
+def compute_ovr(target_season='2024-2025', stage_spec=None, launch_spec=None):
+    """기본(둘 다 None): 전 시즌 OVR 이력을 계산해 courtside_ovr_history.json에 쓴다(기존 동작 그대로).
+
+    라운드별 궤적(build_ovr_rounds.py)용 읽기 전용 모드 둘 - 파일을 안 쓰고 값을 돌려준다:
+      stage_spec = {'season', 'gmkeys', 'volume_scale', 'exclude_season_awards'}
+        -> 그 시즌을 gmkeys 경기만으로 다시 집계한 채(다른 시즌은 전부 그대로 = 리그 백분위 풀) 엔진을 돌려
+           DataFrame(global_df)을 돌려준다. 컬럼 OVR_F/OFF_F/DEF_F는 정수 반올림·캡·수동보정이 끝난 값을
+           소수 1자리 해상도로 복원한 것. 부분 시즌이라 볼륨 기반 항(가비지 패널티 200/500분, 신인 바닥 400분,
+           캡 보너스 1000분)과 스무딩 신뢰도(경기수)는 volume_scale(=270/치른 경기 수)만큼 시즌 환산한다.
+      launch_spec = {'season', 'roster'}
+        -> 그 시즌 이전 기록만으로 그 시즌 개막 전 예상치(프로젝션 블록)를 만들어 행 리스트로 돌려준다
+           (roster: pcode -> {team, name}, 원래 season_roster 자리)."""
     if not os.path.exists(DB_PATH):
         print(f"Error: DB not found at {DB_PATH}")
         return
 
+    projection_season = launch_spec['season'] if launch_spec else PROJECTION_SEASON
+    stage_season = stage_spec['season'] if stage_spec else None
     conn = sqlite3.connect(DB_PATH)
 
     # 1. 전체 시즌(역대 기록) 모든 선수의 스탯을 조회하여 "역사적 정규분포"를 구한다.
@@ -467,6 +490,11 @@ def compute_ovr(target_season='2024-2025'):
     # season_category는 DB에 '챔피언결정전'으로 들어있다 - 예전엔 '챔프전'으로 적어둬서
     # 이 IN 절이 0건 매칭했고, 챔프전 42경기가 OVR 집계에서 통째로 빠져 있었다
     # (2026-09-24 발견). 리그에서 제일 중요한 경기들이라 영향이 작지 않다.
+    # stage_spec 모드: 대상 시즌은 지정한 경기만, 나머지 시즌은 전부(기본 모드는 stage_sql == '').
+    stage_sql = ""
+    if stage_spec:
+        stage_sql = (f" AND (g.season_name <> '{stage_season}'"
+                     f" OR g.gmkey IN {_gmkey_in_sql(stage_spec['gmkeys'])})")
     global_query = """
     SELECT
         gps.pcode, g.season_name,
@@ -520,7 +548,7 @@ def compute_ovr(target_season='2024-2025'):
     JOIN games g ON gps.gmkey = g.gmkey
     WHERE g.season_category IN ('정규시즌', '플레이오프', '챔피언결정전')
       AND g.season_name NOT LIKE '%D리그%'
-      AND """ + FULL_SEASON_SQL + """
+      AND """ + FULL_SEASON_SQL + stage_sql + """
     GROUP BY gps.pcode, g.season_name
     """
 
@@ -541,7 +569,7 @@ def compute_ovr(target_season='2024-2025'):
         shots_df = pd.read_sql_query(
             "SELECT s.pcode, g.season_name, s.x, s.y, s.made, s.quarter, ABS(g.home_score - g.away_score) AS margin"
             " FROM shot_log s JOIN games g ON s.gmkey = g.gmkey"
-            " WHERE g.season_category IN ('정규시즌', '플레이오프', '챔피언결정전')",
+            " WHERE g.season_category IN ('정규시즌', '플레이오프', '챔피언결정전')" + stage_sql,
             conn,
         )
     except Exception as e:
@@ -550,6 +578,11 @@ def compute_ovr(target_season='2024-2025'):
         return
 
     conn.close()
+
+    if launch_spec:
+        # 개막 전 예상치 재현: 그 시즌 이전 기록만 남긴다(백분위 풀·레전드 순위·프로젝션 이력 전부 당시 기준).
+        global_df = global_df[global_df['season_name'] < projection_season].reset_index(drop=True)
+        shots_df = shots_df[shots_df['season_name'] < projection_season].reset_index(drop=True)
 
     if global_df.empty:
         print("No historical data found in DB.")
@@ -632,6 +665,12 @@ def compute_ovr(target_season='2024-2025'):
             global_df = global_df.drop(columns='wpaPerGame').merge(
                 wpa_by_pcode[['wpaPerGame']].reset_index(), on=['pcode', 'season_name'], how='left')
             global_df['wpaPerGame'] = global_df['wpaPerGame'].fillna(0)
+
+    if stage_spec:
+        # WPA 리더보드는 시즌 통째 집계라 경기 부분집합으로 못 쪼갠다(미래 정보 유출 방지) - 대상 시즌은 다른 시즌 평균값으로
+        # 대체한다(가산 폭은 wpaPerGame*2, 리그 표준편차 0.14 -> OVR 영향 0.3 안팎).
+        _tgt = global_df['season_name'] == stage_season
+        global_df.loc[_tgt, 'wpaPerGame'] = global_df.loc[~_tgt, 'wpaPerGame'].mean()
 
     # 포지션 데이터를 먼저 로드하여 병합 (가중치 계산용)
     teams, positions = load_teams_and_positions()
@@ -724,6 +763,16 @@ def compute_ovr(target_season='2024-2025'):
     garbage_mask = global_df['total_min'] < 5
     for col in ['attr_outside_mapped', 'attr_inside_mapped', 'attr_playmaking_mapped', 'attr_athletic_mapped', 'attr_defense_mapped', 'attr_rebounding_mapped']:
         global_df.loc[garbage_mask, col] = 45.0
+
+    # 스무딩(OvrCurveModel) 신뢰도에 넣을 경기 수 - 기본은 실제 경기 수. stage_spec 모드에선 대상 시즌의 출전분(total_min)과
+    # 경기 수를 시즌 환산(volume_scale)해 "이 페이스로 한 시즌 뛴 선수"로 취급한다(위 attr_athletic·garbage_mask는 이미
+    # 실측 기준으로 끝났고, 아래 가비지/신인바닥/캡 보너스는 환산 분을 쓴다).
+    global_df['g_model'] = global_df['g']
+    if stage_spec:
+        _tgt = global_df['season_name'] == stage_season
+        global_df['total_min_real'] = global_df['total_min']
+        global_df.loc[_tgt, 'total_min'] = global_df.loc[_tgt, 'total_min'] * stage_spec['volume_scale']
+        global_df.loc[_tgt, 'g_model'] = (global_df.loc[_tgt, 'g'] * stage_spec['volume_scale']).round()
 
     # ── 2. 모던 롤(Role) 판별 및 Multi-Role Max 가중치 적용 ──
     # NBA 2K 엔진 스타일: 모든 스페셜리스트 롤의 가중치를 전부 계산해보고, 가장 점수가 높게 나오는 롤을
@@ -878,7 +927,11 @@ def compute_ovr(target_season='2024-2025'):
         return min(boost, REPUTATION_CAP)
 
     global_df['start_year'] = global_df['season_name'].apply(parse_start_year)
-    global_df['rep_boost'] = [reputation_boost(p, y) for p, y in zip(global_df['pcode'], global_df['start_year'])]
+    # stage_spec(exclude_season_awards)면 대상 시즌 행은 그 시즌 자체 수상(시즌 끝에야 확정)을 뺀다 - 백테스트 사후정보 차단.
+    _no_own_awards = bool(stage_spec and stage_spec.get('exclude_season_awards'))
+    global_df['rep_boost'] = [
+        reputation_boost(p, y - 1 if (_no_own_awards and s == stage_season) else y)
+        for p, y, s in zip(global_df['pcode'], global_df['start_year'], global_df['season_name'])]
 
     global_df['raw_ovr_mapped'] += (wpa_boost + win_bonus + margin_bonus + pie_bonus + global_df['rep_boost'])
 
@@ -1016,7 +1069,7 @@ def compute_ovr(target_season='2024-2025'):
                     "age": int(group.loc[i, 'age_for_model']),
                     "raw_performance": group.loc[i, mapped_col],
                     "play_style": play_style,
-                    "games": int(group.loc[i, 'g']),
+                    "games": int(group.loc[i, 'g_model']),
                 }
                 for i in idxs
             ]
@@ -1110,6 +1163,12 @@ def compute_ovr(target_season='2024-2025'):
     global_df['ATTR_DEFENSE'] = (global_df['ATTR_DEFENSE'] + diff).clip(40, 99)
     global_df['ATTR_REBOUNDING'] = (global_df['ATTR_REBOUNDING'] + diff).clip(40, 99)
 
+    if stage_spec:
+        # 라운드별 궤적용: 최종 정수 OVR/OFF/DEF에서 "반올림 후 가해진 정수 조정분(캡·수동보정·클립)"만 떼어 반올림 전 소수값에 다시 얹는다.
+        for _col, _corr in (('OVR', corrected_ovr), ('OFF', corrected_off), ('DEF', corrected_def)):
+            global_df[_col + '_F'] = (_corr + (global_df[_col] - _corr.round().astype(int))).clip(40, 99)
+        return global_df
+
     # ── 3차: 배지 및 빌드(Archetype) 산출 ────────────────────────────────
     # 화면용 플레이 스타일(메인 + 서브) - 엔진 `role`(위에서 OFF/DEF 분할·롤 플레이어 캡에 쓴 11개)은 그대로 두고,
     # 표시용 스타일만 play_styles.py가 따로 정한다(OVR/OFF/DEF/능력치에는 영향 없음). 라벨은 STYLE_LABEL 한 곳에서만 온다.
@@ -1164,14 +1223,16 @@ def compute_ovr(target_season='2024-2025'):
     # 팀과 포지션 정보 로드
     teams, positions = load_teams_and_positions()
     # 시즌별 팀 - 없으면(경기 기록에 팀이 없는 예외) 예전처럼 현재 팀으로 폴백한다.
-    season_team = load_season_teams()
+    season_team = {} if launch_spec else load_season_teams()
     global_df['team'] = [
         season_team.get((p, s)) or teams.get(p, "Unknown")
         for p, s in zip(global_df['pcode'], global_df['season_name'])
     ]
     print(f"시즌별 팀 매핑: {sum((p, s) in season_team and bool(season_team[(p, s)]) for p, s in zip(global_df['pcode'], global_df['season_name']))}/{len(global_df)}행")
 
-    for _, row in global_df.iterrows():
+    # launch_spec 모드는 확정 시즌 행/공백 보간이 필요 없다(프로젝션 행만 돌려준다) - 비싼 순회를 빈 프레임으로 건너뛴다.
+    _rows_out = global_df.iloc[0:0] if launch_spec else global_df
+    for _, row in _rows_out.iterrows():
         out_data.append({
             "pcode": row['pcode'],
             "name": row['name'],
@@ -1201,7 +1262,7 @@ def compute_ovr(target_season='2024-2025'):
     # 안 뛰었으니 검증할 근거가 없다) - 대신 공백 앞뒤의 실측값을 선형보간해 매끄럽게 잇는다.
     GAP_FILL_MAX_SEASONS = 10  # 사용자의 요청에 따라 모든 공백(군대, 장기 부상 등)을 이어지게 하기 위해 크게 늘림
     gap_fill_rows = []
-    for pcode, group in global_df.groupby('pcode'):
+    for pcode, group in _rows_out.groupby('pcode'):
         recs = group.sort_values('season_name').to_dict('records')
         # 유효한 시작 연도가 있는 레코드만 필터링 (에러 방지)
         valid_recs = []
@@ -1250,8 +1311,8 @@ def compute_ovr(target_season='2024-2025'):
     # OvrCurveModel의 나이 곡선을 그대로 적용한 예상치를 만든다. 과거 기록이 아예 없는
     # 완전 신인은 예상할 근거가 없어 건너뛴다(그 선수는 지금처럼 "기록 없음"으로 남는다 -
     # 이건 데이터 부족이 아니라 사실이 그렇다).
-    next_season_roster = load_next_season_roster(PROJECTION_SEASON)
-    already_covered = set(global_df.loc[global_df['season_name'] == PROJECTION_SEASON, 'pcode'])
+    next_season_roster = launch_spec['roster'] if launch_spec else load_next_season_roster(projection_season)
+    already_covered = set(global_df.loc[global_df['season_name'] == projection_season, 'pcode'])
     to_project = set(next_season_roster) - already_covered
 
     # 커리어 기록이 전혀 없는 완전 신인용 최저치 - 실측 데이터에서 실제로 몇 경기 못 뛴
@@ -1268,7 +1329,7 @@ def compute_ovr(target_season='2024-2025'):
             out_data.append({
                 "pcode": pcode,
                 "name": next_season_roster.get(pcode, {}).get("name", "Unknown"),
-                "season": PROJECTION_SEASON,
+                "season": projection_season,
                 "team": next_season_roster.get(pcode, {}).get("team", "Unknown"),
                 "position": positions.get(pcode, "Unknown"),
                 "OVR": scouted["OVR"] if scouted else floor,
@@ -1303,7 +1364,7 @@ def compute_ovr(target_season='2024-2025'):
             return model.project_forward(seasons, extra_years=1)
 
         # 마지막 확정 시즌 이후~예상 시즌 개막 전에 새로 쌓인 평판(예: 2026 아시안게임 발탁)만 얹는다.
-        rep_delta = (reputation_boost(pcode, parse_start_year(PROJECTION_SEASON))
+        rep_delta = (reputation_boost(pcode, parse_start_year(projection_season))
                      - reputation_boost(pcode, last['start_year']))
         proj_ovr = round(project_one('raw_ovr_mapped') + rep_delta)
         proj_off = round(project_one('raw_off_mapped') + rep_delta)
@@ -1315,7 +1376,7 @@ def compute_ovr(target_season='2024-2025'):
         proj_defense = round(project_one('attr_defense_mapped'))
         proj_rebounding = round(project_one('attr_rebounding_mapped'))
 
-        manual_delta = manual_override_delta(pcode, PROJECTION_SEASON)
+        manual_delta = manual_override_delta(pcode, projection_season)
         if manual_delta:
             proj_ovr += manual_delta
             proj_off += manual_delta
@@ -1329,7 +1390,7 @@ def compute_ovr(target_season='2024-2025'):
 
         # ── Rookie Scale Cap (for projected data) ──
         if last['is_domestic'] and pd.notna(last['start_year']):
-            proj_start_year = parse_start_year(PROJECTION_SEASON)
+            proj_start_year = parse_start_year(projection_season)
             proj_pro_year = proj_start_year - debut_year_map.get(pcode, -10**6) + 1
             if 1 <= proj_pro_year <= 5:
                 if proj_pro_year == 1:
@@ -1381,7 +1442,7 @@ def compute_ovr(target_season='2024-2025'):
         out_data.append({
             "pcode": pcode,
             "name": last['name'],
-            "season": PROJECTION_SEASON,
+            "season": projection_season,
             "team": next_season_roster.get(pcode, {}).get("team") or teams.get(pcode, "Unknown"),
             "position": positions.get(pcode, "Unknown"),
             "OVR": int(max(40, min(99, proj_ovr))),
@@ -1405,6 +1466,9 @@ def compute_ovr(target_season='2024-2025'):
     # getPlayerOvrHistory()는 이 배열이 이미 오름차순 정렬돼 있다고 가정하므로(재정렬 안 함)
     # 여기서 최종적으로 한 번 더 정렬해 그 가정을 보장한다.
     out_data.sort(key=lambda r: (r['pcode'], r['season']))
+
+    if launch_spec:
+        return out_data  # 파일은 안 쓴다 - 프로젝션 행(개막 전 예상치)만 들어 있다
 
     OUT_PATH = os.path.join(os.path.dirname(__file__), '..', 'courtside-web', 'lib', 'courtside_ovr_history.json')
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
