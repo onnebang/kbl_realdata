@@ -1238,7 +1238,9 @@ export default function GameReplay({
   // replayPlayers, 이벤트에 등장한 선수만)이 이 값을 null로 넘기는데, 예전처럼 null도 DNP로 치면
   // 라이브 중 전원이 "DNP - 감독 결정"으로 뜨고 스탯이 하나도 안 보인다(2026-09-25 발견). 출전시간
   // 자체는 아래 liveSec(교체 이벤트로 재구성, 실측 오차 0.00분)가 따로 계산한다.
-  const isDnp = (p: PlayerMeta) => p.minPlayed != null && Number(p.minPlayed) === 0;
+  // 진행중에는 min_played가 공식 값이 아니다 - live_collector가 12인 엔트리를 0분으로 미리 넣어 두기 때문에
+  // (seed_game_player_stats) 그대로 믿으면 코트 위 선수까지 전원 DNP가 된다. 진행중 출전은 liveSec가 정한다.
+  const isDnp = (p: PlayerMeta) => !live && p.minPlayed != null && Number(p.minPlayed) === 0;
   const jerseyNum = (p: PlayerMeta) => (p.backNum ? <span className="replay-jersey-num">#{p.backNum}</span> : null);
   const plusMinusCell = (p: PlayerMeta) => {
     const pm = finalPlusMinus.get(p.pcode) ?? 0;

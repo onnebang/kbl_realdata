@@ -334,15 +334,34 @@ def load_team_stats(cur, rows):
     print(f"game_team_stats: {len(rows)}행 적재")
 
 
+# live_collector.seed_game_player_stats가 경기 시작 때 12인 엔트리를 전부 0으로 미리 넣어 둔다. 예전처럼
+# "충돌 시 아무것도 안 함"이면 종료 정산의 공식 기록이 그 0 행에 막혀 박스스코어가 영원히 0으로 남는다
+# (2026-09-26 발견). 그래서 충돌 시 "아직 아무 기록이 없는 자리표시 행"일 때만 공식 값으로 덮는다 -
+# 실제 기록이 있는 행은 예전과 똑같이 그대로 둔다. 진짜 DNP(공식 0분)는 같은 값으로 덮여 무해하다.
+UPSERT_PLAYER_STATS_SQL = """
+    insert into game_player_stats (gmkey, pcode, tcode, back_num, pos, is_starter, min_played,
+        pts, reb, ast, stl, blk, turnovers, fouls,
+        fgm, fga, tpm, tpa, ftm, fta, per, off_rtg, def_rtg, net_rtg, usage_rtg, pie) values %s
+    on conflict (gmkey, pcode) do update set
+        tcode = excluded.tcode, back_num = excluded.back_num, pos = excluded.pos,
+        is_starter = excluded.is_starter, min_played = excluded.min_played,
+        pts = excluded.pts, reb = excluded.reb, ast = excluded.ast, stl = excluded.stl,
+        blk = excluded.blk, turnovers = excluded.turnovers, fouls = excluded.fouls,
+        fgm = excluded.fgm, fga = excluded.fga, tpm = excluded.tpm, tpa = excluded.tpa,
+        ftm = excluded.ftm, fta = excluded.fta, per = excluded.per, off_rtg = excluded.off_rtg,
+        def_rtg = excluded.def_rtg, net_rtg = excluded.net_rtg, usage_rtg = excluded.usage_rtg,
+        pie = excluded.pie
+    where coalesce(game_player_stats.min_played, 0) = 0
+      and coalesce(game_player_stats.pts, 0) = 0 and coalesce(game_player_stats.reb, 0) = 0
+      and coalesce(game_player_stats.ast, 0) = 0 and coalesce(game_player_stats.fga, 0) = 0
+      and coalesce(game_player_stats.fta, 0) = 0 and game_player_stats.per is null
+"""
+
+
 def load_player_stats(cur, rows):
     from psycopg2.extras import execute_values
     for chunk in batched(rows):
-        execute_values(cur, """
-            insert into game_player_stats (gmkey, pcode, tcode, back_num, pos, is_starter, min_played,
-                pts, reb, ast, stl, blk, turnovers, fouls,
-                fgm, fga, tpm, tpa, ftm, fta, per, off_rtg, def_rtg, net_rtg, usage_rtg, pie) values %s
-            on conflict (gmkey, pcode) do nothing
-        """, chunk)
+        execute_values(cur, UPSERT_PLAYER_STATS_SQL, chunk)
     print(f"game_player_stats: {len(rows)}행 적재")
 
 

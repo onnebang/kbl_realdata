@@ -880,15 +880,26 @@ class GameIngestor:
                 0  # min_played (0으로 해야 DNP/벤치 표시에 나옴)
             ))
         if not rows: return
-        
-        # executemany(insert ... on conflict do nothing)
-        from psycopg2.extras import execute_values
-        execute_values(cur, """
-            insert into game_player_stats (gmkey, pcode, tcode, back_num, pos, is_starter, min_played,
-                pts, reb, ast, stl, blk, turnovers, fouls, fgm, fga, tpm, tpa, ftm, fta)
-            values %s
-            on conflict (gmkey, pcode) do nothing
-        """, [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) for r in rows])
+
+        # 이 자리표시 행은 부가 기능이라 라이브 수집을 절대 깨면 안 된다: players에 없는 pcode(신규 영입 직후)는
+        # FK 위반으로 트랜잭션 전체를 죽이므로 존재하는 선수만, 그리고 SAVEPOINT 안에서 넣어 어떤 오류도
+        # 이 구간에서 끝낸다. 종료 정산(migrate_to_supabase.UPSERT_PLAYER_STATS_SQL)이 이 행을 공식 값으로 덮는다.
+        cur.execute("savepoint seed_gps")
+        try:
+            for r in rows:
+                if not r[2]:
+                    continue
+                cur.execute("""
+                    insert into game_player_stats (gmkey, pcode, tcode, back_num, pos, is_starter, min_played,
+                        pts, reb, ast, stl, blk, turnovers, fouls, fgm, fga, tpm, tpa, ftm, fta)
+                    select %s, %s, %s, %s, %s, %s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                    where exists (select 1 from players where pcode = %s)
+                    on conflict (gmkey, pcode) do nothing
+                """, (*r, r[1]))
+            cur.execute("release savepoint seed_gps")
+        except Exception as e:  # noqa: BLE001
+            cur.execute("rollback to savepoint seed_gps")
+            log(f"  {self.gmkey}: 12인 엔트리 자리표시 행 기록 실패(무시): {type(e).__name__}: {e}")
 
 
     def seed_event_count(self, cur):
