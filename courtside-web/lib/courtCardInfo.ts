@@ -37,7 +37,7 @@ const ARCHETYPE_KO: Record<string, string> = {
 };
 
 /** 한글로 옮긴 스타일. 표에 없는 순수 영문은 화면에 못 내니 null(빈 칩 대신 숨김). */
-function archetypeKo(raw: string | undefined): string | null {
+function archetypeKo(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const ko = ARCHETYPE_KO[raw];
   if (ko) return ko;
@@ -46,10 +46,7 @@ function archetypeKo(raw: string | undefined): string | null {
 
 const finite = (n: unknown): number | null => (typeof n === "number" && Number.isFinite(n) ? n : null);
 
-/** archetype2는 다른 브랜치가 OvrSeasonRecord에 추가하는 중이라 여기서는 넓혀서 읽는다(있든 없든 컴파일된다). */
-type RecordWithStyle2 = OvrSeasonRecord & { archetype2?: string };
-
-function toInfo(r: RecordWithStyle2): CourtCardInfo {
+function toInfo(r: OvrSeasonRecord): CourtCardInfo {
   const pos = (r.position ?? "").charAt(0).toUpperCase();
   return {
     ovr: finite(r.OVR),
