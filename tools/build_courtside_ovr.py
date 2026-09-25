@@ -151,7 +151,7 @@ MANUAL_OVR_OVERRIDES = {
 # 전부 같아서 편평하고, 신인 스카우팅은 포지션별로 강점이 다르므로 델타 하나로는 못 살린다).
 # key: season_roster.pcode가 NULL이라 load_next_season_roster()가 만드는 "tbd_이름" 임시 키.
 SCOUTED_ROOKIE_PROFILES = {
-    'tbd_다리우스 베즐리': {
+    '291886': {
         'OVR': 90, 'OFF': 90, 'DEF': 88,
         'attributes': {'outside': 84, 'inside': 82, 'playmaking': 74, 'athletic': 93, 'defense': 86, 'rebounding': 85},
         'archetype': 'Slasher',
@@ -159,7 +159,7 @@ SCOUTED_ROOKIE_PROFILES = {
                   '10.4리바 FG54% 3P41% + 9/2·9/5 일본 연습경기 13점/18점. 특급, "오마리 스펠맨(peak 89) '
                   '전성기 운동능력 상위 호환"',
     },
-    'tbd_스코티 제임스': {
+    '291881': {
         'OVR': 91, 'OFF': 91, 'DEF': 87,
         'attributes': {'outside': 85, 'inside': 88, 'playmaking': 76, 'athletic': 84, 'defense': 86, 'rebounding': 90},
         'archetype': 'Stretch Big',
@@ -167,7 +167,7 @@ SCOUTED_ROOKIE_PROFILES = {
                   '3P 41.3%, 일본 전훈 4일만에 17점 10리바. 특급, "자밀 워니급(peak 96) 1옵션 + 41% 외곽" '
                   '- CBA에서 워니 전담 수비 경험도 있음',
     },
-    'tbd_존 무니': {
+    '291883': {
         'OVR': 85, 'OFF': 84, 'DEF': 84,
         'attributes': {'outside': 68, 'inside': 88, 'playmaking': 70, 'athletic': 78, 'defense': 82, 'rebounding': 90},
         'archetype': 'Paint Beast',
@@ -190,7 +190,7 @@ SCOUTED_ROOKIE_PROFILES = {
                   '5시즌 183경기, 9/1 SK 연습경기 19점(워니·힉스·안영준·오재현 상대). 상급, "패리스 배스(peak '
                   '90)형 외곽 슬래셔"',
     },
-    'tbd_트레이 포터': {
+    '291885': {
         'OVR': 81, 'OFF': 75, 'DEF': 87,
         'attributes': {'outside': 60, 'inside': 81, 'playmaking': 65, 'athletic': 83, 'defense': 91, 'rebounding': 87},
         'archetype': 'Glass Cleaner',
@@ -200,7 +200,7 @@ SCOUTED_ROOKIE_PROFILES = {
                   '+5(76->81) - 스카우팅 근거(일본 2부리그 20분 한정 백업)만 보면 원래 수치가 정직한 평가지만, '
                   'KBL 이적 후 실제로는 주전급 볼륨을 받을 가능성이 높아 최소 80대 초반은 보장.',
     },
-    'tbd_제리 아바디아노': {
+    '291887': {
         'OVR': 70, 'OFF': 64, 'DEF': 76,
         'attributes': {'outside': 62, 'inside': 60, 'playmaking': 68, 'athletic': 76, 'defense': 80, 'rebounding': 62},
         'archetype': 'Lockdown Defender',
