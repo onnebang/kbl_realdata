@@ -42,7 +42,7 @@
   top: 0;
   left: 50%;
   width: 60px;
-  aspect-ratio: 1;
+  height: 60px;
   transform: translate(-50%, -50%);
   border: 2px solid rgba(var(--line-rgb), 0.14);
   border-radius: 50%;
