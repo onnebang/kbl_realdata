@@ -198,6 +198,37 @@ def get_conn():
     return psycopg2.connect(url)
 
 
+def fill_context_from_db(pregame_ctx, gmkeys):
+    """증분 모드(--gmkeys) 전용: 학습 테이블(pregame_training_table.json)에 아직 없는 새 경기의
+    경기 전 컨텍스트를 Supabase pregame_features에서 채운다(live_collector.load_pregame_context와
+    같은 컬럼/같은 계산). 2026-09-25 실측 - 이걸 안 하면 정산(--replace)이 라이브 때 쓴 실제
+    netrtg/synergy 격차를 중립(0)으로 덮어써서 종료 경기의 "예상 승률"이 전부 중립 기저값(57.46%)이
+    됐다(오늘 새벽 종료된 두 경기가 63%/71%가 아니라 둘 다 57%로 표시됨, home_win_prob==objective_prob).
+    조회가 실패하거나 행이 없으면 예전처럼 중립으로 진행한다(정산 자체는 절대 막지 않음)."""
+    need = [gk for gk in gmkeys
+            if pregame_ctx.get(gk, {}).get("netrtgDiff") is None and pregame_ctx.get(gk, {}).get("synergyDiff") is None]
+    if not need:
+        return
+    try:
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("""select gmkey, home_netrtg, away_netrtg, home_synergy_onoff_rating, away_synergy_onoff_rating
+                           from pregame_features where gmkey = any(%s)""", (need,))
+            filled = 0
+            for gk, h_net, a_net, h_syn, a_syn in cur.fetchall():
+                net = (h_net - a_net) if h_net is not None and a_net is not None else None
+                syn = (h_syn - a_syn) if h_syn is not None and a_syn is not None else None
+                if net is not None or syn is not None:
+                    pregame_ctx[gk] = {"netrtgDiff": net, "synergyDiff": syn}
+                    filled += 1
+        finally:
+            conn.close()
+        print(f"경기전 컨텍스트를 pregame_features에서 채움: {filled}/{len(need)}경기 (나머지는 중립)", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"  pregame_features 조회 실패({type(e).__name__}: {e}) - 중립 컨텍스트로 진행", flush=True)
+
+
 EVENT_COLS = ("quarter", "clock_min", "clock_sec", "action_code", "pcode", "tcode",
               "home_score", "away_score", "home_lineup", "away_lineup",
               "home_win_prob", "wpa_home", "objective_prob")
@@ -296,6 +327,7 @@ def main():
             return
         for gk in gmkeys:
             pregame_ctx.setdefault(gk, {"netrtgDiff": None, "synergyDiff": None})
+        fill_context_from_db(pregame_ctx, gmkeys)
     else:
         gmkeys = sorted(pregame_ctx.keys())
     if args.limit:
