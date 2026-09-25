@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { teamInkStyle } from "@/lib/teamAccent";
+import { absenceText } from "@/lib/lineupText";
 import { POS_LABEL_KO, type AceEntry, type PreviewInsight } from "@/lib/matchupInsights";
 
 // 프리뷰 스카우팅 인사이트(요청 항목 1~6) 카드 + 경기 후 채점(항목 7, actual prop) - 기존
@@ -25,6 +26,7 @@ export function InsightCard({
   homeTname,
   awayTname,
   actual,
+  lineup,
 }: {
   insight: PreviewInsight;
   hColor: string;
@@ -32,6 +34,8 @@ export function InsightCard({
   homeTname: string;
   awayTname: string;
   actual?: string | null;
+  // 12인 엔트리 발표 후 재계산한 홈 승률(예정 경기의 win_prob 카드에만 - 홈 목록 카드와 같은 규칙).
+  lineup?: { homeProb: number; absentHome: string[]; absentAway: string[] } | null;
 }) {
   let borderColor = "var(--ink-faint)";
   let title = "";
@@ -152,10 +156,29 @@ export function InsightCard({
     }
     case "win_prob": {
       title = "코트사이드 최종 예측";
+      // 요청(2026-09-25): 시즌 전체 기준 예측과 12인 엔트리 반영 예측을 나란히, 변동이 있으면 어디서
+      // 생겼는지(빠진 핵심 로테이션 선수)까지. 엔트리 미발표면 lineup이 없어 예전 한 줄 그대로.
+      const homePct = Math.round(insight.homeProb * 100);
+      const lineupPct = lineup ? Math.round(lineup.homeProb * 100) : null;
+      const delta = lineupPct != null ? lineupPct - homePct : 0;
+      const absent = lineup ? absenceText(homeTname, awayTname, lineup) : "";
       body = (
         <>
-          <b className="team-ink" style={teamInkStyle(hColor)}>{homeTname}</b> 승률 {Math.round(insight.homeProb * 100)}% · <b className="team-ink" style={teamInkStyle(aColor)}>{awayTname}</b> 승률{" "}
+          {lineup && <span className="prob-caveat">시즌 기준 · </span>}
+          <b className="team-ink" style={teamInkStyle(hColor)}>{homeTname}</b> 승률 {homePct}% · <b className="team-ink" style={teamInkStyle(aColor)}>{awayTname}</b> 승률{" "}
           {Math.round(insight.awayProb * 100)}%
+          {lineupPct != null && (
+            <>
+              <br />
+              <span className="prob-caveat">엔트리 반영 · </span>
+              <b className="team-ink" style={teamInkStyle(hColor)}>{homeTname}</b> 승률 {lineupPct}% · <b className="team-ink" style={teamInkStyle(aColor)}>{awayTname}</b> 승률{" "}
+              {100 - lineupPct}%{" "}
+              <span className="prob-caveat">
+                ({delta === 0 ? "변동 없음" : `${homeTname} ${delta > 0 ? "+" : "−"}${Math.abs(delta)}%p`})
+              </span>
+              {absent && <div className="ace-note">12인 엔트리에서 빠진 핵심 로테이션 선수 — {absent}</div>}
+            </>
+          )}
         </>
       );
       break;

@@ -16,6 +16,7 @@ import {
   HOME_PAGE_SIZE,
 } from "@/lib/homeGames";
 import { deriveGameStatus } from "@/lib/gameStatus";
+import { absenceText } from "@/lib/lineupText";
 import HomeLiveRefresher from "@/components/HomeLiveRefresher";
 import { PreseasonBanner } from "@/components/PreseasonBanner";
 
@@ -289,7 +290,7 @@ export default async function HomePage({
                     {(lineupInfo.absentHome.length > 0 || lineupInfo.absentAway.length > 0) && (
                       <span className="prob-caveat">
                         {" "}
-                        ({[...lineupInfo.absentHome, ...lineupInfo.absentAway].join(", ")} 결장)
+                        ({absenceText(g.home_team?.abbr ?? "", g.away_team?.abbr ?? "", lineupInfo)} 결장)
                       </span>
                     )}
                   </span>

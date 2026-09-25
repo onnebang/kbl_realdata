@@ -14,6 +14,7 @@ import { collectAllOnCourtLineups, subComboKeys, type PlayerStartInfo } from "@/
 import { getLineupRatings, getPlayerOnOffRatings, type LineupRating, type PlayerOnOff } from "@/lib/lineupNetRating";
 import { buildMatchupInsights, gradeMatchupInsights, type PreviewInsight, type PriorGameData } from "@/lib/matchupInsights";
 import { getDepartedByTeam, prevSeasonName } from "@/lib/preseason";
+import { getLineupWinProbs } from "@/lib/homeGames";
 import { getScheduleContext, scheduleSummary } from "@/lib/scheduleContext";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getTeamPowerByName } from "@/lib/teamPower";
@@ -503,13 +504,15 @@ export default async function GamePage({
 
   // 본체(팀스탯·박스스코어·이벤트·액션라벨)는 그대로 던진다 - 없으면 그릴 화면이 없다.
   // 프리뷰 지표와 슛 로그는 패널 재료라 실패해도 그 패널만 빈다.
-  const [teamStats, playerStats, events, pregameFeatures, actionLabels, shots] = await Promise.all([
+  const [teamStats, playerStats, events, pregameFeatures, actionLabels, shots, lineupWinProbs] = await Promise.all([
     getTeamStats(gmkey, ttl),
     getPlayerStats(gmkey, ttl),
     getEvents(gmkey, ttl),
     soft("pregameFeatures", getPregameFeatures(gmkey, ttl), null),
     getActionLabels(),
     soft("shots", getShots(gmkey, ttl), []),
+    // 12인 엔트리 반영 승률 - 예정 경기에만 쓴다(홈 목록 카드와 같은 규칙, lib/homeGames.ts 주석 참고).
+    status === "scheduled" ? soft("lineupWinProbs", getLineupWinProbs([gmkey]), new Map()) : Promise.resolve(new Map()),
   ]);
 
   const homeTeam = teamStats.find((t) => t.tcode === game.home_team?.tcode);
@@ -853,6 +856,7 @@ export default async function GamePage({
                 aColor={aColor}
                 homeTname={game.home_team?.name ?? ""}
                 awayTname={game.away_team?.name ?? ""}
+                lineup={insight.kind === "win_prob" ? lineupWinProbs.get(gmkey) : undefined}
               />
             ))}
             {/* 이적 게이트의 실제 적용 범위를 밝힌다 - roster_changes의 이탈 행은 확정 로스터가
