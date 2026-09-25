@@ -832,6 +832,7 @@ export default async function PlayerPage({
                   photoUrl={info.photoUrl}
                   attributes={latestOvr.attributes}
                   archetype={latestOvr.archetype}
+                  archetype2={latestOvr.archetype2}
                   badges={latestOvr.badges}
                 />
               </div>
