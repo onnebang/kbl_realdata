@@ -51,6 +51,16 @@ def revalidate(tags):
     예외 없이 False만 돌려줌 - 호출부는 반환값을 무시해도 안전."""
     if not tags:
         return True
+    
+    # Next.js 엔드포인트의 MAX_TAGS = 100 제한 대응 (100개 이상이면 쪼개서 재귀 호출)
+    chunk_size = 100
+    if len(tags) > chunk_size:
+        success = True
+        for i in range(0, len(tags), chunk_size):
+            if not revalidate(tags[i:i + chunk_size]):
+                success = False
+        return success
+        return True
     token = _find_token()
     if not token:
         print("[revalidate] REVALIDATE_TOKEN 없음 - 건너뜀(.env.supabase 또는 GH Actions secret 확인)", flush=True)
