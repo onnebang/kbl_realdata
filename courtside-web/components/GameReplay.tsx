@@ -919,8 +919,6 @@ export default function GameReplay({
   if (droughts.awaySec >= DROUGHT_MIN_SEC) {
     flowChips.push({ key: "drought-away", text: `${awayTeam.abbr} ${Math.floor(droughts.awaySec / 60)}분 ${droughts.awaySec % 60}초 무득점` });
   }
-  // 서지가 있으면 그걸 쓴다 - 서지는 0-런을 포함하는 개념이라(상대 0점이면 값이 같다) 둘 다
-  // 띄우면 같은 사건이 칩 두 개로 보인다.
   if (row.surge) {
     const t = row.surge.side === "home" ? homeTeam : awayTeam;
     flowChips.push({
@@ -931,6 +929,47 @@ export default function GameReplay({
     if (row.runHome >= RUN_THRESHOLD) flowChips.push({ key: "run-home", text: `🔥 ${homeTeam.abbr} ${row.runHome}-0 런` });
     if (row.runAway >= RUN_THRESHOLD) flowChips.push({ key: "run-away", text: `🔥 ${awayTeam.abbr} ${row.runAway}-0 런` });
   }
+
+  // 1. 쿼터 파울트러블, 팀파울이 걸렸을때 좀더 표시 (요청 1번)
+  let homeTeamFouls = 0;
+  let awayTeamFouls = 0;
+  for (let i = idx; i >= 0; i--) {
+    const e = events[i];
+    if (e.quarter !== row.quarter) break;
+    if (e.action_code && FOUL_CODES.has(e.action_code)) {
+      if (e.tcode === homeTeam.tcode) homeTeamFouls++;
+      else if (e.tcode === awayTeam.tcode) awayTeamFouls++;
+    }
+  }
+  if (homeTeamFouls >= 5) flowChips.push({ key: "team-foul-home", text: `🚨 ${homeTeam.abbr} 팀파울 (현재 쿼터)` });
+  if (awayTeamFouls >= 5) flowChips.push({ key: "team-foul-away", text: `🚨 ${awayTeam.abbr} 팀파울 (현재 쿼터)` });
+
+  for (const p of players) {
+    const b = box.get(p.pcode);
+    if (!b) continue;
+    if (b.foul > 0) {
+      const isEarly = row.quarter === "Q1" || row.quarter === "Q2";
+      if ((isEarly && b.foul >= 3) || b.foul >= 4) {
+        flowChips.push({ key: `foul-trouble-${p.pcode}`, text: `⚠️ ${p.name ?? p.pcode} 파울트러블 (${b.foul}반칙)` });
+      }
+    }
+
+    // 2, 3. 기록 및 밀스톤 (더블-더블, 득점 점유율)
+    const stats = [b.pts, b.reb, b.ast, b.stl, b.blk];
+    const doubleDigits = stats.filter((v) => v >= 10).length;
+    if (doubleDigits >= 3) {
+      flowChips.push({ key: `triple-double-${p.pcode}`, text: `🌟 ${p.name ?? p.pcode} 트리플-더블 달성!` });
+    } else if (doubleDigits === 2) {
+      flowChips.push({ key: `double-double-${p.pcode}`, text: `✨ ${p.name ?? p.pcode} 더블-더블 달성!` });
+    }
+
+    const tPts = p.tcode === homeTeam.tcode ? row.home_score : row.away_score;
+    if (tPts >= 20 && b.pts >= tPts * 0.4) {
+      const pct = Math.round((b.pts / tPts) * 100);
+      flowChips.push({ key: `score-carry-${p.pcode}`, text: `🔥 ${p.name ?? p.pcode} 팀 득점의 ${pct}%(${b.pts}점) 책임지는 중` });
+    }
+  }
+
 
   // 요청: "현 시점 game leaders를 보여줌" - 위 box(computeBoxScore, 이미 as-of-idx로
   // 계산됨)에서 팀별 최고 득점/리바운드/어시스트만 뽑음.

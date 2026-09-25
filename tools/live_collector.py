@@ -849,6 +849,7 @@ class GameIngestor:
             n2p, starters = roster_from_player_stat(pstat, self.home_tcode, self.away_tcode)
             if n2p and self.roster_source != "player-stat":
                 self.set_roster(n2p, starters, "player-stat")
+                self.seed_game_player_stats(cur, pstat)
                 log(f"  {self.gmkey}: 로스터 = 공식 player-stat "
                     f"({len(n2p)}명, 선발 {sum(len(v) for v in starters.values())}명)")
                 return
@@ -860,6 +861,35 @@ class GameIngestor:
             self.set_roster(n2p, starters, "db-fallback")
             log(f"  {self.gmkey}: player-stat 없음 - DB 로스터 폴백({len(n2p)}명, "
                 f"선발은 문자중계 101 이벤트로 복원)")
+
+    def seed_game_player_stats(self, cur, pstat):
+        """라이브 시작/로스터 발표 직후 12명 엔트리를 0분으로 game_player_stats에 기록.
+        이렇게 하면 웹에서 1쿼터 시작부터 벤치 명단(12명 전체)이 박스스코어에 표시된다."""
+        rows = []
+        for row in pstat or []:
+            if not isinstance(row, dict): continue
+            p = row.get("player")
+            if not isinstance(p, dict) or not p.get("pcode"): continue
+            rows.append((
+                self.gmkey,
+                p["pcode"],
+                p.get("tcode"),
+                p.get("backNum"),
+                p.get("pos"),
+                bool(row.get("startFlag") == 1),
+                0  # min_played (0으로 해야 DNP/벤치 표시에 나옴)
+            ))
+        if not rows: return
+        
+        # executemany(insert ... on conflict do nothing)
+        from psycopg2.extras import execute_values
+        execute_values(cur, """
+            insert into game_player_stats (gmkey, pcode, tcode, back_num, pos, is_starter, min_played,
+                pts, reb, ast, stl, blk, turnovers, fouls, fgm, fga, tpm, tpa, ftm, fta)
+            values %s
+            on conflict (gmkey, pcode) do nothing
+        """, [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) for r in rows])
+
 
     def seed_event_count(self, cur):
         """DB에 이미 들어있는 이 경기의 이벤트 수 - detect_ended의 '이벤트 증가' 비교 기준.

@@ -163,11 +163,11 @@ export default async function HomePage({
           // 종료: 기존 그대로.
           const status = deriveGameStatus(g);
           const homeWon = status === "final" && (g.home_score ?? 0) > (g.away_score ?? 0);
-          const homeProb = status === "live" ? liveProbs.get(g.gmkey) ?? winProbs.get(g.gmkey) : winProbs.get(g.gmkey);
-          // 엔트리 반영 승률 - "예정" 상태에만 의미가 있다(위 getLineupWinProbs 주석 참고,
-          // 라이브/종료는 별개의 이벤트 기반 모델을 씀). 엔트리 미발표면 undefined라 기존
-          // 단일 승률 줄만 그대로 보임.
-          const lineupInfo = status === "scheduled" ? lineupWinProbs.get(g.gmkey) : undefined;
+          const seasonProb = winProbs.get(g.gmkey);
+          const liveProb = status === "live" ? liveProbs.get(g.gmkey) : undefined;
+          // 엔트리 반영 승률 - 원래 "예정" 상태에만 보여줬으나, 경기 종료 후에도
+          // 엔트리에 따른 승률 차이를 보여달라는 요청에 따라 항상 표시한다.
+          const lineupInfo = lineupWinProbs.get(g.gmkey);
           const mvp = mvps.get(g.gmkey);
           const tag = tags.get(g.gmkey);
           const homeWinPct = g.home_team ? seasonWinPcts.get(g.home_team.tcode) : undefined;
@@ -264,13 +264,13 @@ export default async function HomePage({
                     {g.game_start ? ` ${g.game_start.slice(0, 5)}` : ""} 경기 예정
                   </span>
                 )}
-                {homeProb != null && (
+                {seasonProb != null && (
                   <span className="game-card-meta-item">
                     {/* 원정 쪽은 100에서 홈 반올림값을 빼서 합이 항상 100 - 각자 반올림하면
                         50%·51%처럼 101%가 되는 경우가 실제로 관측됨(검증 지적). 엔트리 반영
                         값이 따로 있으면(아래 줄) 이 줄이 "시즌 기준"임을 밝혀 혼동을 막는다. */}
-                    예상 승률{lineupInfo ? "(시즌 기준)" : ""} {g.home_team?.abbr} {Math.round(homeProb * 100)}% ·{" "}
-                    {g.away_team?.abbr} {100 - Math.round(homeProb * 100)}%
+                    예상 승률(시즌 기준) {g.home_team?.abbr} {Math.round(seasonProb * 100)}% ·{" "}
+                    {g.away_team?.abbr} {100 - Math.round(seasonProb * 100)}%
                     {/* OPEN MATCH DAY(오픈매치, 2026-27시즌 신설)는 모델이 학습 때 한 번도 못
                         본 경기 유형이라 일반 경기와 신뢰도가 다름 - 제거하지 않고 문구로만
                         명시(사용자 결정, 2026-09-24). */}
@@ -284,17 +284,25 @@ export default async function HomePage({
                     {/* 요청(2026-09-25): "승률을 2개를 적어야할것 같아... 어느 부분에서
                         변동이 있었는지" - 이정현 결장으로 소노 승률이 크게 내려간 사례가
                         계기. 결장자가 있을 때만 사유를 덧붙인다(핵심 로테이션 전원 출전이면
-                        엔트리 반영값도 시즌 기준과 사실상 같아 사유 문구가 무의미함). */}
-                    엔트리 반영 {g.home_team?.abbr} {Math.round(lineupInfo.lineupProb * 100)}% ·{" "}
+                        그냥 "엔트리 기준"이라고만 쓴다). */}
+                    예상 승률(엔트리 기준) {g.home_team?.abbr} {Math.round(lineupInfo.lineupProb * 100)}% ·{" "}
                     {g.away_team?.abbr} {100 - Math.round(lineupInfo.lineupProb * 100)}%
                     {(lineupInfo.absentHome.length > 0 || lineupInfo.absentAway.length > 0) && (
                       <span className="prob-caveat">
                         {" "}
-                        ({absenceText(g.home_team?.abbr ?? "", g.away_team?.abbr ?? "", lineupInfo)} 결장)
+                        ·{" "}
+                        {absenceText(g.home_team?.abbr ?? "", g.away_team?.abbr ?? "", lineupInfo)} 결장
                       </span>
                     )}
                   </span>
                 )}
+                {liveProb != null && (
+                  <span className="game-card-meta-item live-prob">
+                    실시간 예측 승률 {g.home_team?.abbr} {Math.round(liveProb * 100)}% ·{" "}
+                    {g.away_team?.abbr} {100 - Math.round(liveProb * 100)}%
+                  </span>
+                )}
+
                 {(homeWinPct || awayWinPct) && (
                   <span className="game-card-meta-item">
                     실제 시즌 승률 {g.home_team?.abbr} {homeWinPct ? `${Math.round(homeWinPct.pct * 100)}%` : "-"} ·{" "}

@@ -75,16 +75,25 @@ def stored_lineup_probs(cur, gmkeys):
     return {k: (float(v) if v is not None else None) for k, v in cur.fetchall()}
 
 
-def core_rotation_pcodes(tcode, ctx):
+def core_rotation_pcodes(tcode, ctx, active_roster=None):
     """최근 ROLL_WINDOW경기 평균 출전시간 상위 CORE_ROTATION_SIZE명 - "빠지면 눈에 띄는" 선수."""
     hist = ctx["timelines"].get(tcode, [])
     window = hist[-ett.ROLL_WINDOW:]
     roster = ett.roster_window_minutes(window, ctx["player_stats_by_game"], tcode)
-    top = sorted(roster.items(), key=lambda x: -x[1])[:CORE_ROTATION_SIZE]
-    return [pcode for pcode, _ in top]
+    top = sorted(roster.items(), key=lambda x: -x[1])
+    
+    pcodes = []
+    for pcode, _ in top:
+        if active_roster is not None and pcode not in active_roster.get(tcode, set()):
+            continue  # 현재 팀 로스터에 없는 선수(이적/은퇴 등)는 핵심 로테이션에서 제외
+        pcodes.append(pcode)
+        if len(pcodes) >= CORE_ROTATION_SIZE:
+            break
+            
+    return pcodes
 
 
-def compute_absences(g, lineup, ctx):
+def compute_absences(g, lineup, ctx, active_roster=None):
     """{"home": [pcode, ...], "away": [pcode, ...]} - 핵심 로테이션인데 이번 엔트리(dressed)에
     없는 선수만. 이름은 여기서 안 붙인다 - 프론트가 어차피 players 테이블을 조인해서 표시하니
     pcode만 남겨 중복 소스를 안 만든다."""
@@ -93,7 +102,7 @@ def compute_absences(g, lineup, ctx):
         dressed = set((lineup.get(tcode) or {}).get("dressed") or [])
         if not dressed:
             continue
-        out[side] = [p for p in core_rotation_pcodes(tcode, ctx) if p not in dressed]
+        out[side] = [p for p in core_rotation_pcodes(tcode, ctx, active_roster) if p not in dressed]
     return out
 
 
@@ -148,8 +157,22 @@ def main():
         print("[recalc] 계산된 행 없음 - 종료.", flush=True)
         return
 
+    # 현재 시즌 로스터 조회를 위해 미리 DB 연결
+    sug.load_env_supabase()
+    conn = sug.get_conn()
+    active_roster = {}
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT team_code, pcode FROM players WHERE season_code = %s", (ctx["current_season_code"],))
+        for t, p in cur.fetchall():
+            active_roster.setdefault(t, set()).add(p)
+    except Exception as e:
+        print("[recalc] active_roster 조회 실패 (진행은 계속함):", e, flush=True)
+    finally:
+        conn.close()
+
     target_by_gm = {g["gmkey"]: g for g in target}
-    absences_by_gm = {gm: compute_absences(g, lineups[gm], ctx) for gm, g in target_by_gm.items()}
+    absences_by_gm = {gm: compute_absences(g, lineups[gm], ctx, active_roster) for gm, g in target_by_gm.items()}
 
     name_by_gm = {g["gmkey"]: (g.get("tnameH"), g.get("tnameA")) for g in target}
     lineup_rows = []
