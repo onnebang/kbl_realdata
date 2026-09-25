@@ -8,6 +8,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ovr_curve_model import OvrCurveModel
+from play_styles import STYLE_LABEL, assign_play_styles, styles_json
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'raw', 'kbl_realdata.db')
 KBL540_PLAYERS_PATH = '../../kbl540/kbl540_players_public.json'
@@ -45,6 +46,12 @@ HOOP_R = (643.82, 203.94)
 PAINT_RADIUS = 70
 THREE_RADIUS = 145
 LEAGUE_AVG_MIDRANGE_PCT = 0.373  # 실측 리그 평균(위 반경 기준), 2026-09-24
+# 플레이 스타일(play_styles.py) 판정용 신호 - 코너 3점 = 3점 밖 + 골대 중심선에서 옆으로 CORNER_MIN_DY 이상 +
+# 골대에서 코트 중앙 쪽으로 CORNER_MAX_DX 이내(엔드라인~직선 구간 끝). 2025-26 3점 시도의 약 24%가 여기 몰려
+# (좌표 히스토그램에서 뚜렷한 덩어리) 실제 코너 위치와 맞는다. 접전 = 최종 점수차 CLOSE_GAME_MARGIN 이하.
+CORNER_MIN_DY = 150
+CORNER_MAX_DX = 45
+CLOSE_GAME_MARGIN = 5
 
 # 평판 가산 가중치(수상 id -> 1회당 OVR 가산). 회당 값은 예전 calculate_reputation_boost와 같고, 시즌 인지형으로
 # 바뀌면서 dpoy·allstar_mvp만 새로 넣었다(둘 다 스탯에 다 안 잡히는 "그 해의 얼굴" 신호인데 빠져 있었음).
@@ -154,7 +161,7 @@ SCOUTED_ROOKIE_PROFILES = {
     '291886': {
         'OVR': 90, 'OFF': 90, 'DEF': 88,
         'attributes': {'outside': 84, 'inside': 82, 'playmaking': 74, 'athletic': 93, 'defense': 86, 'rebounding': 85},
-        'archetype': 'Slasher',
+        'role': 'Slasher', 'role2': 'Glass Cleaner',  # 대표팀 10.4리바
         'reason': 'NBA 5시즌 237경기(20-21 OKC 주전 13.7점 7.2리바) + 2026 푸에르토리코 대표팀 12.5점 '
                   '10.4리바 FG54% 3P41% + 9/2·9/5 일본 연습경기 13점/18점. 특급, "오마리 스펠맨(peak 89) '
                   '전성기 운동능력 상위 호환"',
@@ -162,7 +169,7 @@ SCOUTED_ROOKIE_PROFILES = {
     '291881': {
         'OVR': 91, 'OFF': 91, 'DEF': 87,
         'attributes': {'outside': 85, 'inside': 88, 'playmaking': 76, 'athletic': 84, 'defense': 86, 'rebounding': 90},
-        'archetype': 'Stretch Big',
+        'role': 'Stretch Big', 'role2': 'Double-Double Machine',  # CBA 22.2점 11.9리바
         'reason': '중국 CBA(KBL보다 상위리그) 톈진 4시즌 158경기 22.2점 11.9리바, 24-25 24.6점 14.0리바 '
                   '3P 41.3%, 일본 전훈 4일만에 17점 10리바. 특급, "자밀 워니급(peak 96) 1옵션 + 41% 외곽" '
                   '- CBA에서 워니 전담 수비 경험도 있음',
@@ -170,7 +177,7 @@ SCOUTED_ROOKIE_PROFILES = {
     '291883': {
         'OVR': 85, 'OFF': 84, 'DEF': 84,
         'attributes': {'outside': 68, 'inside': 88, 'playmaking': 70, 'athletic': 78, 'defense': 82, 'rebounding': 90},
-        'archetype': 'Paint Beast',
+        'role': 'Paint Beast', 'role2': 'Midrange Master',  # "마레이에 미드레인지를 더한 형태"
         'reason': '일본 B1 통산 213경기 14.9점 11.4리바(23-24 리바운드왕), EASL 실전으로 KBL과 직접 붙은 '
                   '기록 있음 - vs 정관장 22점 22리바 2연승, EASL 결승 vs SK 워니 상대 우승(72-69). 상급, '
                   '"아셈 마레이(peak 90)에 미드레인지를 더한 형태"',
@@ -178,14 +185,14 @@ SCOUTED_ROOKIE_PROFILES = {
     '291882': {
         'OVR': 86, 'OFF': 89, 'DEF': 76,
         'attributes': {'outside': 76, 'inside': 85, 'playmaking': 76, 'athletic': 90, 'defense': 74, 'rebounding': 70},
-        'archetype': 'Slasher',
+        'role': 'Slasher', 'role2': 'Scoring Threat',  # 득점왕
         'reason': '대만 P.리그+ 25-26 득점왕(26.4점, 한 경기 51점) + EASL 25-26 득점왕·올-서드팀(29.3점) '
                   '+ EASL 실전으로 SK 원정 35점(워니·안영준·오재현 상대). NBA 1라운드 출신. 상급',
     },
     '291884': {
         'OVR': 83, 'OFF': 84, 'DEF': 78,
         'attributes': {'outside': 82, 'inside': 76, 'playmaking': 74, 'athletic': 80, 'defense': 76, 'rebounding': 74},
-        'archetype': 'Scoring Threat',
+        'role': 'Scoring Threat', 'role2': 'Sharpshooter',  # 3P 41%
         'reason': '푸에르토리코 BSN 25-26 43경기 15.8점 6.5리바 3.9어시 FG46% 3P41%(리그 올스타), G리그 '
                   '5시즌 183경기, 9/1 SK 연습경기 19점(워니·힉스·안영준·오재현 상대). 상급, "패리스 배스(peak '
                   '90)형 외곽 슬래셔"',
@@ -193,7 +200,7 @@ SCOUTED_ROOKIE_PROFILES = {
     '291885': {
         'OVR': 81, 'OFF': 75, 'DEF': 87,
         'attributes': {'outside': 60, 'inside': 81, 'playmaking': 65, 'athletic': 83, 'defense': 91, 'rebounding': 87},
-        'archetype': 'Glass Cleaner',
+        'role': 'Glass Cleaner', 'role2': 'Rim Protector',  # B2 블록왕
         'reason': '일본 B1 알티리 치바 25-26 58경기 11.7점 7.9리바 1.1블록 FG60%(2대2·풋백 위주), B2 시절 '
                   '블록왕. 역할(3단계 중 최하), 20분 내외 골밑 한정 역할 - "오누아쿠(2024-25 85) 수비 지향 버전". '
                   '2026-09-25 팬 피드백: 라건아/오브라이언트/칸터와 같은 "까다로운 스타일" 저평가 제보로 '
@@ -203,20 +210,20 @@ SCOUTED_ROOKIE_PROFILES = {
     '291887': {
         'OVR': 70, 'OFF': 64, 'DEF': 76,
         'attributes': {'outside': 62, 'inside': 60, 'playmaking': 68, 'athletic': 76, 'defense': 80, 'rebounding': 62},
-        'archetype': 'Lockdown Defender',
+        'role': 'Lockdown Defender', 'role2': 'Ball Hawk',  # "압박수비·활동량 스페셜리스트"
         'reason': '필리핀 MPBL 2026 16경기 9.6점 1.9리바 2.6어시(16.1분), 코칭스태프 평가 "압박수비·활동량 '
                   '스페셜리스트". 아쿼중급, "론제이 아바리엔토스(79)보다 수비 기반" - 득점력은 더 낮게 봄',
     },
     '291889': {
         'OVR': 87, 'OFF': 88, 'DEF': 85,
         'attributes': {'outside': 78, 'inside': 86, 'playmaking': 76, 'athletic': 90, 'defense': 84, 'rebounding': 82},
-        'archetype': 'Slasher',
+        'role': 'Slasher', 'role2': 'Scoring Threat',
         'reason': '아치 굿윈. NBA 출신 폭발적인 슬래셔.',
     },
     '291888': {
         'OVR': 88, 'OFF': 89, 'DEF': 86,
         'attributes': {'outside': 85, 'inside': 84, 'playmaking': 80, 'athletic': 86, 'defense': 85, 'rebounding': 83},
-        'archetype': 'Shot Creator',
+        'role': 'Scoring Threat', 'role2': 'Sharpshooter',  # 예전 'Shot Creator'는 표준 스타일 목록에 없어 가장 가까운 것으로 정규화
         'reason': '루이스 킹. NBA 출신 다재다능한 스코어러.',
     },
 }
@@ -485,6 +492,10 @@ def compute_ovr(target_season='2024-2025'):
         SUM(gps.fg) as fgm, SUM(gps.fg_a) as fga,
         SUM(gps.threep) as tpm, SUM(gps.threep_a) as tpa,
         SUM(gps.ft) as ftm, SUM(gps.ft_a) as fta,
+        -- 플레이 스타일 판정용(play_styles.py): 선발 경기 수 / 더블더블 경기 수 / 접전(점수차 CLOSE_GAME_MARGIN 이하) 출전 경기 수
+        SUM(gps.start_flag) as starts,
+        SUM(CASE WHEN ((gps.score>=10)+(gps.rb>=10)+(gps.ast>=10)+(gps.stl>=10)+(gps.bs>=10)) >= 2 THEN 1 ELSE 0 END) as dd_games,
+        SUM(CASE WHEN ABS(g.home_score - g.away_score) <= """ + str(CLOSE_GAME_MARGIN) + """ THEN 1 ELSE 0 END) as close_g,
         AVG(gps.offr) as offr, AVG(gps.defr) as defr,
         SUM(gps.offr) as total_offr, SUM(gps.defr) as total_defr,
         SUM(gps.dk) as dkm, SUM(gps.dk_a) as dka,
@@ -528,7 +539,7 @@ def compute_ovr(target_season='2024-2025'):
             conn,
         )
         shots_df = pd.read_sql_query(
-            "SELECT s.pcode, g.season_name, s.x, s.y, s.made"
+            "SELECT s.pcode, g.season_name, s.x, s.y, s.made, s.quarter, ABS(g.home_score - g.away_score) AS margin"
             " FROM shot_log s JOIN games g ON s.gmkey = g.gmkey"
             " WHERE g.season_category IN ('정규시즌', '플레이오프', '챔피언결정전')",
             conn,
@@ -568,6 +579,24 @@ def compute_ovr(target_season='2024-2025'):
     global_df['mid_fga'] = global_df['mid_fga'].fillna(0)
     global_df['midrange_pct'] = np.where(
         global_df['mid_fga'] > 0, global_df['mid_fgm'] / global_df['mid_fga'], LEAGUE_AVG_MIDRANGE_PCT)
+
+    # 플레이 스타일 판정용 신호 - 코너 3점 시도/성공, shot_log 기준 3점 시도, 접전(CLOSE_GAME_MARGIN점 이하) 4쿼터·연장 슈팅/필드골 득점.
+    # 결과는 play_styles.assign_play_styles()에서만 쓰이고 OVR 계산과는 무관하다.
+    is3 = shots_df['dist'] > THREE_RADIUS
+    use_l = dist_l <= dist_r
+    dx = np.where(use_l, shots_df['x'] - HOOP_L[0], HOOP_R[0] - shots_df['x'])
+    dy = np.abs(shots_df['y'] - np.where(use_l, HOOP_L[1], HOOP_R[1]))
+    corner = is3 & (dy >= CORNER_MIN_DY) & (dx <= CORNER_MAX_DX)
+    clutch = (shots_df['quarter'].isin(['Q4']) | shots_df['quarter'].str.startswith('EQ')) & (shots_df['margin'] <= CLOSE_GAME_MARGIN)
+    made = shots_df['made']
+    sig = pd.DataFrame({
+        'pcode': shots_df['pcode'], 'season_name': shots_df['season_name'],
+        'tpa_shot': is3.astype(int), 'corner_a': corner.astype(int), 'corner_m': (corner & (made == 1)).astype(int),
+        'clutch_fga': clutch.astype(int), 'clutch_pts': np.where(clutch, made * np.where(is3, 3, 2), 0),
+    }).groupby(['pcode', 'season_name'], as_index=False).sum()
+    global_df = global_df.merge(sig, on=['pcode', 'season_name'], how='left')
+    for c in ['tpa_shot', 'corner_a', 'corner_m', 'clutch_fga', 'clutch_pts']:
+        global_df[c] = global_df[c].fillna(0)
 
 
     # WPA 데이터 로드
@@ -1082,21 +1111,19 @@ def compute_ovr(target_season='2024-2025'):
     global_df['ATTR_REBOUNDING'] = (global_df['ATTR_REBOUNDING'] + diff).clip(40, 99)
 
     # ── 3차: 배지 및 빌드(Archetype) 산출 ────────────────────────────────
-    ROLE_KOR_MAP = {
-        'Point Center': '포인트 센터',
-        'Stretch Big': '스트레치 빅',
-        'Paint Beast': '페인트존 장인',
-        'Glass Cleaner': '글래스 클리너',
-        'Playmaker': '플레이메이커',
-        'Sharpshooter': '샤프슈터',
-        'Slasher': '슬래셔',
-        '3&D Wing': '3&D 윙',
-        'Lockdown Defender': '락다운 디펜더',
-        'Scoring Threat': '스코어링 스렛',
-        'All-Around': '올어라운드'
-    }
-    
-    global_df['archetype'] = global_df['role'].map(ROLE_KOR_MAP)
+    # 화면용 플레이 스타일(메인 + 서브) - 엔진 `role`(위에서 OFF/DEF 분할·롤 플레이어 캡에 쓴 11개)은 그대로 두고,
+    # 표시용 스타일만 play_styles.py가 따로 정한다(OVR/OFF/DEF/능력치에는 영향 없음). 라벨은 STYLE_LABEL 한 곳에서만 온다.
+    global_df['style_main'], global_df['style_sub'] = assign_play_styles(global_df)
+    global_df['archetype'] = global_df['style_main'].map(STYLE_LABEL)
+    global_df['archetype2'] = global_df['style_sub'].map(STYLE_LABEL)
+
+    def style_fields(main, sub):
+        """JSON 행에 들어갈 role/archetype(메인) + role2/archetype2(서브, 없으면 null)."""
+        sub = None if sub is None or pd.isna(sub) else sub
+        return {
+            "role": main, "archetype": STYLE_LABEL[main],
+            "role2": sub, "archetype2": STYLE_LABEL[sub] if sub else None,
+        }
 
     def calc_badge(val, bronze, silver, gold, hof):
         if val >= hof: return 4
@@ -1151,7 +1178,7 @@ def compute_ovr(target_season='2024-2025'):
             "season": row['season_name'],
             "team": row['team'],
             "position": positions.get(row['pcode'], "Unknown"),
-            "role": row.get('role', 'Unknown'),
+            **style_fields(row['style_main'], row['style_sub']),
             "OVR": int(row['OVR']),
             "OFF": int(row['OFF']),
             "DEF": int(row['DEF']),
@@ -1163,7 +1190,6 @@ def compute_ovr(target_season='2024-2025'):
                 "defense": int(row['ATTR_DEFENSE']),
                 "rebounding": int(row['ATTR_REBOUNDING'])
             },
-            "archetype": row['archetype'],
             "badges": row['badges'],
             "projected": False,
         })
@@ -1210,7 +1236,7 @@ def compute_ovr(target_season='2024-2025'):
                             "defense": int(round(before['ATTR_DEFENSE'] + (after['ATTR_DEFENSE'] - before['ATTR_DEFENSE']) * frac)),
                             "rebounding": int(round(before['ATTR_REBOUNDING'] + (after['ATTR_REBOUNDING'] - before['ATTR_REBOUNDING']) * frac))
                         },
-                        "archetype": before['archetype'],
+                        **style_fields(before['style_main'], before['style_sub']),  # 공백 앞 실제 시즌의 스타일을 그대로 잇는다
                         "badges": before['badges'],
                         "projected": True,
                     })
@@ -1252,7 +1278,8 @@ def compute_ovr(target_season='2024-2025'):
                     "outside": floor, "inside": floor, "playmaking": floor,
                     "athletic": floor, "defense": floor, "rebounding": floor
                 },
-                "archetype": scouted["archetype"] if scouted else "롤 플레이어",
+                # 스카우팅 프로필은 role/role2를 손으로 정해뒀다(근거는 각 항목 주석). 기록도 스카우팅도 없는 신인은 롤 플레이어.
+                **(style_fields(scouted["role"], scouted.get("role2")) if scouted else style_fields("Role Player", None)),
                 "badges": {"finishing": 0, "shooting": 0, "playmaking": 0, "defense": 0},
                 "projected": True,
             })
@@ -1368,7 +1395,7 @@ def compute_ovr(target_season='2024-2025'):
                 "defense": int(max(40, min(99, proj_defense))),
                 "rebounding": int(max(40, min(99, proj_rebounding)))
             },
-            "archetype": last['archetype'],
+            **style_fields(last['style_main'], last['style_sub']),  # 마지막 실제 시즌의 스타일을 그대로 잇는다
             "badges": last['badges'],
             "projected": True,
         })
@@ -1383,6 +1410,10 @@ def compute_ovr(target_season='2024-2025'):
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     with open(OUT_PATH, 'w', encoding='utf-8') as f:
         json.dump(out_data, f, ensure_ascii=False, indent=2)
+
+    # 스타일 목록(key/label/description) - 화면(lib/playStyles.ts)과 공유하는 단일 출처
+    with open(os.path.join(os.path.dirname(OUT_PATH), 'play_styles.json'), 'w', encoding='utf-8') as f:
+        json.dump(styles_json(), f, ensure_ascii=False, indent=2)
 
     # Windows에서 이모지 출력 시 cp949 인코딩 오류 방지
     print(f"[SUCCESS] Generated {len(out_data)} historical OVR records at {OUT_PATH}")
