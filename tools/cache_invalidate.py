@@ -10,14 +10,19 @@
 뒤이므로, 실패하면 그냥 오늘까지의 동작(TTL 만료까지 대기)으로 돌아갈 뿐 - 새로운 실패
 모드를 호출부(daily_batch.py 등)에 추가하지 않는다.
 
-**토큰**: REVALIDATE_TOKEN 환경변수(GitHub Actions secret 또는 tools/.env.supabase) -
-sync_upcoming_games.load_env_supabase()가 이미 .env.supabase를 로드해두면 그대로 쓰임.
+**토큰**: REVALIDATE_TOKEN 환경변수(GitHub Actions secret) 또는 tools/.env.supabase 파일.
+**os.environ에 이미 있을 거라고 가정하지 않는다** - 이 모듈을 쓰는 19개 스크립트 중 15개는
+sync_upcoming_games.load_env_supabase()가 아니라 import_roster.load_database_url()로 DB
+자격증명을 읽는데, 그 함수는 DATABASE_URL 값만 돌려주고 os.environ은 전혀 안 건드린다(실제로
+겪음 - build_roster_changes.py 재실행 시 REVALIDATE_TOKEN이 안 보임). 그래서 이 모듈이
+직접, 독립적으로 .env.supabase를 읽는다 - 누가 먼저 뭘 로드했는지에 의존하지 않음.
 없으면 조용히 건너뛴다(예전 동작 = TTL 만료 대기로 자연 후퇴).
 
 사용법:
     from cache_invalidate import revalidate
     revalidate([f"game:{gmkey}", "batch:daily"])
 """
+import io
 import json
 import os
 import urllib.error
@@ -25,6 +30,20 @@ import urllib.request
 
 SITE_URL = os.environ.get("REVALIDATE_SITE_URL", "https://courtside-web-ten.vercel.app")
 TIMEOUT_SEC = 5
+_ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env.supabase")
+
+
+def _find_token():
+    token = os.environ.get("REVALIDATE_TOKEN")
+    if token:
+        return token
+    if not os.path.exists(_ENV_PATH):
+        return None
+    for line in io.open(_ENV_PATH, encoding="utf-8"):
+        line = line.strip()
+        if line.startswith("REVALIDATE_TOKEN="):
+            return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return None
 
 
 def revalidate(tags):
@@ -32,7 +51,7 @@ def revalidate(tags):
     예외 없이 False만 돌려줌 - 호출부는 반환값을 무시해도 안전."""
     if not tags:
         return True
-    token = os.environ.get("REVALIDATE_TOKEN")
+    token = _find_token()
     if not token:
         print("[revalidate] REVALIDATE_TOKEN 없음 - 건너뜀(.env.supabase 또는 GH Actions secret 확인)", flush=True)
         return False
