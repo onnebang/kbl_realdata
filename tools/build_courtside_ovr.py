@@ -666,9 +666,9 @@ def compute_ovr(target_season='2024-2025', stage_spec=None, launch_spec=None):
                 wpa_by_pcode[['wpaPerGame']].reset_index(), on=['pcode', 'season_name'], how='left')
             global_df['wpaPerGame'] = global_df['wpaPerGame'].fillna(0)
 
-    if stage_spec:
+    if stage_spec and not stage_spec.get('keep_wpa'):
         # WPA 리더보드는 시즌 통째 집계라 경기 부분집합으로 못 쪼갠다(미래 정보 유출 방지) - 대상 시즌은 다른 시즌 평균값으로
-        # 대체한다(가산 폭은 wpaPerGame*2, 리그 표준편차 0.14 -> OVR 영향 0.3 안팎).
+        # 대체한다(가산 폭은 wpaPerGame*2, 리그 표준편차 0.14 -> OVR 영향 0.3 안팎). keep_wpa: 시즌이 끝난 뒤(전 경기 포함)엔 실제 값 유지.
         _tgt = global_df['season_name'] == stage_season
         global_df.loc[_tgt, 'wpaPerGame'] = global_df.loc[~_tgt, 'wpaPerGame'].mean()
 
