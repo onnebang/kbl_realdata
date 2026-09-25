@@ -17,6 +17,8 @@ import json
 import os
 import sys
 
+from cache_invalidate import revalidate
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 ANALYSIS_DIR = os.path.join(BASE, "..", "raw", "analysis")
 BATCH_SIZE = 2000
@@ -106,6 +108,7 @@ def main():
         if args.only != "combos":
             migrate_player_onoff(cur, conn)
         print("완료")
+        revalidate(["manual:build", "batch:daily"])
     except Exception:
         conn.rollback()
         raise

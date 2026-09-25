@@ -44,6 +44,7 @@ import psycopg2
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_roster import load_database_url  # noqa: E402
+from cache_invalidate import revalidate  # noqa: E402
 
 TOP_MOMENTS = 5          # 클러치 / 클러치 밖 각각
 MIN_SCORES = 20          # 득점 이벤트가 이보다 적으면 "커리어 임팩트"가 문장이 안 된다
@@ -199,6 +200,10 @@ def main():
         cur.execute(ONCOURT_SQL)
         print("  갱신 %d행" % cur.rowcount)
         conn.commit()
+
+    # player_win_impact 전체 재생성이라 개별 pcode를 파이썬에서 추적 안 함 - lib/winImpact.ts의
+    # 캐시가 player:${pcode}와 TAG.build를 같이 태그하므로 manual:build 하나로 전부 풀린다.
+    revalidate(["manual:build"])
 
     # 검산. 셋 다 0이어야 한다.
     cur.execute("""

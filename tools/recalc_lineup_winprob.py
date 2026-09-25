@@ -36,6 +36,8 @@ import json
 import os
 import sys
 
+from cache_invalidate import revalidate
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
@@ -176,6 +178,8 @@ def main():
         for gm, new, _ in changed:
             print("  [DB] %s %s -> %s" % (gm, old_stored.get(gm), new), flush=True)
         print("[recalc] %d경기 갱신 완료." % len(changed), flush=True)
+        # 2026-09-25(revalidateTag 연동) - 보통 소수 경기(오늘 엔트리 나온 것만)라 개별 gmkey로.
+        revalidate(["batch:daily"] + [f"game:{gm}" for gm, _, _ in changed])
     finally:
         conn.close()
 

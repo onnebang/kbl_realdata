@@ -33,6 +33,8 @@ import unicodedata
 import psycopg2
 from psycopg2.extras import execute_values
 
+from cache_invalidate import revalidate
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -274,6 +276,7 @@ def main():
     """, resolved)
     conn.commit()
     print("\n적재 완료: %d행" % len(resolved))
+    revalidate(["manual:build", "batch:daily", f"season:{args.season}"])
 
     cur.execute("""
         select t.name, count(*) from season_roster r join teams t using (tcode)

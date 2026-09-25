@@ -50,6 +50,7 @@ from psycopg2.extras import Json, execute_values
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_roster import load_database_url  # noqa: E402
+from cache_invalidate import revalidate  # noqa: E402
 
 SEASON_CATEGORY = "정규시즌"
 # 동시 출전을 "간선"으로 셀 최소 시간. 이보다 짧은 동시 출전은 교체 순서 복원 오차로 본다
@@ -427,6 +428,7 @@ def main():
     )
     conn.commit()
     print("저장 완료")
+    revalidate(["manual:build", f"season:{season}"])
     conn.close()
 
 

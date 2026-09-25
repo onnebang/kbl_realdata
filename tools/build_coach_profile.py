@@ -21,6 +21,7 @@ import sys
 sys.path.insert(0, r"D:\영상작업\축구\개발\kbl_realdata\tools")
 import psycopg2
 from import_roster import load_database_url
+from cache_invalidate import revalidate
 
 # 경기당 마진 SD(2011-12~2025-26 팀-경기) - 결과 F definition의 하드코딩 값. 시즌이 추가되면 재계산.
 MARGIN_SD = 12.64
@@ -244,6 +245,7 @@ def main():
     cur.execute(SQL_CH_LEAGUE)
     cur.execute(SQL_TIMEOUT)
     c.commit()
+    revalidate(["manual:build"])
 
     counts = {}
     for t in ("coach_season_record", "coach_season_style", "coach_challenge_usage", "coach_challenge_league", "coach_timeout_tendency"):

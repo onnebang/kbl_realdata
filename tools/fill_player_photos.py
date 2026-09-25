@@ -36,6 +36,7 @@ import sys
 
 import psycopg2
 from import_roster import load_database_url
+from cache_invalidate import revalidate
 
 RAW_PHOTOS_DIR = r"D:\영상작업\축구\개발\raw_photos"
 PHOTO_URL_TEMPLATE = "https://kbl.or.kr/files/kbl/players-photo/{pcode}.png"
@@ -74,6 +75,7 @@ def main():
             (PHOTO_URL_TEMPLATE.format(pcode=pcode), pcode),
         )
     conn.commit()
+    revalidate(["batch:daily"] + [f"player:{p}" for p in fillable])
 
     cur.execute("select count(photo_url) from players")
     after = cur.fetchone()[0]

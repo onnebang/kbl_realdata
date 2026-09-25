@@ -22,6 +22,8 @@ import sys
 import joblib
 import numpy as np
 
+from cache_invalidate import revalidate
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 GAMES_DIR = os.path.join(BASE, "..", "raw", "games")
 ANALYSIS_DIR = os.path.join(BASE, "..", "raw", "analysis")
@@ -375,6 +377,9 @@ def main():
 
         print(f"완료 - {len(gmkeys)}경기 중 {skipped}경기 건너뜀(text-cast/player-stat 없음), "
               f"이벤트 {total_events}건 적재.")
+        # 2026-09-25(revalidateTag 연동) - migrate_to_supabase.py와 같은 이유(경기 종료 직후
+        # 정산 배치 커밋과 courtside-web 캐시 사이의 공백을 없앰).
+        revalidate([f"game:{gm}" for gm in gmkeys] + ["batch:daily"])
     finally:
         conn.close()
 

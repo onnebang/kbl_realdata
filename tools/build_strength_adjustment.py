@@ -64,6 +64,7 @@ from psycopg2.extras import execute_values
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_roster import load_database_url  # noqa: E402
+from cache_invalidate import revalidate  # noqa: E402
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 SEASON_CATEGORY = "정규시즌"
@@ -157,6 +158,7 @@ def ensure_policy(cur, table):
         # service_role로 읽으므로 정책이 없어도 동작한다. 예전엔 이 줄이 배치를 돌릴 때마다
         # 락다운을 조용히 되돌려 테이블이 다시 anon 공개가 됐다(감사 실측).
         # cur.execute('create policy "public read %s" on %s for select using (true)' % (table, table))
+        pass
 
 
 def short_season(season):
@@ -364,6 +366,7 @@ def main():
          prev_per, tier, evidence) values %s""", player_rows)
     conn.commit()
     print("\n저장 완료 - 팀 %d행 · 슬롯 %d행" % (len(team_rows), len(player_rows)))
+    revalidate(["manual:build", "batch:daily", f"season:{season}"])
     conn.close()
 
 

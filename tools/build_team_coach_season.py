@@ -19,12 +19,14 @@ import sys
 sys.path.insert(0, r"D:\영상작업\축구\개발\kbl_realdata\tools")
 import psycopg2
 from import_roster import load_database_url
+from cache_invalidate import revalidate
 
 season = sys.argv[1] if len(sys.argv) > 1 else "2026-2027"
 c = psycopg2.connect(load_database_url()); c.autocommit = False; cur = c.cursor()
 cur.execute("update games g set home_coach_id=t.coach_id from team_coach_season t where g.season_name=%s and t.season_name=%s and t.tcode=g.home_tcode", (season, season)); h = cur.rowcount
 cur.execute("update games g set away_coach_id=t.coach_id from team_coach_season t where g.season_name=%s and t.season_name=%s and t.tcode=g.away_tcode", (season, season)); a = cur.rowcount
 c.commit()
+revalidate(["manual:build", f"season:{season}"])
 cur.execute("select count(*), count(home_coach_id), count(away_coach_id) from games where season_name=%s", (season,))
 print("%s: home %d / away %d 갱신 → games 채움 %s" % (season, h, a, cur.fetchone()))
 cur.execute("select tm.name, co.name, t.confirmed from team_coach_season t join teams tm on tm.tcode=t.tcode join coaches co on co.coach_id=t.coach_id where t.season_name=%s order by tm.name", (season,))

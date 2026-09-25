@@ -34,6 +34,7 @@ from psycopg2.extras import execute_values
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_roster import load_database_url  # noqa: E402
+from cache_invalidate import revalidate  # noqa: E402
 
 SEASON_CATEGORY = "정규시즌"
 # "로스터가 얇다"를 인원수가 아니라 이 문턱으로 센다 - 인원수만 보면 이탈 0인 팀이 더 얇아 보인다.
@@ -95,6 +96,7 @@ def ensure_policy(cur, table):
         # service_role로 읽으므로 정책이 없어도 동작한다. 예전엔 이 줄이 배치를 돌릴 때마다
         # 락다운을 조용히 되돌려 테이블이 다시 anon 공개가 됐다(감사 실측).
         # cur.execute('create policy "public read %s" on %s for select using (true)' % (table, table))
+        pass
 
 
 def prev_season(season):
@@ -268,6 +270,7 @@ def main():
          minutes, pts, reb, ast, pos, minutes_rank, team_players) values %s""", player_rows)
     conn.commit()
     print("저장 완료")
+    revalidate(["manual:build", f"season:{season}"])
     conn.close()
 
 

@@ -33,6 +33,8 @@ import os
 import sys
 import time
 
+from cache_invalidate import revalidate
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 
 CATEGORIES = {"R", "PO", "CP", "CU", "OM"}  # predict_upcoming_games.fetch_upcoming_schedule과 동일 스코프
@@ -277,6 +279,10 @@ def main():
                   f"{f' (표본 부족 보류 {n_skip}건)' if n_skip else ''}", flush=True)
         conn.commit()
         print("[sync_upcoming] 커밋 완료.", flush=True)
+        # 2026-09-25(revalidateTag 연동) - 한 번에 수백 경기를 건드릴 수 있어서(실측 277건)
+        # gmkey별로 나열하지 않고 포괄 태그만. 이 테이블의 실제 소비처(lib/homeGames.ts 등)가
+        # 전부 TAG.batch로 캐시돼 있어 이걸로 충분.
+        revalidate(["batch:daily"])
     except Exception:
         conn.rollback()
         raise

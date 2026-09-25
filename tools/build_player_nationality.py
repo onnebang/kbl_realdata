@@ -45,6 +45,7 @@ import sys, io, json, argparse, collections
 sys.path.insert(0, r"D:\영상작업\축구\개발\kbl_realdata\tools")
 import psycopg2
 from import_roster import load_database_url
+from cache_invalidate import revalidate
 
 JSON_PATH = r"D:\영상작업\축구\개발\kbl540_players_final.json"
 
@@ -176,6 +177,7 @@ def main():
     cur.execute(POLICY)
     c.commit()
     print("적재 완료: %d행" % len(payload))
+    revalidate(["manual:build", "batch:daily"])
     c.close()
 
 

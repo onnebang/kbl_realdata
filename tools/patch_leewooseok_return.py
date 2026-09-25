@@ -15,6 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_roster import load_database_url
+from cache_invalidate import revalidate
 import psycopg2
 
 PCODE = "291375"
@@ -33,6 +34,7 @@ def patch():
             pcode = excluded.pcode, source = excluded.source, updated_at = now()
     """, (SEASON, TCODE, PCODE, NAME, "manual: 2026 AG 금메달 조기전역 복귀(2026-09-24)"))
     conn.commit()
+    revalidate(["manual:build", "batch:daily", f"season:{SEASON}"])
 
     cur.execute("select season_name, tcode, pcode, player_name from season_roster where pcode=%s", (PCODE,))
     print(f"[SUCCESS] {NAME} season_roster 반영: {cur.fetchall()}")

@@ -38,6 +38,8 @@ import sys
 import psycopg2
 from psycopg2.extras import execute_values
 
+from cache_invalidate import revalidate
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_roster import load_database_url  # noqa: E402  (같은 .env.supabase 해석)
 
@@ -318,6 +320,9 @@ def main():
     """, rows)
     conn.commit()
     print("\nroster_changes 재생성 완료: %d행" % len(rows))
+    # 2026-09-25(revalidateTag 연동) - 오늘 삼성/정관장 로스터 사진이 코드 수정 뒤에도 최대
+    # 1시간 안 보였던 그 버그(rosterChangeReport_v2 캐시가 안 풀려서)의 근본 수정.
+    revalidate(["manual:build", "batch:daily", f"season:{args.season}"])
 
 
 if __name__ == "__main__":

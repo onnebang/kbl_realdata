@@ -16,6 +16,8 @@ import json
 import os
 import sys
 
+from cache_invalidate import revalidate
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 SRC_PATH = os.path.join(BASE, "..", "raw", "analysis", "pregame_training_table.json")
 
@@ -107,6 +109,7 @@ def main():
             """, chunk)
             conn.commit()
         print(f"완료 - pregame_features {len(rows)}행 적재")
+        revalidate(["manual:build", "batch:daily"])
     except Exception:
         conn.rollback()
         raise

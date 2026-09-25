@@ -34,6 +34,8 @@ import os
 import sqlite3
 import sys
 
+from cache_invalidate import revalidate
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 GAMES_DIR = os.path.join(BASE, "..", "raw", "games")
 SQLITE_PATH = os.path.join(BASE, "..", "raw", "kbl_realdata.db")
@@ -423,6 +425,11 @@ def main():
                 load_lineup_stints(cur, limit_gmkeys=limit_gmkeys)
         conn.commit()
         print("전체 커밋 완료.")
+        # 2026-09-25(revalidateTag 연동) - 이 커밋 직후가 정확히 오늘 "박스스코어 공백" 버그의
+        # 원인 지점이다(is_ended=true 직후~이 정산 배치 사이 캐시된 페이지가 최대 24시간
+        # 묵음). 성공 커밋마다 그 경기들의 캐시를 바로 무효화.
+        gmkeys = [r[0] for r in data["games_rows"]]
+        revalidate([f"game:{gm}" for gm in gmkeys] + ["batch:daily"])
     except Exception:
         conn.rollback()
         print("에러 발생 - 롤백함. 위 트레이스백 확인 후 다시 실행하면 이미 커밋된(이전 실행)"

@@ -28,6 +28,7 @@ from psycopg2.extras import execute_values
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_roster import load_database_url  # noqa: E402
+from cache_invalidate import revalidate  # noqa: E402
 
 # embed_leader_photos.PLACEHOLDER_SHA256과 같은 값(그 모듈은 PIL을 최상단에서 import해서 여기서
 # 가져오면 PIL 없는 인터프리터에서 죽는다 - 상수만 복제하고 출처를 적어둔다).
@@ -102,6 +103,7 @@ def main():
             from (values %s) as v(pcode, url) where p.pcode = v.pcode
         """, updates)
         conn.commit()
+        revalidate(["batch:daily"] + [f"player:{pcode}" for pcode, _ in updates])
     print("photo_url 갱신 %d명 (플레이스홀더 %d명은 NULL 유지)" % (len(updates), counts["placeholder"]))
 
 
