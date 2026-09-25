@@ -18,6 +18,7 @@ import { getScheduleContext, scheduleSummary } from "@/lib/scheduleContext";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getTeamPowerByName } from "@/lib/teamPower";
 import GameReplay from "@/components/GameReplay";
+import { buildCourtCardInfo } from "@/lib/courtCardInfo";
 import { InsightCard } from "@/components/InsightCard";
 import { deriveGameStatus } from "@/lib/gameStatus";
 import { cached, cachedMap, gameTtl, TTL, TAG } from "@/lib/cachePolicy";
@@ -661,6 +662,9 @@ export default async function GamePage({
           minPlayed: null,
         }));
 
+  // "코트 위" 선수 카드의 OVR·플레이 스타일(lib/courtCardInfo.ts, 서버 전용 - OVR JSON이 커서 클라이언트로는 이 로스터분만 내려간다).
+  const cardInfo = await soft("courtCardInfo", Promise.resolve().then(() => buildCourtCardInfo(replayPlayers, game.season_name)), {});
+
   // 요청: "라인업 조합별(1~5인) 넷레이팅 표시" - tools/build_synergy_matchup.py가 이미
   // 계산해둔 lineup_combo 테이블을 조회하되, 로스터 전체 조합(수백~수천 개)이 아니라 이
   // 경기에서 실제로 코트에 나왔던 라인업의 부분조합만(gameLineups.collectAllOnCourtLineups)
@@ -1126,6 +1130,7 @@ export default async function GamePage({
             awayNetRating={awaySeasonStats ? awaySeasonStats.ppg - awaySeasonStats.oppPpg : null}
             lineupRatings={lineupRatings}
             playerOnOff={playerOnOff}
+            cardInfo={cardInfo}
             live={status === "live"}
             /* action_codes 33행 맵(약 800B). 예전엔 라이브 경기에만 보냈지만, 행마다 라벨
                문자열을 박는 것(14,060B)보다 압도적으로 싸서 이제 항상 보낸다. 복원 규칙은

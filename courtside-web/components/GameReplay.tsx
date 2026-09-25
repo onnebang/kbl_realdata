@@ -40,6 +40,9 @@ import {
 import { iGa } from "@/lib/josa";
 import { currentOnCourt, comboKey, computeFinalPlusMinus, computeSecondsUpTo } from "@/lib/gameLineups";
 import type { LineupRating, PlayerOnOff } from "@/lib/lineupNetRating";
+import { OnCourtCards } from "./OnCourtCards";
+import { buildOnCourtTeam } from "@/lib/onCourtCards";
+import type { CourtCardInfo } from "@/lib/courtCardInfo"; // 타입만 - 값을 가져오면 OVR JSON이 브라우저 번들에 들어간다
 
 // "코트사이드" 시그니처 기능(인터랙티브 리플레이/스크럽) 포팅 - courtside_template.html의
 // render(idx)/computeBoxScore/renderFeedGroups/renderCourt 등 약 90개 함수 중 핵심 스크럽
@@ -556,6 +559,7 @@ export default function GameReplay({
   live = false,
   actionLabels = EMPTY_MAP,
   liveNames,
+  cardInfo,
 }: {
   // 파생 필드(elapsed/runHome/runAway/surge = 실측 34,382B)와 action_label/player_name까지
   // 뺀 **원본 game_events 행 그대로**. 전부 이 컴포넌트가 복원한다 - toGameEventShape 주석과
@@ -588,6 +592,9 @@ export default function GameReplay({
   // players prop이 같은 이름을 이미 들고 있어 서버가 아예 안 보낸다(undefined).
   // 경기 도중 처음 투입되는 선수 이름만 useLiveGame이 따로 채운다(lateNames).
   liveNames?: Record<string, string>;
+  // "코트 위" 선수 카드(OnCourtCards)의 OVR·플레이 스타일 - page.tsx가 서버에서 lib/courtCardInfo.ts로 뽑아 내려준다
+  // (OVR JSON이 커서 클라이언트에서 직접 읽지 않는다). 없으면 카드는 OVR 없이 그려진다.
+  cardInfo?: Record<string, CourtCardInfo>;
 }) {
   // ---- B-1. events = 서버 prop ∪ 라이브 수신 행 --------------------------------
   // 로컬 state가 아니라 파생값(useMemo)으로 둔 것이 이 구현의 핵심 선택이다. state로 두면
@@ -1162,6 +1169,14 @@ export default function GameReplay({
   const liveSec = useMemo(
     () => computeSecondsUpTo(events, idx, players, homeTeam.tcode, awayTeam.tcode),
     [events, idx, players, homeTeam.tcode, awayTeam.tcode]
+  );
+  // "코트 위" 선수 카드 재료 - 아래 표와 같은 homeOnCourt/awayOnCourt·box·liveSec를 그대로 재사용한다(새 이벤트 스캔 없음).
+  const courtCardTeams = useMemo(
+    () => [
+      buildOnCourtTeam(homeTeam, players, homeOnCourt, box, liveSec, cardInfo, topPcode),
+      buildOnCourtTeam(awayTeam, players, awayOnCourt, box, liveSec, cardInfo, topPcode),
+    ],
+    [homeTeam, awayTeam, players, homeOnCourt, awayOnCourt, box, liveSec, cardInfo, topPcode]
   );
   // 팀별 스크럽 시점 합계 - '팀 득점 점유'와 USG%의 분모.
   const teamTotals = useMemo(() => {
@@ -1827,6 +1842,8 @@ export default function GameReplay({
           통산 얼마나 잘했는지"를 한 섹션처럼 읽히게 배치(요청). */}
       <div className="replay-court">
         <div className="panel-title">코트 위</div>
+        {/* 게임식 선수 카드 - 아래 표(상세)와 같은 온코트 5인을 프로필 카드로. 경기 시작 전(PRE)에만 빈 상태 안내가 나온다. */}
+        <OnCourtCards teams={courtCardTeams} pre={row.quarter === "PRE"} topTitle={topBadgeTitle} />
         {/* 표를 넘기는 탭(요청: "길어진다면, 표를 여러개 만들어서 항목을 넘기도록"). 세 장 모두
             지금 스크럽 시점까지의 이벤트만으로 계산한다 - 아래 캡션이 그 사실을 들고 있다. */}
         <div className="replay-boxtabs" role="tablist">
