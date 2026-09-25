@@ -21,6 +21,15 @@ on:
     - cron: "0 4 * * *"
   workflow_dispatch: {} # 수동 테스트용
 
+# 같은 잡이 둘 이상 동시에 돌지 않게 한다(2026-09-25). schedule 트리거는 GitHub 부하에 따라 수십 분~
+# 수 시간 늦게 뜨는 게 실측됨(daily-batch가 06:00 KST 예정인데 08:42 KST에 시작) - 그래서 중요한 날엔
+# workflow_dispatch로 제때 수동 기동해두는데, 그러면 늦게 뜬 schedule 실행이 그 위에 겹쳐 분(minute)을
+# 이중으로 태우고 같은 경기를 두 곳에서 폴링하게 된다. cancel-in-progress: false = 돌고 있는 실행은
+# 절대 안 죽이고, 뒤에 온 실행은 대기(끝나면 오늘 남은 경기가 없어 바로 종료됨).
+concurrency:
+  group: live-collector
+  cancel-in-progress: false
+
 jobs:
   collect:
     runs-on: ubuntu-latest

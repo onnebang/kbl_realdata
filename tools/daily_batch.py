@@ -63,6 +63,7 @@ RECOVERY_DAYS = 3
 CATEGORIES = {"R", "PO", "CP", "CU", "AS", "OM"}  # 정규+플옵+챔프전+컵+올스타+오픈매치
 
 BASE = os.path.dirname(os.path.abspath(__file__))
+ON_CLOUD = os.environ.get("GITHUB_ACTIONS") == "true"  # GitHub Actions 러너에서만 true(자동 설정)
 
 
 def child_env():
@@ -141,6 +142,15 @@ def run_report(failures=None):
     경기의 pregame_features.home_win_prob이 조용히 낡은 채로 굳는다. 인터프리터를
     python_runtime으로 고정하고 종료코드를 확인한다."""
     f = failures if failures is not None else []
+    if ON_CLOUD:
+        # 2026-09-25 실측 - 클라우드 러너엔 전체 경기 아카이브(raw/games 5,600여 경기)와 그걸로 만든
+        # raw/analysis/*.json이 없다(gitignore, 800MB+). predict_upcoming_games.py는 그게 필수라
+        # 매일 아침 FileNotFoundError로 실패해 워크플로만 빨갛게 됐다. 예측은 아카이브가 있는
+        # 노트북 작업 스케줄러 쪽이 계속 맡는다(GITHUB_ACTIONS는 GitHub이 자동으로 true로 둠 -
+        # 노트북에서는 절대 안 걸리므로 거기선 예전처럼 누락이 곧바로 실패로 드러난다).
+        print("[daily_batch] 클라우드 러너 - 예측/리포트 단계 생략(전체 경기 아카이브 없음, 노트북 배치가 담당).",
+              flush=True)
+        return f
     exe = resolve_python()
     step([exe, "predict_upcoming_games.py"], "predict_upcoming_games.py", f)
     step([exe, "generate_daily_report.py"], "generate_daily_report.py", f)
@@ -185,7 +195,9 @@ def run_supabase_sync(new_gmkeys, failures=None):
     else:
         print("[daily_batch] 새 완료 경기 없음 - Supabase 이관 건너뜀.", flush=True)
 
-    step([exe, "sync_upcoming_games.py"], "sync_upcoming_games.py", failures, env)
+    # 클라우드에선 예측(전체 경기 아카이브 필요) 없이 games 예정 행 UPSERT만 - run_report 주석 참고.
+    sync_argv = [exe, "sync_upcoming_games.py"] + (["--skip-predictions"] if ON_CLOUD else [])
+    step(sync_argv, "sync_upcoming_games.py", failures, env)
     return failures
 
 

@@ -51,8 +51,18 @@ def scaled_score_diff(score_diff, remaining_sec):
     return score_diff / math.sqrt(remaining_sec + 30)
 
 
-def load_pregame_context():
-    with open(os.path.join(ANALYSIS_DIR, "pregame_training_table.json"), encoding="utf-8") as f:
+def load_pregame_context(required=True):
+    """required=False(증분 모드 --gmkeys): 파일이 없으면 빈 컨텍스트로 진행한다. 2026-09-25 실측 -
+    GitHub Actions 러너는 raw/analysis/*.json(gitignore 대상, 로컬 전체 경기 아카이브로 만든 산출물)이
+    없어서 이 줄에서 FileNotFoundError로 죽었고, 그러면 live_collector.reconcile_finished_game의
+    이벤트 정산 단계가 매번 ok=False -> 경기 종료 후 라이브 잠정 이벤트가 정정되지 않고 재시도만
+    반복했다. 증분 모드는 원래 "테이블에 없는 경기는 중립 컨텍스트"가 정상 경로(main()의 setdefault)라
+    이 파일이 없어도 결과가 같다. 전체 재구축 모드는 이 파일이 곧 경기 목록이라 그대로 필수."""
+    path = os.path.join(ANALYSIS_DIR, "pregame_training_table.json")
+    if not required and not os.path.exists(path):
+        print("pregame_training_table.json 없음(클라우드 러너 등) - 증분 모드라 중립 컨텍스트로 진행", flush=True)
+        return {}
+    with open(path, encoding="utf-8") as f:
         rows = json.load(f)
     out = {}
     for r in rows:
@@ -273,7 +283,7 @@ def main():
 
     print("모델 로딩...", flush=True)
     model = joblib.load(MODEL_PATH)
-    pregame_ctx = load_pregame_context()
+    pregame_ctx = load_pregame_context(required=not args.gmkeys)
     print(f"경기전 컨텍스트 있는 경기: {len(pregame_ctx)}개", flush=True)
 
     if args.gmkeys:
