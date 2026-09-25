@@ -1,0 +1,146 @@
+{
+  "season": "2024-2025",
+  "closed": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6",
+    "PO"
+  ],
+  "constants": {
+    "K_MINUTES": 600.0,
+    "K_MINUTES_NODATA": 600.0,
+    "STEP_MIN": 0.2,
+    "STEP_MAX": 1.0,
+    "SEASON_CAP": 3.5,
+    "RECAL_MIN_MINUTES": 240.0,
+    "RECAL_CAP": 6.0,
+    "PRORATE_VOLUME": true
+  },
+  "data_players": {
+    "n": 102,
+    "nonzero_steps": 309,
+    "share_in_0.2_1.0": 1.0,
+    "median_abs_step": 0.4,
+    "mean_moves_per_player": 3.0294117647058822,
+    "share_never_moved": 0.00980392156862745,
+    "hit_cap": 6,
+    "first_cap_stage": {
+      "R4": 3,
+      "PO": 2,
+      "R5": 1
+    },
+    "final_drift": {
+      "mean": 1.0431372549019606,
+      "median": 0.7000000000000028,
+      "p90": 2.6900000000000026,
+      "max": 3.5,
+      "share_gt_3": 0.08823529411764706
+    },
+    "reversal_gt2_players": 4,
+    "any_reversal_players": 43,
+    "n_with_truth": 102,
+    "mean_abs_L_minus_E": 2.176470588235294,
+    "mean_abs_V_minus_E": 1.1980392156862743,
+    "corr_move_vs_gap": 0.9521874871311513,
+    "mean_L": 77.66666666666667,
+    "mean_V": 77.97254901960784,
+    "mean_E": 78.37254901960785,
+    "share_moved_toward_truth": 0.8469387755102041,
+    "recal": {
+      "n": 0,
+      "mean_abs_jump": null,
+      "max_abs_jump": null,
+      "stage": {}
+    }
+  },
+  "nodata_players": {
+    "n": 11,
+    "nonzero_steps": 43,
+    "share_in_0.2_1.0": 1.0,
+    "median_abs_step": 1.0,
+    "mean_moves_per_player": 4.909090909090909,
+    "share_never_moved": 0.0,
+    "hit_cap": 4,
+    "first_cap_stage": {
+      "R6": 3,
+      "PO": 1
+    },
+    "final_drift": {
+      "mean": 8.445454545454545,
+      "median": 9.0,
+      "p90": 9.5,
+      "max": 9.5,
+      "share_gt_3": 1.0
+    },
+    "reversal_gt2_players": 0,
+    "any_reversal_players": 0,
+    "n_with_truth": 11,
+    "mean_abs_L_minus_E": 26.0,
+    "mean_abs_V_minus_E": 17.554545454545455,
+    "corr_move_vs_gap": 0.6825173435672497,
+    "mean_L": 53.36363636363637,
+    "mean_V": 61.809090909090905,
+    "mean_E": 79.36363636363636,
+    "share_moved_toward_truth": 1.0,
+    "recal": {
+      "n": 11,
+      "mean_abs_jump": 4.754545454545454,
+      "max_abs_jump": 6.0,
+      "stage": {
+        "R1": 1,
+        "R3": 3,
+        "R2": 2,
+        "R5": 4,
+        "R6": 1
+      }
+    }
+  },
+  "all_ge_min": {
+    "n": 113,
+    "nonzero_steps": 352,
+    "share_in_0.2_1.0": 1.0,
+    "median_abs_step": 0.4,
+    "mean_moves_per_player": 3.2123893805309733,
+    "share_never_moved": 0.008849557522123894,
+    "hit_cap": 10,
+    "first_cap_stage": {
+      "R4": 3,
+      "PO": 3,
+      "R5": 1,
+      "R6": 3
+    },
+    "final_drift": {
+      "mean": 1.763716814159292,
+      "median": 0.7999999999999972,
+      "p90": 3.5,
+      "max": 9.5,
+      "share_gt_3": 0.17699115044247787
+    },
+    "reversal_gt2_players": 4,
+    "any_reversal_players": 43,
+    "n_with_truth": 113,
+    "mean_abs_L_minus_E": 4.495575221238938,
+    "mean_abs_V_minus_E": 2.790265486725663,
+    "corr_move_vs_gap": 0.9773853546838928,
+    "mean_L": 75.30088495575221,
+    "mean_V": 76.3991150442478,
+    "mean_E": 78.46902654867256,
+    "share_moved_toward_truth": 0.8623853211009175,
+    "recal": {
+      "n": 11,
+      "mean_abs_jump": 4.754545454545454,
+      "max_abs_jump": 6.0,
+      "stage": {
+        "R1": 1,
+        "R3": 3,
+        "R2": 2,
+        "R5": 4,
+        "R6": 1
+      }
+    }
+  },
+  "elapsed_sec_incl_engine": 164.6
+}
