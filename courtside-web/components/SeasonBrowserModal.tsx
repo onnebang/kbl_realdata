@@ -300,5 +300,5 @@ export default function SeasonBrowserModal({ game, onClose }: { game: SeasonGame
 }
 
 function fmtDate(d: string) {
-  return d.replaceAll("-", ".");
+  return d.split("-").join(".");
 }

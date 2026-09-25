@@ -466,7 +466,7 @@ export async function generateMetadata({ params }: { params: Promise<{ gmkey: st
   const away = game.away_team?.name ?? "원정";
   const home = game.home_team?.name ?? "홈";
   const status = deriveGameStatus(game);
-  const date = game.game_date.slice(2).replaceAll("-", ".");
+  const date = game.game_date.slice(2).split("-").join(".");
   if (status === "final") {
     return {
       title: `${away} ${game.away_score} : ${game.home_score} ${home} (${date})`,
