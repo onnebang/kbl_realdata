@@ -207,6 +207,18 @@ SCOUTED_ROOKIE_PROFILES = {
         'reason': '필리핀 MPBL 2026 16경기 9.6점 1.9리바 2.6어시(16.1분), 코칭스태프 평가 "압박수비·활동량 '
                   '스페셜리스트". 아쿼중급, "론제이 아바리엔토스(79)보다 수비 기반" - 득점력은 더 낮게 봄',
     },
+    '291889': {
+        'OVR': 87, 'OFF': 88, 'DEF': 85,
+        'attributes': {'outside': 78, 'inside': 86, 'playmaking': 76, 'athletic': 90, 'defense': 84, 'rebounding': 82},
+        'archetype': 'Slasher',
+        'reason': '아치 굿윈. NBA 출신 폭발적인 슬래셔.',
+    },
+    '291888': {
+        'OVR': 88, 'OFF': 89, 'DEF': 86,
+        'attributes': {'outside': 85, 'inside': 84, 'playmaking': 80, 'athletic': 86, 'defense': 85, 'rebounding': 83},
+        'archetype': 'Shot Creator',
+        'reason': '루이스 킹. NBA 출신 다재다능한 스코어러.',
+    },
 }
 
 
