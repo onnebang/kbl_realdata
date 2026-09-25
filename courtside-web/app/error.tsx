@@ -40,7 +40,10 @@ export default function Error({
       title="지금은 이 화면을 불러오지 못했습니다"
       detail={
         "데이터를 가져오는 중에 문제가 생겼습니다.\n" +
-        "기록이 없는 게 아니라 잠시 연결이 끊긴 것이라, 대개 다시 시도하면 바로 열립니다."
+        "기록이 없는 게 아니라 잠시 연결이 끊긴 것이라, 대개 다시 시도하면 바로 열립니다.\n\n" +
+        "[디버그 정보]\n" +
+        `${error.name}: ${error.message}\n` +
+        (error.stack ? `${error.stack.slice(0, 300)}...` : "")
       }
       action={
         <button

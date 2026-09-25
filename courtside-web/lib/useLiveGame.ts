@@ -168,49 +168,57 @@ export function useLiveGame({ gmkey, enabled, initialLastOrder }: UseLiveGameArg
     stats.transport = "connecting";
     stats.channels += 1;
 
-    const channel = supabase
-      .channel(`live-game:${gmkey}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "game_events", filter: `gmkey=eq.${gmkey}` },
-        (payload) => {
-          stats.realtimeMsgs += 1;
-          ingest([payload.new as unknown as LiveEventRow], "realtime");
-        }
-      )
-      .on(
-        "postgres_changes",
-        // 수집기가 upsert 하므로 UPDATE도 반드시 구독 - 병합이 event_order로 "교체"한다.
-        { event: "UPDATE", schema: "public", table: "game_events", filter: `gmkey=eq.${gmkey}` },
-        (payload) => {
-          stats.realtimeMsgs += 1;
-          ingest([payload.new as unknown as LiveEventRow], "realtime");
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "games", filter: `gmkey=eq.${gmkey}` },
-        (payload) => {
-          stats.realtimeMsgs += 1;
-          lastRealtimeAtRef.current = Date.now();
-          const g = payload.new as unknown as { home_score: number | null; away_score: number | null; is_ended: boolean };
-          setScore({ home: g.home_score, away: g.away_score });
-          if (g.is_ended) setEnded(true);
-        }
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          stats.subscribed += 1;
-          lastRealtimeAtRef.current = Date.now();
-          stats.transport = "realtime";
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          // 조용히 죽는 경우가 더 흔하지만, 티가 나는 경우엔 즉시 폴링으로 표시.
-          stats.transport = "polling";
-        }
-      });
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel(`live-game:${gmkey}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "game_events", filter: `gmkey=eq.${gmkey}` },
+          (payload) => {
+            stats.realtimeMsgs += 1;
+            ingest([payload.new as unknown as LiveEventRow], "realtime");
+          }
+        )
+        .on(
+          "postgres_changes",
+          // 수집기가 upsert 하므로 UPDATE도 반드시 구독 - 병합이 event_order로 "교체"한다.
+          { event: "UPDATE", schema: "public", table: "game_events", filter: `gmkey=eq.${gmkey}` },
+          (payload) => {
+            stats.realtimeMsgs += 1;
+            ingest([payload.new as unknown as LiveEventRow], "realtime");
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "games", filter: `gmkey=eq.${gmkey}` },
+          (payload) => {
+            stats.realtimeMsgs += 1;
+            lastRealtimeAtRef.current = Date.now();
+            const g = payload.new as unknown as { home_score: number | null; away_score: number | null; is_ended: boolean };
+            setScore({ home: g.home_score, away: g.away_score });
+            if (g.is_ended) setEnded(true);
+          }
+        )
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            stats.subscribed += 1;
+            lastRealtimeAtRef.current = Date.now();
+            stats.transport = "realtime";
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            // 조용히 죽는 경우가 더 흔하지만, 티가 나는 경우엔 즉시 폴링으로 표시.
+            stats.transport = "polling";
+          }
+        });
+    } catch (e) {
+      console.warn("[live] 웹소켓 생성 중 에러(네트워크 차단 등):", e);
+      stats.transport = "polling"; // 에러 발생 시 즉시 HTTP 폴백으로 우회
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      try {
+        if (channel) supabase.removeChannel(channel);
+      } catch (e) {}
     };
   }, [gmkey, enabled, ended, ingest]);
 

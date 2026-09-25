@@ -13,7 +13,7 @@ import styles from "@/app/season-browser/season-browser.module.css";
 // props로 넘겨준 걸 그대로 받아 필터링만 함 - 여기서 추가로 Supabase를 부르지 않음.
 
 function fmtDate(d: string) {
-  return d.replaceAll("-", ".");
+  return d.split("-").join(".");
 }
 
 export default function SeasonBrowserBoard({ games }: { games: SeasonGameRow[] }) {
