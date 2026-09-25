@@ -175,14 +175,14 @@ SCOUTED_ROOKIE_PROFILES = {
                   '기록 있음 - vs 정관장 22점 22리바 2연승, EASL 결승 vs SK 워니 상대 우승(72-69). 상급, '
                   '"아셈 마레이(peak 90)에 미드레인지를 더한 형태"',
     },
-    'tbd_아치 굿윈': {
+    '291882': {
         'OVR': 86, 'OFF': 89, 'DEF': 76,
         'attributes': {'outside': 76, 'inside': 85, 'playmaking': 76, 'athletic': 90, 'defense': 74, 'rebounding': 70},
         'archetype': 'Slasher',
         'reason': '대만 P.리그+ 25-26 득점왕(26.4점, 한 경기 51점) + EASL 25-26 득점왕·올-서드팀(29.3점) '
                   '+ EASL 실전으로 SK 원정 35점(워니·안영준·오재현 상대). NBA 1라운드 출신. 상급',
     },
-    'tbd_루이스 킹': {
+    '291884': {
         'OVR': 83, 'OFF': 84, 'DEF': 78,
         'attributes': {'outside': 82, 'inside': 76, 'playmaking': 74, 'athletic': 80, 'defense': 76, 'rebounding': 74},
         'archetype': 'Scoring Threat',

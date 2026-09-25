@@ -116547,6 +116547,58 @@
     "projected": false
   },
   {
+    "pcode": "291882",
+    "name": "아치 굿윈",
+    "season": "2026-2027",
+    "team": "창원 LG",
+    "position": "Unknown",
+    "OVR": 86,
+    "OFF": 89,
+    "DEF": 76,
+    "attributes": {
+      "outside": 76,
+      "inside": 85,
+      "playmaking": 76,
+      "athletic": 90,
+      "defense": 74,
+      "rebounding": 70
+    },
+    "archetype": "Slasher",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
+    "pcode": "291884",
+    "name": "루이스 킹",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "Unknown",
+    "OVR": 83,
+    "OFF": 84,
+    "DEF": 78,
+    "attributes": {
+      "outside": 82,
+      "inside": 76,
+      "playmaking": 74,
+      "athletic": 80,
+      "defense": 76,
+      "rebounding": 74
+    },
+    "archetype": "Scoring Threat",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true
+  },
+  {
     "pcode": "650010",
     "name": "박상률",
     "season": "2007-2008",
@@ -117836,32 +117888,6 @@
     "projected": true
   },
   {
-    "pcode": "tbd_루이스 킹",
-    "name": "루이스 킹",
-    "season": "2026-2027",
-    "team": "전주 KCC",
-    "position": "Unknown",
-    "OVR": 83,
-    "OFF": 84,
-    "DEF": 78,
-    "attributes": {
-      "outside": 82,
-      "inside": 76,
-      "playmaking": 74,
-      "athletic": 80,
-      "defense": 76,
-      "rebounding": 74
-    },
-    "archetype": "Scoring Threat",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
     "pcode": "tbd_박준형",
     "name": "박준형",
     "season": "2026-2027",
@@ -117931,32 +117957,6 @@
       "rebounding": 90
     },
     "archetype": "Stretch Big",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "tbd_아치 굿윈",
-    "name": "아치 굿윈",
-    "season": "2026-2027",
-    "team": "창원 LG",
-    "position": "Unknown",
-    "OVR": 86,
-    "OFF": 89,
-    "DEF": 76,
-    "attributes": {
-      "outside": 76,
-      "inside": 85,
-      "playmaking": 76,
-      "athletic": 90,
-      "defense": 74,
-      "rebounding": 70
-    },
-    "archetype": "Slasher",
     "badges": {
       "finishing": 0,
       "shooting": 0,
