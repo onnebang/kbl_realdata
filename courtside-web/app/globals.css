@@ -755,8 +755,8 @@ select {
   }
 }
 
-/* 아직 열리지 않은 막(경기 페이지) - 예정 경기의 Act 2/3, 진행중 경기의 Act 3 자리에
-   헤더 대신 들어가는 작은 안내. */
+/* 아직 열리지 않은 탭(경기 페이지) - 예정 경기의 실시간 중계·경기 후 탭, 진행중 경기의 경기 후 탭
+   패널에 들어가는 작은 안내. */
 .act-locked-note {
   max-width: var(--measure-read);
   margin-top: 28px;
@@ -893,47 +893,14 @@ select {
   margin-bottom: 10px;
 }
 
-/* 요청: "경기전 프리뷰/경기중 인터랙티브 문자중계/경기후 AI리포트로 명확한 3막 구조" - 경기
-   상세 페이지 전체를 나누는 섹션 헤더로, .panel-title(패널 하나 안의 작은 라벨)보다 한 단계
-   더 눈에 띄어야 해서 새로 추가. .title(Big Shoulders Display)은 한글 글리프가 없어 한글
-   제목엔 못 씀(위 player-hero 주석의 실측 버그와 같은 이유) - Pretendard 볼드로 대체. */
+/* 경기 페이지 탭 패널(components/GameTabs.tsx) 안의 섹션 묶음. 예전에는 이 묶음마다 번호 배지 +
+   제목 + 구분선(.game-act-header)이 붙은 "3막" 세로 스크롤이었는데, 세 화면을 탭으로 나누면서
+   탭 이름이 그 제목을 대신해 헤더 스타일은 없앴다. */
 .game-act {
   margin-top: 32px;
 }
 .game-act:first-child {
   margin-top: 0;
-}
-.game-act-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-.game-act-num {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--surface);
-  background: var(--home);
-  border-radius: 999px;
-  width: 22px;
-  height: 22px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.game-act-title {
-  font-weight: 800;
-  font-size: var(--fs-500);
-  line-height: var(--lh-tight);
-  color: var(--ink);
-  white-space: nowrap;
-}
-.game-act-rule {
-  flex: 1;
-  height: 1px;
-  background: rgba(var(--line-rgb), 0.14);
 }
 
 /* 요청: "프리뷰 인사이트 자세히 보기를 누르면 펼쳐서 보여줌" - 순수 <details>/<summary>라

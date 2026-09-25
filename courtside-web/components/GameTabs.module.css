@@ -1,0 +1,115 @@
+/* 경기 페이지 탭(GameTabs.tsx). 색은 전부 전역 토큰(--bg, --ink 계열, --home)이라 라이트/다크가 자동으로 따라온다.
+   PlayerHeroTabs.module.css는 딥다크 히어로 위 rgba 흰색을 하드코딩한 알약형이라 그대로 못 쓰고, 구조
+   (탭 바 + 버튼 + 감춘 패널)만 같게 두고 사이트 내비(.nav-link)와 같은 밑줄형으로 만들었다. */
+
+.tabs {
+  /* 탭 바 높이. 아래 GameReplay 고정 바를 이 밑으로 내릴 때도 쓴다(자손 요소로 상속된다). */
+  --game-tabs-h: 46px;
+  margin-top: 16px;
+}
+
+/* 탭 바가 제자리인지 붙었는지 알아내는 IntersectionObserver 표적(GameTabs.tsx). */
+.sentinel {
+  height: 0;
+}
+
+/* 사이트 내비(.nav-bar)는 sticky가 아니라서 탭 바가 화면 맨 위(top: 0)에 붙는다. */
+.bar {
+  position: sticky;
+  top: 0;
+  /* GameReplay 고정 바(z-index 40)보다 위 - 그 바는 아래로 내려서 겹치지 않고, 나타날 때만 탭 바 밑으로 미끄러져 나온다. */
+  z-index: 41;
+  display: flex;
+  height: var(--game-tabs-h);
+  background: var(--bg);
+  /* border가 아니라 inset 그림자 - 고른 탭의 밑줄이 이 선을 덮는다. */
+  box-shadow: inset 0 -1px 0 rgba(var(--line-rgb), 0.14);
+  /* 375px 폭에서는 세 탭이 겨우 들어가고, 더 좁으면 가로로 밀어서 본다(스크롤바만 숨긴다). */
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.bar::-webkit-scrollbar {
+  display: none;
+}
+/* .wrap(max-width 1180px)이 화면을 꽉 채우는 폭이면 좌우 패딩(18px)까지 배경을 넓혀서 탭 바가 화면 양 끝까지
+   닿게 한다. 그보다 넓은 화면에서는 패널 가장자리에 맞춘다. */
+@media (max-width: 1180px) {
+  .bar {
+    margin-inline: -18px;
+    padding-inline: 18px;
+  }
+}
+
+.tab {
+  flex: 1 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: var(--fs-200);
+  font-weight: 700;
+  line-height: var(--lh-data);
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* 아직 열리지 않은 탭 - 흐리게만(누르면 "언제 열린다"는 안내가 나온다). */
+.tab[data-empty] {
+  color: var(--ink-faint);
+}
+@media (hover: hover) {
+  .tab:hover {
+    color: var(--ink);
+  }
+}
+/* 고른 탭 - 위 두 규칙과 특이도가 같아서 반드시 뒤에 둔다. */
+.tab[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--home);
+}
+/* 가로 스크롤 컨테이너 안이라 바깥 윤곽선은 잘린다 - 안쪽으로. */
+.tab:focus-visible {
+  outline: 2px solid var(--home);
+  outline-offset: -4px;
+  border-radius: var(--r-inset);
+}
+
+@media (min-width: 640px) {
+  .tab {
+    flex: 0 0 auto;
+    padding: 0 20px;
+    font-size: var(--fs-300);
+  }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── GameReplay 고정 점수·재생바(.replay-sticky-bar, globals.css)와 같이 쓰기 ────────────
+   그 바는 position: fixed; top: 0; z-index: 40 이라 그대로 두면 탭 바를 통째로 덮는다(실시간 탭에서는
+   패널이 항상 화면에 걸쳐 있어 늘 떠 있다) - 그러면 다른 탭으로 가려고 맨 위까지 올라가야 한다.
+   그래서 탭 바 바로 아래로 내린다. 숨김 위치(translateY)도 같은 높이만큼 더 올려야, 숨은 바가 탭 바 밑으로
+   비치지 않는다. */
+.tabs :global(.replay-sticky-bar) {
+  top: var(--game-tabs-h);
+  transform: translateY(calc(-100% - var(--game-tabs-h)));
+}
+.tabs :global(.replay-sticky-bar.show) {
+  transform: translateY(0);
+}
+/* 탭 바가 아직 제자리(배너가 보이는 맨 위)면 그 바를 감춘다(GameTabs.tsx의 stuck 참고). */
+.tabs:not([data-stuck]) :global(.replay-sticky-bar) {
+  visibility: hidden;
+}
