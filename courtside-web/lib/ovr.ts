@@ -33,6 +33,11 @@ export interface OvrSeasonRecord {
     rebounding: number;
   };
   archetype?: string;
+  /** 플레이 스타일 영문 key(메인/서브). 목록·라벨·설명은 lib/play_styles.json(lib/playStyles.ts). 서브가 없으면 null. */
+  role?: string;
+  role2?: string | null;
+  /** 서브 스타일의 한글 라벨 - 메인(archetype)과 다르고 진짜 두 번째 특성일 때만 있다. */
+  archetype2?: string | null;
   badges?: {
     finishing: number;
     shooting: number;

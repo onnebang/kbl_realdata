@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getOvrHistoryCache } from "@/lib/ovr";
+import { styleDescriptionByLabel } from "@/lib/playStyles";
 import styles from "../rankings.module.css";
 import Image from "next/image";
 
@@ -70,7 +71,17 @@ export default async function PlayerRankingsPage({
                   <span className={styles.name}>{p.name}</span>
                   <span className={styles.teamPos}>{p.team} | {p.position}</span>
                 </div>
-                {p.archetype && <div className={styles.archetype}>{p.archetype}</div>}
+                {p.archetype && (
+                  <div className={styles.archetype}>
+                    <span title={styleDescriptionByLabel(p.archetype)}>{p.archetype}</span>
+                    {p.archetype2 && (
+                      <span className={styles.archetype2} title={styleDescriptionByLabel(p.archetype2)}>
+                        {" / "}
+                        {p.archetype2}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </Link>

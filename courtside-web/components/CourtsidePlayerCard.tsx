@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import styles from "./CourtsidePlayerCard.module.css";
+import { styleDescriptionByLabel } from "@/lib/playStyles";
 
 // 2K 스타일 선수 카드. 처음 버전(git blame: feat "implement 2K style infographic player
 // profile")은 Tailwind 유틸리티 클래스(w-[400px], bg-black/40 등)로 작성됐는데, 이 프로젝트엔
@@ -27,6 +28,8 @@ interface CourtsidePlayerCardProps {
   defOvr: number;
   photoUrl?: string | null;
   archetype?: string;
+  /** 서브 스타일 라벨(없으면 칩을 안 그린다). 마우스오버 툴팁은 라벨로 lib/playStyles에서 찾는다. */
+  archetype2?: string | null;
   badges?: {
     finishing: number;
     shooting: number;
@@ -64,6 +67,7 @@ export default function CourtsidePlayerCard({
   defOvr,
   photoUrl,
   archetype,
+  archetype2,
   badges,
   attributes,
 }: CourtsidePlayerCardProps & {
@@ -102,7 +106,20 @@ export default function CourtsidePlayerCard({
               <div className={styles.nameBlock}>
                 <span className={styles.nameFirst}>{enameFirst}</span>
                 <span className={styles.nameLast}>{enameRest}</span>
-                {archetype && <span className={styles.archetype}>{archetype}</span>}
+                {(archetype || archetype2) && (
+                  <div className={styles.archetypeRow}>
+                    {archetype && (
+                      <span className={styles.archetype} title={styleDescriptionByLabel(archetype)}>
+                        {archetype}
+                      </span>
+                    )}
+                    {archetype2 && (
+                      <span className={styles.archetype2} title={styleDescriptionByLabel(archetype2)}>
+                        {archetype2}
+                      </span>
+                    )}
+                  </div>
+                )}
                 {badges && (
                   <div className={styles.badgeRow}>
                     {badges.finishing > 0 && <span className={`${styles.badge} ${badgeClass(badges.finishing)}`} title="Finishing">F</span>}

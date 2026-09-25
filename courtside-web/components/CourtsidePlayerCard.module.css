@@ -186,6 +186,27 @@
   border-radius: 4px;
 }
 
+/* 메인 + 서브 칩 한 줄(좁으면 줄바꿈). 서브는 메인보다 한 톤 옅게 - 메인이 카드의 정체성, 서브는 곁들이는 특성. */
+.archetypeRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 2px;
+}
+.archetypeRow .archetype {
+  margin-top: 0;
+}
+.archetype2 {
+  font-size: max(11px, 3cqw);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
 .badgeRow {
   display: flex;
   gap: 4px;
