@@ -21,6 +21,8 @@ import { getTeamPowerByName } from "@/lib/teamPower";
 import GameReplay from "@/components/GameReplay";
 import { InsightCard } from "@/components/InsightCard";
 import { deriveGameStatus } from "@/lib/gameStatus";
+import { initialGameTab } from "@/lib/gameTabs";
+import GameTabs from "@/components/GameTabs";
 import { cached, cachedMap, gameTtl, TTL, TAG } from "@/lib/cachePolicy";
 import LiveGameProvider from "@/components/LiveGameProvider";
 import LiveScore from "@/components/LiveScore";
@@ -425,24 +427,6 @@ function fgPct(m: number | null | undefined, a: number | null | undefined) {
   return aa > 0 ? Math.round((mm / aa) * 100) : 0;
 }
 
-// 요청: "경기전 프리뷰/경기중 인터랙티브 문자중계/경기후 AI리포트로 명확한 3막 구조" - 경기의
-// 자연스러운 타임라인(경기 전 → 경기 중 → 경기 후) 순서로 페이지를 재배치하면서, 세 구간을
-// "의도된 3막"으로 읽히게 각 구간 시작에 번호 배지 + 제목 + 구분선을 붙임(globals.css의
-// .game-act*). 예전엔 "인터랙티브 리플레이가 메인이 되도록" 리플레이를 배너 바로 다음(맨
-// 위)으로 올리고 프리뷰 정보를 그 아래 접이식으로 묶었었는데(아래 두 번째 act 직전 주석
-// 참고), 이번 요청은 그 우선순위 배치보다 "경기 타임라인을 그대로 읽는" 서사 구조를 명시적으로
-// 요구해서 순서를 되돌림 - 리플레이 자체의 내용/동작은 전혀 안 바꾸고 페이지 안에서의 위치와
-// 라벨만 바뀜.
-function ActHeader({ num, title }: { num: number; title: string }) {
-  return (
-    <div className="game-act-header">
-      <span className="game-act-num">{num}</span>
-      <span className="game-act-title">{title}</span>
-      <span className="game-act-rule" />
-    </div>
-  );
-}
-
 /**
  * 선택적 패널 전용 폴백. lib/supabaseServer.ts가 모든 쿼리 실패를 던지게 된 뒤(조용한 빈 화면을
  * 없애려고), 이 페이지의 부수 패널 하나가 삐끗하면 경기 화면 전체가 오류가 됐다 - 라이브 중계
@@ -483,14 +467,17 @@ export async function generateMetadata({ params }: { params: Promise<{ gmkey: st
 
 export default async function GamePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ gmkey: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { gmkey } = await params;
+  const { tab } = await searchParams;
   const game = await getGame(gmkey);
   if (!game) notFound();
 
-  // 예정/진행중/종료 판정 - 홈 목록과 같은 단일 정의(lib/gameStatus.ts). 이 아래의 3막
+  // 예정/진행중/종료 판정 - 홈 목록과 같은 단일 정의(lib/gameStatus.ts). 이 아래의 3화면(탭)
   // 게이팅은 전부 이 status만 봄(예전의 home_score != null 개별 체크 대신).
   const status = deriveGameStatus(game);
   // 예정/진행중/종료 게이팅과 동일한 기준으로 캐시 TTL도 결정(gameTtl: 라이브 0=통과,
@@ -796,45 +783,54 @@ export default async function GamePage({
         ← 경기 목록
       </Link>
 
-      {/* Act 1/3 - 경기전. 매치업 배너(항상 표시)와, 더 깊은 프리뷰 인사이트/시즌 평균
-          비교/최근 결과/역대 맞대결/리그 순위를 담은 접이식 패널. */}
-      <div className="game-act">
-        <ActHeader num={1} title="경기전 프리뷰 인사이트" />
-        <div
-          className="matchup-banner"
-          style={{
-            background: `linear-gradient(to right, ${game.home_team?.color ?? "#888"} 50%, ${game.away_team?.color ?? "#888"} 50%)`,
-          }}
-        >
-          <div className="matchup-banner-side home" style={{ background: game.home_team?.color ?? "#888" }}>
-            <TeamBadge
-              team={game.home_team ? { name: game.home_team.name, abbr: game.home_team.abbr, color: "#ffffff33", logoUrl: game.home_team.logo_url } : null}
-              size={36}
-            />
-            <span className="matchup-banner-name">{game.home_team?.name ?? game.gmkey}</span>
-            {/* 요청("실시간 라이브 중계에서도 오버롤 시스템... 지금 파워에서 누가 더 강력한지
-                직관적으로") - 승률 모델과는 별개로, 로스터 오버롤 기반 팀 파워만 배지로 상시 노출. */}
-            {homePower && <span className="matchup-banner-pwr" title="팀 파워(로스터 오버롤)">PWR {homePower.ovr}</span>}
-            {/* 예정 경기는 스코어 자리를 아예 비움(0-0이나 빈칸처럼 보이는 것 방지) - 가운데 VS만 */}
-            {status !== "scheduled" && <LiveScore side="home" initial={game.home_score} />}
-          </div>
-          <div className="matchup-banner-vs">VS</div>
-          <div className="matchup-banner-side away" style={{ background: game.away_team?.color ?? "#888" }}>
-            {status !== "scheduled" && <LiveScore side="away" initial={game.away_score} />}
-            <span className="matchup-banner-name">{game.away_team?.name ?? ""}</span>
-            {awayPower && <span className="matchup-banner-pwr" title="팀 파워(로스터 오버롤)">PWR {awayPower.ovr}</span>}
-            <TeamBadge
-              team={game.away_team ? { name: game.away_team.name, abbr: game.away_team.abbr, color: "#ffffff33", logoUrl: game.away_team.logo_url } : null}
-              size={36}
-            />
-          </div>
+      {/* 매치업 배너 - 탭 바깥이라 경기 전/중/후 어느 탭에서든 항상 보인다(팀·스코어·PWR). */}
+      <div
+        className="matchup-banner"
+        style={{
+          background: `linear-gradient(to right, ${game.home_team?.color ?? "#888"} 50%, ${game.away_team?.color ?? "#888"} 50%)`,
+        }}
+      >
+        <div className="matchup-banner-side home" style={{ background: game.home_team?.color ?? "#888" }}>
+          <TeamBadge
+            team={game.home_team ? { name: game.home_team.name, abbr: game.home_team.abbr, color: "#ffffff33", logoUrl: game.home_team.logo_url } : null}
+            size={36}
+          />
+          <span className="matchup-banner-name">{game.home_team?.name ?? game.gmkey}</span>
+          {/* 요청("실시간 라이브 중계에서도 오버롤 시스템... 지금 파워에서 누가 더 강력한지
+              직관적으로") - 승률 모델과는 별개로, 로스터 오버롤 기반 팀 파워만 배지로 상시 노출. */}
+          {homePower && <span className="matchup-banner-pwr" title="팀 파워(로스터 오버롤)">PWR {homePower.ovr}</span>}
+          {/* 예정 경기는 스코어 자리를 아예 비움(0-0이나 빈칸처럼 보이는 것 방지) - 가운데 VS만 */}
+          {status !== "scheduled" && <LiveScore side="home" initial={game.home_score} />}
         </div>
-        <div className="subtitle">
-          {game.game_date}
-          {status === "scheduled" && game.game_start ? ` ${game.game_start.slice(0, 5)} 예정` : ""} · {game.season_name}{" "}
-          {game.season_category} · {game.gmkey}
+        <div className="matchup-banner-vs">VS</div>
+        <div className="matchup-banner-side away" style={{ background: game.away_team?.color ?? "#888" }}>
+          {status !== "scheduled" && <LiveScore side="away" initial={game.away_score} />}
+          <span className="matchup-banner-name">{game.away_team?.name ?? ""}</span>
+          {awayPower && <span className="matchup-banner-pwr" title="팀 파워(로스터 오버롤)">PWR {awayPower.ovr}</span>}
+          <TeamBadge
+            team={game.away_team ? { name: game.away_team.name, abbr: game.away_team.abbr, color: "#ffffff33", logoUrl: game.away_team.logo_url } : null}
+            size={36}
+          />
         </div>
+      </div>
+      <div className="subtitle">
+        {game.game_date}
+        {status === "scheduled" && game.game_start ? ` ${game.game_start.slice(0, 5)} 예정` : ""} · {game.season_name}{" "}
+        {game.season_category} · {game.gmkey}
+      </div>
 
+      {/* 세 화면을 탭으로 나눈다(요청: "페이지가 너무 길다 - 상황에 맞는 화면만"). 경기 전 / 실시간 중계
+          (인터랙티브 리플레이) / 경기 후 AI 분석 - 패널 셋 다 항상 마운트되고 GameTabs가 hidden으로만
+          전환하므로 GameReplay의 스크러버·라이브 상태가 탭 전환에 초기화되지 않는다. 첫 탭은 경기 상태가
+          정하고(예정=경기 전 / 진행중=실시간 중계 / 종료=경기 후) ?tab=pre|live|post가 덮어쓴다.
+          패널 본문의 들여쓰기는 일부러 예전 그대로 둔다(줄 단위 병합 충돌을 줄이려고). */}
+      <GameTabs
+        key={gmkey}
+        initialTab={initialGameTab(status, tab)}
+        isLive={status === "live"}
+        available={{ pre: true, live: status !== "scheduled", post: status === "final" }}
+        pre={
+      <div className="game-act">
         {/* 요청 항목 1~6("직전 경기 활약 선수 주의/수비 약점/조합 시너지/최근 추세/오펜스
             리바운드·블록 주의/코트사이드 최종 승률") - lib/matchupInsights.ts가 만드는 구조화된
             PreviewInsight[]를 카드로. 접이식 "프리뷰 인사이트 자세히 보기"(아래, 시즌 평균/역대
@@ -1082,26 +1078,20 @@ export default async function GamePage({
           </details>
         )}
       </div>
-
-      {/* Act 2/3 - 경기중. 인터랙티브 리플레이(스코어보드/코트 위/플레이바이플레이/슛차트
-          등) 전체를 그대로 담되, 이제 명시적으로 "경기 중" 구간으로 라벨링. 예전엔("요청:
-          인터랙티브 리플레이가 메인이 되도록") 이 컴포넌트를 배너 바로 다음(페이지 맨
-          위/최우선)으로 올렸었는데, 이번 3막 구조 요청은 그 우선순위 배치보다 "경기 전 →
-          경기 중 → 경기 후"라는 시간 순서를 그대로 따르길 원해서 순서를 되돌림 - GameReplay
-          내부 동작/데이터는 전혀 안 바뀜, 페이지 안에서의 위치와 섹션 라벨만 바뀜. */}
-      {/* 예정 - Act 2/3 헤더 자체를 숨기고 작은 안내만(상태 게이팅은 위 deriveGameStatus). */}
+        }
+        live={<>
+      {/* 실시간 중계 탭 - 인터랙티브 리플레이(스코어보드/코트 위/플레이바이플레이/슛차트 등) 전체.
+          예정 경기는 안내만(상태 게이팅은 위 deriveGameStatus). */}
       {status === "scheduled" && (
-        <div className="act-locked-note">경기 시작 후 인터랙티브 문자중계가 열립니다</div>
+        <div className="act-locked-note">경기가 시작되면 실시간 중계가 열립니다</div>
       )}
       {status !== "scheduled" && game.home_team && game.away_team && derivedEvents.length === 0 && (
         <div className="game-act">
-          <ActHeader num={2} title="경기중 인터랙티브 문자중계" />
           <div className="act-locked-note">문자중계 데이터가 아직 수신되지 않았습니다 - 잠시 후 새로고침해 주세요.</div>
         </div>
       )}
       {status !== "scheduled" && game.home_team && game.away_team && derivedEvents.length > 0 && (
         <div className="game-act">
-          <ActHeader num={2} title="경기중 인터랙티브 문자중계" />
           <WidgetBoundary name="인터랙티브 문자중계">
           <GameReplay
             /* 페이로드 감사(2026-09): 예전엔 derivedEvents를 그대로 넘겼는데, 그 배열의
@@ -1146,15 +1136,17 @@ export default async function GamePage({
         </div>
       )}
 
-      {/* Act 3/3 - 경기후. AI 코트사이드 리포트(요청 - 시간 언급 클릭 시 위 Act 2 리플레이로
-          스크롤+이동, lib/postgameReport.ts의 report-jump-link) + 팀 스탯.
-          진행중 경기는 헤더까지 숨기고 안내만(종료 후 daily_batch가 데이터를 채우면 자동 표시). */}
-      {status === "live" && (
-        <div className="act-locked-note">경기 종료 후 AI 리포트가 생성됩니다</div>
+      </>}
+        post={<>
+      {/* 경기 후 AI 분석 탭 - AI 코트사이드 리포트(요청 - 시간 언급 클릭 시 실시간 중계 탭으로 넘어가
+          그 순간으로 이동: lib/postgameReport.ts의 report-jump-link를 GameTabs가 탭부터 열고
+          GameReplay가 이동+스크롤) + 예측 정확도 + 팀 스탯. 아직 안 끝난 경기는 안내만(종료 후
+          daily_batch가 데이터를 채우면 자동 표시). */}
+      {status !== "final" && (
+        <div className="act-locked-note">경기가 끝나면 AI 분석이 제공됩니다</div>
       )}
       {status === "final" && (
       <div className="game-act">
-        <ActHeader num={3} title="경기후 AI코트사이드 리포트" />
         {reportSections.length > 0 && (
           <div className="panel">
             <div className="panel-title">AI 코트사이드 리포트</div>
@@ -1213,6 +1205,8 @@ export default async function GamePage({
         </div>
       </div>
       )}
+      </>}
+      />
 
       {/* 요청: "경기 페이지에 라인업 조합 링크도 붙여줘" - 이 경기 자체의 온/오프 넷레이팅(위
           "코트 위" 패널)과 달리 시즌 전체 표본으로 본 선수별 조합(WOWY)이다. 팀만 채워서 넘긴다
