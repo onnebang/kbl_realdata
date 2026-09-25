@@ -114,8 +114,7 @@ def main():
     args = ap.parse_args()
 
     if args.gmkey:
-        d = datetime.datetime.now(KST).strftime("%Y%m%d")
-        games = [g for g in fkd.fetch_game_list(d, d) if g["gmkey"] == args.gmkey]
+        games = [g for g in fkd.fetch_game_list("20260901", "20270501") if g["gmkey"] == args.gmkey]
     elif args.today:
         games = fsl.today_games()
     else:
@@ -163,9 +162,13 @@ def main():
     active_roster = {}
     try:
         cur = conn.cursor()
-        cur.execute("SELECT team_code, pcode FROM players WHERE season_code = %s", (ctx["current_season_code"],))
-        for t, p in cur.fetchall():
-            active_roster.setdefault(t, set()).add(p)
+        cur.execute("SELECT season_name FROM seasons WHERE season_code = %s", (ctx["current_season_code"],))
+        row = cur.fetchone()
+        if row:
+            season_name = row[0]
+            cur.execute("SELECT tcode, pcode FROM season_roster WHERE season_name = %s", (season_name,))
+            for t, p in cur.fetchall():
+                active_roster.setdefault(t, set()).add(p)
     except Exception as e:
         print("[recalc] active_roster 조회 실패 (진행은 계속함):", e, flush=True)
     finally:

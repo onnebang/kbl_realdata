@@ -37,6 +37,10 @@ def team_features_now(tcode, prefix, ctx, today_str, lineup=None):
 
     window = hist[-ett.ROLL_WINDOW:]
     roster = ett.roster_window_minutes(window, ctx["player_stats_by_game"], tcode)
+    # 현재 팀 로스터에 없는 선수 필터링
+    if ctx.get("active_roster") and tcode in ctx.get("active_roster"):
+        roster = {p: m for p, m in roster.items() if p in ctx["active_roster"][tcode]}
+        
     # lineup이 주어지면(= 그 경기 12인 엔트리가 발표됨) 결장자를 빼고 선발을 소폭 가산한다.
     # None이면 아무 일도 안 일어나므로 기존 호출부 동작은 그대로다.
     if lineup:
@@ -115,6 +119,22 @@ def build_context(current_season_code=None):
     season_names = ett.season_name_by_code(games)
     prev_season_name = season_names.get(current_season_code - 2)  # 팀 PWR 피처용 - 직전 완결 시즌만(누수 방지)
 
+    active_roster = {}
+    try:
+        import sync_upcoming_games as sug
+        sug.load_env_supabase()
+        conn = sug.get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT season_name FROM seasons WHERE season_code = %s", (current_season_code,))
+        row = cur.fetchone()
+        if row:
+            cur.execute("SELECT tcode, pcode FROM season_roster WHERE season_name = %s", (row[0],))
+            for t, p in cur.fetchall():
+                active_roster.setdefault(t, set()).add(p)
+        conn.close()
+    except Exception as e:
+        print("[predict] active_roster 로드 실패:", e)
+
     return {
         "games": games, "timelines": timelines, "coach_timelines": coach_timelines,
         "venue_timelines": venue_timelines, "referee_timeline": referee_timeline,
@@ -122,6 +142,7 @@ def build_context(current_season_code=None):
         "latest_manager": latest_manager, "bio": bio, "latest_onoff": latest_onoff,
         "age_curves": age_curves, "current_season_code": current_season_code,
         "ovr_by_pcode_season": ovr_by_pcode_season, "prev_season_name": prev_season_name,
+        "active_roster": active_roster,
     }
 
 
