@@ -20,7 +20,7 @@ import os
 import sys
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 GAMES_DIR = os.path.join(BASE, "..", "raw", "games")
@@ -44,6 +44,9 @@ def _load_one(gmkey):
             tr = {r["tcode"]: r["records"] for r in json.load(f)}
     except (OSError, ValueError, KeyError):
         return None
+    # isEnded=0이 과거 경기 3건에서 stale로 남아있다(실제론 종료) -> 최근 2일 이내 경기에만 적용
+    if g.get("isEnded") == 0 and g["gameDate"] >= (datetime.now() - timedelta(days=2)).strftime("%Y%m%d"):
+        return "PENDING"  # 진행중/미종료 - 캐시에 넣지도, 영구 skip 하지도 않는다(다음 실행에서 재시도)
     h, a = g.get("tcodeH"), g.get("tcodeA")
     if h not in tr or a not in tr or g.get("seasonGrade") not in (None, 1):
         return None
@@ -74,7 +77,7 @@ def load_games(refresh=False, workers=16):
     if todo:
         with ThreadPoolExecutor(workers) as ex:
             res = list(ex.map(_load_one, todo))
-        new = [r for r in res if r]
+        new = [r for r in res if isinstance(r, dict)]
         skip |= {k for k, r in zip(todo, res) if r is None}
         cached += new
         cached.sort(key=lambda x: (x["gameDate"], x["gmkey"]))
