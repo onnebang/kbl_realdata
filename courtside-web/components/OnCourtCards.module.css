@@ -1,0 +1,402 @@
+/* "코트 위" 선수 카드(OnCourtCards.tsx). 색은 사이트 토큰(--surface/--ink/--line-rgb…)과 팀 색 한 쌍(--tb-l/--tb-d 막대용,
+   --ti-l/--ti-d 글자용 - lib/teamAccent.ts teamBarStyle/teamInkStyle)만 쓴다. 테마 토글이 없고 다크는 prefers-color-scheme
+   하나뿐이라 아래 미디어쿼리 한 곳에서 팀 색을 고른다(globals.css .team-ink와 같은 규약).
+
+   크기는 컨테이너 쿼리로 잡는다: .court가 컨테이너라 카드 폭이 뷰포트가 아니라 "이 패널의 폭"을 따른다.
+   폰(패널 안쪽 ~290-320px)에서 5장이 한 줄에 들어가야 해서 그 폭이 기본(컴팩트)이고, 480px 이상에서 OFF/DEF·보조 스타일·긴 라벨이 붙는다. */
+
+.court {
+  container-type: inline-size;
+  position: relative;
+  margin: 2px 0 14px;
+  padding: 6px;
+  border: 2px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
+  /* 마룻바닥 결 - 아주 옅은 세로 줄 하나뿐이다. */
+  background:
+    repeating-linear-gradient(90deg, transparent 0 34px, rgba(var(--line-rgb), 0.035) 34px 35px),
+    var(--surface-soft);
+}
+
+.note {
+  margin: 2px 0 14px;
+  padding: 12px;
+  border: 1px dashed rgba(var(--line-rgb), 0.25);
+  border-radius: var(--r-inset);
+  color: var(--ink-soft);
+  font-size: var(--fs-200);
+  text-align: center;
+}
+
+/* 하프코트 중앙선 + 센터서클. 홈/원정 두 줄 사이에 놓이고 카드 뒤(z-index)로 깔린다. */
+.mid {
+  position: relative;
+  z-index: 0;
+  height: 0;
+  margin: 4px -6px;
+  border-top: 2px solid rgba(var(--line-rgb), 0.14);
+}
+.mid::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 60px;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(var(--line-rgb), 0.14);
+  border-radius: 50%;
+}
+
+.half {
+  --tb: var(--tb-l, var(--ink-faint));
+  --ti: var(--ti-l, var(--ink));
+  position: relative;
+  z-index: 1;
+  padding: 2px 0;
+  border-radius: var(--r-inset);
+}
+@media (prefers-color-scheme: dark) {
+  .half {
+    --tb: var(--tb-d, var(--ink-faint));
+    --ti: var(--ti-d, var(--ink));
+  }
+}
+/* 팀 색은 골대 쪽 끝(홈 위/원정 아래)에서 옅게 번지는 것으로만 - 코트 위에 팀 진영이 놓인 느낌. */
+.home {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--tb) 12%, transparent), transparent 60%);
+}
+.away {
+  background: linear-gradient(to top, color-mix(in srgb, var(--tb) 12%, transparent), transparent 60%);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 4px 6px;
+}
+.teamName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ti);
+  font-size: var(--fs-200);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.caption {
+  flex: none;
+  margin-left: auto;
+  color: var(--ink-soft);
+  font-size: var(--fs-100);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 한 줄 = 5열. 카드는 이 그리드의 6개 행을 세로로 가로지르고(grid-row: span 6) 안쪽을 subgrid로 물려받아서,
+   이름 줄 높이·칩 줄 높이 같은 것이 다섯 카드 사이에서 맞춰진다(한 장만 이름이 두 줄이어도 스탯 줄은 나란히). */
+.row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: 3px;
+  row-gap: 0;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 2px;
+  list-style: none;
+}
+
+.card {
+  --ph: clamp(40px, 13cqw, 64px);
+  position: relative;
+  display: grid;
+  grid-row: span 6;
+  grid-template-rows: subgrid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 0;
+  justify-items: center;
+  min-width: 0;
+  padding: 7px 2px 6px;
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-top: 3px solid var(--tb);
+  border-radius: 8px;
+  background: var(--surface);
+  text-align: center;
+  animation: cardIn 0.28s ease-out;
+}
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+}
+
+/* ── 사진 + 모서리 표식(포지션 좌상 / OVR 우상 / 등번호 좌하 / 최고 활약 우하) ── */
+.portrait {
+  position: relative;
+  width: var(--ph);
+  height: var(--ph);
+}
+.img,
+.initial {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--surface-soft);
+  box-shadow: 0 0 0 2px var(--tb);
+  object-fit: cover;
+  object-position: 50% 12%;
+}
+.initial {
+  display: grid;
+  place-items: center;
+  color: var(--ink-soft);
+  font-size: calc(var(--ph) * 0.42);
+  font-weight: 800;
+}
+.pos,
+.num,
+.ovr {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.pos {
+  top: -3px;
+  left: -6px;
+  min-width: 15px;
+  height: 15px;
+  border: 1px solid rgba(var(--line-rgb), 0.25);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 800;
+}
+.num {
+  bottom: -3px;
+  left: -7px;
+  height: 14px;
+  padding: 0 3px;
+  border: 1px solid rgba(var(--line-rgb), 0.25);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+}
+/* 사진 오른쪽으로 6px까지만 - 카드 폭(~55px)이 사진(40px)보다 7px 남짓 넓어서, 더 나가면 옆 카드가 배지를 덮는다. */
+.ovr {
+  top: -5px;
+  right: -6px;
+  min-width: 21px;
+  height: 17px;
+  padding: 0 3px;
+  border-radius: 5px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.star {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* OVR 등급색 - 문턱(92/89/85/75)과 색상 계열은 CourtsidePlayerCard와 같다. 그쪽은 어두운 카드 위 글자색이라 밝은 톤(#f43f5e…)인데,
+   여기는 라이트 테마 흰 카드 위에서도 흰 숫자가 4.5:1 이상 나와야 해서 같은 계열의 한 단계 진한 색을 채움으로 쓴다. */
+.elite {
+  background: #e11d48;
+}
+.gold {
+  background: #9333ea;
+}
+.silver {
+  background: #2563eb;
+}
+.bronze {
+  background: #047857;
+}
+.base {
+  background: #4b5563;
+}
+.none {
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+}
+
+/* ── 이름 / 플레이 스타일 칩 ── */
+.name {
+  display: -webkit-box;
+  max-width: 100%;
+  margin-top: 6px;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: var(--ink);
+  font-size: clamp(11px, 2.3cqw, 14px);
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+.name a {
+  color: inherit;
+}
+.name a:hover {
+  text-decoration: underline;
+}
+.name a:focus-visible {
+  outline: 2px solid var(--tb);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  max-width: 100%;
+  margin-top: 4px;
+}
+.chips:empty {
+  margin-top: 0;
+}
+.main,
+.sub {
+  max-width: 100%;
+  padding: 2px 5px;
+  border-radius: 8px;
+  font-size: clamp(10px, 2.2cqw, 12px);
+  line-height: 1.15;
+  word-break: keep-all;
+}
+.main {
+  border: 1px solid color-mix(in srgb, var(--tb) 45%, transparent);
+  background: color-mix(in srgb, var(--tb) 16%, var(--surface));
+  color: var(--ink);
+  font-weight: 700;
+}
+.sub {
+  border: 1px dashed rgba(var(--line-rgb), 0.3);
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+/* 보조 스타일은 폭이 넉넉할 때만(컴팩트에선 주 스타일 하나로 충분 - 접근성 이름에는 그대로 들어 있다). */
+.sub {
+  display: none;
+}
+
+/* OFF/DEF - 컴팩트에선 숨김(카드 폭 ~53px에 두 줄이 더 붙으면 카드가 너무 길어진다). */
+.od {
+  display: none;
+  gap: 8px;
+  margin-top: 4px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+.od b {
+  margin-left: 2px;
+  color: var(--ink);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 라이브 스탯: 숫자 위, 라벨 아래 세 칸(점/리바/어시) ── */
+.stat {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 0 3px;
+  margin-top: 6px;
+  line-height: 1.05;
+}
+.stat > span {
+  display: grid;
+  justify-items: center;
+}
+.stat b {
+  color: var(--ink);
+  font-size: clamp(11px, 2.7cqw, 16px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.stat i {
+  color: var(--ink-soft);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+}
+/* 컴팩트에서는 라벨 뒷글자를 접는다(점·리·어). */
+.more {
+  display: none;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-self: start;
+  justify-content: center;
+  gap: 2px 4px;
+  margin-top: 5px;
+  font-size: 10px;
+  line-height: 1.2;
+}
+.min {
+  color: var(--ink-soft);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* 파울 트러블(4개 이상) - 색만이 아니라 "파울 N" 글자가 같이 나간다. 채움 대신 옅은 틴트라 다크 테마의 밝은 빨강에서도 대비가 남는다. */
+.foul {
+  padding: 0 5px;
+  border: 1px solid var(--negative);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--negative) 14%, var(--surface));
+  color: var(--negative);
+  font-weight: 800;
+}
+
+/* ── 넓은 패널(태블릿·데스크톱) ── */
+@container (min-width: 480px) {
+  .card {
+    padding-inline: 4px;
+  }
+  .sub {
+    display: inline-block;
+  }
+  .od {
+    display: flex;
+  }
+  .more {
+    display: inline;
+  }
+  .stat {
+    gap: 0 8px;
+  }
+  .meta {
+    font-size: 11px;
+  }
+}
