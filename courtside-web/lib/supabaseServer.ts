@@ -59,10 +59,11 @@ const RETRY_DELAYS_MS = [150, 400];
 const retryingFetch: typeof fetch = async (input, init) => {
   const method = (init?.method ?? "GET").toUpperCase();
   const idempotent = method === "GET" || method === "HEAD";
+  const fetchInit: RequestInit = { ...init, cache: "no-store" };
   let lastErr: unknown;
   for (let attempt = 0; ; attempt++) {
     try {
-      const res = await fetch(input, init);
+      const res = await fetch(input, fetchInit);
       if (!idempotent || res.status < 500 || attempt >= RETRY_DELAYS_MS.length) return res;
       lastErr = new Error(`HTTP ${res.status}`);
     } catch (e) {
