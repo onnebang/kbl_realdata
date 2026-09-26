@@ -57,6 +57,47 @@ const MISS_CODES = new Set(["202", "206", "208"]);
 // 세 코드를 다 세고 있었고 이 파일만 어긋나 있었다.
 const FOUL_CODES = new Set(["215", "216", "224"]);
 
+// 모멘텀 숨은 공신 (Momentum MVP) 계산기: 특정 시간(초) 동안 해당 팀의 득점, 어시스트, 스틸을 합산하여 기여도 1위를 찾는다.
+function getSurgeMvp(
+  eventsUpToIdx: GameEvent[],
+  surgeDurationSec: number,
+  tcode: string
+): { pcode: string; pts: number; ast: number; stl: number } | null {
+  if (eventsUpToIdx.length === 0) return null;
+  const endRow = eventsUpToIdx[eventsUpToIdx.length - 1];
+  const startElapsed = endRow.elapsed - surgeDurationSec;
+  
+  const stats = new Map<string, { pts: number; ast: number; stl: number }>();
+  for (let i = eventsUpToIdx.length - 1; i >= 0; i--) {
+    const e = eventsUpToIdx[i];
+    if (e.elapsed < startElapsed) break;
+    if (e.tcode === tcode && e.pcode) {
+      if (!stats.has(e.pcode)) stats.set(e.pcode, { pts: 0, ast: 0, stl: 0 });
+      const s = stats.get(e.pcode)!;
+      const lbl = e.action_label || "";
+      
+      if (lbl.includes("성공")) {
+        if (lbl.includes("3점")) s.pts += 3;
+        else if (lbl.includes("자유투")) s.pts += 1;
+        else s.pts += 2;
+      }
+      if (lbl.includes("어시스트")) s.ast += 1;
+      if (lbl.includes("스틸")) s.stl += 1;
+    }
+  }
+
+  let mvpPcode: string | null = null;
+  let maxImpact = 0;
+  for (const [pcode, s] of stats.entries()) {
+    const impact = s.pts + s.ast * 2 + s.stl * 2; // Impact formula
+    if (impact > maxImpact && impact >= 2) { // Minimum impact to show
+      maxImpact = impact;
+      mvpPcode = pcode;
+    }
+  }
+  return mvpPcode ? { pcode: mvpPcode, ...stats.get(mvpPcode)! } : null;
+}
+
 // 모듈 레벨 상수여야 한다 - 기본값을 `= {}`로 쓰면 렌더마다 새 객체가 되어 아래
 // serverEvents/events useMemo가 매 렌더 재계산된다(600~800행 × attachDerivedFields).
 const EMPTY_MAP: Record<string, string> = {};
@@ -921,9 +962,21 @@ export default function GameReplay({
   }
   if (row.surge) {
     const t = row.surge.side === "home" ? homeTeam : awayTeam;
+    let mvpStr = "";
+    const mvp = getSurgeMvp(eventsUpToIdx, row.surge.seconds, t.tcode);
+    if (mvp) {
+      const parts = [];
+      if (mvp.pts > 0) parts.push(`${mvp.pts}득점`);
+      if (mvp.ast > 0) parts.push(`${mvp.ast}어시스트`);
+      if (mvp.stl > 0) parts.push(`${mvp.stl}스틸`);
+      const name = nameByPcode.get(mvp.pcode) ?? mvp.pcode;
+      if (parts.length > 0) {
+        mvpStr = ` - 이 구간 핵심: ${name} ${parts.join(" ")}`;
+      }
+    }
     flowChips.push({
       key: `surge-${row.surge.side}`,
-      text: `🔥 ${t.abbr} ${surgeScoreText(row.surge)} 몰아치기 (${fmtSurgeDuration(row.surge.seconds)})`,
+      text: `🔥 ${t.abbr} ${surgeScoreText(row.surge)} 몰아치기 (${fmtSurgeDuration(row.surge.seconds)})${mvpStr}`,
     });
   } else {
     if (row.runHome >= RUN_THRESHOLD) flowChips.push({ key: "run-home", text: `🔥 ${homeTeam.abbr} ${row.runHome}-0 런` });
