@@ -5,7 +5,7 @@ import { teamInkStyle } from "@/lib/teamAccent";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { TeamBadge } from "./TeamBadge";
-import { buildCourtDotsSvg, shotValue, COURT_X, COURT_Y, type ShotDotMeta } from "@/lib/zoneCompare";
+import { buildCourtDotsSvg, shotValue, shotXPTS, COURT_X, COURT_Y, type ShotDotMeta } from "@/lib/zoneCompare";
 import {
   attachDerivedFields,
   findShootingStreaks,
@@ -943,6 +943,41 @@ export default function GameReplay({
   );
   const droughts = useMemo(() => computeCurrentDroughts(eventsUpToIdx), [eventsUpToIdx]);
 
+  // 슛 매핑 (스크럽 위치와 무관한 정적 맵) 및 실시간 xPTS 계산
+  const shotReliability = useMemo(() => buildShotReliability(events, shots), [events, shots]);
+  const shotToEventIdx = useMemo(() => buildShotToEventIndex(events, shots, shotReliability), [events, shots, shotReliability]);
+
+  const { homeXPTS, awayXPTS } = useMemo(() => {
+    let hX = 0, aX = 0;
+    for (const s of shots) {
+      const sIdx = shotToEventIdx.get(s);
+      if (sIdx != null && sIdx <= idx) {
+        const xp = shotXPTS(s.x, s.y, s.d);
+        if (s.tcode === homeTeam.tcode) hX += xp;
+        else if (s.tcode === awayTeam.tcode) aX += xp;
+      }
+    }
+    return { homeXPTS: hX, awayXPTS: aX };
+  }, [shots, shotToEventIdx, idx, homeTeam.tcode, awayTeam.tcode]);
+
+  // 실시간 체력 모니터링 (현재 코트 위 선수들이 휴식 없이 몇 분째 뛰고 있는지)
+  const stintSec = useMemo(() => {
+    const startElapsed = new Map<string, number>();
+    const startersHome = players.filter((p) => p.tcode === homeTeam.tcode && p.isStarter).map((p) => p.pcode);
+    const startersAway = players.filter((p) => p.tcode === awayTeam.tcode && p.isStarter).map((p) => p.pcode);
+    for (const p of startersHome) startElapsed.set(p, 0);
+    for (const p of startersAway) startElapsed.set(p, 0);
+    for (const e of eventsUpToIdx) {
+      if (e.action_code === "101" && e.pcode) startElapsed.set(e.pcode, e.elapsed);
+      else if (e.action_code === "102" && e.pcode) startElapsed.delete(e.pcode);
+    }
+    const currentSec = new Map<string, number>();
+    for (const [pcode, start] of startElapsed.entries()) {
+      currentSec.set(pcode, row.elapsed - start);
+    }
+    return currentSec;
+  }, [eventsUpToIdx, row.elapsed, players, homeTeam.tcode, awayTeam.tcode]);
+
   // 실시간 라인업 시너지 계산을 위해 OnCourt 정보를 위로 끌어올림
   const homeOnCourt = useMemo(() => currentOnCourt(events, idx, players, homeTeam.tcode), [events, idx, players, homeTeam.tcode]);
   const awayOnCourt = useMemo(() => currentOnCourt(events, idx, players, awayTeam.tcode), [events, idx, players, awayTeam.tcode]);
@@ -1030,6 +1065,16 @@ export default function GameReplay({
     flowChips.push({ key: "clutch-time", text: "🚨 클러치 타임 돌입! (종료 5분 전, 5점 차 이내 접전)" });
   }
 
+  // 득점 기대치(xPTS) vs 실제 득점 (슛 퀄리티)
+  if (Math.abs(row.home_score - homeXPTS) >= 8 && row.home_score > 0) {
+    const diff = row.home_score - homeXPTS;
+    flowChips.push({ key: "xpts-home", text: `🎯 [${homeTeam.abbr} 슛 퀄리티] 기대득점 ${homeXPTS.toFixed(1)}점 vs 실제 ${row.home_score}점 (${diff > 0 ? "터프샷 폭발🔥" : "슛 난조빙하기❄️"})` });
+  }
+  if (Math.abs(row.away_score - awayXPTS) >= 8 && row.away_score > 0) {
+    const diff = row.away_score - awayXPTS;
+    flowChips.push({ key: "xpts-away", text: `🎯 [${awayTeam.abbr} 슛 퀄리티] 기대득점 ${awayXPTS.toFixed(1)}점 vs 실제 ${row.away_score}점 (${diff > 0 ? "터프샷 폭발🔥" : "슛 난조빙하기❄️"})` });
+  }
+
   // 실시간 라인업 시너지 알럿 (마진 절댓값 10 이상일 때만 표시해 피로도 방지)
   const home5 = bestComboBySize(homeOnCourt, 5);
   if (home5 && Math.abs(home5.rating.netRatingPer40) >= 10) {
@@ -1052,13 +1097,38 @@ export default function GameReplay({
       }
     }
 
-    // 2, 3. 기록 및 밀스톤 (더블-더블, 득점 점유율)
-    const stats = [b.pts, b.reb, b.ast, b.stl, b.blk];
-    const doubleDigits = stats.filter((v) => v >= 10).length;
-    if (doubleDigits >= 3) {
+    // 2, 3. 기록 및 밀스톤 (더블-더블, 트리플-더블, 30득점 돌파 및 워치)
+    const statsObj = [
+      { name: "득점", val: b.pts },
+      { name: "리바운드", val: b.reb },
+      { name: "어시스트", val: b.ast },
+      { name: "스틸", val: b.stl },
+      { name: "블록", val: b.blk }
+    ];
+    const tens = statsObj.filter((s) => s.val >= 10);
+    const nines = statsObj.filter((s) => s.val === 8 || s.val === 9);
+
+    if (tens.length >= 3) {
       flowChips.push({ key: `triple-double-${p.pcode}`, text: `🌟 ${p.name ?? p.pcode} 트리플-더블 달성!` });
-    } else if (doubleDigits === 2) {
+    } else if (tens.length === 2 && nines.length > 0) {
+      flowChips.push({ key: `triple-double-watch-${p.pcode}`, text: `👀 ${p.name ?? p.pcode} 트리플-더블까지 ${nines[0].name} 단 ${10 - nines[0].val}개!` });
+    } else if (tens.length === 2) {
       flowChips.push({ key: `double-double-${p.pcode}`, text: `✨ ${p.name ?? p.pcode} 더블-더블 달성!` });
+    } else if (tens.length === 1 && nines.length > 0) {
+      flowChips.push({ key: `double-double-watch-${p.pcode}`, text: `👀 ${p.name ?? p.pcode} 더블-더블까지 ${nines[0].name} 단 ${10 - nines[0].val}개!` });
+    }
+
+    if (b.pts >= 28 && b.pts < 30) {
+      flowChips.push({ key: `30pts-watch-${p.pcode}`, text: `🔥 ${p.name ?? p.pcode} 30득점 돌파까지 단 ${30 - b.pts}점!` });
+    } else if (b.pts >= 30) {
+      flowChips.push({ key: `30pts-${p.pcode}`, text: `🔥 ${p.name ?? p.pcode} 30득점 돌파! (${b.pts}점)` });
+    }
+
+    // 붉은 맛 체력바 (Stint Fatigue)
+    const cSec = stintSec.get(p.pcode);
+    if (cSec && cSec >= 10 * 60 && (homeOnCourt.has(p.pcode) || awayOnCourt.has(p.pcode))) {
+      const min = Math.floor(cSec / 60);
+      flowChips.push({ key: `fatigue-${p.pcode}`, text: `🥵 ${p.name ?? p.pcode} 체력 경고 (휴식 없이 ${min}분째 출전 중)` });
     }
 
     const tPts = p.tcode === homeTeam.tcode ? row.home_score : row.away_score;
@@ -1178,22 +1248,11 @@ export default function GameReplay({
       }),
     [shots, curQRank, quarterRank, shotOutcome, shotVal]
   );
-  // (선수,쿼터) 조합별 신뢰도 - 경기 전체를 대상으로 하는 정적 결과라 스크럽 위치(idx)와
-  // 무관, shots/events가 바뀔 때만 다시 계산. findShotForScoreRow(포제션 카드, 아래)와
-  // shotToEventIdx(슛 차트 클릭, 바로 다음)가 이 하나의 계산을 공유(같은 신뢰도 게이트
-  // 중복 금지 - 두 방향 모두 findShotForScoreRow/buildShotToEventIndex 쪽에서 온 원칙).
-  const shotReliability = useMemo(() => buildShotReliability(events, shots), [events, shots]);
-
   // 실제 슛 점 차트(app/games/[gmkey]/page.tsx와 같은 lib/zoneCompare.ts의
   // buildCourtDotsSvg) - 스크럽할수록 점이 하나씩 채워지는 느낌을 그대로 살림.
   const homeQuarterShots = useMemo(() => filteredShots.filter((s) => s.tcode === homeTeam.tcode), [filteredShots, homeTeam.tcode]);
   const awayQuarterShots = useMemo(() => filteredShots.filter((s) => s.tcode === awayTeam.tcode), [filteredShots, awayTeam.tcode]);
 
-  // Feature("슛 차트 호버로 누가/언제, 클릭하면 그 순간으로 이동") - lib/possessionFeed.ts의
-  // buildShotToEventIndex(findShotForScoreRow의 반대 방향, 같은 shotReliability 게이트
-  // 재사용)로 신뢰 가능한 (선수,쿼터) 조합의 슛만 정확한 game_events 인덱스를 앎. 이 맵은
-  // 스크럽 위치(idx)와 무관 - shots/events가 바뀔 때만 재계산.
-  const shotToEventIdx = useMemo(() => buildShotToEventIndex(events, shots, shotReliability), [events, shots, shotReliability]);
   const shotDotMeta = useCallback(
     (s: ShotWithQuarter): ShotDotMeta => {
       const name = (s.pcode && nameByPcode.get(s.pcode)) || "선수 불명";

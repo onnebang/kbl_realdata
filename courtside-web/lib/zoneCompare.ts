@@ -53,6 +53,21 @@ export function shotValue(x: number, y: number, d: string): 2 | 3 {
   return shotDistM(mx, y) >= THREE_PT_M ? 3 : 2;
 }
 
+// 슛 퀄리티 분석(xPTS)용 룩업. 각 구역별 리그 평균 슛 성공률 기준 기대득점.
+export function shotXPTS(x: number, y: number, d: string): number {
+  const mx = mirrorShotX(x, d);
+  const distM = shotDistM(mx, y);
+  const zone = classifyZone(distM)[0];
+  switch (zone) {
+    case "rim": return 1.20;       // 60% * 2점
+    case "close": return 0.90;     // 45% * 2점
+    case "midShort": return 0.80;  // 40% * 2점
+    case "midLong": return 0.76;   // 38% * 2점
+    case "three": return 0.99;     // 33% * 3점
+    default: return 0.80;
+  }
+}
+
 export function drawCourtMarkings(hoopX: number, baselineX: number, dir: 1 | -1, stroke: string, sw: number): string {
   const u = (v: number) => v / SCALE_M_PER_UNIT;
   const midY = (COURT_Y[0] + COURT_Y[1]) / 2;
