@@ -235,7 +235,20 @@ async function getShots(gmkey: string, ttl: number): Promise<(ShotRow & { quarte
       .select("x, y, d, made, tcode, quarter, pcode, shot_order")
       .eq("gmkey", gmkey)
       .order("shot_order", { ascending: true });
-    return (data ?? []) as (ShotRow & { quarter: string; pcode: string | null; shot_order: number })[];
+    return (data ?? []).map((r) => {
+      let q = String(r.quarter);
+      const qNum = Number(q);
+      if (!isNaN(qNum) && qNum > 0) {
+        if (qNum <= 4) q = `Q${qNum}`;
+        else q = `OT${qNum - 4}`;
+      }
+      return {
+        ...r,
+        quarter: q,
+        pcode: r.pcode != null ? String(r.pcode) : null,
+        tcode: r.tcode != null ? String(r.tcode) : null,
+      };
+    }) as (ShotRow & { quarter: string; pcode: string | null; shot_order: number })[];
   };
   return cached(load, ["gamePage:shots", gmkey], ttl, [TAG.game(gmkey)]);
 }

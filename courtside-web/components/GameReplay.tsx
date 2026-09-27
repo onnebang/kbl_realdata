@@ -954,15 +954,18 @@ export default function GameReplay({
     for (const s of shots) {
       if (!s.pcode) continue;
       
+      const pcodeStr = String(s.pcode);
+      const tcodeStr = String(s.tcode);
+      
       // 박스스코어(idx 시점 기준)에 집계된 선수의 총 FGA(3점 포함)만큼만 shots에서 누적
-      const maxFga = box.get(s.pcode)?.fga ?? 0;
-      const seen = fgaCount.get(s.pcode) ?? 0;
+      const maxFga = box.get(pcodeStr)?.fga ?? 0;
+      const seen = fgaCount.get(pcodeStr) ?? 0;
       
       if (seen < maxFga) {
-        fgaCount.set(s.pcode, seen + 1);
+        fgaCount.set(pcodeStr, seen + 1);
         const xp = shotXPTS(s.x, s.y, s.d);
-        if (s.tcode === homeTeam.tcode) hX += xp;
-        else if (s.tcode === awayTeam.tcode) aX += xp;
+        if (tcodeStr === String(homeTeam.tcode)) hX += xp;
+        else if (tcodeStr === String(awayTeam.tcode)) aX += xp;
       }
     }
     return { homeXPTS: hX, awayXPTS: aX };
@@ -1340,8 +1343,8 @@ export default function GameReplay({
   );
   // 실제 슛 점 차트(app/games/[gmkey]/page.tsx와 같은 lib/zoneCompare.ts의
   // buildCourtDotsSvg) - 스크럽할수록 점이 하나씩 채워지는 느낌을 그대로 살림.
-  const homeQuarterShots = useMemo(() => filteredShots.filter((s) => s.tcode === homeTeam.tcode), [filteredShots, homeTeam.tcode]);
-  const awayQuarterShots = useMemo(() => filteredShots.filter((s) => s.tcode === awayTeam.tcode), [filteredShots, awayTeam.tcode]);
+  const homeQuarterShots = useMemo(() => filteredShots.filter((s) => String(s.tcode) === String(homeTeam.tcode)), [filteredShots, homeTeam.tcode]);
+  const awayQuarterShots = useMemo(() => filteredShots.filter((s) => String(s.tcode) === String(awayTeam.tcode)), [filteredShots, awayTeam.tcode]);
 
   const shotDotMeta = useCallback(
     (s: ShotWithQuarter): ShotDotMeta => {
