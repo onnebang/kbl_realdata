@@ -1,6 +1,6 @@
 import { eunNeun, iGa } from "./josa";
 import { teamInkPair } from "./teamAccent";
-import { teamZoneStats, type ShotRow } from "./zoneCompare";
+import { teamZoneStats, shotXPTS, type ShotRow } from "./zoneCompare";
 import type { H2H, SeasonStats } from "./matchups";
 
 // courtside_template.html(35차, "경기가 종료되면 주요 이벤트들을 하나의 보고서로")의
@@ -933,6 +933,37 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     }
   }
 
+  // 2-1.5 슛 퀄리티 결산 (xPTS vs Actual PTS)
+  if (input.shots && input.shots.length > 0) {
+    let homeXPTS = 0;
+    let awayXPTS = 0;
+    for (const s of input.shots) {
+      if (!s.tcode) continue;
+      const xp = shotXPTS(s.x, s.y, s.d);
+      if (s.tcode === homeTcode) homeXPTS += xp;
+      else if (s.tcode === awayTcode) awayXPTS += xp;
+    }
+    
+    const items: string[] = [];
+    for (const [tcode, tname, xpts, pts] of [
+      [homeTcode, homeTname, homeXPTS, homeScore],
+      [awayTcode, awayTname, awayXPTS, awayScore],
+    ] as const) {
+      const diff = pts - xpts;
+      if (Math.abs(diff) >= 8) { // 8점 이상 차이날 때만 유의미한 분석으로 간주
+        if (diff > 0) {
+          items.push(`${liOpen(tcode)}🎯 ${teamTag(tcode, tname)} 슛 퀄리티 대비 <b>득점 폭발</b> - 완벽한 슛 기회(기대득점)는 <b>${xpts.toFixed(1)}점</b>이었으나, 어려운 터프샷을 다수 꽂아 넣으며 실제로는 <b>${pts}점</b>을 만들어냈습니다.</li>`);
+        } else {
+          items.push(`${liOpen(tcode)}🎯 ${teamTag(tcode, tname)} 슛 퀄리티 대비 <b>득점 빈곤</b> - 오픈 찬스 등 좋은 슛 기회를 만들어내어 기대득점은 <b>${xpts.toFixed(1)}점</b>에 달했으나, 실제 득점은 <b>${pts}점</b>에 그치며 마무리가 아쉬웠습니다.</li>`);
+        }
+      }
+    }
+    if (items.length > 0) {
+      sections.push({ title: "슛 퀄리티 결산 (xPTS vs Actual)", html: `<ul class="report-list">${items.join("")}</ul><p class="report-caveat">기대득점(xPTS)은 슛 좌표(위치/거리)별 리그 평균 성공률을 기반으로 산출된 슛 기회의 질적 지표입니다. (자유투 제외)</p>` });
+    }
+  }
+
+
   // 2-2. 평소의 그 팀이 아니었다 - 이 경기 팀 기록이 그 팀 자신의 시즌 기록(이 경기 이전, 정규시즌)을
   // 깼을 때만. '평균 대비 차이' 임계로 하면 아무 경기나 걸린다 - 실측에서 최다득점 5.9% / 최소실점
   // 4.5% / 최다3점 4.5%라 셋을 합쳐도 경기의 21%에서만 뜬다.
@@ -1154,6 +1185,48 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     }
     if (unsungItems.length) {
       sections.push({ title: "숨은 공헌자 (Unsung Hero)", html: `<ul class="report-list">${unsungItems.join("")}</ul>` });
+    }
+
+    // 2.6 라인업 시너지 흥망성쇠 (Best & Worst 5-Man Units)
+    const synergyItems: string[] = [];
+    for (const [side, tcode, tname] of [
+      ["home", homeTcode, homeTname],
+      ["away", awayTcode, awayTname],
+    ] as const) {
+      let bestLineup: { pcodes: string[], diff: number, dur: number } | null = null;
+      let worstLineup: { pcodes: string[], diff: number, dur: number } | null = null;
+      
+      const acc = new Map<string, { pcodes: string[]; seconds: number; my: number; opp: number }>();
+      for (const s of segs) {
+        const lu = side === "home" ? s.homeOn : s.awayOn;
+        if (lu.length !== 5) continue;
+        const sorted = [...lu].sort();
+        const key = sorted.join(",");
+        const cur = acc.get(key) ?? { pcodes: sorted, seconds: 0, my: 0, opp: 0 };
+        cur.seconds += s.seconds;
+        cur.my += side === "home" ? s.homePts : s.awayPts;
+        cur.opp += side === "home" ? s.awayPts : s.homePts;
+        acc.set(key, cur);
+      }
+      
+      for (const [_, v] of acc) {
+        if (v.seconds < 120) continue; // 최소 2분 이상 가동된 라인업만
+        const diff = v.my - v.opp;
+        if (diff >= 8 && (!bestLineup || diff > bestLineup.diff)) bestLineup = { pcodes: v.pcodes, diff, dur: v.seconds };
+        if (diff <= -8 && (!worstLineup || diff < worstLineup.diff)) worstLineup = { pcodes: v.pcodes, diff, dur: v.seconds };
+      }
+      
+      if (bestLineup) {
+        const names = bestLineup.pcodes.map((pc) => playerTag(nameOf(pc), tcode)).join(" · ");
+        synergyItems.push(`${liOpen(tcode)}📈 ${teamTag(tcode, tname)} <b>최고의 5인 조합</b>: ${names} - 이 라인업이 코트에 있던 ${fmtDuration(bestLineup.dur)} 동안 상대를 압도하며 득실마진 <b>+${bestLineup.diff}점</b>을 기록했습니다.</li>`);
+      }
+      if (worstLineup) {
+        const names = worstLineup.pcodes.map((pc) => playerTag(nameOf(pc), tcode)).join(" · ");
+        synergyItems.push(`${liOpen(tcode)}📉 ${teamTag(tcode, tname)} <b>최악의 5인 조합</b>: ${names} - 이 조합이 가동된 ${fmtDuration(worstLineup.dur)} 동안 공수가 무너지며 득실마진 <b>${worstLineup.diff}점</b>을 잃어 뼈아픈 타격이 되었습니다.</li>`);
+      }
+    }
+    if (synergyItems.length) {
+      sections.push({ title: "라인업 시너지 흥망성쇠", html: `<ul class="report-list">${synergyItems.join("")}</ul>` });
     }
   }
 
