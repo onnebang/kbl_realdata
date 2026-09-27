@@ -906,7 +906,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       let html: string;
       if (zoneHomeWon === homeWon) {
         html =
-          `<ul class="report-list"><li>${liOpen(zw.tcode)}🔥 <b>${label} 핫존 지배</b> - ${teamTag(zw.tcode, zw.name)}${eunNeun(zw.name)} 이 구역에서 ${zw.s.made}/${zw.s.att}를 기록하며 상대(${teamTag(zl.tcode, zl.name)} ${zl.s.made}/${zl.s.att})를 완전히 압도했습니다. 이 구역 하나에서만 벌어진 <b>${Math.abs(diff)}점</b>의 격차가 최종 마진(${Math.abs(margin)}점)보다 컸을 정도로 승부에 결정적이었습니다.</li></ul>`;
+          `<ul class="report-list">${liOpen(zw.tcode)}🔥 <b>${label} 핫존 지배</b> - ${teamTag(zw.tcode, zw.name)}${eunNeun(zw.name)} 이 구역에서 ${zw.s.made}/${zw.s.att}를 기록하며 상대(${teamTag(zl.tcode, zl.name)} ${zl.s.made}/${zl.s.att})를 완전히 압도했습니다. 이 구역 하나에서만 벌어진 <b>${Math.abs(diff)}점</b>의 격차가 최종 마진(${Math.abs(margin)}점)보다 컸을 정도로 승부에 결정적이었습니다.</li></ul>`;
       } else {
         // 그 구역을 이기고도 진 경기 - 승자가 그보다 더 크게 벌린 구역을 같이 보여준다.
         const winnerHome = homeWon;
@@ -922,7 +922,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
             return `<b>${ZONE_LABEL[x.z.key]}</b>(${ls.made}/${ls.att} vs ${ws.made}/${ws.att})`;
           });
         html =
-          `<ul class="report-list"><li>${liOpen(zw.tcode)}🧊 <b>${label} 핫존의 역설</b> - ${teamTag(zw.tcode, zw.name)}${eunNeun(zw.name)} 이 구역에서 ${zw.s.made}/${zw.s.att}를 기록하며 상대(${teamTag(zl.tcode, zl.name)} ${zl.s.made}/${zl.s.att})보다 <b>${Math.abs(diff)}점</b>을 더 넣고도 오히려 패배했습니다` +
+          `<ul class="report-list">${liOpen(zw.tcode)}🧊 <b>${label} 핫존의 역설</b> - ${teamTag(zw.tcode, zw.name)}${eunNeun(zw.name)} 이 구역에서 ${zw.s.made}/${zw.s.att}를 기록하며 상대(${teamTag(zl.tcode, zl.name)} ${zl.s.made}/${zl.s.att})보다 <b>${Math.abs(diff)}점</b>을 더 넣고도 오히려 패배했습니다` +
           (madeUp.length ? `. 반대로 ${madeUp.join("과 ")}에서 치명적인 콜드존을 형성하며 더 크게 밀렸기 때문입니다.` : ".") +
           `</li></ul>`;
       }
@@ -1354,9 +1354,6 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
 
   // 8.8 템포와 페이스 진단 (Pace & Transition Diagnostics)
   {
-    let homeFbPts = 0;
-    let awayFbPts = 0;
-    
     // Estimate POSS: FGA + 0.44*FTA + TO - Est.OREB
     // (공격 리바운드 정확한 분리 데이터가 없으므로 야투 실패의 약 25%를 공격 리바운드로 가정)
     const getPoss = (tcode: string) => {
@@ -1375,37 +1372,12 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     const aPoss = getPoss(awayTcode);
     const avgPoss = Math.round((hPoss + aPoss) / 2);
     
-    // 속공 득점 집계
-    for (const e of events) {
-       if (!e.tcode) continue;
-       const lbl = e.action_label || "";
-       if (lbl.includes("속공") && lbl.includes("성공")) {
-          const isHome = e.tcode === homeTcode;
-          let pts = 2;
-          if (lbl.includes("3점")) pts = 3;
-          else if (lbl.includes("자유투")) pts = 1; 
-          
-          if (isHome) homeFbPts += pts;
-          else awayFbPts += pts;
-       }
-    }
-    
     let paceLabel = "보통 (Average)";
     if (avgPoss >= 75) paceLabel = "빠름 (Up-Tempo)";
     else if (avgPoss <= 67) paceLabel = "느림 (Slow Pace)";
     
-    const fbDiff = homeFbPts - awayFbPts;
-    const items: string[] = [];
-    items.push(`<li><b>경기 페이스 (추정 POSS):</b> <b>${avgPoss}회</b> - 템포 <b>${paceLabel}</b></li>`);
-    items.push(`<li>${liOpen(homeTcode)}${teamTag(homeTcode, homeTname)} - 속공 득점 <b>${homeFbPts}점</b></li>`);
-    items.push(`<li>${liOpen(awayTcode)}${teamTag(awayTcode, awayTname)} - 속공 득점 <b>${awayFbPts}점</b></li>`);
-    
     let summary = "";
-    if (fbDiff >= 8) {
-       summary = `${teamTag(homeTcode, homeTname)}${iGa(homeTname)} 날카로운 트랜지션 게임으로 속공에서 재미를 톡톡히 보며 상대 수비가 정돈되기 전에 림을 폭격했습니다.`;
-    } else if (fbDiff <= -8) {
-       summary = `${teamTag(awayTcode, awayTname)}${iGa(awayTname)} 압도적인 기동력을 앞세워 얼리 오펜스와 속공을 주도하며 코트 위를 휘저었습니다.`;
-    } else if (avgPoss <= 67) {
+    if (avgPoss <= 67) {
        summary = `양 팀 모두 철저한 지공 위주의 하프코트 세트 오펜스를 전개하며 끈적한 늪 농구 양상을 띠었습니다.`;
     } else if (avgPoss >= 75) {
        summary = `양 팀 모두 쉴 새 없이 달리는 빠른 템포의 난타전을 펼쳤습니다.`;
@@ -1413,11 +1385,9 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
        summary = `양 팀이 무난한 템포 속에서 공수 전환을 주고받았습니다.`;
     }
     
-    // 두 조건 모두 해당되지 않거나 너무 임팩트 없는 경우를 필터링할지?
-    // 보통 템포 진단은 항상 띄워줘도 흥미로우므로 항상 표출.
     sections.push({ 
       title: "템포와 페이스 진단 (Pace & Transition)", 
-      html: `<p class="report-text">🏃 ${summary}</p><ul class="report-list">${items.join("")}</ul>` 
+      html: `<p class="report-text">🏃 <b>추정 경기 페이스: ${avgPoss}회 (템포 ${paceLabel})</b><br/>${summary}</p>` 
     });
   }
 
@@ -1477,9 +1447,9 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     if (best && worst && best.pcode !== worst.pcode) {
        const items: string[] = [];
        
-       items.push(`<li>📈 <b>상한가: ${playerTag(best.name, best.tcode)}</b> - 오늘 <b>${best.pts}점 ${best.reb}리바운드 ${best.ast}어시스트</b>를 쏟아부으며 게임스코어 <b>${gameScore(best).toFixed(1)}</b>을 기록, 다음 라운드 OVR 떡상이 유력합니다!</li>`);
+       items.push(`${liOpen(best.tcode)}📈 <b>상한가: ${playerTag(best.name, best.tcode)}</b> - 오늘 <b>${best.pts}점 ${best.reb}리바운드 ${best.ast}어시스트</b>를 쏟아부으며 게임스코어 <b>${gameScore(best).toFixed(1)}</b>을 기록, 다음 라운드 OVR 급상승이 유력합니다!</li>`);
        
-       items.push(`<li>📉 <b>하한가: ${playerTag(worst.name, worst.tcode)}</b> - 오늘 <b>${worst.pts}점 (야투 ${worst.fgm}/${worst.fga})</b>, 턴오버 <b>${worst.turnovers}개</b>에 그치며 유독 고전했습니다. 하루빨리 폼 회복이 시급합니다.</li>`);
+       items.push(`${liOpen(worst.tcode)}📉 <b>하한가: ${playerTag(worst.name, worst.tcode)}</b> - 오늘 <b>${worst.pts}점 (야투 ${worst.fgm}/${worst.fga})</b>, 턴오버 <b>${worst.turnovers}개</b>에 그치며 유독 고전했습니다. 하루빨리 폼 회복이 시급합니다.</li>`);
        
        sections.push({ 
          title: "주가 변동 리포트 (Stock Up & Down)", 

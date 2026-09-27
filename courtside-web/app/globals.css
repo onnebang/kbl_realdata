@@ -1101,8 +1101,8 @@ table.data-table td:nth-child(2) {
 .report-list {
   margin: 0;
   padding-left: 20px;
-  font-size: 13px;
-  line-height: 1.8;
+  font-size: var(--fs-300);
+  line-height: var(--lh-prose);
   color: var(--ink-soft);
 }
 .report-list li::marker {
