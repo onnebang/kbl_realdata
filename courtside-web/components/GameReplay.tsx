@@ -1087,13 +1087,95 @@ export default function GameReplay({
     flowChips.push({ key: "synergy-away", text: `${isGood ? "🔥" : "⚠️"} [${awayTeam.abbr} 코트 위 5인] 정규시즌 마진 ${fmtRating(away5.rating.netRatingPer40)}` });
   }
 
+  // 페이스 기반 예상 최종 스코어
+  if (row.elapsed > 600 && row.quarter !== "PRE" && row.quarter !== "FT" && row.clock_min != null) {
+    let homeFga = 0, homeFta = 0, homeOreb = 0, homeTo = 0;
+    let awayFga = 0, awayFta = 0, awayOreb = 0, awayTo = 0;
+    for (const p of players) {
+      const b = box.get(p.pcode);
+      if (!b) continue;
+      if (p.tcode === homeTeam.tcode) {
+        homeFga += b.fga; homeFta += b.fta; homeOreb += b.oreb; homeTo += b.to;
+      } else {
+        awayFga += b.fga; awayFta += b.fta; awayOreb += b.oreb; awayTo += b.to;
+      }
+    }
+    const homePoss = homeFga + 0.44 * homeFta - homeOreb + homeTo;
+    const awayPoss = awayFga + 0.44 * awayFta - awayOreb + awayTo;
+    const totalPoss = homePoss + awayPoss;
+    const pace = (totalPoss / 2) / (row.elapsed / 60) * 40; // 40분 기준 페이스
+
+    const expHome = Math.round((row.home_score / row.elapsed) * (40 * 60));
+    const expAway = Math.round((row.away_score / row.elapsed) * (40 * 60));
+
+    if (pace >= 85) {
+      flowChips.push({ key: "pace-fast", text: `⏩ 오늘 양 팀 엄청난 템포! (예상 최종: ${expHome} - ${expAway})` });
+    } else if (pace <= 65 && row.elapsed > 1200) { // 진흙탕 수비전은 후반부터
+      flowChips.push({ key: "pace-slow", text: `🐢 오늘 진흙탕 수비전! (예상 최종: ${expHome} - ${expAway})` });
+    }
+  }
+
+  // 1대1 매치업 킬러 트래커 (H2H)
+  let homeTopScorer = { pcode: "", pts: -1, name: "" };
+  let awayTopScorer = { pcode: "", pts: -1, name: "" };
+  for (const p of players) {
+    const pts = box.get(p.pcode)?.pts ?? 0;
+    if (p.tcode === homeTeam.tcode && pts > homeTopScorer.pts) homeTopScorer = { pcode: p.pcode, pts, name: p.name ?? p.pcode };
+    if (p.tcode === awayTeam.tcode && pts > awayTopScorer.pts) awayTopScorer = { pcode: p.pcode, pts, name: p.name ?? p.pcode };
+  }
+
+  const h2hMargin = useMemo(() => {
+    if (!homeTopScorer.pcode || !awayTopScorer.pcode) return 0;
+    let currentHOn = players.find(p => p.pcode === homeTopScorer.pcode)?.isStarter ?? false;
+    let currentAOn = players.find(p => p.pcode === awayTopScorer.pcode)?.isStarter ?? false;
+    let startHomeScore = 0;
+    let startAwayScore = 0;
+    let wasBothOn = currentHOn && currentAOn;
+    let margin = 0;
+    
+    for (const e of eventsUpToIdx) {
+      const isBothOn = currentHOn && currentAOn;
+      if (isBothOn && !wasBothOn) {
+        startHomeScore = e.home_score;
+        startAwayScore = e.away_score;
+      } else if (!isBothOn && wasBothOn) {
+        margin += (e.home_score - startHomeScore) - (e.away_score - startAwayScore);
+      }
+      
+      if (e.action_code === "101") {
+        if (e.pcode === homeTopScorer.pcode) currentHOn = true;
+        if (e.pcode === awayTopScorer.pcode) currentAOn = true;
+      } else if (e.action_code === "102") {
+        if (e.pcode === homeTopScorer.pcode) currentHOn = false;
+        if (e.pcode === awayTopScorer.pcode) currentAOn = false;
+      }
+      wasBothOn = currentHOn && currentAOn;
+    }
+    
+    if (wasBothOn) margin += (row.home_score - startHomeScore) - (row.away_score - startAwayScore);
+    return margin;
+  }, [eventsUpToIdx, homeTopScorer.pcode, awayTopScorer.pcode, row.home_score, row.away_score, players]);
+
+  if (homeTopScorer.pts >= 15 && awayTopScorer.pts >= 15 && homeOnCourt.has(homeTopScorer.pcode) && awayOnCourt.has(awayTopScorer.pcode)) {
+    const diff = Math.abs(h2hMargin);
+    if (diff >= 5) {
+      const favored = h2hMargin > 0 ? homeTeam.abbr : awayTeam.abbr;
+      flowChips.push({ key: "h2h-killer", text: `⚔️ [에이스 정면승부] ${homeTopScorer.name} vs ${awayTopScorer.name}: 동시 출전 시 ${favored} ${diff}점 리드` });
+    }
+  }
+
   for (const p of players) {
     const b = box.get(p.pcode);
     if (!b) continue;
     if (b.foul > 0) {
       const isEarly = row.quarter === "Q1" || row.quarter === "Q2";
       if ((isEarly && b.foul >= 3) || b.foul >= 4) {
-        flowChips.push({ key: `foul-trouble-${p.pcode}`, text: `⚠️ ${p.name ?? p.pcode} 파울트러블 (${b.foul}반칙)` });
+        let txt = `⚠️ ${p.name ?? p.pcode} 파울트러블 (${b.foul}반칙)`;
+        const onoff = playerOnOff?.[p.pcode];
+        if (onoff && onoff.netRatingPer40 > 0) {
+          txt += ` (이 선수가 빠지면 정규시즌 마진 ${fmtRating(onoff.netRatingPer40)} 증발!)`;
+        }
+        flowChips.push({ key: `foul-trouble-${p.pcode}`, text: txt });
       }
     }
 
