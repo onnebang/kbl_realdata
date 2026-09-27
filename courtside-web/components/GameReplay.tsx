@@ -1077,7 +1077,8 @@ export default function GameReplay({
     flowChips.push({ key: "clutch-time", text: "🚨 클러치 타임 돌입! (종료 5분 전, 5점 차 이내 접전)" });
   }
 
-  // 득점 기대치(xPTS) vs 실제 득점 (슛 퀄리티)
+  // 득점 기대치(xPTS) vs 실제 득점 (슛 퀄리티) - 임시 비활성화 (샷 데이터 부족 시 0.0점 표출 이슈)
+  /*
   if (Math.abs(row.home_score - homeXPTS) >= 8 && row.home_score > 0) {
     const diff = row.home_score - homeXPTS;
     flowChips.push({ key: "xpts-home", text: `🎯 [${homeTeam.abbr} 슛 퀄리티] 기대득점 ${homeXPTS.toFixed(1)}점 vs 실제 ${row.home_score}점 (${diff > 0 ? "터프샷 폭발🔥" : "슛 난조빙하기❄️"})` });
@@ -1086,6 +1087,7 @@ export default function GameReplay({
     const diff = row.away_score - awayXPTS;
     flowChips.push({ key: "xpts-away", text: `🎯 [${awayTeam.abbr} 슛 퀄리티] 기대득점 ${awayXPTS.toFixed(1)}점 vs 실제 ${row.away_score}점 (${diff > 0 ? "터프샷 폭발🔥" : "슛 난조빙하기❄️"})` });
   }
+  */
 
   // 실시간 라인업 시너지 알럿 (마진 절댓값 10 이상일 때만 표시해 피로도 방지)
   const home5 = bestComboBySize(homeOnCourt, 5);
