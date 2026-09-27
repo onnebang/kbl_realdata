@@ -6,13 +6,27 @@ import type { GameEvent } from "./postgameReport";
 // 나온 라인업 전부" 수집용, 클라이언트는 "지금 스크럽 시점 라인업" 재구성용) 공용 파일로 분리.
 export type PlayerStartInfo = { pcode: string; tcode: string; isStarter?: boolean | null };
 
-function startingFive(players: PlayerStartInfo[], tcode: string): Set<string> {
-  return new Set(players.filter((p) => p.tcode === tcode && p.isStarter).map((p) => p.pcode));
+function startingFive(players: PlayerStartInfo[], tcode: string, events?: GameEvent[]): Set<string> {
+  const explicit = new Set(players.filter((p) => p.tcode === tcode && p.isStarter).map((p) => p.pcode));
+  if (explicit.size > 0 || !events) return explicit;
+  
+  // game_player_stats가 정산되지 않아 is_starter가 전부 null인 경우(진행중/직후),
+  // 이벤트 로그에서 첫 교체(IN) 전에 등장(액션 또는 OUT)한 선수를 스타터로 추론한다.
+  const inferred = new Set<string>();
+  for (const row of events) {
+    if (inferred.size >= 5) break;
+    if (row.tcode !== tcode || !row.pcode) continue;
+    // IN 이벤트가 먼저 나오면 그 선수는 벤치 멤버
+    if (row.action_code === "101") continue;
+    // OUT이나 다른 액션을 먼저 했다면 코트 위에 있었던 것(스타터)
+    inferred.add(row.pcode);
+  }
+  return inferred;
 }
 
 // 지금 스크럽 시점(0..uptoIdx) 기준 온코트 5인 - GameReplay.tsx가 매 idx 변경마다 씀.
 export function currentOnCourt(events: GameEvent[], uptoIdx: number, players: PlayerStartInfo[], tcode: string): Set<string> {
-  const onCourt = startingFive(players, tcode);
+  const onCourt = startingFive(players, tcode, events);
   for (let i = 0; i <= uptoIdx; i++) {
     const row = events[i];
     if (row.tcode !== tcode || !row.pcode) continue;
@@ -31,7 +45,7 @@ export function collectAllOnCourtLineups(
   players: PlayerStartInfo[],
   tcode: string
 ): Set<string>[] {
-  const onCourt = startingFive(players, tcode);
+  const onCourt = startingFive(players, tcode, events);
   const seen: Set<string>[] = [new Set(onCourt)];
   for (const row of events) {
     if (row.tcode !== tcode || !row.pcode) continue;
@@ -85,8 +99,8 @@ export function computeSecondsUpTo(
 ): Map<string, number> {
   const sec = new Map<string, number>();
   for (const p of players) sec.set(p.pcode, 0);
-  const homeOn = startingFive(players, homeTcode);
-  const awayOn = startingFive(players, awayTcode);
+  const homeOn = startingFive(players, homeTcode, events);
+  const awayOn = startingFive(players, awayTcode, events);
   let prev = 0;
   const end = Math.min(uptoIdx, events.length - 1);
   for (let i = 0; i <= end; i++) {

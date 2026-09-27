@@ -950,6 +950,7 @@ export default function GameReplay({
   const { homeXPTS, awayXPTS } = useMemo(() => {
     let hX = 0, aX = 0;
     const fgaCount = new Map<string, number>();
+    const liveBox = computeBoxScore(events, idx, players);
     
     for (const s of shots) {
       if (!s.pcode) continue;
@@ -958,7 +959,7 @@ export default function GameReplay({
       const tcodeStr = String(s.tcode);
       
       // 박스스코어(idx 시점 기준)에 집계된 선수의 총 FGA(3점 포함)만큼만 shots에서 누적
-      const maxFga = box.get(pcodeStr)?.fga ?? 0;
+      const maxFga = liveBox.get(pcodeStr)?.fga ?? 0;
       const seen = fgaCount.get(pcodeStr) ?? 0;
       
       if (seen < maxFga) {
@@ -969,7 +970,7 @@ export default function GameReplay({
       }
     }
     return { homeXPTS: hX, awayXPTS: aX };
-  }, [shots, box, homeTeam.tcode, awayTeam.tcode]);
+  }, [shots, events, idx, players, homeTeam.tcode, awayTeam.tcode]);
 
   // 실시간 체력 모니터링 (현재 코트 위 선수들이 휴식 없이 몇 분째 뛰고 있는지)
   const stintSec = useMemo(() => {
@@ -1077,8 +1078,6 @@ export default function GameReplay({
   }
 
   // 득점 기대치(xPTS) vs 실제 득점 (슛 퀄리티)
-  // 임시 비활성화: 기대득점이 0.0으로 고정되는 이슈 해결 전까지 라이브 서비스에서 숨김
-  /*
   if (Math.abs(row.home_score - homeXPTS) >= 8 && row.home_score > 0) {
     const diff = row.home_score - homeXPTS;
     flowChips.push({ key: "xpts-home", text: `🎯 [${homeTeam.abbr} 슛 퀄리티] 기대득점 ${homeXPTS.toFixed(1)}점 vs 실제 ${row.home_score}점 (${diff > 0 ? "터프샷 폭발🔥" : "슛 난조빙하기❄️"})` });
@@ -1087,7 +1086,6 @@ export default function GameReplay({
     const diff = row.away_score - awayXPTS;
     flowChips.push({ key: "xpts-away", text: `🎯 [${awayTeam.abbr} 슛 퀄리티] 기대득점 ${awayXPTS.toFixed(1)}점 vs 실제 ${row.away_score}점 (${diff > 0 ? "터프샷 폭발🔥" : "슛 난조빙하기❄️"})` });
   }
-  */
 
   // 실시간 라인업 시너지 알럿 (마진 절댓값 10 이상일 때만 표시해 피로도 방지)
   const home5 = bestComboBySize(homeOnCourt, 5);
@@ -1474,7 +1472,18 @@ export default function GameReplay({
   // 자체는 아래 liveSec(교체 이벤트로 재구성, 실측 오차 0.00분)가 따로 계산한다.
   // 진행중에는 min_played가 공식 값이 아니다 - live_collector가 12인 엔트리를 0분으로 미리 넣어 두기 때문에
   // (seed_game_player_stats) 그대로 믿으면 코트 위 선수까지 전원 DNP가 된다. 진행중 출전은 liveSec가 정한다.
-  const isDnp = (p: PlayerMeta) => !live && p.minPlayed != null && Number(p.minPlayed) === 0;
+  const hasSettledMinutes = useMemo(() => players.some((p) => p.minPlayed != null && Number(p.minPlayed) > 0), [players]);
+  const isDnp = (p: PlayerMeta) => {
+    const sec = liveSec.get(p.pcode) ?? 0;
+    if (sec > 0) return false;
+    if (!live && hasSettledMinutes) {
+      return p.minPlayed != null && Number(p.minPlayed) === 0;
+    }
+    const b = box.get(p.pcode);
+    if (!b) return true;
+    const hasStats = b.pts > 0 || b.reb > 0 || b.ast > 0 || b.stl > 0 || b.blk > 0 || b.turnovers > 0 || b.fouls > 0 || b.fga > 0 || b.fta > 0;
+    return !hasStats;
+  };
   const jerseyNum = (p: PlayerMeta) => (p.backNum ? <span className="replay-jersey-num">#{p.backNum}</span> : null);
   const plusMinusCell = (p: PlayerMeta) => {
     const pm = finalPlusMinus.get(p.pcode) ?? 0;

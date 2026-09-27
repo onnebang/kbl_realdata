@@ -289,6 +289,7 @@ function buildGameData(
     objective_prob: e.objective_prob,
   }));
   const derivedEvents = attachDerivedFields(rawEvents);
+  const hasSettledStats = playerStats.some((p) => p.min_played != null && Number(p.min_played) > 0);
   const box: PlayerBox[] = playerStats.map((p) => ({
     pcode: p.pcode,
     tcode: p.tcode,
@@ -306,6 +307,44 @@ function buildGameData(
     fouls: p.fouls ?? 0,
     turnovers: p.turnovers ?? 0,
   }));
+
+  if (!hasSettledStats && derivedEvents.length > 0) {
+    const MAKE_CODES = new Set(["201", "205", "207"]);
+    const MISS_CODES = new Set(["202", "206", "208"]);
+    const FOUL_CODES = new Set(["215", "216", "224"]);
+    for (const row of derivedEvents) {
+      if (!row.pcode || !row.action_code) continue;
+      const b = box.find((x) => x.pcode === row.pcode);
+      if (!b) continue;
+      const code = row.action_code;
+      if (MAKE_CODES.has(code)) {
+        b.pts += code === "205" ? 3 : 2;
+        b.fgm++;
+        b.fga++;
+      } else if (MISS_CODES.has(code)) {
+        b.fga++;
+      } else if (code === "203") {
+        b.pts += 1;
+        b.ftm++;
+        b.fta++;
+      } else if (code === "204") {
+        b.fta++;
+      } else if (code === "209" || code === "210") {
+        b.reb++;
+      } else if (code === "211") {
+        b.ast++;
+      } else if (code === "212") {
+        b.stl++;
+      } else if (code === "213") {
+        b.blk++;
+      } else if (code === "214") {
+        b.turnovers++;
+      } else if (FOUL_CODES.has(code)) {
+        b.fouls++;
+      }
+    }
+  }
+
   const players: PlayerStartInfo[] = playerStats.map((p) => ({ pcode: p.pcode, tcode: p.tcode, isStarter: p.is_starter }));
   const minutesByPcode = new Map(playerStats.map((p) => [p.pcode, p.min_played ?? 0]));
   const usageByPcode = new Map(playerStats.map((p) => [p.pcode, p.usage_rtg ?? 0]));
