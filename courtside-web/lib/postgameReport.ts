@@ -1246,10 +1246,10 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     }
   }
 
-  // 8. 교체·파울트러블 연관 분석
+  // 8. 결정적 교체 타이밍
   {
     const boxByPcode = new Map(box.map((b) => [b.pcode, b]));
-    const items: string[] = [];
+    const subItems: string[] = [];
     const notableSubs = findNotableSubSparks(events, homeTcode)
       .sort((a, b) => Math.abs(b.spark.delta) - Math.abs(a.spark.delta))
       .slice(0, 2);
@@ -1258,18 +1258,89 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       const dir = s.spark.delta > 0 ? "좋아짐" : "나빠짐";
       const { delta, afterDur, homeGain, awayGain } = s.spark;
       const sTcode = boxByPcode.get(s.pcode)?.tcode ?? null;
-      items.push(
-        `${liOpen(sTcode)}${playerTag(name, sTcode)}${iGa(name)} ${jumpLink(s.idx, clockStr(s.row))} 투입된 뒤 팀 흐름이 뚜렷하게 ${dir}(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${teamTag(homeTcode, homeTname)} ${homeGain}점 · ${teamTag(awayTcode, awayTname)} ${awayGain}점).</li>`
+      subItems.push(
+        `${liOpen(sTcode)}🔄 ${playerTag(name, sTcode)}${iGa(name)} ${jumpLink(s.idx, clockStr(s.row))} 투입된 뒤 팀 흐름이 뚜렷하게 ${dir}(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${teamTag(homeTcode, homeTname)} ${homeGain}점 · ${teamTag(awayTcode, awayTname)} ${awayGain}점).</li>`
       );
     }
+    if (subItems.length) sections.push({ title: "결정적 교체 타이밍", html: `<ul class="report-list">${subItems.join("")}</ul>` });
+    
+    // 8.5 파울 트러블 스노우볼 효과 (Foul Trouble Snowball)
+    const foulItems: string[] = [];
     for (const fe of findFoulTroubleEvents(events)) {
       const runInfo = checkOpponentRunAfterFoulTrouble(events, fe, homeTcode);
       if (!runInfo) continue;
       const name = boxByPcode.get(fe.key)?.name ?? "";
       const feTcode = boxByPcode.get(fe.key)?.tcode ?? null;
-      items.push(`${liOpen(feTcode)}${playerTag(name, feTcode)}${iGa(name)} ${jumpLink(fe.endIdx, clockStr(fe.endRow))} 무렵 파울트러블(${fmtDuration(fe.durationSec)} 만에 파울 ${fe.count}개)에 걸린 뒤, 상대가 ${runInfo.maxOppRun}점 런을 탐.</li>`);
+      const t = metaOf(feTcode);
+      if (!t) continue;
+      const oppTname = feTcode === homeTcode ? awayTname : homeTname;
+      const oppTcode = feTcode === homeTcode ? awayTcode : homeTcode;
+      
+      foulItems.push(`${liOpen(feTcode)}⚠️ ${playerTag(name, feTcode)}${iGa(name)} ${jumpLink(fe.endIdx, clockStr(fe.endRow))} 무렵 파울트러블(${fmtDuration(fe.durationSec)} 만에 반칙 ${fe.count}개 누적)에 걸려 코트를 비운 사이, <b>${teamTag(oppTcode, oppTname)}에게 ${runInfo.maxOppRun}점 연속 득점(런)</b>을 허용하며 뼈아픈 스노우볼이 되었습니다.</li>`);
     }
-    if (items.length) sections.push({ title: "교체·파울트러블 연관 분석", html: `<ul class="report-list">${items.join("")}</ul>` });
+    if (foulItems.length) sections.push({ title: "파울 트러블 스노우볼 효과", html: `<ul class="report-list">${foulItems.join("")}</ul>` });
+  }
+
+  // 8.7 클러치 타임 현미경 (Clutch Time Anatomy)
+  {
+    const last5Events = events.filter(e => {
+       if (e.quarter === 'PRE' || e.quarter === 'Q1' || e.quarter === 'Q2' || e.quarter === 'Q3') return false;
+       return (e.quarter === 'Q4' && e.elapsed >= 2100) || e.quarter.startsWith('OT');
+    });
+    
+    // Check if it was a clutch game (margin <= 5 at any point in last 5 mins)
+    const isClutchGame = last5Events.some(e => Math.abs(e.home_score - e.away_score) <= 5);
+    
+    if (isClutchGame && last5Events.length > 0) {
+       let hPts = 0, aPts = 0;
+       let hFGA = 0, hFGM = 0, aFGA = 0, aFGM = 0;
+       let hTO = 0, aTO = 0;
+       
+       for (const e of last5Events) {
+         if (!e.tcode) continue;
+         const isHome = e.tcode === homeTcode;
+         const lbl = e.action_label || "";
+         
+         if (lbl.includes("성공")) {
+            if (lbl.includes("3점슛")) { if (isHome) hPts += 3; else aPts += 3; }
+            else if (lbl.includes("자유투")) { if (isHome) hPts += 1; else aPts += 1; }
+            else if (lbl.includes("슛") || lbl.includes("팁인") || lbl.includes("덩크")) { if (isHome) hPts += 2; else aPts += 2; }
+         }
+         
+         if (lbl.includes("슛") && !lbl.includes("자유투")) {
+            if (isHome) hFGA++; else aFGA++;
+            if (lbl.includes("성공")) { if (isHome) hFGM++; else aFGM++; }
+         } else if (lbl.includes("팁인") || lbl.includes("덩크")) {
+            if (isHome) hFGA++; else aFGA++;
+            if (lbl.includes("성공")) { if (isHome) hFGM++; else aFGM++; }
+         }
+         
+         if (lbl.includes("턴오버")) {
+            if (isHome) hTO++; else aTO++;
+         }
+       }
+       
+       const hPct = hFGA > 0 ? Math.round((hFGM / hFGA) * 100) : 0;
+       const aPct = aFGA > 0 ? Math.round((aFGM / aFGA) * 100) : 0;
+       
+       const items: string[] = [];
+       items.push(`${liOpen(homeTcode)}${teamTag(homeTcode, homeTname)} - 클러치 구간 득점 <b>${hPts}점</b> (야투 ${hFGM}/${hFGA} <b>${hPct}%</b>), 턴오버 <b>${hTO}개</b></li>`);
+       items.push(`${liOpen(awayTcode)}${teamTag(awayTcode, awayTname)} - 클러치 구간 득점 <b>${aPts}점</b> (야투 ${aFGM}/${aFGA} <b>${aPct}%</b>), 턴오버 <b>${aTO}개</b></li>`);
+       
+       let summary = "";
+       if (hPts > aPts + 3) {
+         summary = `${teamTag(homeTcode, homeTname)}${iGa(homeTname)} 숨 막히는 승부처에서 놀라운 집중력을 발휘하며 상대를 제압했습니다.`;
+       } else if (aPts > hPts + 3) {
+         summary = `${teamTag(awayTcode, awayTname)}${iGa(awayTname)} 피 말리는 승부처에서 강심장을 뽐내며 경기 후반 흐름을 지배했습니다.`;
+       } else {
+         summary = `양 팀 모두 마지막까지 한 치의 양보도 없는 팽팽한 혈투를 벌였습니다.`;
+       }
+       
+       sections.push({ 
+         title: "클러치 타임 현미경 (종료 5분 전)", 
+         html: `<p class="report-text">🔍 ${summary}</p><ul class="report-list">${items.join("")}</ul>` 
+       });
+    }
   }
 
   // 9. 역대 맞대결의 매듭 - 이 경기 이전까지 이어지던 맞대결 연승이 끊겼는지 이어졌는지.
