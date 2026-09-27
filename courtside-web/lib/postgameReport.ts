@@ -1410,6 +1410,73 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     });
   }
 
+  // 8.9 에이스 정면승부 성적표 (Head-to-Head Duel)
+  {
+    const hStar = teamTopPerformer(box, homeTcode);
+    const aStar = teamTopPerformer(box, awayTcode);
+    
+    if (hStar && aStar) {
+      const segs = buildLineupSegments(events, box, homeTcode, awayTcode);
+      let duelSec = 0;
+      let hPts = 0;
+      let aPts = 0;
+      
+      for (const s of segs) {
+        if (s.homeOn.includes(hStar.pcode) && s.awayOn.includes(aStar.pcode)) {
+          duelSec += s.seconds;
+          hPts += s.homePts;
+          aPts += s.awayPts;
+        }
+      }
+      
+      if (duelSec >= 300) { // 최소 5분 이상 동시 출전
+        const onD = hPts - aPts; // 홈팀 기준 마진
+        const hName = hStar.name;
+        const aName = aStar.name;
+        let duelSummary = "";
+        
+        if (onD >= 5) {
+          duelSummary = `${teamTag(homeTcode, homeTname)}${iGa(homeTname)} <b>${hName}</b>${eunNeun(hName)} <b>${aName}</b>와의 에이스 맞대결 구간(${fmtDuration(duelSec)})에서 팀을 <b>+${onD}점</b>(${hPts}-${aPts}) 우위로 이끌며 자존심 싸움에서 판정승을 거두었습니다.`;
+        } else if (onD <= -5) {
+          duelSummary = `${teamTag(awayTcode, awayTname)}${iGa(awayTname)} <b>${aName}</b>${eunNeun(aName)} <b>${hName}</b>와의 에이스 정면승부 구간(${fmtDuration(duelSec)})에서 팀을 <b>+${Math.abs(onD)}점</b>(${aPts}-${hPts}) 우위로 이끌며 완승했습니다.`;
+        } else {
+          duelSummary = `양 팀의 에이스 <b>${hName}</b>와 <b>${aName}</b>${eunNeun(aName)} 코트에 동시 출전한 ${fmtDuration(duelSec)} 동안 스코어 <b>${hPts}-${aPts}</b>로 우열을 가리기 힘든 호각세를 보였습니다.`;
+        }
+        
+        sections.push({ 
+          title: "에이스 정면승부 성적표 (Head-to-Head Duel)", 
+          html: `<p class="report-text">🥊 ${duelSummary}</p>` 
+        });
+      }
+    }
+  }
+
+  // 8.10 주가 변동 리포트 (Player Stock Up & Down)
+  {
+    // 게임스코어(gameScore) 기준으로 가장 잘한 선수와 부진한 선수 추출
+    const sortedDesc = [...box]
+      .filter(p => (p.pts > 0 || p.fga > 0 || p.reb > 0 || p.ast > 0))
+      .sort((a, b) => gameScore(b) - gameScore(a));
+      
+    // 상한가는 게임스코어 15 이상인 선수 중 1위
+    const best = sortedDesc.find(p => gameScore(p) >= 15);
+    // 하한가는 야투 5개 이상 시도했거나 턴오버 3개 이상이면서 게임스코어가 5 이하인 선수 중 최하위
+    const worst = [...sortedDesc].reverse().find(p => (p.fga >= 5 || p.turnovers >= 3 || p.fouls >= 4) && gameScore(p) <= 5);
+    
+    if (best && worst && best.pcode !== worst.pcode) {
+       const items: string[] = [];
+       
+       items.push(`<li>📈 <b>상한가: ${playerTag(best.name, best.tcode)}</b> - 오늘 <b>${best.pts}점 ${best.reb}리바운드 ${best.ast}어시스트</b>를 쏟아부으며 게임스코어 <b>${gameScore(best).toFixed(1)}</b>을 기록, 다음 라운드 OVR 떡상이 유력합니다!</li>`);
+       
+       items.push(`<li>📉 <b>하한가: ${playerTag(worst.name, worst.tcode)}</b> - 오늘 <b>${worst.pts}점 (야투 ${worst.fgm}/${worst.fga})</b>, 턴오버 <b>${worst.turnovers}개</b>에 그치며 유독 고전했습니다. 하루빨리 폼 회복이 시급합니다.</li>`);
+       
+       sections.push({ 
+         title: "주가 변동 리포트 (Stock Up & Down)", 
+         html: `<ul class="report-list">${items.join("")}</ul>` 
+       });
+    }
+  }
+
   // 9. 역대 맞대결의 매듭 - 이 경기 이전까지 이어지던 맞대결 연승이 끊겼는지 이어졌는지.
   // getHeadToHead는 원래 전 맞대결을 받아 놓고 5경기만 쓰고 버렸다 - 그 행에서 연승만 더 센다.
   if (input.h2h?.streak && input.h2h.streak.length >= H2H_MIN_STREAK) {
