@@ -949,16 +949,24 @@ export default function GameReplay({
 
   const { homeXPTS, awayXPTS } = useMemo(() => {
     let hX = 0, aX = 0;
+    const fgaCount = new Map<string, number>();
+    
     for (const s of shots) {
-      const sIdx = shotToEventIdx.get(s);
-      if (sIdx != null && sIdx <= idx) {
+      if (!s.pcode) continue;
+      
+      // 박스스코어(idx 시점 기준)에 집계된 선수의 총 FGA(3점 포함)만큼만 shots에서 누적
+      const maxFga = box.get(s.pcode)?.fga ?? 0;
+      const seen = fgaCount.get(s.pcode) ?? 0;
+      
+      if (seen < maxFga) {
+        fgaCount.set(s.pcode, seen + 1);
         const xp = shotXPTS(s.x, s.y, s.d);
         if (s.tcode === homeTeam.tcode) hX += xp;
         else if (s.tcode === awayTeam.tcode) aX += xp;
       }
     }
     return { homeXPTS: hX, awayXPTS: aX };
-  }, [shots, shotToEventIdx, idx, homeTeam.tcode, awayTeam.tcode]);
+  }, [shots, box, homeTeam.tcode, awayTeam.tcode]);
 
   // 실시간 체력 모니터링 (현재 코트 위 선수들이 휴식 없이 몇 분째 뛰고 있는지)
   const stintSec = useMemo(() => {
