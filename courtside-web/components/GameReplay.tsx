@@ -942,6 +942,28 @@ export default function GameReplay({
     [eventsUpToIdx, row.elapsed]
   );
   const droughts = useMemo(() => computeCurrentDroughts(eventsUpToIdx), [eventsUpToIdx]);
+
+  // 실시간 라인업 시너지 계산을 위해 OnCourt 정보를 위로 끌어올림
+  const homeOnCourt = useMemo(() => currentOnCourt(events, idx, players, homeTeam.tcode), [events, idx, players, homeTeam.tcode]);
+  const awayOnCourt = useMemo(() => currentOnCourt(events, idx, players, awayTeam.tcode), [events, idx, players, awayTeam.tcode]);
+  const ratingLookup = (pcodes: string[]) => (lineupRatings ?? {})[comboKey(pcodes)];
+  function bestComboBySize(lineup: Set<string>, size: number): { pcodes: string[]; rating: LineupRating } | null {
+    const arr = Array.from(lineup);
+    if (arr.length < size) return null;
+    let best: { pcodes: string[]; rating: LineupRating } | null = null;
+    const combos = (pool: string[], n: number): string[][] => {
+      if (n === 0) return [[]];
+      if (pool.length < n) return [];
+      const [first, ...rest] = pool;
+      return [...combos(rest, n - 1).map((c) => [first, ...c]), ...combos(rest, n)];
+    };
+    for (const combo of combos(arr, size)) {
+      const rating = ratingLookup(combo);
+      if (rating && (!best || rating.netRatingPer40 > best.rating.netRatingPer40)) best = { pcodes: combo, rating };
+    }
+    return best;
+  }
+
   const flowChips: { key: string; text: string }[] = [];
   for (const s of liveStreaks) {
     const name = nameByPcode.get(s.pcode) ?? s.pcode;
@@ -996,6 +1018,29 @@ export default function GameReplay({
   }
   if (homeTeamFouls >= 5) flowChips.push({ key: "team-foul-home", text: `🚨 ${homeTeam.abbr} 팀파울 (현재 쿼터)` });
   if (awayTeamFouls >= 5) flowChips.push({ key: "team-foul-away", text: `🚨 ${awayTeam.abbr} 팀파울 (현재 쿼터)` });
+
+  // 클러치 타임 알럿: 4쿼터 또는 연장전 종료 5분 전, 5점 차 이내
+  const isClutchTime =
+    (row.quarter === "Q4" || row.quarter.startsWith("EQ")) &&
+    row.clock_min != null &&
+    (row.clock_min < 5 || (row.clock_min === 5 && row.clock_sec === 0)) &&
+    Math.abs(row.home_score - row.away_score) <= 5;
+  
+  if (isClutchTime) {
+    flowChips.push({ key: "clutch-time", text: "🚨 클러치 타임 돌입! (종료 5분 전, 5점 차 이내 접전)" });
+  }
+
+  // 실시간 라인업 시너지 알럿 (마진 절댓값 10 이상일 때만 표시해 피로도 방지)
+  const home5 = bestComboBySize(homeOnCourt, 5);
+  if (home5 && Math.abs(home5.rating.netRatingPer40) >= 10) {
+    const isGood = home5.rating.netRatingPer40 > 0;
+    flowChips.push({ key: "synergy-home", text: `${isGood ? "🔥" : "⚠️"} [${homeTeam.abbr} 코트 위 5인] 정규시즌 마진 ${fmtRating(home5.rating.netRatingPer40)}` });
+  }
+  const away5 = bestComboBySize(awayOnCourt, 5);
+  if (away5 && Math.abs(away5.rating.netRatingPer40) >= 10) {
+    const isGood = away5.rating.netRatingPer40 > 0;
+    flowChips.push({ key: "synergy-away", text: `${isGood ? "🔥" : "⚠️"} [${awayTeam.abbr} 코트 위 5인] 정규시즌 마진 ${fmtRating(away5.rating.netRatingPer40)}` });
+  }
 
   for (const p of players) {
     const b = box.get(p.pcode);
@@ -1069,25 +1114,6 @@ export default function GameReplay({
   // 시점의 온코트 5인을 교체(101 IN/102 OUT) 이벤트로 재구성(lib/gameLineups.ts, 시작
   // 라인업은 is_starter 기준)한 뒤, page.tsx가 미리 조회해둔 lineupRatings에서 그 5인 및
   // 부분조합의 통산 넷레이팅을 찾음(스크럽 중 네트워크 호출 없음).
-  const homeOnCourt = useMemo(() => currentOnCourt(events, idx, players, homeTeam.tcode), [events, idx, players, homeTeam.tcode]);
-  const awayOnCourt = useMemo(() => currentOnCourt(events, idx, players, awayTeam.tcode), [events, idx, players, awayTeam.tcode]);
-  const ratingLookup = (pcodes: string[]) => (lineupRatings ?? {})[comboKey(pcodes)];
-  function bestComboBySize(lineup: Set<string>, size: number): { pcodes: string[]; rating: LineupRating } | null {
-    const arr = Array.from(lineup);
-    if (arr.length < size) return null;
-    let best: { pcodes: string[]; rating: LineupRating } | null = null;
-    const combos = (pool: string[], n: number): string[][] => {
-      if (n === 0) return [[]];
-      if (pool.length < n) return [];
-      const [first, ...rest] = pool;
-      return [...combos(rest, n - 1).map((c) => [first, ...c]), ...combos(rest, n)];
-    };
-    for (const combo of combos(arr, size)) {
-      const rating = ratingLookup(combo);
-      if (rating && (!best || rating.netRatingPer40 > best.rating.netRatingPer40)) best = { pcodes: combo, rating };
-    }
-    return best;
-  }
   const lineupLine = (team: TeamMeta, onCourt: Set<string>) => {
     const five = bestComboBySize(onCourt, 5);
     const best3 = bestComboBySize(onCourt, 3);
