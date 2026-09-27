@@ -1490,7 +1490,7 @@ export default function GameReplay({
     }
     const b = box.get(p.pcode);
     if (!b) return true;
-    const hasStats = b.pts > 0 || b.reb > 0 || b.ast > 0 || b.stl > 0 || b.blk > 0 || b.turnovers > 0 || b.fouls > 0 || b.fga > 0 || b.fta > 0;
+    const hasStats = b.pts > 0 || b.reb > 0 || b.ast > 0 || b.stl > 0 || b.blk > 0 || b.to > 0 || b.foul > 0 || b.fga > 0 || b.fta > 0;
     return !hasStats;
   };
   const jerseyNum = (p: PlayerMeta) => (p.backNum ? <span className="replay-jersey-num">#{p.backNum}</span> : null);
