@@ -1201,8 +1201,11 @@ export default function GameReplay({
     ];
     const tens = statsObj.filter((s) => s.val >= 10);
     const nines = statsObj.filter((s) => s.val === 8 || s.val === 9);
+    const twenties = statsObj.filter((s) => s.val >= 20);
 
-    if (tens.length >= 3) {
+    if (twenties.length >= 2) {
+      flowChips.push({ key: `20-20-${p.pcode}`, text: `👑 ${p.name ?? p.pcode} 괴물 같은 활약! 20-20 달성!` });
+    } else if (tens.length >= 3) {
       flowChips.push({ key: `triple-double-${p.pcode}`, text: `🌟 ${p.name ?? p.pcode} 트리플-더블 달성!` });
     } else if (tens.length === 2 && nines.length > 0) {
       flowChips.push({ key: `triple-double-watch-${p.pcode}`, text: `👀 ${p.name ?? p.pcode} 트리플-더블까지 ${nines[0].name} 단 ${10 - nines[0].val}개!` });
@@ -1213,16 +1216,22 @@ export default function GameReplay({
     }
 
     if (b.pts >= 28 && b.pts < 30) {
-      flowChips.push({ key: `30pts-watch-${p.pcode}`, text: `🔥 ${p.name ?? p.pcode} 30득점 돌파까지 단 ${30 - b.pts}점!` });
+      flowChips.push({ key: `30pts-watch-${p.pcode}`, text: `🔥 ${p.name ?? p.pcode} 30득점 고지까지 단 ${30 - b.pts}점!` });
     } else if (b.pts >= 30) {
-      flowChips.push({ key: `30pts-${p.pcode}`, text: `🔥 ${p.name ?? p.pcode} 30득점 돌파! (${b.pts}점)` });
+      flowChips.push({ key: `30pts-${p.pcode}`, text: `🔥 ${p.name ?? p.pcode} 30득점 폭발! (${b.pts}점)` });
     }
 
-    // 붉은 맛 체력바 (Stint Fatigue)
+    // 붉은 맛 체력바 (Stint Fatigue) - 코트 위에 있을 때만 표시
     const cSec = stintSec.get(p.pcode);
-    if (cSec && cSec >= 10 * 60 && (homeOnCourt.has(p.pcode) || awayOnCourt.has(p.pcode))) {
+    if (cSec && (homeOnCourt.has(p.pcode) || awayOnCourt.has(p.pcode))) {
       const min = Math.floor(cSec / 60);
-      flowChips.push({ key: `fatigue-${p.pcode}`, text: `🥵 ${p.name ?? p.pcode} 체력 경고 (휴식 없이 ${min}분째 출전 중)` });
+      const isLateGame = row.quarter === "Q4" || row.quarter.startsWith("OT");
+      // 4쿼터나 연장전엔 8분 연속 출전도 위험, 그 외엔 10분 연속 출전 시 경고
+      const fatigueThreshold = isLateGame ? 8 : 10;
+      
+      if (min >= fatigueThreshold) {
+        flowChips.push({ key: `fatigue-${p.pcode}`, text: `🥵 ${p.name ?? p.pcode} 체력 방전 주의 (교체 없이 ${min}분째 출전 중)` });
+      }
     }
 
     const tPts = p.tcode === homeTeam.tcode ? row.home_score : row.away_score;
