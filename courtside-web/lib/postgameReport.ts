@@ -99,6 +99,17 @@ export const QUARTER_ORDER = ["Q1", "Q2", "Q3", "Q4", "X1", "X2", "X3", "X4", "E
 export function quarterLenSec(q: string) {
   return q === "Q1" || q === "Q2" || q === "Q3" || q === "Q4" ? 600 : 300;
 }
+/**
+ * PRE·정규 4쿼터를 뺀 나머지는 전부 연장전이다(X1~X4든 EQ1~EQ4든, 앞으로 붙을 다른 태그든).
+ * 화이트리스트(`quarter.startsWith("X")` 같은 접두사 매칭)로 판정하면 연장 태그가 하나라도
+ * 다르게 들어오는 순간 그 경기의 연장전 전체가 조용히 누락된다 - 실측(2026-09):
+ * S23G01N219·S37G01N5·S41G01N171 세 경기가 3차 연장(X3)까지 갔는데, 아래 8.7절이
+ * `quarter.startsWith("OT")`로 판정하던 탓에(이 데이터셋엔 "OT"로 시작하는 태그가 아예 없음)
+ * 세 경기 모두 연장전 이벤트가 클러치 리포트에서 통째로 빠졌었다.
+ */
+export function isOvertimeQuarter(q: string): boolean {
+  return q !== "PRE" && q !== "Q1" && q !== "Q2" && q !== "Q3" && q !== "Q4";
+}
 export function cumulativeElapsed(q: string, m: number, s: number): number {
   const idx = QUARTER_ORDER.indexOf(q);
   let prior = 0;
@@ -112,6 +123,10 @@ export function fmtDuration(sec: number): string {
   return `${m}분${s > 0 ? " " + s + "초" : ""}`;
 }
 export function clockStr(e: Pick<GameEvent, "quarter" | "clock_min" | "clock_sec">): string {
+  // clock_min/clock_sec는 DB에서 nullable이다(PRE 행은 항상 null이고, 드물게 실시간 피드가
+  // 흔들리며 실제 이벤트에도 null이 들어올 수 있음) - 그대로 문자열로 이으면 "Q3 null:null"처럼
+  // 깨진 문구가 리포트/점프링크 텍스트에 그대로 노출된다. 시간 정보가 없으면 쿼터 이름만 보여준다.
+  if (e.clock_min == null || e.clock_sec == null) return e.quarter;
   return `${e.quarter} ${e.clock_min}:${String(e.clock_sec).padStart(2, "0")}`;
 }
 
@@ -433,7 +448,7 @@ function findTopWpaSwings(events: GameEvent[], k = 3): { idx: number; row: GameE
 const HIGHLIGHT_ACTION_BONUS: Record<string, number> = { "205": 0.15, "207": 0.2, "213": 0.1, "212": 0.05 };
 function computeHighlightScore(row: GameEvent): number {
   const wpa = Math.abs(row.wpa_home || 0);
-  const isLateClutch = (row.quarter === "Q4" || row.quarter.startsWith("X")) && (row.clock_min ?? 99) < 3;
+  const isLateClutch = (row.quarter === "Q4" || isOvertimeQuarter(row.quarter)) && (row.clock_min ?? 99) < 3;
   return wpa + (isLateClutch ? 0.1 : 0) + (row.action_code ? HIGHLIGHT_ACTION_BONUS[row.action_code] || 0 : 0);
 }
 function findAiPickBestScene(events: GameEvent[], excludeIdx: Set<number>): { idx: number; row: GameEvent } | null {
@@ -1009,7 +1024,9 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
         // 득점한 선수와 승률이 오른 팀이 다를 수 있다(자책성 상황·자유투 유도 등). 그래서
         // 두 조각을 각자의 tcode로 따로 칠한다. li 마커는 득점한 선수 쪽 팀 색.
         const benefitTcode = homeBenefits ? homeTcode : awayTcode;
-        return `${liOpen(row.tcode)}${jumpLink(s.idx, clockStr(row))}, ${row.home_score}-${row.away_score} 상황 ${playerTag(row.player_name ?? "", row.tcode)}의 ${row.action_label} - ${teamTag(benefitTcode, beneficiary)} 승률 ${beforeProb}%→${afterProb}%로 상승.</li>`;
+        // action_label은 DB 컬럼이 아니라 action_code로 참조 맵을 찾아 호출부가 붙여준 값이다 -
+        // 맵에 없는(신설/미등록) action_code면 null로 들어와 문장에 그대로 "null"이 새는 걸 막는다.
+        return `${liOpen(row.tcode)}${jumpLink(s.idx, clockStr(row))}, ${row.home_score}-${row.away_score} 상황 ${playerTag(row.player_name ?? "", row.tcode)}의 ${row.action_label ?? "결정적 장면"} - ${teamTag(benefitTcode, beneficiary)} 승률 ${beforeProb}%→${afterProb}%로 상승.</li>`;
       })
       .join("");
     sections.push({ title: "승패의 분수령 (WPA Swing Analysis)", html: `<ul class="report-list">${items}</ul>` });
@@ -1022,7 +1039,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     if (best) {
       sections.push({
         title: "AI 선정 베스트 장면",
-        html: `<p class="report-text">✨ ${jumpLink(best.idx, clockStr(best.row))}, ${playerTag(best.row.player_name ?? "", best.row.tcode)}의 ${best.row.action_label} - 이 경기에서 가장 짜릿했던 순간.</p>`,
+        html: `<p class="report-text">✨ ${jumpLink(best.idx, clockStr(best.row))}, ${playerTag(best.row.player_name ?? "", best.row.tcode)}의 ${best.row.action_label ?? "결정적 장면"} - 이 경기에서 가장 짜릿했던 순간.</p>`,
       });
     }
   }
@@ -1290,12 +1307,13 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     if (foulItems.length) sections.push({ title: "파울 트러블 스노우볼 효과", html: `<ul class="report-list">${foulItems.join("")}</ul>` });
   }
 
-  // 8.7 클러치 타임 현미경 (Clutch Time Anatomy)
+  // 8.7 클러치 타임 현미경 (Clutch Time Anatomy) - 4쿼터 마지막 5분(elapsed>=2100) + 연장전
+  // 전체(연장은 한 절이 5분뿐이라 "마지막 5분"이 곧 절 전체). 버그였던 지점: 예전엔
+  // `quarter.startsWith('OT')`로 판정했는데 이 데이터셋의 연장 태그는 X1~X4/EQ1~EQ4라
+  // "OT"로 시작하는 게 하나도 없다 - 실제로 3차 연장까지 간 경기 세 건(위 isOvertimeQuarter
+  // 주석 참고)에서 연장전 전체가 이 절에서 빠지고 있었다.
   {
-    const last5Events = events.filter(e => {
-       if (e.quarter === 'PRE' || e.quarter === 'Q1' || e.quarter === 'Q2' || e.quarter === 'Q3') return false;
-       return (e.quarter === 'Q4' && e.elapsed >= 2100) || e.quarter.startsWith('OT');
-    });
+    const last5Events = events.filter((e) => (e.quarter === "Q4" && e.elapsed >= 2100) || isOvertimeQuarter(e.quarter));
     
     // Check if it was a clutch game (margin <= 5 at any point in last 5 mins)
     const isClutchGame = last5Events.some(e => Math.abs(e.home_score - e.away_score) <= 5);
