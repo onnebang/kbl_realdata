@@ -45,7 +45,7 @@ import {
   prevSeasonName,
   PRESEASON_SEASON,
 } from "@/lib/seasonFocus";
-import { aggregateCareer, getPlayerWpaBySeason } from "@/lib/playerPageData";
+import { aggregateCareer, getPlayerWpaBySeason, OPEN_MATCH_CATEGORY } from "@/lib/playerPageData";
 import { getCareerGrain, type CareerGrain, type CareerNight } from "@/lib/careerGrain";
 import { buildCareerStripSvg, buildCareerStripRowsSvg, CELL_MAX_W, GAP_RESERVE } from "@/lib/careerStrip";
 import { getPlayerForm, type PlayerForm } from "@/lib/playerForm";
@@ -618,15 +618,18 @@ export default async function PlayerPage({
   // 득점 분석(요청 - ESPN 르브론 제임스 득점 인포그래픽) - careerRows 하나로 전부 집계.
   // 팀명은 현재 연고 기준(PRESEASON_SEASON)으로 통일 - "그 경기 당시 이름"이 아니라
   // "지금 이 팀을 뭐라고 부르나"(displayTeamName의 나머지 페이지와 같은 태도).
-  const careerPts = careerRows.reduce((s, r) => s + r.pts, 0);
-  const teamPtsRows = aggregateByTeam(careerRows, teamByTcode, PRESEASON_SEASON);
+  // "커리어" 스코프는 aggregateCareer/getPlayerForm과 같은 정규+PO다 - 오픈매치(전시경기,
+  // 2026-27시즌 신설)는 걷어낸다. 안 그러면 개막 전까지 "커리어 득점"에 전시경기가 끼어든다.
+  const scoringRows = careerRows.filter((r) => r.seasonCategory !== OPEN_MATCH_CATEGORY);
+  const careerPts = scoringRows.reduce((s, r) => s + r.pts, 0);
+  const teamPtsRows = aggregateByTeam(scoringRows, teamByTcode, PRESEASON_SEASON);
   const teamPieSvg = teamPtsRows.length > 0 ? buildTeamPieSvg(teamPtsRows, careerPts) : "";
-  const seasonBarSvg = buildSeasonBarSvg(aggregateBySeason(careerRows), careerPts);
-  const zoneStats = aggregateZones(careerRows);
+  const seasonBarSvg = buildSeasonBarSvg(aggregateBySeason(scoringRows), careerPts);
+  const zoneStats = aggregateZones(scoringRows);
   const zoneSvg = buildZoneSvg(zoneStats, careerPts);
   const detailed5Zones = computeDetailed5Zones(careerShots, zoneStats, careerPts);
   const detailed5ZoneSvg = buildDetailed5ZoneSvg(detailed5Zones, careerPts);
-  const koreaMapSvg = buildKoreaMapSvg(aggregateByOpponent(careerRows, teamByTcode, PRESEASON_SEASON), careerPts);
+  const koreaMapSvg = buildKoreaMapSvg(aggregateByOpponent(scoringRows, teamByTcode, PRESEASON_SEASON), careerPts);
   const onOff = onOffMap.get(pcode) ?? null;
   
   // OVR 히스토리 데이터 

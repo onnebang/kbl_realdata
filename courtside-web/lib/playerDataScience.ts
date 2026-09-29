@@ -4,6 +4,10 @@ import { classifyShot } from "./formIndex";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import { buildDensityFieldSvg } from "./shotDensityField";
 
+// playerPageData.ts가 이 파일을 이미 import하므로(COMBO_MIN_MINUTES 등) 그 반대 방향으로 상수를
+// 끌어오면 순환 참조가 된다 - teamSeasonStats.ts와 같은 이유로 리터럴을 로컬에 다시 둔다.
+const OPEN_MATCH_CATEGORY = "OPEN MATCH DAY";
+
 // 선수 프로필 "데이터 사이언스" 대개편의 데이터 레이어 - 퍼센타일/클러치/시너지/슈팅 DNA/
 // 히어로 별자리(커리어 슛 전체). GROUP BY 집계가 필요한 두 가지(시즌 전체 선수 풀, 클러치
 // 프로필)는 PostgREST로는 불가능해서 이번에 만든 RPC(마이그레이션 player_profile_datasci_rpc,
@@ -29,14 +33,18 @@ async function computeCareerShots(pcode: string): Promise<CareerShot[]> {
     made: boolean;
     tcode: string;
     quarter: string;
-    games: { season_name: string } | { season_name: string }[];
+    games: { season_name: string; season_category: string } | { season_name: string; season_category: string }[];
   };
   const rows = await fetchAllPagesBounded<Row>(
     (from, to) =>
       supabase
         .from("shot_log")
-        .select("x, y, d, made, tcode, quarter, games!inner(season_name)", { count: "exact" })
+        .select("x, y, d, made, tcode, quarter, games!inner(season_name, season_category)", { count: "exact" })
         .eq("pcode", pcode)
+        // "커리어"는 정규+PO 스코프다(다른 커리어 집계와 동일) - 오픈매치(전시경기, 2026-27시즌
+        // 신설)는 season_name은 같아도 여기 안 든다. 안 그러면 개막 전까지 슈팅 DNA·별자리·
+        // 시즌별 슛차트에 전시경기 슛이 "2026-27 시즌" 행세를 한다.
+        .neq("games.season_category", OPEN_MATCH_CATEGORY)
         .range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: unknown; count: number | null }>
   );
   return rows.map((r) => {
