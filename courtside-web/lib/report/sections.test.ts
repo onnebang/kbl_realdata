@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { computeLineupSynergy, renderLineupSynergySection } from "./lineupSynergy";
 import { computeHotZoneEdge, renderHotZoneSection } from "./shotHotZone";
+import { computeAceDuel, DUEL_DECISIVE_PTS, DUEL_MIN_SEC } from "./aceDuel";
 import { createReportTags } from "./renderKit";
 import type { LineupSegment } from "../postgameReport";
 import type { ShotRow } from "../zoneCompare";
 
-// postgameReport.ts에서 떼어낸 두 섹션의 **계산 층**을 직접 고정한다. 예전엔
+// postgameReport.ts에서 떼어낸 섹션들의 **계산 층**을 직접 고정한다. 예전엔
 // buildPostgameReport() 전체를 돌리지 않으면 이 임계값들을 확인할 방법이 없었다.
 
 const homeTeam = { tcode: "H", name: "홈팀", abbr: "홈", color: "#111111" };
@@ -123,5 +124,43 @@ describe("computeHotZoneEdge", () => {
     expect(
       computeHotZoneEdge({ shots: [], teamThrees: threes(10, 0), homeTcode: "H", awayTcode: "A", homeScore: 80, awayScore: 70 })
     ).toBeNull();
+  });
+});
+
+describe("computeAceDuel", () => {
+  const home = { team: homeTeam, star: { pcode: "p1", name: "홈에이스" } };
+  const away = { team: awayTeam, star: { pcode: "a1", name: "원정에이스" } };
+  const segs: LineupSegment[] = [
+    { homeOn: ["p1", "p2"], awayOn: ["a1", "a2"], seconds: 200, homePts: 14, awayPts: 6 },
+    { homeOn: ["p1", "p3"], awayOn: ["a1", "a3"], seconds: 150, homePts: 10, awayPts: 9 },
+    // 원정 에이스가 빠진 구간 - 마진 +30이라 섞이면 판정이 뒤집힌다(제외되는지 확인용).
+    { homeOn: ["p1", "p3"], awayOn: ["a2", "a3"], seconds: 400, homePts: 30, awayPts: 0 },
+  ];
+  const duelOf = (homePts: number, awayPts: number) =>
+    computeAceDuel([{ homeOn: ["p1"], awayOn: ["a1"], seconds: DUEL_MIN_SEC, homePts, awayPts }], home, away)!;
+
+  it("두 에이스가 같이 있던 구간만 합산한다(나머지는 통째로 무시)", () => {
+    const d = computeAceDuel(segs, home, away)!;
+    expect(d.seconds).toBe(350);
+    expect(d.home.pts).toBe(24);
+    expect(d.away.pts).toBe(15);
+    expect(d.margin).toBe(9);
+    expect(d.verdict).toBe("home");
+  });
+
+  it("동시 출전이 DUEL_MIN_SEC 미만이면 섹션을 만들지 않는다", () => {
+    const short: LineupSegment[] = [{ homeOn: ["p1"], awayOn: ["a1"], seconds: DUEL_MIN_SEC - 1, homePts: 40, awayPts: 0 }];
+    expect(computeAceDuel(short, home, away)).toBeNull();
+  });
+
+  it("±DUEL_DECISIVE_PTS 경계 - 한 점 모자라면 호각세", () => {
+    expect(duelOf(20 + DUEL_DECISIVE_PTS - 1, 20).verdict).toBe("even");
+    expect(duelOf(20 + DUEL_DECISIVE_PTS, 20).verdict).toBe("home");
+    expect(duelOf(20, 20 + DUEL_DECISIVE_PTS - 1).verdict).toBe("even");
+    expect(duelOf(20, 20 + DUEL_DECISIVE_PTS).verdict).toBe("away");
+  });
+
+  it("한쪽 에이스가 없으면 null(박스스코어가 비어 topOf가 못 고르는 경우)", () => {
+    expect(computeAceDuel(segs, home, { team: awayTeam, star: null })).toBeNull();
   });
 });

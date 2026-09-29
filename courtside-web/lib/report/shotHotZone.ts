@@ -1,6 +1,6 @@
 import { eunNeun } from "../josa";
 import { teamZoneStats, type ShotRow } from "../zoneCompare";
-import type { ReportSection, ReportTags, ReportTeamMeta } from "./renderKit";
+import type { HtmlSection, ReportTags, ReportTeamMeta } from "./renderKit";
 
 // ---------------------------------------------------------------------------
 // 슈팅 핫존 & 콜드존 (Spatial Shot Analysis)
@@ -102,7 +102,7 @@ export function computeHotZoneEdge(input: HotZoneInput): HotZoneEdge | null {
 export function renderHotZoneSection(
   edge: HotZoneEdge,
   ctx: { homeTeam: ReportTeamMeta; awayTeam: ReportTeamMeta; tags: ReportTags }
-): ReportSection {
+): HtmlSection {
   const { homeTeam, awayTeam, tags } = ctx;
   const metaOf = (side: "home" | "away") => (side === "home" ? homeTeam : awayTeam);
   const statOf = (z: ZoneTotal, side: "home" | "away") => (side === "home" ? z.home : z.away);

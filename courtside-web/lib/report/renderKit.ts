@@ -1,4 +1,5 @@
 import { teamInkPair } from "../teamAccent";
+import type { AceDuel } from "./aceDuel";
 
 // postgameReport.ts(1,500줄)에서 **렌더링 프리미티브만** 떼어낸 모듈. 섹션별 분석 모듈
 // (lineupSynergy.ts, shotHotZone.ts, ...)이 팀 색·약어 칩을 쓰려면 이게 필요한데,
@@ -11,7 +12,29 @@ import { teamInkPair } from "../teamAccent";
 /** 리포트가 선수·팀 이름에 색과 약어를 붙이는 데 필요한 최소 정보. */
 export type ReportTeamMeta = { tcode: string; name: string; abbr: string; color: string | null };
 
-export type ReportSection = { title: string; html: string };
+/** 문자열 HTML을 만드는 섹션. 아직 옮기지 않은 섹션 전부와 render*Section() 반환값. */
+export type HtmlSection = { title: string; html: string };
+/** 타입 있는 데이터만 내려보내고 렌더는 컴포넌트가 하는 섹션. */
+export type DataSection = { title: string; data: ReportSectionData };
+
+/**
+ * 리포트 한 섹션. 지금은 두 형태가 공존한다:
+ * - `html`: 원본(courtside_template.html) 그대로의 문자열 조립.
+ * - `data`: components/report/*.tsx가 JSX로 렌더하는 구조화 데이터
+ *   (lib/matchupInsights.ts + components/InsightCard.tsx가 이미 쓰는 방식과 같다).
+ *
+ * 섹션 단위로 하나씩 `data`로 옮긴다 - 22개를 한 번에 바꾸면 문장 하나가 조용히 달라져도
+ * 알아채기 어렵고, `.report-text b`(금색)/`.report-list b`(--ink)가 `.report-team`을 이기는
+ * CSS 특이도(app/globals.css 주석) 때문에 마크업이 한 겹만 달라져도 색이 바뀐다. 그래서
+ * 옮긴 섹션은 렌더 결과가 기존 문자열과 바이트 단위로 같은지 테스트로 고정한다
+ * (components/report/AceDuelSection.test.tsx).
+ */
+export type ReportSection = HtmlSection | DataSection;
+
+/** `data` 섹션의 판별 유니온 - 섹션을 옮길 때마다 한 종류씩 늘어난다. 종류가 둘 이상이 되면
+ *  app/games/[gmkey]/page.tsx의 렌더 자리가 타입 에러로 분기를 요구한다(그때 dispatcher를
+ *  만들면 된다 - 미리 만들어 두지 않는다). */
+export type ReportSectionData = AceDuel;
 
 export const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 

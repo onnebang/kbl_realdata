@@ -1,4 +1,4 @@
-import { fmtDuration, type ReportSection, type ReportTags, type ReportTeamMeta } from "./renderKit";
+import { fmtDuration, type HtmlSection, type ReportTags, type ReportTeamMeta } from "./renderKit";
 // 타입만 가져온다(런타임 import 아님) - postgameReport.ts가 이 모듈을 import하므로
 // 값을 가져오면 순환이 된다. buildLineupSegments()는 호출부(postgameReport.ts)가 이미
 // 돌려서 세그먼트를 넘겨주므로 여기선 계산 결과만 받는다.
@@ -69,7 +69,7 @@ export type SynergyEntry = { team: ReportTeamMeta; synergy: LineupSynergy };
 export function renderLineupSynergySection(
   entries: SynergyEntry[],
   ctx: { tags: ReportTags; nameOf: (pcode: string) => string }
-): ReportSection | null {
+): HtmlSection | null {
   const { tags, nameOf } = ctx;
   const items: string[] = [];
   for (const { team, synergy } of entries) {

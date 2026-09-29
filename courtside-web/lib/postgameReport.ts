@@ -3,12 +3,14 @@ import { shotXPTS, type ShotRow } from "./zoneCompare";
 import type { H2H, SeasonStats } from "./matchups";
 // 섹션별 분석은 report/ 아래로 하나씩 옮기는 중이다(계산/문장 분리, report/renderKit.ts 주석 참고).
 // 의존 방향은 여기 -> report/* 한쪽뿐. 옮겨간 타입·함수는 하위호환을 위해 그대로 re-export한다.
-import { createReportTags, fmtDuration, type ReportSection, type ReportTeamMeta } from "./report/renderKit";
+import { createReportTags, fmtDuration, type ReportSection, type ReportSectionData, type ReportTeamMeta } from "./report/renderKit";
 import { computeLineupSynergy, renderLineupSynergySection, type FiveManUnit } from "./report/lineupSynergy";
 import { computeHotZoneEdge, renderHotZoneSection } from "./report/shotHotZone";
+import { computeAceDuel, type AceDuel } from "./report/aceDuel";
 
 export { fmtDuration };
-export type { ReportSection, ReportTeamMeta };
+export type { ReportSection, ReportSectionData, ReportTeamMeta };
+export type { AceDuel };
 
 // courtside_template.html(35차, "경기가 종료되면 주요 이벤트들을 하나의 보고서로")의
 // A1-A8 분석 엔진을 TypeScript로 포팅 - 원본은 클라이언트에 미리 구운 JSON(timeline 배열)을
@@ -1519,43 +1521,16 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
   }
 
   // 8.9 에이스 정면승부 성적표 (Head-to-Head Duel)
+  // 이 섹션만 문자열 HTML이 아니라 타입 있는 data로 내려보낸다(renderKit.ts의 ReportSection
+  // 주석 참고) - 문장은 components/report/AceDuelSection.tsx가 JSX로 만든다. 계산은
+  // report/aceDuel.ts.
   {
-    const hStar = topOf(homeTcode);
-    const aStar = topOf(awayTcode);
-
-    if (hStar && aStar) {
-      let duelSec = 0;
-      let hPts = 0;
-      let aPts = 0;
-      
-      for (const s of segs) {
-        if (s.homeOn.includes(hStar.pcode) && s.awayOn.includes(aStar.pcode)) {
-          duelSec += s.seconds;
-          hPts += s.homePts;
-          aPts += s.awayPts;
-        }
-      }
-      
-      if (duelSec >= 300) { // 최소 5분 이상 동시 출전
-        const onD = hPts - aPts; // 홈팀 기준 마진
-        const hName = hStar.name;
-        const aName = aStar.name;
-        let duelSummary = "";
-        
-        if (onD >= 5) {
-          duelSummary = `${teamTag(homeTcode, homeTname)}${iGa(homeTname)} <b>${hName}</b>${eunNeun(hName)} <b>${aName}</b>와의 에이스 맞대결 구간(${fmtDuration(duelSec)})에서 팀을 <b>+${onD}점</b>(${hPts}-${aPts}) 우위로 이끌며 자존심 싸움에서 판정승을 거두었습니다.`;
-        } else if (onD <= -5) {
-          duelSummary = `${teamTag(awayTcode, awayTname)}${iGa(awayTname)} <b>${aName}</b>${eunNeun(aName)} <b>${hName}</b>와의 에이스 정면승부 구간(${fmtDuration(duelSec)})에서 팀을 <b>+${Math.abs(onD)}점</b>(${aPts}-${hPts}) 우위로 이끌며 완승했습니다.`;
-        } else {
-          duelSummary = `양 팀의 에이스 <b>${hName}</b>와 <b>${aName}</b>${eunNeun(aName)} 코트에 동시 출전한 ${fmtDuration(duelSec)} 동안 스코어 <b>${hPts}-${aPts}</b>로 우열을 가리기 힘든 호각세를 보였습니다.`;
-        }
-        
-        sections.push({ 
-          title: "에이스 정면승부 성적표 (Head-to-Head Duel)", 
-          html: `<p class="report-text">🥊 ${duelSummary}</p>` 
-        });
-      }
-    }
+    const duel = computeAceDuel(
+      segs,
+      { team: homeTeam, star: topOf(homeTcode) },
+      { team: awayTeam, star: topOf(awayTcode) }
+    );
+    if (duel) sections.push({ title: "에이스 정면승부 성적표 (Head-to-Head Duel)", data: duel });
   }
 
   // 8.10 주가 변동 리포트 (Player Stock Up & Down)

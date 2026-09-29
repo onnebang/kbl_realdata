@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { attachDerivedFields, clockStr, estimatePossessions, isOvertimeQuarter, buildPostgameReport, type GameEvent, type PlayerBox } from "./postgameReport";
+import { attachDerivedFields, clockStr, estimatePossessions, isOvertimeQuarter, buildPostgameReport, type GameEvent, type PlayerBox, type ReportSection } from "./postgameReport";
 import { shotXPTS } from "./zoneCompare";
+
+/**
+ * buildPostgameReport()는 문자열 HTML 섹션과 타입 있는 data 섹션을 섞어 돌려준다
+ * (lib/report/renderKit.ts의 ReportSection 주석). 아래에서 보는 섹션들은 전부 html 쪽이고,
+ * data 섹션의 렌더 결과는 그 컴포넌트 테스트가 따로 고정한다
+ * (components/report/AceDuelSection.test.tsx).
+ */
+function htmlOf(s: ReportSection | undefined): string {
+  if (!s) return "";
+  return "html" in s ? s.html : `[data:${s.data.kind}]`;
+}
 
 describe("isOvertimeQuarter", () => {
   it("real overtime tags seen in the data (X1-X3, 3rd-OT games S23G01N219/S37G01N5/S41G01N171)", () => {
@@ -82,10 +93,10 @@ describe("buildPostgameReport with a 3rd-overtime game", () => {
     expect(clutch).toBeTruthy();
     // 홈은 Q4 막판 2점 + X3 2점 = 4점, 원정은 X3 3점뿐 = 3점. "OT" 접두사 버그였다면
     // X3 이벤트가 전부 빠져 홈 2점/원정 0점으로 나왔을 것(회귀 증명).
-    expect(clutch!.html).toContain("클러치 구간 득점 <b>4점</b>");
-    expect(clutch!.html).toContain("클러치 구간 득점 <b>3점</b>");
-    expect(clutch!.html).not.toContain("null");
-    for (const s of sections) expect(s.html).not.toContain(">null<");
+    expect(htmlOf(clutch)).toContain("클러치 구간 득점 <b>4점</b>");
+    expect(htmlOf(clutch)).toContain("클러치 구간 득점 <b>3점</b>");
+    expect(htmlOf(clutch)).not.toContain("null");
+    for (const s of sections) expect(htmlOf(s)).not.toContain(">null<");
   });
 });
 
@@ -216,15 +227,15 @@ describe("템포와 페이스 섹션의 렌더 결과 (연장 경기 회귀)", (
 
   it("40분 환산 포제션을 보여준다(공식 poss 96.0 / 55분 → 70)", () => {
     expect(pace).toBeTruthy();
-    expect(pace!.html).toContain("40분당 70 포제션");
+    expect(htmlOf(pace)).toContain("40분당 70 포제션");
   });
 
   it("연장 경기임을 문구에 밝힌다", () => {
-    expect(pace!.html).toContain("연장 포함 55분 → 40분 환산");
+    expect(htmlOf(pace)).toContain("연장 포함 55분 → 40분 환산");
   });
 
   it("회귀: 연장 경기가 자동으로 '빠름'이 되지 않는다", () => {
-    expect(pace!.html).toContain("보통 (Average)");
-    expect(pace!.html).not.toContain("빠름");
+    expect(htmlOf(pace)).toContain("보통 (Average)");
+    expect(htmlOf(pace)).not.toContain("빠름");
   });
 });
