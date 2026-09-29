@@ -129,6 +129,26 @@ export function usesAccent(tcode: string, color: string | null | undefined): boo
 // 캐시 표는 팀이 색을 바꾸면 조용히 낡는다. TEAM_ACCENT는 이미 그 위험을 안고 있어서
 // "살아 있는 color로 먼저 계산" 규칙을 붙여야 했다 - 여기서는 표를 아예 만들지 않는다.
 
+// ── 색 한 쌍 메모 ─────────────────────────────────────────────────────────────
+// 위 "표를 캐시로 두지 않는 이유"와 모순되지 않는다. 그 문단이 경계한 건 **색을 손으로 적어
+// 둔 표**(TEAM_ACCENT)다 - 팀이 색을 바꾸면 조용히 낡는다. 아래 메모는 **입력 색 문자열
+// 자체가 키**라서 색이 바뀌면 키도 바뀐다(낡을 수가 없다). 키 공간도 teams.color 13개로
+// 데이터가 묶어 준다.
+//
+// 그런데 같은 문단의 "팀당 이분탐색 40회라 렌더 비용이 사실상 0"은 **팀당 한 번 부를 때만**
+// 맞는 말이었다. 실제 호출부는 그렇지 않다: lib/report/renderKit.ts의 inkVars()는 리포트
+// 문장의 태그 하나하나마다 부르고(경기당 수백 회), components/GameReplay.tsx의
+// teamInkStyle()도 렌더되는 요소마다 부른다. readableInk() 한 번이 40스텝 이분탐색이고 매
+// 스텝이 hex↔HSL 왕복(withLightness) + 대비비 2회(relativeLuminance, Math.pow 6회)라
+// 실제 비용은 0이 아니었다 - 실측(V8 CPU 프로파일, 실경기 26건 × 30회): AI 코트사이드
+// 리포트 생성 시간의 **49%**가 parseHex/withLightness/lin/readableInk였다.
+//
+// 반환 객체를 공유하므로 Object.freeze로 잠근다(호출부가 실수로 고치면 다른 호출부까지
+// 오염되는데, 얼려 두면 그 자리에서 바로 터진다).
+const NEUTRAL_INK = Object.freeze({ light: "#5B5F6E", dark: "#9297A8" });
+const inkPairMemo = new Map<string, { light: string; dark: string }>();
+const barPairMemo = new Map<string, { light: string; dark: string }>();
+
 /** 본문 텍스트 기준. 굵은 12.5px는 WCAG "large text"가 아니므로 3:1이 아니라 4.5:1이다. */
 export const TEXT_CONTRAST_TARGET = 4.5;
 /** 각 테마에서 가장 불리한 면(--surface-soft). 여기서 통과하면 --surface/--bg에서도 통과한다. */
@@ -190,11 +210,15 @@ export const UI_CONTRAST_TARGET = 3;
  * 막대에는 과보정이다(원색에서 그만큼 멀어진다). 그래서 같은 이분탐색을 3:1로만 돌린다.
  */
 export function teamBarPair(color: string | null | undefined): { light: string; dark: string } {
-  if (!color || relativeLuminance(color) == null) return { light: "#5B5F6E", dark: "#9297A8" };
-  return {
+  if (!color || relativeLuminance(color) == null) return NEUTRAL_INK;
+  const hit = barPairMemo.get(color);
+  if (hit) return hit;
+  const pair = Object.freeze({
     light: readableInk(color, LIGHT_TEXT_BG, false, UI_CONTRAST_TARGET),
     dark: readableInk(color, DARK_TEXT_BG, true, UI_CONTRAST_TARGET),
-  };
+  });
+  barPairMemo.set(color, pair);
+  return pair;
 }
 
 /** teamInkStyle과 같은 규약(--tb-l/--tb-d 두 색을 같이 내려보내고 CSS 미디어쿼리가 고른다). */
@@ -205,11 +229,15 @@ export function teamBarStyle(color: string | null | undefined): CSSProperties {
 
 /** 한 팀의 두 테마용 잉크 한 쌍. 색이 없으면 중립 잉크로 폴백한다(팀 색을 지어내지 않는다). */
 export function teamInkPair(color: string | null | undefined): { light: string; dark: string } {
-  if (!color || relativeLuminance(color) == null) return { light: "#5B5F6E", dark: "#9297A8" };
-  return {
+  if (!color || relativeLuminance(color) == null) return NEUTRAL_INK;
+  const hit = inkPairMemo.get(color);
+  if (hit) return hit;
+  const pair = Object.freeze({
     light: readableInk(color, LIGHT_TEXT_BG, false),
     dark: readableInk(color, DARK_TEXT_BG, true),
-  };
+  });
+  inkPairMemo.set(color, pair);
+  return pair;
 }
 
 /** withLightness가 쓰는 것과 같은 변환의 명도 성분만. */

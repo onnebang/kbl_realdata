@@ -54,18 +54,26 @@ export function shotValue(x: number, y: number, d: string): 2 | 3 {
 }
 
 // 슛 퀄리티 분석(xPTS)용 룩업. 각 구역별 리그 평균 슛 성공률 기준 기대득점.
+//
+// 값의 출처: tools/build_xpts_shot_quality.py가 15시즌 전수 슛로그(55만 개)로 구운
+// raw/analysis/xpts_zone_table.json의 expectedPtsPerShot. 예전엔 여기에 눈대중 값
+// (rim 60%, close 45%, midShort 40%, midLong 38%, three 33%)이 하드코딩돼 있었는데
+// 실측과 어긋나서(rim 실제 66.6%, close 실제 53.8% - 골밑 두 구역이 합쳐서 슛당 0.13~0.18점씩
+// 과소평가됨) 림 근처를 많이 쏘는 팀일수록 "기대보다 잘 넣었다"가 자동으로 찍혔음.
+// 표를 갱신하려면 저 스크립트를 다시 돌리고 json의 expectedPtsPerShot을 그대로 옮길 것
+// (구역 경계 ZONE_BOUNDS_M/THREE_PT_M는 스크립트와 이미 같은 값으로 맞춰져 있음).
+const ZONE_XPTS: Record<string, number> = {
+  rim: 1.3327,      // 66.63% * 2점 (n=104,912)
+  close: 1.0758,    // 53.79% * 2점 (n=138,636)
+  midShort: 0.7631, // 38.15% * 2점 (n=66,735)
+  midLong: 0.7363,  // 36.81% * 2점 (n=56,057)
+  three: 0.9951,    // 33.17% * 3점 (n=186,908)
+};
 export function shotXPTS(x: number, y: number, d: string): number {
   const mx = mirrorShotX(x, d);
   const distM = shotDistM(mx, y);
   const zone = classifyZone(distM)[0];
-  switch (zone) {
-    case "rim": return 1.20;       // 60% * 2점
-    case "close": return 0.90;     // 45% * 2점
-    case "midShort": return 0.80;  // 40% * 2점
-    case "midLong": return 0.76;   // 38% * 2점
-    case "three": return 0.99;     // 33% * 3점
-    default: return 0.80;
-  }
+  return ZONE_XPTS[zone] ?? ZONE_XPTS.midShort;
 }
 
 export function drawCourtMarkings(hoopX: number, baselineX: number, dir: 1 | -1, stroke: string, sw: number): string {

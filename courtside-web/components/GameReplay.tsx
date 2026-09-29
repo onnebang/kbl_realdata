@@ -13,6 +13,7 @@ import {
   computeCurrentDroughts,
   fmtRating,
   gameWideTopPerformer,
+  isOvertimeQuarter,
   QUARTER_ORDER,
   quarterLenSec,
   surgeScoreText,
@@ -947,10 +948,19 @@ export default function GameReplay({
   const shotReliability = useMemo(() => buildShotReliability(events, shots), [events, shots]);
   const shotToEventIdx = useMemo(() => buildShotToEventIndex(events, shots, shotReliability), [events, shots, shotReliability]);
 
-  const { homeXPTS, awayXPTS } = useMemo(() => {
+  const { homeXPTS, awayXPTS, homeFgPts, awayFgPts } = useMemo(() => {
     let hX = 0, aX = 0;
     const fgaCount = new Map<string, number>();
     const liveBox = computeBoxScore(events, idx, players);
+    // xPTS는 필드골 좌표만 더한 값이라 자유투가 한 점도 안 들어있다 - 비교 대상도 팀 총점이
+    // 아니라 야투 득점(pts - ftm)이어야 한다(lib/postgameReport.ts의 같은 섹션과 동일한 보정).
+    let hFg = 0, aFg = 0;
+    for (const p of players) {
+      const b = liveBox.get(p.pcode);
+      if (!b) continue;
+      if (p.tcode === homeTeam.tcode) hFg += b.pts - b.ftm;
+      else if (p.tcode === awayTeam.tcode) aFg += b.pts - b.ftm;
+    }
     
     for (const s of shots) {
       if (!s.pcode) continue;
@@ -969,7 +979,7 @@ export default function GameReplay({
         else if (tcodeStr === String(awayTeam.tcode)) aX += xp;
       }
     }
-    return { homeXPTS: hX, awayXPTS: aX };
+    return { homeXPTS: hX, awayXPTS: aX, homeFgPts: hFg, awayFgPts: aFg };
   }, [shots, events, idx, players, homeTeam.tcode, awayTeam.tcode]);
 
   // 실시간 체력 모니터링 (현재 코트 위 선수들이 휴식 없이 몇 분째 뛰고 있는지)
@@ -1067,8 +1077,11 @@ export default function GameReplay({
   if (awayTeamFouls >= 5) flowChips.push({ key: "team-foul-away", text: `🚨 ${awayTeam.abbr} 팀파울 (현재 쿼터)` });
 
   // 클러치 타임 알럿: 4쿼터 또는 연장전 종료 5분 전, 5점 차 이내
+  // 연장전 판정은 isOvertimeQuarter()로 - 이 데이터셋의 실제 연장 태그는 X1~X3이고 "EQ"로
+  // 시작하는 행은 한 건도 없다(lib/postgameReport.ts의 같은 버그를 2026-09에 고친 것과 동일).
+  // startsWith("EQ")였을 땐 연장전에서 클러치 칩이 한 번도 안 떴다.
   const isClutchTime =
-    (row.quarter === "Q4" || row.quarter.startsWith("EQ")) &&
+    (row.quarter === "Q4" || isOvertimeQuarter(row.quarter)) &&
     row.clock_min != null &&
     (row.clock_min < 5 || (row.clock_min === 5 && row.clock_sec === 0)) &&
     Math.abs(row.home_score - row.away_score) <= 5;
@@ -1078,14 +1091,17 @@ export default function GameReplay({
   }
 
   // 득점 기대치(xPTS) vs 실제 득점 (슛 퀄리티) - 임시 비활성화 (샷 데이터 부족 시 0.0점 표출 이슈)
+  // 비활성 상태지만, 되살릴 때 옛 버그를 그대로 들고 오지 않도록 비교 기준은 고쳐둔다:
+  // 총점(자유투 포함)이 아니라 야투 득점과 비교하고, 임계값도 12점으로(보정 후 델타 표준편차
+  // 10.0점 기준 약 1.2σ) 맞춤. 총점과 비교하던 시절엔 팀-경기의 77.5%에서 칩이 떴다.
   /*
-  if (Math.abs(row.home_score - homeXPTS) >= 8 && row.home_score > 0) {
-    const diff = row.home_score - homeXPTS;
-    flowChips.push({ key: "xpts-home", text: `🎯 [${homeTeam.abbr} 슛 퀄리티] 기대득점 ${homeXPTS.toFixed(1)}점 vs 실제 ${row.home_score}점 (${diff > 0 ? "터프샷 폭발🔥" : "슛 난조빙하기❄️"})` });
+  if (Math.abs(homeFgPts - homeXPTS) >= 12 && homeXPTS > 0) {
+    const diff = homeFgPts - homeXPTS;
+    flowChips.push({ key: "xpts-home", text: `🎯 [${homeTeam.abbr} 슛 퀄리티] 야투 기대득점 ${homeXPTS.toFixed(1)}점 vs 실제 야투 ${homeFgPts}점 (${diff > 0 ? "터프샷 폭발🔥" : "슛 난조빙하기❄️"})` });
   }
-  if (Math.abs(row.away_score - awayXPTS) >= 8 && row.away_score > 0) {
-    const diff = row.away_score - awayXPTS;
-    flowChips.push({ key: "xpts-away", text: `🎯 [${awayTeam.abbr} 슛 퀄리티] 기대득점 ${awayXPTS.toFixed(1)}점 vs 실제 ${row.away_score}점 (${diff > 0 ? "터프샷 폭발🔥" : "슛 난조빙하기❄️"})` });
+  if (Math.abs(awayFgPts - awayXPTS) >= 12 && awayXPTS > 0) {
+    const diff = awayFgPts - awayXPTS;
+    flowChips.push({ key: "xpts-away", text: `🎯 [${awayTeam.abbr} 슛 퀄리티] 야투 기대득점 ${awayXPTS.toFixed(1)}점 vs 실제 야투 ${awayFgPts}점 (${diff > 0 ? "터프샷 폭발🔥" : "슛 난조빙하기❄️"})` });
   }
   */
 
@@ -1103,20 +1119,25 @@ export default function GameReplay({
 
   // 페이스 기반 예상 최종 스코어
   if (row.elapsed > 600 && row.quarter !== "PRE" && row.quarter !== "FT" && row.clock_min != null) {
-    let homeFga = 0, homeFta = 0, homeOreb = 0, homeTo = 0;
-    let awayFga = 0, awayFta = 0, awayOreb = 0, awayTo = 0;
+    let homeFga = 0, homeFgm = 0, homeFta = 0, homeOreb = 0, homeDreb = 0, homeTo = 0;
+    let awayFga = 0, awayFgm = 0, awayFta = 0, awayOreb = 0, awayDreb = 0, awayTo = 0;
     for (const p of players) {
       const b = box.get(p.pcode);
       if (!b) continue;
       if (p.tcode === homeTeam.tcode) {
-        homeFga += b.fga; homeFta += b.fta; homeOreb += b.oreb; homeTo += b.to;
+        homeFga += b.fga; homeFgm += b.fgm; homeFta += b.fta; homeOreb += b.oreb; homeDreb += b.dreb; homeTo += b.to;
       } else {
-        awayFga += b.fga; awayFta += b.fta; awayOreb += b.oreb; awayTo += b.to;
+        awayFga += b.fga; awayFgm += b.fgm; awayFta += b.fta; awayOreb += b.oreb; awayDreb += b.dreb; awayTo += b.to;
       }
     }
-    const homePoss = homeFga + 0.44 * homeFta - homeOreb + homeTo;
-    const awayPoss = awayFga + 0.44 * awayFta - awayOreb + awayTo;
-    const totalPoss = homePoss + awayPoss;
+    // KBL 공식 poss와 같은 식(= BBRef Pace). lib/postgameReport.ts의 estimatePossessions()와
+    // 같은 계수를 써서 라이브 칩과 경기 후 리포트가 서로 다른 페이스를 말하지 않게 맞춘다.
+    // 예전 식(0.44·FTA − OREB)은 팀당 +1.96 포제션 과대였다(최근 4시즌 공식값 대조).
+    const possSide = (fga: number, fgm: number, fta: number, to: number, oreb: number, oppDreb: number) =>
+      fga + 0.4 * fta - 1.07 * (oreb + oppDreb > 0 ? oreb / (oreb + oppDreb) : 0) * Math.max(0, fga - fgm) + to;
+    const totalPoss =
+      possSide(homeFga, homeFgm, homeFta, homeTo, homeOreb, awayDreb) +
+      possSide(awayFga, awayFgm, awayFta, awayTo, awayOreb, homeDreb);
     const pace = (totalPoss / 2) / (row.elapsed / 60) * 40; // 40분 기준 페이스
 
     const expHome = Math.round((row.home_score / row.elapsed) * (40 * 60));

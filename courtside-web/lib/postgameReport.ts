@@ -1,7 +1,14 @@
 import { eunNeun, iGa } from "./josa";
-import { teamInkPair } from "./teamAccent";
-import { teamZoneStats, shotXPTS, type ShotRow } from "./zoneCompare";
+import { shotXPTS, type ShotRow } from "./zoneCompare";
 import type { H2H, SeasonStats } from "./matchups";
+// 섹션별 분석은 report/ 아래로 하나씩 옮기는 중이다(계산/문장 분리, report/renderKit.ts 주석 참고).
+// 의존 방향은 여기 -> report/* 한쪽뿐. 옮겨간 타입·함수는 하위호환을 위해 그대로 re-export한다.
+import { createReportTags, fmtDuration, type ReportSection, type ReportTeamMeta } from "./report/renderKit";
+import { computeLineupSynergy, renderLineupSynergySection, type FiveManUnit } from "./report/lineupSynergy";
+import { computeHotZoneEdge, renderHotZoneSection } from "./report/shotHotZone";
+
+export { fmtDuration };
+export type { ReportSection, ReportTeamMeta };
 
 // courtside_template.html(35차, "경기가 종료되면 주요 이벤트들을 하나의 보고서로")의
 // A1-A8 분석 엔진을 TypeScript로 포팅 - 원본은 클라이언트에 미리 구운 JSON(timeline 배열)을
@@ -90,8 +97,6 @@ export type GameRarity = {
   marginPercentile: number;
 };
 
-export type ReportSection = { title: string; html: string };
-
 // export - Phase 2의 진행중 경기 승률 차트(components/GameReplay.tsx의 WinProbLiveChart)가
 // "경과 시간축 + 남은 시간은 빈 칸"으로 그리려면 쿼터 길이 규칙이 필요한데, 그 표를 저쪽에
 // 복사하면 두 벌이 서로 어긋날 수 있어서 여기 하나만 공개한다(값/동작 변화 없음).
@@ -117,11 +122,6 @@ export function cumulativeElapsed(q: string, m: number, s: number): number {
   return prior + (quarterLenSec(q) - (m * 60 + s));
 }
 
-export function fmtDuration(sec: number): string {
-  const m = Math.floor(sec / 60),
-    s = Math.round(sec % 60);
-  return `${m}분${s > 0 ? " " + s + "초" : ""}`;
-}
 export function clockStr(e: Pick<GameEvent, "quarter" | "clock_min" | "clock_sec">): string {
   // clock_min/clock_sec는 DB에서 nullable이다(PRE 행은 항상 null이고, 드물게 실시간 피드가
   // 흔들리며 실제 이벤트에도 null이 들어올 수 있음) - 그대로 문자열로 이으면 "Q3 null:null"처럼
@@ -149,10 +149,39 @@ export function fmtRating(r: number): string {
 // 잘못 계산되던 실측 버그를 이미 겪었음(35차 M3). 여기서는 애초에 안전한 값을 직접 넣고,
 // 원본과 동일하게 시간 스캔 함수들에서는 PRE 행을 명시적으로 건너뜀(둘 다 같은 동작
 // 유지 - 정적 페이지와 이 사이트 사이의 결과 차이를 만들지 않기 위해).
+/**
+ * 시간 스캔용 인덱스. PRE가 아닌 행만, events 인덱스 오름차순으로 담고, 각 자리마다
+ * **그 자리까지의 elapsed 누적 최대값**을 같이 들고 있다.
+ *
+ * 왜 최대값이냐: elapsed는 단조증가가 **아니다**(아래 computeSurgeAt 주석의 실측 - 시계가
+ * 뒤로 가는 행이 49/270경기에 있다). 그래서 "이 행의 elapsed가 창 밖이니 더 볼 필요 없다"로
+ * 스캔을 끊으면 창이 잘려 조용히 틀린 숫자가 나온다. 반면 누적 최대값은 정의상 단조증가라
+ * `maxEl[p] < 하한`이면 **p와 그 앞 전부가** 창 밖임이 증명된다 - 결과를 한 건도 바꾸지 않고
+ * 스캔 범위만 줄이는 근거가 이것이다(창 밖 판정은 아래에서 행마다 다시 하므로, 흔들린 행이
+ * 창 안에 있으면 여전히 정확히 잡힌다).
+ */
+type ElapsedIndex = { at: number[]; maxEl: number[] };
+
+function buildElapsedIndex(events: GameEvent[]): ElapsedIndex {
+  const ix: ElapsedIndex = { at: [], maxEl: [] };
+  let running = -Infinity;
+  for (let i = 0; i < events.length; i++) {
+    if (events[i].quarter === "PRE") continue;
+    running = Math.max(running, events[i].elapsed);
+    ix.at.push(i);
+    ix.maxEl.push(running);
+  }
+  return ix;
+}
+
 export function attachDerivedFields(rawEvents: RawGameEvent[]): GameEvent[] {
   const events: GameEvent[] = rawEvents.map((e) => ({ ...e, elapsed: 0, runHome: 0, runAway: 0, surge: null }));
   let homeRun = 0,
     awayRun = 0;
+  // 인덱스를 훑으면서 같이 키운다 - computeSurgeAt(i)는 i보다 앞선 행만 보므로, i를 넣기
+  // **전에** 부르면 예전 코드의 `for (j = i-1; j >= 0; j--)` 범위와 정확히 같다.
+  const ix: ElapsedIndex = { at: [], maxEl: [] };
+  let runningMaxEl = -Infinity;
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
     e.elapsed = e.quarter === "PRE" ? 0 : cumulativeElapsed(e.quarter, e.clock_min ?? 0, e.clock_sec ?? 0);
@@ -170,7 +199,12 @@ export function attachDerivedFields(rawEvents: RawGameEvent[]): GameEvent[] {
     }
     e.runHome = homeRun;
     e.runAway = awayRun;
-    e.surge = computeSurgeAt(events, i);
+    e.surge = computeSurgeAt(events, i, ix);
+    if (e.quarter !== "PRE") {
+      runningMaxEl = Math.max(runningMaxEl, e.elapsed);
+      ix.at.push(i);
+      ix.maxEl.push(runningMaxEl);
+    }
   }
   return events;
 }
@@ -203,8 +237,11 @@ export function attachDerivedFields(rawEvents: RawGameEvent[]): GameEvent[] {
 export const SURGE_WINDOW_SEC = 300;
 export const SURGE_MIN_DIFF = 14;
 
-/** events[0..i]까지 elapsed/점수가 채워져 있다는 전제. i 시점에 진행 중인 서지. */
-function computeSurgeAt(events: GameEvent[], i: number): Surge | null {
+/**
+ * events[0..i]까지 elapsed/점수가 채워져 있다는 전제. i 시점에 진행 중인 서지.
+ * ix는 [0, i) 구간의 PRE 아닌 행 인덱스(ElapsedIndex 주석 참고).
+ */
+function computeSurgeAt(events: GameEvent[], i: number, ix: ElapsedIndex): Surge | null {
   const cur = events[i];
   if (cur.quarter === "PRE") return null;
   const mNow = cur.home_score - cur.away_score;
@@ -220,17 +257,35 @@ function computeSurgeAt(events: GameEvent[], i: number): Surge | null {
   // 서지가 켜진 1,999행 포함해 차이 0건). 흔들림이 1~3초라 300초 창의 최소/최대를 바꾸지
   // 못했기 때문이다. 그래도 continue로 두는 이유는, break가 **데이터에서 이미 거짓인 가정**에
   // 기대고 있어서다 - 다음 시즌 피드가 조금만 더 흔들려도 조용히 틀린 숫자가 나온다.
-  // 비용은 무시할 만하다: 경기당 500~800행이라 최악이어도 30만 회 비교이고, 이 파일이 이미
-  // 하는 다른 전수 스캔과 같은 수준이다.
+  //
+  // 다만 "그래서 전수 스캔한다"까지 갈 필요는 없었다. 전수 스캔은 이 함수를 매 행마다 부르는
+  // attachDerivedFields 때문에 O(N²)이 되고(880행 경기 = 38만 회 비교), 이게 서버 리포트만의
+  // 문제가 아니다 - components/GameReplay.tsx가 **라이브 폴링마다** 클라이언트에서 같은 함수를
+  // 다시 돌린다(useMemo의 attachDerivedFields(merged)).
+  // 그래서 창 밖 판정(위의 개별 continue)은 그대로 두고, **더 볼 필요가 없음이 증명되는**
+  // 지점에서만 끊는다: ix.maxEl은 단조증가라 `maxEl[p] < floor`면 p 이하 전부가 창 밖이다
+  // (ElapsedIndex 주석). 흔들린 행은 여전히 개별 검사를 거치므로 결과가 바뀌지 않는다
+  // (실경기 26건 전수 대조로 확인 - 파생 필드 바이트 단위 동일).
   let lowIdx = i,
     highIdx = i;
-  for (let j = i - 1; j >= 0; j--) {
-    const p = events[j];
-    if (p.quarter === "PRE") continue;
-    if (cur.elapsed - p.elapsed > SURGE_WINDOW_SEC) continue;
-    const m = p.home_score - p.away_score;
-    if (m < events[lowIdx].home_score - events[lowIdx].away_score) lowIdx = j;
-    if (m > events[highIdx].home_score - events[highIdx].away_score) highIdx = j;
+  // 마진을 값으로 들고 간다 - 예전엔 비교마다 events[lowIdx]를 다시 읽어 뺐다.
+  let lowM = mNow,
+    highM = mNow;
+  const floor = cur.elapsed - SURGE_WINDOW_SEC;
+  for (let p = ix.at.length - 1; p >= 0; p--) {
+    if (ix.maxEl[p] < floor) break;
+    const j = ix.at[p];
+    const q = events[j];
+    if (cur.elapsed - q.elapsed > SURGE_WINDOW_SEC) continue;
+    const m = q.home_score - q.away_score;
+    if (m < lowM) {
+      lowM = m;
+      lowIdx = j;
+    }
+    if (m > highM) {
+      highM = m;
+      highIdx = j;
+    }
   }
 
   const homeSurge = mNow - (events[lowIdx].home_score - events[lowIdx].away_score);
@@ -262,31 +317,45 @@ export function fmtSurgeDuration(sec: number): string {
   return m > 0 ? `${m}분 ${s}초` : `${s}초`;
 }
 
+/**
+ * targetElapsed 시점의 기준 행. 예전엔 매번 배열 앞에서부터 훑었는데(첫 초과 행에서 break),
+ * 그게 곧 "PRE 아닌 행 중 elapsed가 target을 처음 넘는 자리 직전"이다. ix.maxEl이 단조증가라
+ * 그 자리는 이진탐색으로 정확히 같은 값을 준다(ElapsedIndex 주석).
+ *
+ * 왜 고쳤나: computeSubSpark가 교체 한 건당 이걸 3번 부르고, 교체는 경기당 평균 84건이다
+ * (게다가 예전엔 식스맨/결정적교체 두 섹션이 각자 전체를 훑어 같은 값을 두 번 계산했다) -
+ * O(교체수 × N)이라 실측 프로파일에서 서지 다음으로 큰 덩어리였다.
+ */
 function marginRefAt(
   events: GameEvent[],
-  targetElapsed: number
+  targetElapsed: number,
+  ix: ElapsedIndex
 ): { margin: number; elapsed: number; homeScore: number; awayScore: number } {
-  let best: GameEvent | null = null;
-  for (const row of events) {
-    if (row.quarter === "PRE") continue;
-    if (row.elapsed <= targetElapsed) best = row;
-    else break;
+  // maxEl[p] > target인 첫 p. 그 앞자리(p-1)가 예전 루프의 best와 같다.
+  let lo = 0,
+    hi = ix.at.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (ix.maxEl[mid] > targetElapsed) hi = mid;
+    else lo = mid + 1;
   }
-  if (!best) return { margin: 0, elapsed: 0, homeScore: 0, awayScore: 0 };
+  if (lo === 0) return { margin: 0, elapsed: 0, homeScore: 0, awayScore: 0 };
+  const best = events[ix.at[lo - 1]];
   return { margin: best.home_score - best.away_score, elapsed: best.elapsed, homeScore: best.home_score, awayScore: best.away_score };
 }
 
 function computeSubSpark(
   events: GameEvent[],
   row: GameEvent,
-  homeTcode: string
+  homeTcode: string,
+  ix: ElapsedIndex
 ): { delta: number; beforeDur: number; afterDur: number; homeGain: number; awayGain: number } | null {
   const t0 = row.elapsed;
   const lastElapsed = events[events.length - 1].elapsed;
   if (t0 >= lastElapsed) return null;
-  const beforeRef = marginRefAt(events, Math.max(0, t0 - 180));
-  const atSub = marginRefAt(events, t0);
-  const afterRef = marginRefAt(events, Math.min(t0 + 180, lastElapsed));
+  const beforeRef = marginRefAt(events, Math.max(0, t0 - 180), ix);
+  const atSub = marginRefAt(events, t0, ix);
+  const afterRef = marginRefAt(events, Math.min(t0 + 180, lastElapsed), ix);
   const beforeDur = atSub.elapsed - beforeRef.elapsed;
   const afterDur = afterRef.elapsed - atSub.elapsed;
   if (beforeDur < 30 || afterDur < 30) return null;
@@ -512,9 +581,16 @@ function involved(b: PlayerBox): boolean {
 // export - 홈 화면(app/page.tsx)의 "이긴팀 선수와 진팀의 선수" 요청에서도 그대로 재사용.
 export function teamTopPerformer(box: PlayerBox[], tcode: string): PlayerBox | null {
   let top: PlayerBox | null = null;
+  let topScore = 0;
   for (const b of box) {
     if (b.tcode !== tcode || !involved(b)) continue;
-    if (!top || gameScore(b) > gameScore(top)) top = b;
+    // 점수를 들고 간다 - `gameScore(b) > gameScore(top)`은 이미 정한 top의 점수를 매 행마다
+    // 다시 계산했다(홈 화면이 경기 목록 200건에 이 함수를 돌리는 자리라 공짜로 줄일 만하다).
+    const s = gameScore(b);
+    if (!top || s > topScore) {
+      top = b;
+      topScore = s;
+    }
   }
   return top;
 }
@@ -527,9 +603,14 @@ export function teamTopPerformer(box: PlayerBox[], tcode: string): PlayerBox | n
 // 제일 잘한 선수"라는 취지는 동일. winnerTop/loserTop과 겹치지 않도록 exclude로 제외.
 export function bestBenchPerformer(box: PlayerBox[], excludePcodes: Set<string>): PlayerBox | null {
   let top: PlayerBox | null = null;
+  let topScore = 0;
   for (const b of box) {
     if (b.is_starter !== false || excludePcodes.has(b.pcode) || !involved(b)) continue;
-    if (!top || gameScore(b) > gameScore(top)) top = b;
+    const s = gameScore(b);
+    if (!top || s > topScore) {
+      top = b;
+      topScore = s;
+    }
   }
   return top;
 }
@@ -543,10 +624,15 @@ export function gameWideTopPerformer(box: PlayerBox[], homeScore: number, awaySc
   const blowout = Math.abs(margin) >= 15;
   const leaderTcode = margin > 0 ? homeTcode : awayTcode;
   let top: PlayerBox | null = null;
+  let topScore = 0;
   for (const b of box) {
     if (!involved(b)) continue;
     if (blowout && b.tcode !== leaderTcode) continue;
-    if (!top || gameScore(b) > gameScore(top)) top = b;
+    const s = gameScore(b);
+    if (!top || s > topScore) {
+      top = b;
+      topScore = s;
+    }
   }
   return top;
 }
@@ -555,6 +641,72 @@ function sumTeam(box: PlayerBox[], tcode: string, fn: (b: PlayerBox) => number):
   let s = 0;
   for (const b of box) if (b.tcode === tcode) s += fn(b);
   return s;
+}
+
+/**
+ * 팀 포제션 추정 - KBL 공식 박스스코어(team-record.json의 `poss`/`pace`)가 실제로 쓰는 식과
+ * 같은 것, 즉 Basketball-Reference의 Pace 공식이다.
+ *
+ *   측면값 = FGA + 0.4·FTA − 1.07·(OREB / (OREB + 상대 DREB))·(FGA − FGM) + TOV
+ *   포제션 = (홈 측면값 + 원정 측면값) / 2
+ *
+ * **검증**: 최근 4시즌 568경기(1,136 팀-경기)에 이 식을 먹여 KBL 공식 `poss`와 비교하니
+ * RMSE 0.03 - 반올림 오차 수준으로 정확히 재현된다. 반면 이 자리에 있던 예전 식
+ * (FGA + 0.44·FTA + TOV − 0.25·(FGA−FGM), "공격 리바운드를 못 구하니 야투 실패의 25%로
+ * 가정")은 같은 표본에서 팀당 +3.46 포제션 과대(RMSE 4.93)였다.
+ *
+ * 왜 예전 식이 틀렸나 - 두 가지다.
+ *  1) 공격 리바운드는 추정할 필요가 없다. game_player_stats.oreb/dreb 컬럼은 전 행 NULL이지만
+ *     game_events의 action_code 209(공격리바운드)/210(수비리바운드)는 채워져 있고, 최근 4시즌
+ *     전수 대조에서 공식 박스스코어의 offr/defr와 **100% 일치**한다. 실제값이 있는데 상수
+ *     25%를 쓰면 리바운드를 잘/못 잡은 팀의 차이가 통째로 사라진다.
+ *  2) 한 경기에서 두 팀의 포제션은 1회 넘게 벌어질 수 없다(공은 번갈아 가지므로). 팀별로 따로
+ *     추정하면 그 제약이 깨진다 - 예전 식은 홈/원정 추정치가 평균 4.0, 상위 10%에서 8.0,
+ *     최대 15.2회까지 벌어졌다. 그래서 두 측면값을 평균 내는 것이 공식의 핵심이다.
+ *
+ * 0.44가 아니라 0.4인 것도 의도된 것 - 1.07 항과 짝을 이루는 BBRef Pace 공식의 계수다
+ * (0.44는 OREB 항이 없는 Dean Oliver 단순식 쪽 계수). 섞어 쓰면 위 재현 정확도가 깨진다.
+ *
+ * pacePer40: 연장전 보정. 포제션 자체는 경기 길이에 비례해 늘어나므로(3차 연장 = 55분)
+ * 원시값을 그대로 템포 임계값에 넣으면 연장 경기는 자동으로 "빠름"이 된다 - 실측으로 최근
+ * 4시즌 연장 19경기가 19/19 전부 "빠름"으로 찍혔다. 페이스는 40분 환산으로만 비교할 것.
+ */
+export function estimatePossessions(
+  box: PlayerBox[],
+  events: Pick<GameEvent, "quarter" | "action_code" | "tcode">[],
+  homeTcode: string,
+  awayTcode: string
+): { raw: number; playedMin: number; pacePer40: number } {
+  let hOreb = 0,
+    aOreb = 0,
+    hDreb = 0,
+    aDreb = 0;
+  const quarters = new Set<string>();
+  for (const e of events) {
+    if (e.quarter && e.quarter !== "PRE") quarters.add(e.quarter);
+    if (e.action_code === "209") {
+      if (e.tcode === homeTcode) hOreb++;
+      else if (e.tcode === awayTcode) aOreb++;
+    } else if (e.action_code === "210") {
+      if (e.tcode === homeTcode) hDreb++;
+      else if (e.tcode === awayTcode) aDreb++;
+    }
+  }
+  const side = (tcode: string, oreb: number, oppDreb: number) => {
+    const fga = sumTeam(box, tcode, (b) => b.fga);
+    const fgm = sumTeam(box, tcode, (b) => b.fgm);
+    const fta = sumTeam(box, tcode, (b) => b.fta);
+    const to = sumTeam(box, tcode, (b) => b.turnovers);
+    // 리바운드 이벤트가 하나도 없는 경기(수집 실패/진행 초반)면 OREB% 0 - 보정 항이 죽고
+    // 단순 FGA+0.4FTA+TOV로 떨어진다. 25% 같은 상수를 몰래 끼워 넣지 않는다.
+    const orebPct = oreb + oppDreb > 0 ? oreb / (oreb + oppDreb) : 0;
+    return fga + 0.4 * fta - 1.07 * orebPct * Math.max(0, fga - fgm) + to;
+  };
+  const raw = 0.5 * (side(homeTcode, hOreb, aDreb) + side(awayTcode, aOreb, hDreb));
+  let playedSec = 0;
+  for (const q of quarters) playedSec += quarterLenSec(q);
+  const playedMin = playedSec / 60;
+  return { raw, playedMin, pacePer40: playedMin > 0 ? (raw * 40) / playedMin : raw };
 }
 
 function quarterBoundaries(events: GameEvent[]): { i: number; q: string }[] {
@@ -625,41 +777,42 @@ const SUB_SPARK_NOTABLE_THRESHOLD = 120; // courtside_template.html 실측(120�
 
 type SubSpark = NonNullable<ReturnType<typeof computeSubSpark>>;
 
-function findBestSixthManSpark(
-  events: GameEvent[],
-  box: PlayerBox[],
-  homeTcode: string
-): { idx: number; row: GameEvent; pcode: string; spark: SubSpark } | null {
-  const boxByPcode = new Map(box.map((b) => [b.pcode, b]));
-  let best: { idx: number; row: GameEvent; pcode: string; spark: SubSpark } | null = null;
-  for (let i = 1; i < events.length; i++) {
-    const row = events[i];
-    if (row.action_code !== SUB_IN_CODE || !row.pcode) continue;
-    const p = boxByPcode.get(row.pcode);
-    if (!p || p.is_starter !== false) continue;
-    const spark = computeSubSpark(events, row, homeTcode);
-    if (!spark || spark.delta <= 0) continue;
-    if (spark.beforeDur < SUB_SPARK_MIN_SAMPLE_SEC || spark.afterDur < SUB_SPARK_MIN_SAMPLE_SEC) continue;
-    if (!best || spark.delta > best.spark.delta) best = { idx: i, row, pcode: row.pcode, spark };
-  }
-  return best;
-}
+type SubSparkHit = { idx: number; row: GameEvent; pcode: string; spark: SubSpark };
 
-function findNotableSubSparks(events: GameEvent[], homeTcode: string): { idx: number; row: GameEvent; pcode: string; spark: SubSpark }[] {
-  const out: { idx: number; row: GameEvent; pcode: string; spark: SubSpark }[] = [];
+/**
+ * 투입(101) 행마다 스파크를 **한 번만** 계산한다. 예전엔 findBestSixthManSpark와
+ * findNotableSubSparks가 각자 events 전체를 훑으며 같은 computeSubSpark를 두 번씩 돌렸다
+ * (경기당 교체 84건 × marginRefAt 3회 × 2벌). 표본 길이 하한은 두 소비자가 공통으로
+ * 요구하던 조건이라 여기서 한 번 걸러 둔다 - 그 뒤 조건만 각자 다르다.
+ */
+function computeSubSparks(events: GameEvent[], homeTcode: string, ix: ElapsedIndex): SubSparkHit[] {
+  const out: SubSparkHit[] = [];
   for (let i = 1; i < events.length; i++) {
     const row = events[i];
     if (row.action_code !== SUB_IN_CODE || !row.pcode) continue;
-    const spark = computeSubSpark(events, row, homeTcode);
+    const spark = computeSubSpark(events, row, homeTcode, ix);
     if (!spark) continue;
     if (spark.beforeDur < SUB_SPARK_MIN_SAMPLE_SEC || spark.afterDur < SUB_SPARK_MIN_SAMPLE_SEC) continue;
-    if (Math.abs(spark.delta) >= SUB_SPARK_NOTABLE_THRESHOLD) out.push({ idx: i, row, pcode: row.pcode, spark });
+    out.push({ idx: i, row, pcode: row.pcode, spark });
   }
   return out;
 }
 
-/** 리포트가 선수·팀 이름에 색과 약어를 붙이는 데 필요한 최소 정보. */
-export type ReportTeamMeta = { tcode: string; name: string; abbr: string; color: string | null };
+/** 벤치 출신(is_starter === false)이 투입된 뒤 흐름이 가장 좋아진 한 건. */
+function findBestSixthManSpark(hits: SubSparkHit[], boxByPcode: Map<string, PlayerBox>): SubSparkHit | null {
+  let best: SubSparkHit | null = null;
+  for (const h of hits) {
+    const p = boxByPcode.get(h.pcode);
+    if (!p || p.is_starter !== false) continue;
+    if (h.spark.delta <= 0) continue;
+    if (!best || h.spark.delta > best.spark.delta) best = h;
+  }
+  return best;
+}
+
+function findNotableSubSparks(hits: SubSparkHit[]): SubSparkHit[] {
+  return hits.filter((h) => Math.abs(h.spark.delta) >= SUB_SPARK_NOTABLE_THRESHOLD);
+}
 
 export type BuildReportInput = {
   events: GameEvent[]; // event_order 오름차순, attachDerivedFields() 이미 적용된 것
@@ -701,8 +854,7 @@ const CORE_FIVE_MIN_DIFF = 12;
 const ONOFF_MIN_OFF_SEC = 300;
 /** 오프코트 득실차 - >=6이면 40%, >=8이면 29%, >=10이면 19%. */
 const ONOFF_MIN_DIFF = 8;
-/** 최대 구역 득점차 - p50 12 / p75 18 / p90 24. '최종 마진보다 크다' 조건과 함께 15면 33.7%. */
-const ZONE_MIN_DIFF = 15;
+// 최대 구역 득점차(ZONE_MIN_DIFF)는 report/shotHotZone.ts로 같이 옮겼다.
 /** 맞대결 연승 - >=3이면 31%, >=4면 21%, >=5면 14%. 시즌에 6번 만나므로 4연승이면 '한 시즌 내내'가 사실인 최소. */
 const H2H_MIN_STREAK = 4;
 /** 5경기 미만의 '시즌 최다'는 의미가 없다. */
@@ -753,43 +905,82 @@ export function buildLineupSegments(events: GameEvent[], box: PlayerBox[], homeT
 
 type Split = { seconds: number; my: number; opp: number };
 
-/** 조건을 만족하는 구간 / 아닌 구간으로 시간·득점을 둘로 나눈다. 둘을 합치면 항상 경기 전체다. */
-function splitSegments(segs: LineupSegment[], side: "home" | "away", pred: (lineup: string[]) => boolean): { on: Split; off: Split } {
-  const on: Split = { seconds: 0, my: 0, opp: 0 };
-  const off: Split = { seconds: 0, my: 0, opp: 0 };
+const ZERO_SPLIT: Split = Object.freeze({ seconds: 0, my: 0, opp: 0 });
+
+/**
+ * 한 팀 쪽 세그먼트를 **한 번** 훑어 만드는 집계. 주력5인(6-1)·그가없던시간(6-2)·
+ * 스탯에보이지않은선수·라인업시너지·에이스맞대결이 전부 이걸 나눠 쓴다.
+ *
+ * 예전 구조가 왜 비쌌나: 선수 한 명의 온/오프를 알려면 splitSegments()가 세그먼트 전체를
+ * 다시 훑었다. '스탯에 보이지 않은 선수'는 그걸 팀당 12명에게 돌리고(경기당 세그먼트는
+ * 평균 169개, 최대 305개), 그 위에 주력5인 선택·주력5인 온오프·시너지가 각자 또
+ * `[...lu].sort().join(",")`을 세그먼트마다 다시 만들었다(경기당 1,000회 넘는 배열 복사).
+ * 전부 같은 한 번의 순회에서 나오는 값이다.
+ */
+type SideRollup = {
+  /** 그 팀의 경기 전체 합계. 개별 온코트 합계를 빼면 그게 오프코트다(모든 초·점수가 정확히
+   *  한 구간에 들어간다는 buildLineupSegments의 불변식 - 그래서 뺄셈이 정확하다). */
+  total: Split;
+  /** pcode -> 그 선수가 코트에 있던 구간 합계. */
+  onByPcode: Map<string, Split>;
+  /** 5인 조합별 합계. 온코트가 5명이 아닌 구간(교체 누락·퇴장 등)은 버린다 - 기존 규칙 그대로. */
+  units: FiveManUnit[];
+  unitByKey: Map<string, FiveManUnit>;
+};
+
+function rollupSide(segs: LineupSegment[], side: "home" | "away"): SideRollup {
+  const total: Split = { seconds: 0, my: 0, opp: 0 };
+  const onByPcode = new Map<string, Split>();
+  const unitByKey = new Map<string, FiveManUnit>();
   for (const s of segs) {
     const lu = side === "home" ? s.homeOn : s.awayOn;
     const my = side === "home" ? s.homePts : s.awayPts;
     const opp = side === "home" ? s.awayPts : s.homePts;
-    const t = pred(lu) ? on : off;
-    t.seconds += s.seconds;
-    t.my += my;
-    t.opp += opp;
-  }
-  return { on, off };
-}
-
-/** 함께 뛴 시간이 가장 긴 5인 - **결과가 아니라 시간으로** 고른다(결과로 고르면 선택편향으로 94%에서 뜬다). */
-function mostUsedFive(segs: LineupSegment[], side: "home" | "away"): { key: string; pcodes: string[]; seconds: number } | null {
-  const acc = new Map<string, { pcodes: string[]; seconds: number }>();
-  for (const s of segs) {
-    const lu = side === "home" ? s.homeOn : s.awayOn;
+    total.seconds += s.seconds;
+    total.my += my;
+    total.opp += opp;
+    for (const pc of lu) {
+      let acc = onByPcode.get(pc);
+      if (!acc) {
+        acc = { seconds: 0, my: 0, opp: 0 };
+        onByPcode.set(pc, acc);
+      }
+      acc.seconds += s.seconds;
+      acc.my += my;
+      acc.opp += opp;
+    }
     if (lu.length !== 5) continue;
     const sorted = [...lu].sort();
     const key = sorted.join(",");
-    const cur = acc.get(key) ?? { pcodes: sorted, seconds: 0 };
-    cur.seconds += s.seconds;
-    acc.set(key, cur);
+    let u = unitByKey.get(key);
+    if (!u) {
+      u = { key, pcodes: sorted, seconds: 0, my: 0, opp: 0 };
+      unitByKey.set(key, u);
+    }
+    u.seconds += s.seconds;
+    u.my += my;
+    u.opp += opp;
   }
-  let best: { key: string; pcodes: string[]; seconds: number } | null = null;
-  for (const [key, v] of acc) if (!best || v.seconds > best.seconds) best = { key, ...v };
+  return { total, onByPcode, units: [...unitByKey.values()], unitByKey };
+}
+
+/** 전체 - 온코트 = 오프코트. splitSegments()가 세그먼트를 다시 훑던 자리를 대체한다. */
+function onOffOf(r: SideRollup, pcode: string): { on: Split; off: Split } {
+  const on = r.onByPcode.get(pcode) ?? ZERO_SPLIT;
+  return {
+    on,
+    off: { seconds: r.total.seconds - on.seconds, my: r.total.my - on.my, opp: r.total.opp - on.opp },
+  };
+}
+
+/** 함께 뛴 시간이 가장 긴 5인 - **결과가 아니라 시간으로** 고른다(결과로 고르면 선택편향으로 94%에서 뜬다). */
+function mostUsedFive(r: SideRollup): FiveManUnit | null {
+  let best: FiveManUnit | null = null;
+  for (const u of r.units) if (!best || u.seconds > best.seconds) best = u;
   return best;
 }
 
-const ZONE_LABEL: Record<string, string> = { rim: "림", close: "근거리", midShort: "중거리", midLong: "롱2", three: "3점" };
 const sign = (v: number) => (v > 0 ? `+${v}` : `${v}`);
-
-const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
   const { events, box, homeTeam, awayTeam, homeScore, awayScore, rarity } = input;
@@ -798,39 +989,30 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
   const homeTname = homeTeam.name;
   const awayTname = awayTeam.name;
 
-  // ── 팀 색 태그 ──────────────────────────────────────────────────────────────
-  // 두 색을 같이 내려보내고 CSS 미디어쿼리가 고른다(서버는 테마를 모른다 - teamAccent.ts 참고).
-  const inkVars = (t: ReportTeamMeta) => {
-    const ink = teamInkPair(t.color);
-    return `--ti-l:${ink.light};--ti-d:${ink.dark}`;
-  };
-  const metaOf = (tcode: string | null): ReportTeamMeta | null =>
-    tcode === homeTcode ? homeTeam : tcode === awayTcode ? awayTeam : null;
+  // 팀 색 태그 - 정의는 report/renderKit.ts(섹션 모듈들과 같은 것을 써야 해서 밖으로 나갔다).
+  const tags = createReportTags(homeTeam, awayTeam);
+  const { metaOf, playerTag, teamTag, liOpen } = tags;
 
-  /** 선수 이름 - 약어 칩 + 팀색. 색만으로는 색각 이상·흑백에서 무력해서 약어를 같이 붙인다. */
-  const playerTag = (name: string, tcode: string | null): string => {
-    const t = metaOf(tcode);
-    if (!t) return escHtml(name);
-    return (
-      `<span class="report-team" style="${inkVars(t)}">` +
-      `<span class="report-team-abbr" title="${escHtml(t.name)}">${escHtml(t.abbr)}</span>` +
-      `<b class="report-player">${escHtml(name)}</b></span>`
-    );
+  // ── 섹션들이 나눠 쓰는 조회용 자료구조 ────────────────────────────────────────
+  // 예전엔 pcode->선수를 쓰는 섹션마다 `new Map(box.map(...))`를 따로 만들거나(3곳)
+  // `box.find(...)`로 매번 훑었다(라인업 이름 5명 × 팀 2 × 섹션 2). 한 번만 만든다.
+  const boxByPcode = new Map(box.map((b) => [b.pcode, b]));
+  const nameOf = (pcode: string) => boxByPcode.get(pcode)?.name ?? pcode;
+  // 시간 스캔 인덱스 - marginRefAt(교체 섹션)이 쓴다. ElapsedIndex 주석 참고.
+  const elapsedIx = buildElapsedIndex(events);
+  // 팀 에이스는 스포트라이트·온오프·에이스맞대결 세 섹션이 같은 정의로 쓴다(주체를 결과로
+  // 고르지 않는 게 설계였으니 세 곳이 같은 사람이어야 한다) - 팀당 한 번만 고른다.
+  const topByTcode = new Map<string, PlayerBox | null>();
+  const topOf = (tcode: string): PlayerBox | null => {
+    if (!topByTcode.has(tcode)) topByTcode.set(tcode, teamTopPerformer(box, tcode));
+    return topByTcode.get(tcode) ?? null;
   };
-  /** 문장 속 팀 이름 - 칩 없이 색만(팀명 자체가 이미 텍스트 단서다). */
-  const teamTag = (tcode: string | null, text: string): string => {
-    const t = metaOf(tcode);
-    return t ? `<b class="report-team" style="${inkVars(t)}">${escHtml(text)}</b>` : escHtml(text);
-  };
-  /**
-   * 그 줄의 주체 팀 - **마커만** 팀 색으로. 본문까지 칠하면 문장 전체가 팀 색이 되어
-   * 안에 있는 상대 팀 이름과 구분이 사라진다(실측에서 그렇게 나왔다). 그래서 색을 상속시키지
-   * 않는 전용 클래스(.report-li)를 쓴다.
-   */
-  const liOpen = (tcode: string | null): string => {
-    const t = metaOf(tcode);
-    return t ? `<li class="report-li" style="${inkVars(t)}">` : "<li>";
-  };
+  // 교체 스파크 - 식스맨(6절)과 결정적 교체(8절)가 같은 계산을 나눠 쓴다.
+  const subSparkHits = computeSubSparks(events, homeTcode, elapsedIx);
+  // 라인업 세그먼트와 팀별 집계 - 6-1/6-2/스탯에보이지않은선수/시너지/에이스맞대결 공용.
+  // 예전엔 buildLineupSegments()를 6-1절과 8.9절이 각자 한 번씩 돌렸다(같은 결과 두 벌).
+  const segs = buildLineupSegments(events, box, homeTcode, awayTcode);
+  const rollupBySide = { home: rollupSide(segs, "home"), away: rollupSide(segs, "away") } as const;
   const homeWon = homeScore > awayScore;
   const winnerTcode = homeWon ? homeTcode : awayTcode;
   const loserTcode = homeWon ? awayTcode : homeTcode;
@@ -871,8 +1053,8 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
   const spotlightLine = (p: PlayerBox) =>
     `${p.pts}점 (FG ${p.fgm}/${p.fga}, FT ${p.ftm}/${p.fta}) · ${p.ast}AST ${p.reb}REB ${p.stl}STL ${p.blk}BLK ${p.turnovers}TO ${p.fouls}PF`;
   {
-    const winnerTop = teamTopPerformer(box, winnerTcode);
-    const loserTop = teamTopPerformer(box, loserTcode);
+    const winnerTop = topOf(winnerTcode);
+    const loserTop = topOf(loserTcode);
     let html = "";
     if (winnerTop) {
       html += `<p class="report-text">🏆 ${teamTag(winnerTcode, winnerTname)} 스포트라이트 - ${playerTag(winnerTop.name, winnerTop.tcode)} ${spotlightLine(winnerTop)}.</p>`;
@@ -890,60 +1072,17 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     if (html) sections.push({ title: "팀별 스포트라이트", html });
   }
 
-  // 2-1. 경기를 가른 구역 - 5개 구역 중 두 팀 득점차가 가장 컸던 한 곳. 그 구역 한 곳의 차이가
-  // 최종 마진보다 클 때만 말한다('마진보다 크다'가 서술을 주장으로 바꿔주는 조건이고, 없이는 79.6%에서
-  // 떠서 아무 말도 아니게 된다). 그 구역을 이기고도 진 경기면 그 역설을 그대로 보여준다.
+  // 2-1. 경기를 가른 구역 - 계산·문장 전부 report/shotHotZone.ts.
   if (input.shots && input.shots.length) {
-    const zh = teamZoneStats(input.shots, homeTcode);
-    const za = teamZoneStats(input.shots, awayTcode);
-    const th = input.teamThrees?.find((t) => t.tcode === homeTcode);
-    const ta = input.teamThrees?.find((t) => t.tcode === awayTcode);
-    type Z = { key: string; h: { att: number; made: number; pts: number }; a: { att: number; made: number; pts: number } };
-    const zones: Z[] = ["rim", "close", "midShort", "midLong"].map((key) => ({
-      key,
-      h: { att: zh[key].att, made: zh[key].made, pts: zh[key].made * 2 },
-      a: { att: za[key].att, made: za[key].made, pts: za[key].made * 2 },
-    }));
-    // 3점만 공식 기록으로(좌표 판정 오차 회피 - BuildReportInput.teamThrees 주석).
-    zones.push(
-      th && ta
-        ? { key: "three", h: { att: th.tpa, made: th.tpm, pts: th.tpm * 3 }, a: { att: ta.tpa, made: ta.tpm, pts: ta.tpm * 3 } }
-        : { key: "three", h: { att: zh.three.att, made: zh.three.made, pts: zh.three.made * 3 }, a: { att: za.three.att, made: za.three.made, pts: za.three.made * 3 } }
-    );
-    const best = zones.reduce((b, z) => (Math.abs(z.h.pts - z.a.pts) > Math.abs(b.h.pts - b.a.pts) ? z : b));
-    const diff = best.h.pts - best.a.pts;
-    const margin = homeScore - awayScore;
-    if (Math.abs(diff) >= ZONE_MIN_DIFF && Math.abs(diff) > Math.abs(margin)) {
-      const zoneHomeWon = diff > 0;
-      const zw = zoneHomeWon ? { tcode: homeTcode, name: homeTname, s: best.h } : { tcode: awayTcode, name: awayTname, s: best.a };
-      const zl = zoneHomeWon ? { tcode: awayTcode, name: awayTname, s: best.a } : { tcode: homeTcode, name: homeTname, s: best.h };
-      const label = ZONE_LABEL[best.key];
-      let html: string;
-      if (zoneHomeWon === homeWon) {
-        html =
-          `<ul class="report-list">${liOpen(zw.tcode)}🔥 <b>${label} 핫존 지배</b> - ${teamTag(zw.tcode, zw.name)}${eunNeun(zw.name)} 이 구역에서 ${zw.s.made}/${zw.s.att}를 기록하며 상대(${teamTag(zl.tcode, zl.name)} ${zl.s.made}/${zl.s.att})를 완전히 압도했습니다. 이 구역 하나에서만 벌어진 <b>${Math.abs(diff)}점</b>의 격차가 최종 마진(${Math.abs(margin)}점)보다 컸을 정도로 승부에 결정적이었습니다.</li></ul>`;
-      } else {
-        // 그 구역을 이기고도 진 경기 - 승자가 그보다 더 크게 벌린 구역을 같이 보여준다.
-        const winnerHome = homeWon;
-        const madeUp = zones
-          .filter((z) => z.key !== best.key)
-          .map((z) => ({ z, d: winnerHome ? z.h.pts - z.a.pts : z.a.pts - z.h.pts }))
-          .filter((x) => x.d >= 6)
-          .sort((x, y) => y.d - x.d)
-          .slice(0, 2)
-          .map((x) => {
-            const ws = winnerHome ? x.z.h : x.z.a;
-            const ls = winnerHome ? x.z.a : x.z.h;
-            return `<b>${ZONE_LABEL[x.z.key]}</b>(${ls.made}/${ls.att} vs ${ws.made}/${ws.att})`;
-          });
-        html =
-          `<ul class="report-list">${liOpen(zw.tcode)}🧊 <b>${label} 핫존의 역설</b> - ${teamTag(zw.tcode, zw.name)}${eunNeun(zw.name)} 이 구역에서 ${zw.s.made}/${zw.s.att}를 기록하며 상대(${teamTag(zl.tcode, zl.name)} ${zl.s.made}/${zl.s.att})보다 <b>${Math.abs(diff)}점</b>을 더 넣고도 오히려 패배했습니다` +
-          (madeUp.length ? `. 반대로 ${madeUp.join("과 ")}에서 치명적인 콜드존을 형성하며 더 크게 밀렸기 때문입니다.` : ".") +
-          `</li></ul>`;
-      }
-      html += `<p class="report-caveat">구역은 슛 좌표에서 거리로 역산한 것이라 100% 공식 기록과 일치하지 않을 수 있습니다 (3점만 공식 기록 반영). 자유투는 제외.</p>`;
-      sections.push({ title: "슈팅 핫존 & 콜드존 (Spatial Shot Analysis)", html });
-    }
+    const zoneEdge = computeHotZoneEdge({
+      shots: input.shots,
+      teamThrees: input.teamThrees,
+      homeTcode,
+      awayTcode,
+      homeScore,
+      awayScore,
+    });
+    if (zoneEdge) sections.push(renderHotZoneSection(zoneEdge, { homeTeam, awayTeam, tags }));
   }
 
   // 2-1.5 슛 퀄리티 결산 (xPTS vs Actual PTS)
@@ -957,22 +1096,30 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       else if (s.tcode === awayTcode) awayXPTS += xp;
     }
     
+    // 비교 대상은 "야투로 낸 득점"이어야 한다 - xPTS는 슛로그(필드골) 좌표만 더한 값이라
+    // 자유투가 한 점도 안 들어있는데, 예전엔 여기서 팀 총득점(homeScore/awayScore)과 비교했다.
+    // KBL 팀은 경기당 자유투로만 평균 15.4점을 넣으므로 그 차이가 통째로 "기대 대비 초과득점"
+    // 으로 새서(실측 - 최근 4시즌 1,136 팀-경기의 델타 평균 +15.44점, 93%가 양수) 이 섹션이
+    // 팀-경기의 77.5%에서 "득점 폭발"을 찍고 있었다. pts - ftm이 곧 야투 득점(2점+3점)이다.
+    const fgPtsOf = (tcode: string) => sumTeam(box, tcode, (b) => b.pts - b.ftm);
     const items: string[] = [];
     for (const [tcode, tname, xpts, pts] of [
-      [homeTcode, homeTname, homeXPTS, homeScore],
-      [awayTcode, awayTname, awayXPTS, awayScore],
+      [homeTcode, homeTname, homeXPTS, fgPtsOf(homeTcode)],
+      [awayTcode, awayTname, awayXPTS, fgPtsOf(awayTcode)],
     ] as const) {
       const diff = pts - xpts;
-      if (Math.abs(diff) >= 8) { // 8점 이상 차이날 때만 유의미한 분석으로 간주
+      // 임계값 12점 - 위 보정을 하고 나면 델타 분포가 평균 -0.17점 / 표준편차 10.0점이라
+      // 예전 임계값 8점(0.8σ)은 여전히 42%에서 걸린다. 12점(약 1.2σ)이면 23%(양/음 대칭).
+      if (Math.abs(diff) >= 12) {
         if (diff > 0) {
-          items.push(`${liOpen(tcode)}🎯 ${teamTag(tcode, tname)} 슛 퀄리티 대비 <b>득점 폭발</b> - 완벽한 슛 기회(기대득점)는 <b>${xpts.toFixed(1)}점</b>이었으나, 어려운 터프샷을 다수 꽂아 넣으며 실제로는 <b>${pts}점</b>을 만들어냈습니다.</li>`);
+          items.push(`${liOpen(tcode)}🎯 ${teamTag(tcode, tname)} 슛 퀄리티 대비 <b>득점 폭발</b> - 시도한 슛의 위치만 보면 야투 기대득점은 <b>${xpts.toFixed(1)}점</b>이었으나, 어려운 터프샷을 다수 꽂아 넣으며 실제 야투 득점은 <b>${pts}점</b>이었습니다.</li>`);
         } else {
-          items.push(`${liOpen(tcode)}🎯 ${teamTag(tcode, tname)} 슛 퀄리티 대비 <b>득점 빈곤</b> - 오픈 찬스 등 좋은 슛 기회를 만들어내어 기대득점은 <b>${xpts.toFixed(1)}점</b>에 달했으나, 실제 득점은 <b>${pts}점</b>에 그치며 마무리가 아쉬웠습니다.</li>`);
+          items.push(`${liOpen(tcode)}🎯 ${teamTag(tcode, tname)} 슛 퀄리티 대비 <b>득점 빈곤</b> - 오픈 찬스 등 좋은 슛 기회를 만들어내어 야투 기대득점은 <b>${xpts.toFixed(1)}점</b>에 달했으나, 실제 야투 득점은 <b>${pts}점</b>에 그치며 마무리가 아쉬웠습니다.</li>`);
         }
       }
     }
     if (items.length > 0) {
-      sections.push({ title: "슛 퀄리티 결산 (xPTS vs Actual)", html: `<ul class="report-list">${items.join("")}</ul><p class="report-caveat">기대득점(xPTS)은 슛 좌표(위치/거리)별 리그 평균 성공률을 기반으로 산출된 슛 기회의 질적 지표입니다. (자유투 제외)</p>` });
+      sections.push({ title: "슛 퀄리티 결산 (xPTS vs Actual)", html: `<ul class="report-list">${items.join("")}</ul><p class="report-caveat">기대득점(xPTS)은 슛 좌표(위치/거리)별 리그 15시즌 평균 성공률로 산출한 슛 기회의 질적 지표입니다. 자유투는 양쪽 모두에서 제외하고 야투 득점끼리만 비교합니다.</p>` });
     }
   }
 
@@ -1047,8 +1194,9 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
   // 5. 극적인 흐름 - 요청: "왜 요동치게 되었는지, 승률 상승 포인트와 실제 스탯을 제공" - 이
   // 구간에 각 팀이 실제로 몇 점을 냈는지(누적 home_score/away_score 델타, 새 쿼리 불필요)를
   // 같이 보여줌. 승률 표기도 위 3번과 같은 이유로 유리해지는 팀 기준으로.
+  // 5-1절('승자의 최대 위기')도 같은 값으로 중복 판정을 하므로 한 번만 구한다.
+  const dramatic = findDramaticProbSwing(events);
   {
-    const dramatic = findDramaticProbSwing(events);
     if (dramatic) {
       const fromRow = events[dramatic.startIdx],
         toRow = events[dramatic.endIdx];
@@ -1085,7 +1233,6 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       }
     });
     if (lowIdx >= 0 && low <= CRISIS_MAX_PROB) {
-      const dramatic = findDramaticProbSwing(events);
       const dup = !!dramatic && Math.abs(events[lowIdx].elapsed - events[dramatic.startIdx].elapsed) <= CRISIS_DEDUP_SEC;
       if (!dup) {
         const row = events[lowIdx];
@@ -1110,9 +1257,9 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
   // 6. 이 경기의 식스맨 - 요청: "그래서 이 투입 이후 상황이 어떻게 흘러갔는지" - 넷레이팅
   // 변화 숫자만이 아니라 투입 후 실제 관찰 구간 동안 양 팀이 각각 몇 점을 냈는지도 표시.
   {
-    const sixthMan = findBestSixthManSpark(events, box, homeTcode);
+    const sixthMan = findBestSixthManSpark(subSparkHits, boxByPcode);
     if (sixthMan) {
-      const p = box.find((b) => b.pcode === sixthMan.pcode);
+      const p = boxByPcode.get(sixthMan.pcode);
       const { delta, afterDur, homeGain, awayGain } = sixthMan.spark;
       sections.push({
         title: "이 경기의 식스맨",
@@ -1126,8 +1273,6 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
   // 스플릿이라 "이 조합이 잘했다"는 인과로 쓰지 않는다. 원시 점수만 쓰고 per-40 환산은 하지
   // 않는다 - 300~600초 표본을 2400초로 늘리면 노이즈가 4~8배가 된다.
   {
-    const segs = buildLineupSegments(events, box, homeTcode, awayTcode);
-    const nameOf = (pcode: string) => box.find((b) => b.pcode === pcode)?.name ?? pcode;
     const fmtSplit = (s: Split) => `${fmtDuration(s.seconds)} 동안 ${s.my}-${s.opp}(${sign(s.my - s.opp)})`;
 
     const coreItems: string[] = [];
@@ -1136,10 +1281,17 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       ["home", homeTcode, homeTname],
       ["away", awayTcode, awayTname],
     ] as const) {
+      const roll = rollupBySide[side];
       // 주력 5인 - 시간으로 사전 선택(결과로 고르면 94%에서 뜬다).
-      const top = mostUsedFive(segs, side);
+      const top = mostUsedFive(roll);
       if (top && top.seconds >= CORE_FIVE_MIN_SEC) {
-        const { on, off } = splitSegments(segs, side, (lu) => lu.length === 5 && [...lu].sort().join(",") === top.key);
+        // 그 조합이 코트에 있던 구간 = 그 조합의 유닛 합계. 나머지가 오프다.
+        const on: Split = { seconds: top.seconds, my: top.my, opp: top.opp };
+        const off: Split = {
+          seconds: roll.total.seconds - on.seconds,
+          my: roll.total.my - on.my,
+          opp: roll.total.opp - on.opp,
+        };
         const onD = on.my - on.opp;
         const offD = off.my - off.opp;
         if (Math.abs(onD) >= CORE_FIVE_MIN_DIFF && onD * offD <= 0) {
@@ -1152,9 +1304,9 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       }
       // 온/오프 - 주체는 스포트라이트와 같은 사람(teamTopPerformer). 팀 전원에서 |온-오프| 최댓값을
       // 고르면 다중비교로 80~91%에서 뜬다. 주체를 결과로 고르지 않는 게 이 섹션의 핵심 설계.
-      const star = teamTopPerformer(box, tcode);
+      const star = topOf(tcode);
       if (star) {
-        const { on, off } = splitSegments(segs, side, (lu) => lu.includes(star.pcode));
+        const { on, off } = onOffOf(roll, star.pcode);
         const onD = on.my - on.opp;
         const offD = off.my - off.opp;
         if (off.seconds >= ONOFF_MIN_OFF_SEC && Math.abs(offD) >= ONOFF_MIN_DIFF && onD * offD <= 0) {
@@ -1174,12 +1326,13 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       ["home", homeTcode, homeTname],
       ["away", awayTcode, awayTname],
     ] as const) {
+      const roll = rollupBySide[side];
       let bestUnsung: { p: PlayerBox, onD: number, offD: number, onDur: number, offDur: number, diff: number } | null = null;
       for (const p of box) {
         if (p.tcode !== tcode) continue;
         if (p.pts >= 12) continue; // 득점이 많으면 스탯에 보이지 않은 선수가 아님 (에이스는 제외)
-        
-        const { on, off } = splitSegments(segs, side, (lu) => lu.includes(p.pcode));
+
+        const { on, off } = onOffOf(roll, p.pcode);
         if (on.seconds < 300) continue; // 최소 5분 출전
         
         const onD = on.my - on.opp;
@@ -1213,54 +1366,21 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       sections.push({ title: "스탯에 보이지 않은 선수", html: `<ul class="report-list">${unsungItems.join("")}</ul>` });
     }
 
-    // 2.6 라인업 시너지 흥망성쇠 (Best & Worst 5-Man Units)
-    const synergyItems: string[] = [];
-    for (const [side, tcode, tname] of [
-      ["home", homeTcode, homeTname],
-      ["away", awayTcode, awayTname],
-    ] as const) {
-      let bestLineup: { pcodes: string[], diff: number, dur: number } | null = null;
-      let worstLineup: { pcodes: string[], diff: number, dur: number } | null = null;
-      
-      const acc = new Map<string, { pcodes: string[]; seconds: number; my: number; opp: number }>();
-      for (const s of segs) {
-        const lu = side === "home" ? s.homeOn : s.awayOn;
-        if (lu.length !== 5) continue;
-        const sorted = [...lu].sort();
-        const key = sorted.join(",");
-        const cur = acc.get(key) ?? { pcodes: sorted, seconds: 0, my: 0, opp: 0 };
-        cur.seconds += s.seconds;
-        cur.my += side === "home" ? s.homePts : s.awayPts;
-        cur.opp += side === "home" ? s.awayPts : s.homePts;
-        acc.set(key, cur);
-      }
-      
-      for (const [_, v] of acc) {
-        if (v.seconds < 120) continue; // 최소 2분 이상 가동된 라인업만
-        const diff = v.my - v.opp;
-        if (diff >= 8 && (!bestLineup || diff > bestLineup.diff)) bestLineup = { pcodes: v.pcodes, diff, dur: v.seconds };
-        if (diff <= -8 && (!worstLineup || diff < worstLineup.diff)) worstLineup = { pcodes: v.pcodes, diff, dur: v.seconds };
-      }
-      
-      if (bestLineup) {
-        const names = bestLineup.pcodes.map((pc) => playerTag(nameOf(pc), tcode)).join(" · ");
-        synergyItems.push(`${liOpen(tcode)}📈 ${teamTag(tcode, tname)} <b>최고의 5인 조합</b>: ${names} - 이 라인업이 코트에 있던 ${fmtDuration(bestLineup.dur)} 동안 상대를 압도하며 득실마진 <b>+${bestLineup.diff}점</b>을 기록했습니다.</li>`);
-      }
-      if (worstLineup) {
-        const names = worstLineup.pcodes.map((pc) => playerTag(nameOf(pc), tcode)).join(" · ");
-        synergyItems.push(`${liOpen(tcode)}📉 ${teamTag(tcode, tname)} <b>최악의 5인 조합</b>: ${names} - 이 조합이 가동된 ${fmtDuration(worstLineup.dur)} 동안 공수가 무너지며 득실마진 <b>${worstLineup.diff}점</b>을 잃어 뼈아픈 타격이 되었습니다.</li>`);
-      }
-    }
-    if (synergyItems.length) {
-      sections.push({ title: "라인업 시너지 흥망성쇠", html: `<ul class="report-list">${synergyItems.join("")}</ul>` });
-    }
+    // 2.6 라인업 시너지 흥망성쇠 - 계산·문장 전부 report/lineupSynergy.ts.
+    const synergySection = renderLineupSynergySection(
+      [
+        { team: homeTeam, synergy: computeLineupSynergy(segs, "home", rollupBySide.home.units) },
+        { team: awayTeam, synergy: computeLineupSynergy(segs, "away", rollupBySide.away.units) },
+      ],
+      { tags, nameOf }
+    );
+    if (synergySection) sections.push(synergySection);
   }
 
   // 7. 스탯 폭발
   {
     const bursts = computeStatBursts(events);
     if (bursts.length) {
-      const boxByPcode = new Map(box.map((b) => [b.pcode, b]));
       const items = bursts
         .map((b) => {
           const p = boxByPcode.get(b.key);
@@ -1274,9 +1394,8 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
 
   // 8. 결정적 교체 타이밍
   {
-    const boxByPcode = new Map(box.map((b) => [b.pcode, b]));
     const subItems: string[] = [];
-    const notableSubs = findNotableSubSparks(events, homeTcode)
+    const notableSubs = findNotableSubSparks(subSparkHits)
       .sort((a, b) => Math.abs(b.spark.delta) - Math.abs(a.spark.delta))
       .slice(0, 2);
     for (const s of notableSubs) {
@@ -1372,23 +1491,13 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
 
   // 8.8 템포와 페이스 진단 (Pace & Transition Diagnostics)
   {
-    // Estimate POSS: FGA + 0.44*FTA + TO - Est.OREB
-    // (공격 리바운드 정확한 분리 데이터가 없으므로 야투 실패의 약 25%를 공격 리바운드로 가정)
-    const getPoss = (tcode: string) => {
-       let fga = 0, fta = 0, to = 0, fgm = 0;
-       for (const p of box) {
-         if (p.tcode === tcode) {
-            fga += p.fga; fta += p.fta; to += p.turnovers; fgm += p.fgm;
-         }
-       }
-       const missedShots = Math.max(0, fga - fgm);
-       const estOreb = missedShots * 0.25;
-       return Math.round(fga + 0.44 * fta + to - estOreb);
-    };
-    
-    const hPoss = getPoss(homeTcode);
-    const aPoss = getPoss(awayTcode);
-    const avgPoss = Math.round((hPoss + aPoss) / 2);
+    // 포제션 추정식과 그 검증은 estimatePossessions()의 주석 참고. 임계값(75/67)은 그대로
+    // 두되 40분 환산 페이스에만 적용한다 - 최근 4시즌 568경기의 공식 페이스로 재보면
+    // 빠름 26% / 보통 60% / 느림 14%로 갈려 라벨이 실제로 구실을 한다(예전 원시 추정치
+    // 기준으로는 빠름 58% / 느림 2.3%로 사실상 "빠름" 고정이었다).
+    const possEst = estimatePossessions(box, events, homeTcode, awayTcode);
+    const avgPoss = Math.round(possEst.pacePer40);
+    const otNote = possEst.playedMin > 40 ? ` (연장 포함 ${Math.round(possEst.playedMin)}분 → 40분 환산)` : "";
     
     let paceLabel = "보통 (Average)";
     if (avgPoss >= 75) paceLabel = "빠름 (Up-Tempo)";
@@ -1405,17 +1514,16 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     
     sections.push({ 
       title: "템포와 페이스 진단 (Pace & Transition)", 
-      html: `<p class="report-text">🏃 <b>추정 경기 페이스: ${avgPoss}회 (템포 ${paceLabel})</b><br/>${summary}</p>` 
+      html: `<p class="report-text">🏃 <b>추정 경기 페이스: 40분당 ${avgPoss} 포제션 (템포 ${paceLabel})</b>${otNote}<br/>${summary}</p>` 
     });
   }
 
   // 8.9 에이스 정면승부 성적표 (Head-to-Head Duel)
   {
-    const hStar = teamTopPerformer(box, homeTcode);
-    const aStar = teamTopPerformer(box, awayTcode);
-    
+    const hStar = topOf(homeTcode);
+    const aStar = topOf(awayTcode);
+
     if (hStar && aStar) {
-      const segs = buildLineupSegments(events, box, homeTcode, awayTcode);
       let duelSec = 0;
       let hPts = 0;
       let aPts = 0;
@@ -1452,15 +1560,19 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
 
   // 8.10 주가 변동 리포트 (Player Stock Up & Down)
   {
-    // 게임스코어(gameScore) 기준으로 가장 잘한 선수와 부진한 선수 추출
+    // 게임스코어(gameScore) 기준으로 가장 잘한 선수와 부진한 선수 추출.
+    // 정렬 비교자 안에서 gameScore()를 부르면 선수 한 명의 점수가 O(log n)번 다시 계산된다
+    // (그 뒤 find 두 곳에서 또) - 한 번 재서 들고 간다.
+    const gs = new Map(box.map((p) => [p.pcode, gameScore(p)]));
+    const scoreOf = (p: PlayerBox) => gs.get(p.pcode) ?? gameScore(p);
     const sortedDesc = [...box]
       .filter(p => (p.pts > 0 || p.fga > 0 || p.reb > 0 || p.ast > 0))
-      .sort((a, b) => gameScore(b) - gameScore(a));
-      
+      .sort((a, b) => scoreOf(b) - scoreOf(a));
+
     // 상한가는 게임스코어 15 이상인 선수 중 1위
-    const best = sortedDesc.find(p => gameScore(p) >= 15);
+    const best = sortedDesc.find(p => scoreOf(p) >= 15);
     // 하한가는 야투 5개 이상 시도했거나 턴오버 3개 이상이면서 게임스코어가 5 이하인 선수 중 최하위
-    const worst = [...sortedDesc].reverse().find(p => (p.fga >= 5 || p.turnovers >= 3 || p.fouls >= 4) && gameScore(p) <= 5);
+    const worst = [...sortedDesc].reverse().find(p => (p.fga >= 5 || p.turnovers >= 3 || p.fouls >= 4) && scoreOf(p) <= 5);
     
     if (best && worst && best.pcode !== worst.pcode) {
        const items: string[] = [];
