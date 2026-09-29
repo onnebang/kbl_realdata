@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { computeLineupSynergy, renderLineupSynergySection } from "./lineupSynergy";
 import { computeHotZoneEdge, renderHotZoneSection } from "./shotHotZone";
 import { computeAceDuel, DUEL_DECISIVE_PTS, DUEL_MIN_SEC } from "./aceDuel";
+import {
+  computeUnsungHeroes,
+  pickUnsungHero,
+  UNSUNG_MAX_PTS,
+  UNSUNG_MIN_ON_SEC,
+  UNSUNG_MIN_ONOFF_DIFF,
+  type UnsungCandidate,
+} from "./unsungHero";
 import { createReportTags } from "./renderKit";
 import type { LineupSegment } from "../postgameReport";
 import type { ShotRow } from "../zoneCompare";
@@ -162,5 +170,61 @@ describe("computeAceDuel", () => {
 
   it("한쪽 에이스가 없으면 null(박스스코어가 비어 topOf가 못 고르는 경우)", () => {
     expect(computeAceDuel(segs, home, { team: awayTeam, star: null })).toBeNull();
+  });
+});
+
+describe("pickUnsungHero", () => {
+  const cand = (over: Partial<UnsungCandidate> = {}): UnsungCandidate => ({
+    name: "후보",
+    pts: 6,
+    reb: 5,
+    ast: 2,
+    stl: 0,
+    blk: 0,
+    onSec: UNSUNG_MIN_ON_SEC,
+    onMargin: 6,
+    offMargin: -6,
+    offSec: 600,
+    ...over,
+  });
+
+  it("온-오프 격차가 가장 큰 한 명만 고른다(팀당 1명)", () => {
+    const hero = pickUnsungHero(homeTeam, [
+      cand({ name: "작은격차", onMargin: 3, offMargin: -8 }), // diff 11
+      cand({ name: "큰격차", onMargin: 9, offMargin: -12 }), // diff 21
+    ])!;
+    expect(hero.name).toBe("큰격차");
+    expect(hero.onMargin).toBe(9);
+    expect(hero.team).toBe(homeTeam);
+  });
+
+  it("에이스(득점 많음)·짧은 출전·작은 격차는 후보가 아니다", () => {
+    expect(pickUnsungHero(homeTeam, [cand({ pts: UNSUNG_MAX_PTS })])).toBeNull();
+    expect(pickUnsungHero(homeTeam, [cand({ onSec: UNSUNG_MIN_ON_SEC - 1 })])).toBeNull();
+    expect(pickUnsungHero(homeTeam, [cand({ onMargin: 1, offMargin: -(UNSUNG_MIN_ONOFF_DIFF - 2) })])).toBeNull();
+  });
+
+  it("온-오프 부호 조건 - 둘 다 +이거나 둘 다 -면 안 뽑는다(격차만 크면 걸리던 자리)", () => {
+    expect(pickUnsungHero(homeTeam, [cand({ onMargin: 20, offMargin: 5 })])).toBeNull();
+    expect(pickUnsungHero(homeTeam, [cand({ onMargin: -1, offMargin: -20 })])).toBeNull();
+  });
+
+  it("0인 궂은일 스탯은 문장에 안 나가게 미리 빼고, 순서는 리바운드-어시스트-스틸-블록", () => {
+    const hero = pickUnsungHero(homeTeam, [cand({ reb: 7, ast: 0, stl: 1, blk: 2 })])!;
+    expect(hero.chores).toEqual([
+      { label: "리바운드", value: 7 },
+      { label: "스틸", value: 1 },
+      { label: "블록", value: 2 },
+    ]);
+  });
+
+  it("양 팀 다 없으면 섹션을 만들지 않는다", () => {
+    expect(computeUnsungHeroes([{ team: homeTeam, candidates: [] }, { team: awayTeam, candidates: [] }])).toBeNull();
+    const both = computeUnsungHeroes([
+      { team: homeTeam, candidates: [cand()] },
+      { team: awayTeam, candidates: [cand({ name: "원정후보" })] },
+    ])!;
+    expect(both.kind).toBe("unsung_heroes");
+    expect(both.heroes.map((h) => h.team)).toEqual([homeTeam, awayTeam]);
   });
 });

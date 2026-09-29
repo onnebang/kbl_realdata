@@ -4,7 +4,7 @@ import { cache, type CSSProperties, type ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
 import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBox, type ReportSection } from "@/lib/postgameReport";
-import { AceDuelSection } from "@/components/report/AceDuelSection";
+import { DataSectionBody } from "@/components/report/DataSectionBody";
 import { teamInkStyle } from "@/lib/teamAccent";
 import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights";
 import { getGameRarity } from "@/lib/rarity";
@@ -1212,9 +1212,8 @@ export default async function GamePage({
               <div className="report-section" key={s.title}>
                 <div className="report-section-title">{s.title}</div>
                 {/* 문자열 HTML 섹션과 컴포넌트로 옮긴 섹션이 섞여 온다(renderKit.ts의
-                    ReportSection 주석). data 종류가 둘 이상 되면 여기서 타입 에러가 나며
-                    분기를 요구한다 - 그때 dispatcher를 만든다. */}
-                {"data" in s ? <AceDuelSection duel={s.data} /> : <div dangerouslySetInnerHTML={{ __html: s.html }} />}
+                    ReportSection 주석). 옮긴 섹션의 종류별 분기는 DataSectionBody 한 곳. */}
+                {"data" in s ? <DataSectionBody data={s.data} /> : <div dangerouslySetInnerHTML={{ __html: s.html }} />}
               </div>
             ))}
           </div>

@@ -1,8 +1,7 @@
-import type { ReactNode } from "react";
-import { teamInkStyle } from "@/lib/teamAccent";
 import { eunNeun, iGa } from "@/lib/josa";
-import { fmtDuration, type ReportTeamMeta } from "@/lib/report/renderKit";
+import { fmtDuration } from "@/lib/report/renderKit";
 import type { AceDuel } from "@/lib/report/aceDuel";
+import { TeamInk } from "./tags";
 
 // AI 코트사이드 리포트 8.9 "에이스 정면승부" - 기존 문자열 조립(lib/postgameReport.ts가
 // `html: '<p class="report-text">...'`로 만들어 dangerouslySetInnerHTML로 렌더)을 선언적
@@ -14,14 +13,8 @@ import type { AceDuel } from "@/lib/report/aceDuel";
 // (실제로 report-text 안 순수 텍스트 보간에는 안 붙어 있는 자리가 있다), JSX에서는 React가
 // 항상 이스케이프한다. 구조도 타입으로 고정돼서 <b> 짝이 안 맞는 HTML을 만들 수가 없다.
 
-/**
- * 문장 속 팀 이름 - 칩 없이 색만(팀명 자체가 이미 텍스트 단서다). renderKit의 teamTag()와
- * 같은 마크업이고, 서버가 테마를 모르므로 --ti-l/--ti-d 두 색을 같이 내려보내 CSS
- * 미디어쿼리가 고르는 규약도 그대로다(lib/teamAccent.ts의 teamInkStyle - 이미 있던 것 재사용).
- */
-export function TeamInk({ team, children }: { team: ReportTeamMeta; children?: ReactNode }) {
-  return <b className="report-team" style={teamInkStyle(team.color)}>{children ?? team.name}</b>;
-}
+// TeamInk는 ./tags.tsx로 옮겼다(두 번째 섹션 UnsungHeroSection도 같은 태그를 쓴다 - 섹션
+// 파일에서 공유 태그를 import하는 방향이 거꾸로라서).
 
 export function AceDuelSection({ duel }: { duel: AceDuel }) {
   const { home, away, seconds, margin, verdict } = duel;

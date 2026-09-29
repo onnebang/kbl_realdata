@@ -7,6 +7,7 @@ import { createReportTags, fmtDuration, type ReportSection, type ReportSectionDa
 import { computeLineupSynergy, renderLineupSynergySection, type FiveManUnit } from "./report/lineupSynergy";
 import { computeHotZoneEdge, renderHotZoneSection } from "./report/shotHotZone";
 import { computeAceDuel, type AceDuel } from "./report/aceDuel";
+import { computeUnsungHeroes } from "./report/unsungHero";
 
 export { fmtDuration };
 export type { ReportSection, ReportSectionData, ReportTeamMeta };
@@ -1321,52 +1322,35 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     if (coreItems.length) sections.push({ title: "이 경기의 주력 5인", html: `<ul class="report-list">${coreItems.join("")}</ul>` });
     if (onoffItems.length) sections.push({ title: "그가 코트에 없던 시간", html: `<ul class="report-list">${onoffItems.join("")}</ul>` });
 
-    // 2.5 스탯에 보이지 않은 선수
-    // 득점은 적지만 코트 마진(온-오프 마진)이 가장 좋은 선수
-    const unsungItems: string[] = [];
-    for (const [side, tcode, tname] of [
-      ["home", homeTcode, homeTname],
-      ["away", awayTcode, awayTname],
-    ] as const) {
-      const roll = rollupBySide[side];
-      let bestUnsung: { p: PlayerBox, onD: number, offD: number, onDur: number, offDur: number, diff: number } | null = null;
-      for (const p of box) {
-        if (p.tcode !== tcode) continue;
-        if (p.pts >= 12) continue; // 득점이 많으면 스탯에 보이지 않은 선수가 아님 (에이스는 제외)
-
-        const { on, off } = onOffOf(roll, p.pcode);
-        if (on.seconds < 300) continue; // 최소 5분 출전
-        
-        const onD = on.my - on.opp;
-        const offD = off.my - off.opp;
-        const diff = onD - offD; // 온/오프 마진 격차
-        if (diff >= 10 && onD > 0 && offD < 0) { // 코트에 있을 땐 득실마진 +인데 없을 땐 -인 선수
-          if (!bestUnsung || diff > bestUnsung.diff) {
-            bestUnsung = { p, onD, offD, onDur: on.seconds, offDur: off.seconds, diff };
-          }
-        }
-      }
-      
-      if (bestUnsung) {
-        const bp = bestUnsung.p;
-        const extras = [];
-        if (bp.reb > 0) extras.push(`<b>${bp.reb}리바운드</b>`);
-        if (bp.ast > 0) extras.push(`<b>${bp.ast}어시스트</b>`);
-        if (bp.stl > 0) extras.push(`<b>${bp.stl}스틸</b>`);
-        if (bp.blk > 0) extras.push(`<b>${bp.blk}블록</b>`);
-        
-        const extraStr = extras.length > 0 
-          ? ` 비록 득점은 적었으나 ${extras.join(" ")} 등 궂은일을 도맡았으며,`
-          : ` 비록 스탯 라인은 단출했으나,`;
-          
-        unsungItems.push(
-          `${liOpen(tcode)}<b>${playerTag(bp.name, tcode)}</b> - 오늘 <b>${bp.pts}득점</b>에 그쳤지만,${extraStr} 그가 코트를 밟은 ${fmtDuration(bestUnsung.onDur)} 동안 팀은 마진 <b>${sign(bestUnsung.onD)}</b>를 기록했습니다. 반면 벤치에서 쉰 ${fmtDuration(bestUnsung.offDur)} 동안에는 팀 마진이 <b>${sign(bestUnsung.offD)}</b>로 무너졌습니다. 코트 위에서 ${teamTag(tcode, tname)}의 공수 밸런스를 든든하게 지탱했습니다.</li>`
-        );
-      }
-    }
-    if (unsungItems.length) {
-      sections.push({ title: "스탯에 보이지 않은 선수", html: `<ul class="report-list">${unsungItems.join("")}</ul>` });
-    }
+    // 2.5 스탯에 보이지 않은 선수 - 선택 로직은 report/unsungHero.ts, 문장은
+    // components/report/UnsungHeroSection.tsx. 여기서는 후보의 온/오프만 채워 넘긴다
+    // (rollupBySide로 이미 만들어 둔 집계에서 꺼내니 추가 순회 없음).
+    const unsung = computeUnsungHeroes(
+      ([
+        ["home", homeTeam],
+        ["away", awayTeam],
+      ] as const).map(([side, team]) => ({
+        team,
+        candidates: box
+          .filter((p) => p.tcode === team.tcode)
+          .map((p) => {
+            const { on, off } = onOffOf(rollupBySide[side], p.pcode);
+            return {
+              name: p.name,
+              pts: p.pts,
+              reb: p.reb,
+              ast: p.ast,
+              stl: p.stl,
+              blk: p.blk,
+              onSec: on.seconds,
+              onMargin: on.my - on.opp,
+              offSec: off.seconds,
+              offMargin: off.my - off.opp,
+            };
+          }),
+      }))
+    );
+    if (unsung) sections.push({ title: "스탯에 보이지 않은 선수", data: unsung });
 
     // 2.6 라인업 시너지 흥망성쇠 - 계산·문장 전부 report/lineupSynergy.ts.
     const synergySection = renderLineupSynergySection(
