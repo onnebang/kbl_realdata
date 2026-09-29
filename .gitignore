@@ -24,6 +24,7 @@ reports/
 # check_*/test_* 잡동사니는 추적하지 않는다. 진짜 산출물(예: om_stats_report.md)은 예외로 커밋함.
 /=
 check_db.py
+check_om.py
 check_supabase.py
 /test_fetch.js
 /test_html.py
