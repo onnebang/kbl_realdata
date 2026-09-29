@@ -8,6 +8,7 @@ import { computeLineupSynergy, renderLineupSynergySection, type FiveManUnit } fr
 import { computeHotZoneEdge, renderHotZoneSection } from "./report/shotHotZone";
 import { computeAceDuel, type AceDuel } from "./report/aceDuel";
 import { computeUnsungHeroes } from "./report/unsungHero";
+import { computeStockWatch } from "./report/stockWatch";
 
 export { fmtDuration };
 export type { ReportSection, ReportSectionData, ReportTeamMeta };
@@ -1517,34 +1518,27 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     if (duel) sections.push({ title: "에이스 정면승부 성적표 (Head-to-Head Duel)", data: duel });
   }
 
-  // 8.10 주가 변동 리포트 (Player Stock Up & Down)
+  // 8.10 주가 변동 리포트 (Player Stock Up & Down) - 선택 로직은 report/stockWatch.ts,
+  // 문장은 components/report/StockWatchSection.tsx. 여기서는 후보만 채워 넘긴다.
   {
-    // 게임스코어(gameScore) 기준으로 가장 잘한 선수와 부진한 선수 추출.
-    // 정렬 비교자 안에서 gameScore()를 부르면 선수 한 명의 점수가 O(log n)번 다시 계산된다
-    // (그 뒤 find 두 곳에서 또) - 한 번 재서 들고 간다.
-    const gs = new Map(box.map((p) => [p.pcode, gameScore(p)]));
-    const scoreOf = (p: PlayerBox) => gs.get(p.pcode) ?? gameScore(p);
-    const sortedDesc = [...box]
-      .filter(p => (p.pts > 0 || p.fga > 0 || p.reb > 0 || p.ast > 0))
-      .sort((a, b) => scoreOf(b) - scoreOf(a));
-
-    // 상한가는 게임스코어 15 이상인 선수 중 1위
-    const best = sortedDesc.find(p => scoreOf(p) >= 15);
-    // 하한가는 야투 5개 이상 시도했거나 턴오버 3개 이상이면서 게임스코어가 5 이하인 선수 중 최하위
-    const worst = [...sortedDesc].reverse().find(p => (p.fga >= 5 || p.turnovers >= 3 || p.fouls >= 4) && scoreOf(p) <= 5);
-    
-    if (best && worst && best.pcode !== worst.pcode) {
-       const items: string[] = [];
-       
-       items.push(`${liOpen(best.tcode)}📈 <b>상한가: ${playerTag(best.name, best.tcode)}</b> - 오늘 <b>${best.pts}점 ${best.reb}리바운드 ${best.ast}어시스트</b>를 쏟아부으며 게임스코어 <b>${gameScore(best).toFixed(1)}</b>을 기록, 다음 라운드 OVR 급상승이 유력합니다!</li>`);
-       
-       items.push(`${liOpen(worst.tcode)}📉 <b>하한가: ${playerTag(worst.name, worst.tcode)}</b> - 오늘 <b>${worst.pts}점 (야투 ${worst.fgm}/${worst.fga})</b>, 턴오버 <b>${worst.turnovers}개</b>에 그치며 유독 고전했습니다. 하루빨리 폼 회복이 시급합니다.</li>`);
-       
-       sections.push({ 
-         title: "주가 변동 리포트 (Stock Up & Down)", 
-         html: `<ul class="report-list">${items.join("")}</ul>` 
-       });
-    }
+    // 게임스코어는 정렬 비교자 안에서 부르면 한 명의 점수가 O(log n)번 다시 계산된다 -
+    // 한 번 재서 들고 간다(넘기기 전에 여기서 끝낸다).
+    const stock = computeStockWatch(
+      box.map((p) => ({
+        pcode: p.pcode,
+        team: metaOf(p.tcode),
+        name: p.name,
+        pts: p.pts,
+        reb: p.reb,
+        ast: p.ast,
+        fgm: p.fgm,
+        fga: p.fga,
+        turnovers: p.turnovers,
+        fouls: p.fouls,
+        gameScore: gameScore(p),
+      }))
+    );
+    if (stock) sections.push({ title: "주가 변동 리포트 (Stock Up & Down)", data: stock });
   }
 
   // 9. 역대 맞대결의 매듭 - 이 경기 이전까지 이어지던 맞대결 연승이 끊겼는지 이어졌는지.

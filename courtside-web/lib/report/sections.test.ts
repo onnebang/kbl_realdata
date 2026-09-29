@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeLineupSynergy, renderLineupSynergySection } from "./lineupSynergy";
 import { computeHotZoneEdge, renderHotZoneSection } from "./shotHotZone";
 import { computeAceDuel, DUEL_DECISIVE_PTS, DUEL_MIN_SEC } from "./aceDuel";
+import { computeStockWatch, STOCK_DOWN_MIN_FGA, STOCK_UP_MIN_GS, type StockCandidate } from "./stockWatch";
 import {
   computeUnsungHeroes,
   pickUnsungHero,
@@ -226,5 +227,72 @@ describe("pickUnsungHero", () => {
     ])!;
     expect(both.kind).toBe("unsung_heroes");
     expect(both.heroes.map((h) => h.team)).toEqual([homeTeam, awayTeam]);
+  });
+});
+
+describe("computeStockWatch", () => {
+  const cand = (pcode: string, gameScore: number, over: Partial<StockCandidate> = {}): StockCandidate => ({
+    pcode,
+    team: homeTeam,
+    name: pcode,
+    pts: 0,
+    reb: 0,
+    ast: 0,
+    fgm: 0,
+    fga: 0,
+    turnovers: 0,
+    fouls: 0,
+    gameScore,
+    ...over,
+  });
+
+  it("게임스코어로 상한가/하한가를 고른다", () => {
+    const s = computeStockWatch([
+      cand("스타", 22, { pts: 28, reb: 9, ast: 7 }),
+      cand("보통", 9, { pts: 10 }),
+      cand("부진", 1, { pts: 3, fgm: 1, fga: 7, turnovers: 4 }),
+    ])!;
+    expect(s.up.name).toBe("스타");
+    expect(s.up.reb).toBe(9);
+    expect(s.down.name).toBe("부진");
+    expect(s.down.fga).toBe(7);
+  });
+
+  it("기록이 하나도 없는 선수는 후보가 아니다(안 뛴 선수를 하한가로 잡지 않는다)", () => {
+    const s = computeStockWatch([
+      cand("스타", 22, { pts: 28 }),
+      // 게임스코어는 제일 낮지만 pts/fga/reb/ast가 전부 0 - 파울만 4개다.
+      cand("결장", -1, { fouls: 4 }),
+      cand("부진", 1, { pts: 3, fga: 7 }),
+    ])!;
+    expect(s.down.name).toBe("부진");
+  });
+
+  it("상한가 임계(STOCK_UP_MIN_GS) 미달이면 섹션을 안 만든다", () => {
+    expect(
+      computeStockWatch([
+        cand("애매", STOCK_UP_MIN_GS - 0.1, { pts: 14 }),
+        cand("부진", 1, { pts: 3, fga: 7 }),
+      ])
+    ).toBeNull();
+  });
+
+  it("하한가 자격(야투/턴오버/파울)이 없으면 섹션을 안 만든다", () => {
+    expect(
+      computeStockWatch([
+        cand("스타", 22, { pts: 28 }),
+        // 게임스코어는 낮아도 야투 4개(<STOCK_DOWN_MIN_FGA)에 턴오버·파울 없음 - 고전했다고 말할 근거가 없다.
+        cand("조용", 2, { pts: 2, fga: STOCK_DOWN_MIN_FGA - 1 }),
+      ])
+    ).toBeNull();
+  });
+
+  it("하한가 동점이면 박스스코어 뒤쪽 선수(원본의 reverse().find()와 같은 순서)", () => {
+    const s = computeStockWatch([
+      cand("스타", 22, { pts: 28 }),
+      cand("먼저", 2, { pts: 3, fga: 7 }),
+      cand("나중", 2, { pts: 3, fga: 7 }),
+    ])!;
+    expect(s.down.name).toBe("나중");
   });
 });

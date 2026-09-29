@@ -1,5 +1,6 @@
 import { teamInkPair } from "../teamAccent";
 import type { AceDuel } from "./aceDuel";
+import type { StockWatch } from "./stockWatch";
 import type { UnsungHeroes } from "./unsungHero";
 
 // postgameReport.ts(1,500줄)에서 **렌더링 프리미티브만** 떼어낸 모듈. 섹션별 분석 모듈
@@ -35,7 +36,7 @@ export type ReportSection = HtmlSection | DataSection;
 /** `data` 섹션의 판별 유니온 - 섹션을 옮길 때마다 한 종류씩 늘어난다. 두 종류가 되면서
  *  예고대로 분기가 필요해졌고, components/report/DataSectionBody.tsx가 `kind`로 가른다
  *  (switch가 exhaustive라 세 번째 종류를 추가하면 그 파일에서 타입 에러가 난다). */
-export type ReportSectionData = AceDuel | UnsungHeroes;
+export type ReportSectionData = AceDuel | UnsungHeroes | StockWatch;
 
 export const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
