@@ -509,6 +509,27 @@ type MetricSeed = {
   note?: string | null;
 };
 
+/**
+ * 기준 시즌 정규시즌의 경기당 공격/수비 리바운드. **oreb/dreb가 null인 경기는 통째로 뺀다** -
+ * 0으로 접으면 분모(경기 수)는 그대로인데 분자만 줄어 그 선수의 리바운드가 조용히 낮아진다.
+ * gp(쓴 경기)와 total(그 시즌 전체 경기)을 같이 돌려주므로 화면이 "몇 경기 기준인지" 밝힐 수 있다.
+ */
+export function seasonRebSplit(
+  rows: Pick<CareerGameRow, "seasonName" | "seasonCategory" | "oreb" | "dreb">[],
+  season: string | null
+): { gp: number; total: number; oreb: number; dreb: number } | null {
+  if (!season) return null;
+  const inSeason = rows.filter((r) => r.seasonName === season && r.seasonCategory === SEASON_CATEGORY_REGULAR);
+  const usable = inSeason.filter((r) => r.oreb != null && r.dreb != null);
+  if (!usable.length) return null;
+  return {
+    gp: usable.length,
+    total: inSeason.length,
+    oreb: usable.reduce((acc, r) => acc + (r.oreb ?? 0), 0) / usable.length,
+    dreb: usable.reduce((acc, r) => acc + (r.dreb ?? 0), 0) / usable.length,
+  };
+}
+
 function metric(
   seed: MetricSeed,
   opts: {
@@ -881,7 +902,43 @@ async function computePlayerGlance(
   }
 
   // 리바운드·수비
-  metrics.push(axisMetric({ key: "rpg", label: "리바운드", group: "리바운드·수비", unit: "RPG", note: "총 리바운드 - 이 DB는 공/수 리바운드를 분해할 수 없다(oreb/dreb 전 행 NULL)" }, "rpg"));
+  //
+  // 공/수 분해는 2026-09-29부터 가능해졌다 - tools/backfill_player_rebound_split.py가 문자중계
+  // 이벤트(209 공격/210 수비)로 game_player_stats.oreb/dreb를 채웠다(101,281행 중 100,587행,
+  // 99.3%). 공식 팀 기록(team-record.json의 offr/defr)과 8,203 팀-경기를 대조해 99.805% 완전
+  // 일치했다. 다만 **못 채운 0.7%가 null로 남아 있다**(리바운드 이벤트가 통째로 없는 경기 +
+  // 구시즌 중계 노이즈). null을 0으로 접으면 그 선수의 리바운드가 조용히 줄어드니, 아래
+  // rebSplit은 null인 경기를 표본에서 아예 빼고 남은 경기 수를 sample 문구에 밝힌다.
+  const rebSplit = seasonRebSplit(careerRows, statSeason);
+  const rebSplitMetric = (seed: MetricSeed, key: "oreb" | "dreb") =>
+    metric(seed, {
+      value: rebSplit ? rebSplit[key] : null,
+      digits: 1,
+      // 분해가 안 되는 경기가 섞여 있으면 몇 경기 기준인지 반드시 밝힌다.
+      sample: rebSplit
+        ? rebSplit.gp === rebSplit.total
+          ? `${rebSplit.gp}경기`
+          : `${rebSplit.gp}경기(분해 가능한 경기만 · 전체 ${rebSplit.total}경기)`
+        : statSeason
+          ? `${seasonLabel} 정규시즌 분해 가능한 경기 없음`
+          : "기준 시즌 없음",
+      basis: basisReg,
+      dim: !rebSplit,
+    });
+
+  metrics.push(axisMetric({ key: "rpg", label: "리바운드", group: "리바운드·수비", unit: "RPG", note: "총 리바운드(공격+수비)" }, "rpg"));
+  metrics.push(
+    rebSplitMetric(
+      { key: "oreb", label: "공격 리바운드", group: "리바운드·수비", unit: "ORPG", note: "문자중계 이벤트(209)로 분해한 값 - 공식 팀 합계와 99.8% 일치" },
+      "oreb"
+    )
+  );
+  metrics.push(
+    rebSplitMetric(
+      { key: "dreb", label: "수비 리바운드", group: "리바운드·수비", unit: "DRPG", note: "문자중계 이벤트(210)로 분해한 값" },
+      "dreb"
+    )
+  );
   metrics.push(per75Metric({ key: "reb75", label: "75포제션당 리바운드", group: "리바운드·수비" }, "reb"));
   metrics.push(axisMetric({ key: "spg", label: "스틸", group: "리바운드·수비", unit: "SPG" }, "spg", 2));
   metrics.push(axisMetric({ key: "bpg", label: "블록", group: "리바운드·수비", unit: "BPG" }, "bpg", 2));
@@ -1037,7 +1094,8 @@ async function computePlayerGlance(
     "수비 정보는 스틸·블록·DRtg·온오프 넷레이팅뿐이다. 수비 블록이 얇은 것은 디자인이 아니라 데이터의 한계다.",
     "DPM·RAPM 같은 보정 지표, 연봉, 부상 기록, 키·몸무게·나이는 이 DB에 없다.",
     "온/오프는 보정하지 않은 원값이다 - 같이 뛴 동료와 상대가 통제되지 않았다.",
-    "공격/수비 리바운드 분해는 불가능하다(game_player_stats.oreb/dreb가 15시즌 전 행 NULL).",
+    "공/수 리바운드는 문자중계 이벤트로 분해한 값이다 - 리바운드 이벤트가 없는 0.7%의 경기는 표본에서 빠진다.",
+    "리바운드율(OREB%/DREB%)은 아직 없다 - 그가 코트에 있던 동안의 팀·상대 리바운드 기회를 세야 해서 라인업 단위 작업이 필요하다.",
   ];
 
   const percentilePool = percentile

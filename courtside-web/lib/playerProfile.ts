@@ -326,6 +326,15 @@ export type CareerGameRow = {
   min: number;
   pts: number;
   reb: number;
+  /**
+   * 공/수 리바운드 분해. 2026-09-29에 tools/backfill_player_rebound_split.py가 문자중계
+   * 이벤트(209/210)로 채웠다. **null이 남아 있다**(101,281행 중 694행, 0.7%) - 리바운드
+   * 이벤트가 통째로 없는 경기와 구시즌 중계 노이즈라, 합계가 reb와 안 맞는 행은 일부러
+   * 안 채웠다. 읽는 쪽은 null을 0으로 접지 말고 그 경기를 표본에서 빼야 한다
+   * (lib/playerGlance.ts의 rebSplit 참고).
+   */
+  oreb: number | null;
+  dreb: number | null;
   ast: number;
   stl: number;
   blk: number;
@@ -357,6 +366,8 @@ async function computePlayerCareerGames(pcode: string): Promise<CareerGameRow[]>
     min_played: number | string | null;
     pts: number | null;
     reb: number | null;
+    oreb: number | null;
+    dreb: number | null;
     ast: number | null;
     stl: number | null;
     blk: number | null;
@@ -375,7 +386,7 @@ async function computePlayerCareerGames(pcode: string): Promise<CareerGameRow[]>
       .from("games")
       .select(
         `gmkey, game_date, season_name, season_category, home_tcode, away_tcode, home_score, away_score, is_ended,
-         game_player_stats!inner(tcode, back_num, pos, is_starter, min_played, pts, reb, ast, stl, blk, turnovers, fgm, fga, tpm, tpa, ftm, fta)`
+         game_player_stats!inner(tcode, back_num, pos, is_starter, min_played, pts, reb, oreb, dreb, ast, stl, blk, turnovers, fgm, fga, tpm, tpa, ftm, fta)`
       )
       .eq("game_player_stats.pcode", pcode)
       .order("game_date", { ascending: false })
@@ -405,6 +416,8 @@ async function computePlayerCareerGames(pcode: string): Promise<CareerGameRow[]>
         min: Number(stat.min_played ?? 0),
         pts: stat.pts ?? 0,
         reb: stat.reb ?? 0,
+        oreb: stat.oreb,
+        dreb: stat.dreb,
         ast: stat.ast ?? 0,
         stl: stat.stl ?? 0,
         blk: stat.blk ?? 0,
