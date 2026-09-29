@@ -5,7 +5,8 @@ import { teamInkStyle } from "@/lib/teamAccent";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { TeamBadge } from "./TeamBadge";
-import { buildCourtDotsSvg, shotValue, shotXPTS, COURT_X, COURT_Y, type ShotDotMeta } from "@/lib/zoneCompare";
+// shotXPTS는 아래 "임시 비활성화"된 xPTS flow-chip 블록을 되살릴 때 같이 import에 다시 넣어야 한다.
+import { buildCourtDotsSvg, shotValue, COURT_X, COURT_Y, type ShotDotMeta } from "@/lib/zoneCompare";
 import {
   attachDerivedFields,
   findShootingStreaks,
@@ -948,6 +949,11 @@ export default function GameReplay({
   const shotReliability = useMemo(() => buildShotReliability(events, shots), [events, shots]);
   const shotToEventIdx = useMemo(() => buildShotToEventIndex(events, shots, shotReliability), [events, shots, shotReliability]);
 
+  // 이 값을 쓰는 flow-chip 두 줄이 아래에서 주석 처리돼 있다("임시 비활성화" 블록) - 그래서
+  // 계산도 같이 멈춰 둔다. 예전엔 소비자만 주석 처리돼서, **스크럽 한 칸마다**
+  // computeBoxScore(0..idx 전수 순회)와 shots 전체 루프를 돌리고 결과를 그대로 버렸다.
+  // 되살릴 때는 아래 칩 블록과 이 useMemo를 **같이** 풀어야 한다.
+  /*
   const { homeXPTS, awayXPTS, homeFgPts, awayFgPts } = useMemo(() => {
     let hX = 0, aX = 0;
     const fgaCount = new Map<string, number>();
@@ -981,6 +987,7 @@ export default function GameReplay({
     }
     return { homeXPTS: hX, awayXPTS: aX, homeFgPts: hFg, awayFgPts: aFg };
   }, [shots, events, idx, players, homeTeam.tcode, awayTeam.tcode]);
+  */
 
   // 실시간 체력 모니터링 (현재 코트 위 선수들이 휴식 없이 몇 분째 뛰고 있는지)
   const stintSec = useMemo(() => {
