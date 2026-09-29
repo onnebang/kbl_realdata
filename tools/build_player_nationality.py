@@ -69,10 +69,14 @@ alter table player_nationality enable row level security;
 
 POLICY = """
 drop policy if exists "public read player_nationality" on player_nationality;
-# 락다운(tools/lockdown_anon.sql) 이후로는 공개 읽기 정책을 만들지 않는다 - 서버는
-# service_role로 읽으므로 정책이 없어도 동작한다. 예전엔 이 줄이 배치를 돌릴 때마다
-# 락다운을 조용히 되돌려 테이블이 다시 anon 공개가 됐다(감사 실측).
-# create policy "public read player_nationality" on player_nationality for select using (true);
+-- 락다운(tools/lockdown_anon.sql) 이후로는 공개 읽기 정책을 만들지 않는다 - 서버는
+-- service_role로 읽으므로 정책이 없어도 동작한다. 예전엔 이 줄이 배치를 돌릴 때마다
+-- 락다운을 조용히 되돌려 테이블이 다시 anon 공개가 됐다(감사 실측).
+-- create policy "public read player_nationality" on player_nationality for select using (true);
+-- 주석 문자는 반드시 '--' - '#'으로 적혀 있던 동안 cur.execute(POLICY)가 매번
+-- SyntaxError로 죽어서 그 앞의 delete+insert까지 통째로 롤백됐다. 즉 이 스크립트는
+-- 그 기간 내내 "적재 완료" 출력 없이 아무것도 못 넣었고, player_nationality가 새 시즌
+-- 로스터(2026-27 신규 용병 7명 포함)를 모르는 상태로 굳어 있었다(2026-09-29 발견).
 """
 
 
