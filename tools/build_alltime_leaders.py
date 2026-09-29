@@ -68,12 +68,14 @@ def build_alltime_leaders():
     raw_stats = pd.read_sql_query(raw_stats_query, conn)
     
     merged_stats = pd.merge(raw_stats, cat_mapping, on='gmkey')
-    
+
     # Aggregate by pcode and split_type
     agg_split = merged_stats.groupby(['pcode', 'split_type']).sum().reset_index()
-    
-    # We need to compute 'total' = regular + playoffs + other
-    agg_total = merged_stats.groupby('pcode').sum().reset_index()
+
+    # 'total' = regular + playoffs only. 'other'는 역사적으로 0행이었지만(정규시즌/플레이오프/
+    # 챔피언결정전 셋뿐) 2026-27시즌 'OPEN MATCH DAY'(오픈매치, 전시경기) 10경기가 여기 처음
+    # 생겼다 - 통산 순위표는 전시경기를 세면 안 되므로 'total'에서 'other'는 계속 뺀다.
+    agg_total = merged_stats[merged_stats['split_type'] != 'other'].groupby('pcode').sum(numeric_only=True).reset_index()
     agg_total['split_type'] = 'total'
     
     all_agg = pd.concat([agg_split, agg_total], ignore_index=True)

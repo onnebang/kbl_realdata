@@ -18,7 +18,7 @@ import {
   type PercentileProfile,
 } from "./playerDataScience";
 import { classifyShot } from "./formIndex";
-import { PLAYOFF_CATEGORY } from "./playerPageData";
+import { OPEN_MATCH_CATEGORY, PLAYOFF_CATEGORY } from "./playerPageData";
 import { GMKEY_CHUNK, SEASON_CATEGORY_REGULAR, chunk, num } from "./teamSeasonStats";
 import { ONOFF_MIN, seasonShort } from "./seasonFocus";
 import { getPlayerForm, formatRate, type PlayerForm, type FormRow } from "./playerForm";
@@ -215,6 +215,7 @@ export type PlayerGlance = {
  * 값을 만들 수 없다). 여기서는 그의 팀이 뛴 경기의 스틴트를 전부 받아 한 번에 온/오프로 가른다.
  *
  * 표본 범위는 wowy.ts와 같은 정규시즌+플레이오프다(라인업 로그는 원래 귀해서 PO를 버리지 않는다).
+ * 오픈매치(season_category='OPEN MATCH DAY', 2026-27시즌 신설 전시경기)는 이 스코프에 없다 - 제외.
  * 마진은 언제나 주인공 팀 기준. net/40 = 마진 합 ÷ 분 × 40.
  *
  * 검증(2026-09-04 SQL 직접 대조):
@@ -230,6 +231,7 @@ export async function getSeasonOnOff(pcode: string, seasonName: string, tcode: s
     .select("gmkey, home_tcode, away_tcode")
     .eq("season_name", seasonName)
     .eq("is_ended", true)
+    .neq("season_category", OPEN_MATCH_CATEGORY)
     .or(`home_tcode.eq.${tcode},away_tcode.eq.${tcode}`);
   const games = (gameRows ?? []) as { gmkey: string; home_tcode: string; away_tcode: string }[];
   if (!games.length) return null;
@@ -304,7 +306,8 @@ export async function getSeasonOnOff(pcode: string, seasonName: string, tcode: s
  * 하나 더 만든다 - 그 칸이 인쇄하는 축 값이 정규+PO 단순 평균이라, 그 옆에 적을 비교값은 같은
  * 표본이어야 "가중 방식의 차이"만 남는다(WeightedAdvanced.usgAllCat 주석).
  * 그래서 쿼리에서 카테고리 필터를 빼고 행을 받은 뒤 여기서 정규시즌만 갈라 쓴다 - 조회 수는 그대로다.
- * (games.season_category는 전 시즌 통틀어 '정규시즌'과 '플레이오프' 둘뿐이다 - 2026-09-04 실측.)
+ * (2026-27시즌부터 games.season_category에 'OPEN MATCH DAY'(오픈매치, 전시경기)도 생겼다 - "정규+PO"
+ * 표본인 allRows/usgAllCat에서 그 카테고리만 걷어내고, 정규시즌만 쓰는 rows는 원래도 안전하다.)
  */
 export async function getWeightedAdvanced(pcode: string, seasonName: string | null): Promise<WeightedAdvanced> {
   const empty: WeightedAdvanced = {
@@ -337,7 +340,8 @@ export async function getWeightedAdvanced(pcode: string, seasonName: string | nu
     .eq("pcode", pcode)
     .eq("games.season_name", seasonName)
     .eq("games.is_ended", true);
-  const allRows = (data ?? []) as unknown as Row[];
+  // allRows는 "정규+PO" 표본이라 오픈매치(전시경기)는 걷어낸다(위 함수 주석).
+  const allRows = ((data ?? []) as unknown as Row[]).filter((r) => categoryOf(r) !== OPEN_MATCH_CATEGORY);
   const rows = allRows.filter((r) => categoryOf(r) === SEASON_CATEGORY_REGULAR);
 
   const wavg = (list: Row[], pick: (r: Row) => number | null): number | null => {
@@ -1068,7 +1072,7 @@ export function glancePercentileTone(p: number | null): "high" | "mid" | "low" |
 
 /** 플레이오프 표본이 섞였는지 한 줄로 - 카드 캡션에서 두 표본을 구분해 적을 때. */
 export function glanceSampleSplit(careerRows: CareerGameRow[], seasonName: string): { reg: number; po: number } {
-  const inSeason = careerRows.filter((r) => r.seasonName === seasonName && r.min > 0);
+  const inSeason = careerRows.filter((r) => r.seasonName === seasonName && r.min > 0 && r.seasonCategory !== OPEN_MATCH_CATEGORY);
   return {
     reg: inSeason.filter((r) => r.seasonCategory !== PLAYOFF_CATEGORY).length,
     po: inSeason.filter((r) => r.seasonCategory === PLAYOFF_CATEGORY).length,

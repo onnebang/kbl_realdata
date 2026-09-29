@@ -2,7 +2,7 @@ import { supabaseServer as supabase } from "./supabaseServer";
 import { TAG, TTL, cached } from "./cachePolicy";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import { getPlayerCareerGames, type CareerGameRow } from "./playerProfile";
-import { PLAYOFF_CATEGORY, seasonStartYear } from "./playerPageData";
+import { OPEN_MATCH_CATEGORY, PLAYOFF_CATEGORY, seasonStartYear } from "./playerPageData";
 import { SEASON_CATEGORY_REGULAR, num } from "./teamSeasonStats";
 import { PERCENTILE_FINAL, seasonShort } from "./seasonFocus";
 
@@ -542,9 +542,12 @@ async function computePlayerForm(pcode: string, opts?: PlayerFormOptions): Promi
   }
 
   // ── 시즌 행(정규시즌) ──────────────────────────────────────────────────────────────
+  // 시즌/커리어 행은 "정규시즌"·"정규+PO" 라벨을 달고 나가므로 오픈매치(전시경기)를 걷어낸다.
+  // "최근 N경기"(recentList, 아래)는 카테고리 무관이 설계 의도라 이 필터를 타지 않는다.
+  const seasonScopedRows = rows.filter((g) => g.seasonCategory !== OPEN_MATCH_CATEGORY);
   const bySeasonReg = new Map<string, CareerGameRow[]>();
   const bySeasonPo = new Map<string, CareerGameRow[]>();
-  for (const g of rows) {
+  for (const g of seasonScopedRows) {
     const target = g.seasonCategory === PLAYOFF_CATEGORY ? bySeasonPo : bySeasonReg;
     (target.get(g.seasonName) ?? target.set(g.seasonName, []).get(g.seasonName)!).push(g);
   }
@@ -579,9 +582,9 @@ async function computePlayerForm(pcode: string, opts?: PlayerFormOptions): Promi
     playoffRows[i].prevKey = playoffRows[i - 1].key;
   }
 
-  const regAll = rows.filter((g) => g.seasonCategory !== PLAYOFF_CATEGORY);
+  const regAll = seasonScopedRows.filter((g) => g.seasonCategory !== PLAYOFF_CATEGORY);
   const career = buildRow("career", "career", "커리어", null, SEASON_CATEGORY_REGULAR, regAll);
-  const careerAll = buildRow("career", "careerAll", "커리어(정규+PO)", null, "혼합", rows);
+  const careerAll = buildRow("career", "careerAll", "커리어(정규+PO)", null, "혼합", seasonScopedRows);
 
   // ── 최근 N "출전" ─────────────────────────────────────────────────────────────────
   // 창의 단위를 "밤"이 아니라 "출전"으로 잡는 이유는 페이지 §9와 같다(0분 엔트리를 한 칸으로

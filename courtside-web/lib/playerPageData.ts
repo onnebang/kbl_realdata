@@ -408,6 +408,14 @@ export function aggBox(rows: CareerGameRow[]): BoxAgg | null {
 }
 
 export const PLAYOFF_CATEGORY = "플레이오프";
+/**
+ * 2026-27시즌 신설 프리시즌 이벤트(games.season_category='OPEN MATCH DAY', gmkey S49G14N* 10경기,
+ * 2026-09-24~27). season_name은 정규시즌과 같은 '2026-2027'을 공유하므로, "이번 시즌 누적/평균/
+ * 커리어" 집계는 반드시 이 카테고리를 걷어내야 한다 - 안 그러면 정규시즌 개막 전까지 이 10경기가
+ * "2026-27 시즌" 행세를 한다. 반대로 경기 자체를 보여주는 화면(일정 목록·경기 상세)은 그대로
+ * 노출해야 하므로 거기선 이 상수를 쓰지 않는다.
+ */
+export const OPEN_MATCH_CATEGORY = "OPEN MATCH DAY";
 
 /** 시즌 × 팀 라인(시즌별 기록 표) - 정규/PO 분리. */
 export type SeasonTeamLine = { seasonName: string; tcode: string; lastDate: string; all: BoxAgg; reg: BoxAgg | null; po: BoxAgg | null };
@@ -415,7 +423,9 @@ export type SeasonTeamLine = { seasonName: string; tcode: string; lastDate: stri
 /** 시즌 하나로 합친 서사 단위(히어로 타일·커리어 아크) - 시즌 중 이적은 경기수 가중으로 자연히 합쳐진다. */
 export type SeasonAgg = BoxAgg & { seasonName: string; tcodes: string[]; gpReg: number; gpPo: number };
 
-export function aggregateCareer(rows: CareerGameRow[]): { lines: SeasonTeamLine[]; seasonsAsc: SeasonAgg[] } {
+export function aggregateCareer(allRows: CareerGameRow[]): { lines: SeasonTeamLine[]; seasonsAsc: SeasonAgg[] } {
+  // 시즌별 기록표·히어로 타일 전부 "정규+PO 커리어" 스코프다 - 오픈매치(전시경기)는 통계에 안 잡힌다.
+  const rows = allRows.filter((r) => r.seasonCategory !== OPEN_MATCH_CATEGORY);
   const bySeason = new Map<string, CareerGameRow[]>();
   for (const r of rows) (bySeason.get(r.seasonName) ?? bySeason.set(r.seasonName, []).get(r.seasonName)!).push(r);
 
