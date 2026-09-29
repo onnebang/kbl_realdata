@@ -19,6 +19,14 @@ import { getTeams, shortSeason, type TeamInfo } from "./preseason";
 export const SEASON_CATEGORY_REGULAR = "정규시즌";
 
 /**
+ * 2026-27시즌 신설 프리시즌 이벤트(games.season_category='OPEN MATCH DAY', 10경기, 2026-09-24~27).
+ * season_name은 정규시즌과 같은 '2026-2027'을 공유하므로, getSeasonGames({category: null})로 순수
+ * "이 시즌 경기" 필터를 안 거는 호출부는 이걸 걷어내야 한다(2026-10-03 개막 전까진 이 10경기가
+ * "2026-27 시즌"인 척한다). 경기 자체를 보여주는 화면(일정 목록)은 이 상수를 안 쓴다.
+ */
+const OPEN_MATCH_CATEGORY = "OPEN MATCH DAY";
+
+/**
  * gmkey IN 목록 한 덩어리 크기. game_player_stats/game_team_stats에는 시즌 컬럼이 없어서
  * games에서 뽑은 gmkey로 좁히는데, 한 시즌 283경기를 한 번에 IN으로 넣으면 URL이 3KB를
  * 넘어간다(PostgREST GET). 120개씩 끊어서 여러 번 부른다.
@@ -50,7 +58,10 @@ export type SeasonGameRow = {
 
 /**
  * 한 시즌의 경기 목록(= 다른 테이블을 좁히는 gmkey 원천).
- * opts.category 를 넘기면 그 season_category만(기본 정규시즌), null이면 전 카테고리.
+ * opts.category 를 넘기면 그 season_category만(기본 정규시즌), null이면 "정규+PO"(현재 호출부
+ * 전부가 원하는 뜻 - WOWY/조합 표본은 라인업 로그가 귀해 PO는 안 버리지만, 오픈매치(전시경기)는
+ * 애초에 그 표본의 정의 밖이다). 오픈매치까지 포함해 문자 그대로 "전 카테고리"가 필요한 호출부는
+ * 아직 없다 - 생기면 별도 옵션으로 추가할 것.
  * 끝난 경기만 - 예정 경기는 스탯 행이 없고 라이브 드라이런 합성 경기가 섞일 수 있다.
  */
 export async function getSeasonGames(
@@ -73,6 +84,7 @@ export async function getSeasonGames(
       .eq("season_name", seasonName)
       .eq("is_ended", true);
     if (category) q = q.eq("season_category", category);
+    else q = q.neq("season_category", OPEN_MATCH_CATEGORY);
     return q.range(from, to);
   });
   return rows.map((r) => ({
