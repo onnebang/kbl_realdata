@@ -245,6 +245,7 @@ export async function getSeasonOnOff(pcode: string, seasonName: string, tcode: s
         .from("lineup_stints")
         .select("gmkey, home_lineup, away_lineup, duration_sec, home_pts, away_pts", { count: "exact" })
         .in("gmkey", part)
+        .order("stint_id", { ascending: true })
         .range(from, to)
     );
     stints.push(...got);

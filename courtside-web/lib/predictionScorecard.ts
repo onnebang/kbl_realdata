@@ -206,6 +206,8 @@ async function fetchScoredGames(): Promise<ScoredGame[]> {
         .eq("is_ended", true)
         .not("home_score", "is", null)
         .not("away_score", "is", null)
+        // PK 정렬 필수(fetchAllPagesBounded 주석의 실측 - 정렬 없이 받으면 4,192행 중 고유 2,915개).
+        .order("gmkey", { ascending: true })
         .range(from, to)
     ),
     fetchAllPagesBounded<{ gmkey: string; home_win_prob: number | null }>((from, to) =>
@@ -213,6 +215,7 @@ async function fetchScoredGames(): Promise<ScoredGame[]> {
         .from("game_events")
         .select("gmkey, home_win_prob", { count: "exact" })
         .eq("quarter", "PRE")
+        .order("gmkey", { ascending: true })
         .range(from, to)
     ),
     fetchAllPagesBounded<{ gmkey: string; home_win_prob: number | null; home_win_prob_lineup: number | null }>(
@@ -220,9 +223,20 @@ async function fetchScoredGames(): Promise<ScoredGame[]> {
         supabase
           .from("pregame_features")
           .select("gmkey, home_win_prob, home_win_prob_lineup", { count: "exact" })
+          .order("gmkey", { ascending: true })
           .range(from, to)
     ),
   ]);
+
+  // 검산: 페이지네이션이 중복/누락으로 망가지면 받은 행 수는 맞는데 고유 키가 줄어든다
+  // (fetchAllPagesBounded 주석의 실측). 그 경우 조용히 틀린 표본으로 성적표를 그리게 되므로
+  // 여기서 바로 던진다 - 배포본이 4,192경기를 2,857경기로 집계해 나간 적이 있다.
+  for (const [name, rows] of [["games", games], ["game_events(PRE)", pre], ["pregame_features", pf]] as const) {
+    const unique = new Set(rows.map((r) => r.gmkey)).size;
+    if (unique !== rows.length) {
+      throw new Error(`predictionScorecard: ${name} 조회에 중복 gmkey가 있다(${rows.length}행 / 고유 ${unique}개) - 페이지네이션 정렬을 확인할 것.`);
+    }
+  }
 
   const liveBy = new Map(pre.map((r) => [r.gmkey, r.home_win_prob]));
   const pfBy = new Map(pf.map((r) => [r.gmkey, r]));

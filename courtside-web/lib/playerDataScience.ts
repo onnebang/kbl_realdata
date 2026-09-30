@@ -45,6 +45,7 @@ async function computeCareerShots(pcode: string): Promise<CareerShot[]> {
         // 신설)는 season_name은 같아도 여기 안 든다. 안 그러면 개막 전까지 슈팅 DNA·별자리·
         // 시즌별 슛차트에 전시경기 슛이 "2026-27 시즌" 행세를 한다.
         .neq("games.season_category", OPEN_MATCH_CATEGORY)
+        .order("shot_id", { ascending: true })
         .range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: unknown; count: number | null }>
   );
   return rows.map((r) => {

@@ -174,6 +174,7 @@ async function fetchSizeRows(pcode: string, size: ComboSize): Promise<ComboDbRow
         .contains("pcodes", [pcode])
         .eq("n", size)
         .gte("minutes", COMBO_MIN_MINUTES_BY_SIZE[size])
+        .order("combo_key", { ascending: true })
         .range(from, to) as unknown as PromiseLike<{ data: ComboDbRow[] | null; error: unknown; count: number | null }>
   );
 }

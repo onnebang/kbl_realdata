@@ -56,6 +56,8 @@ async function computeShotValueScatterData(seasonName: string): Promise<ShotValu
         .from("game_player_stats")
         .select("pcode, tcode, pts, fga, tpa, fta, games!inner(season_name)", { count: "exact" })
         .eq("games.season_name", seasonName)
+        .order("gmkey", { ascending: true })
+        .order("pcode", { ascending: true })
         .range(from, to) as unknown as PromiseLike<{ data: BoxRow[] | null; error: unknown; count: number | null }>
   );
 
@@ -82,6 +84,7 @@ async function computeShotValueScatterData(seasonName: string): Promise<ShotValu
         .from("shot_log")
         .select("pcode, x, y, d, games!inner(season_name)", { count: "exact" })
         .eq("games.season_name", seasonName)
+        .order("shot_id", { ascending: true })
         .range(from, to) as unknown as PromiseLike<{ data: ShotRow[] | null; error: unknown; count: number | null }>
   );
 

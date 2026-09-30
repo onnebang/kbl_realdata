@@ -233,6 +233,8 @@ async function fetchSeasonTeamGames(seasons: string[]): Promise<TeamGameRow[]> {
       .select(TEAM_SELECT, { count: "exact" })
       .in("games.season_name", seasons)
       .eq("games.is_ended", true)
+      .order("gmkey", { ascending: true })
+      .order("tcode", { ascending: true })
       .range(from, to) as unknown as PromiseLike<{ data: TeamGameRow[] | null; error: unknown; count: number | null }>
   );
 }
@@ -659,7 +661,12 @@ async function computePlayerForm(pcode: string, opts?: PlayerFormOptions): Promi
  */
 async function fetchUsage(pcode: string): Promise<Map<string, number>> {
   const rows = await fetchAllPagesBounded<{ gmkey: string; usage_rtg: number | null }>((from, to) =>
-    supabase.from("game_player_stats").select("gmkey, usage_rtg", { count: "exact" }).eq("pcode", pcode).range(from, to)
+    supabase
+      .from("game_player_stats")
+      .select("gmkey, usage_rtg", { count: "exact" })
+      .eq("pcode", pcode)
+      .order("gmkey", { ascending: true })
+      .range(from, to)
   );
   const out = new Map<string, number>();
   for (const r of rows) if (r.usage_rtg != null) out.set(r.gmkey, num(r.usage_rtg));

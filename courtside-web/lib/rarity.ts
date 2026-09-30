@@ -22,6 +22,8 @@ export async function getGameRarity(homeScore: number, awayScore: number): Promi
       .select("home_score, away_score", { count: "exact" })
       .not("home_score", "is", null)
       .not("away_score", "is", null)
+      // PK 정렬 필수 - 없으면 페이지가 겹치며 행이 빠진다(fetchAllPagesBounded 주석의 실측).
+      .order("gmkey", { ascending: true })
       .range(from, to)
   );
   if (!rows.length) return null;

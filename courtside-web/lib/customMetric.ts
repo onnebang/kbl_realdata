@@ -71,6 +71,8 @@ async function computeSeasonPlayerMetrics(seasonName: string): Promise<MetricPla
         "pcode, tcode, pts, reb, ast, stl, blk, turnovers, fgm, fga, tpm, tpa, ftm, fta, player:players(name), games!inner(season_name)"
       )
       .eq("games.season_name", seasonName)
+      .order("gmkey", { ascending: true })
+      .order("pcode", { ascending: true })
       .range(from, to) as unknown as PromiseLike<{ data: StatRow[] | null; error: unknown }>
   );
   if (!rows.length) return [];

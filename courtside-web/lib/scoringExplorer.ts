@@ -65,6 +65,17 @@ async function fetchPageWithRetry<T>(
 // export: lib/shotValueScatter.ts도 시즌 전체(전 선수) shot_log/game_player_stats를 한 번에
 // 끌어와야 해서(그 파일 상단 주석) 이 병렬 페이지네이션이 그대로 필요 - 같은 문제를 겪은 이
 // 파일의 해법을 재사용(중복 구현 금지).
+/**
+ * **호출부는 반드시 결정적 정렬(.order)을 걸어야 한다** - 보통 그 테이블의 PK다.
+ *
+ * 왜(2026-09-30 실측): OFFSET 페이지네이션은 ORDER BY가 없으면 페이지마다 행 순서가 달라질 수
+ * 있어서 어떤 행은 두 페이지에 들어가고 어떤 행은 어디에도 안 들어간다. 같은 DB에서 직접 재봤다 -
+ * `select gmkey from game_events where quarter='PRE'`를 1000행씩 5페이지로 받으면
+ *   정렬 없음  : 4,192행을 받았지만 고유 gmkey는 **2,915개**(1,277행이 중복 = 1,277행 누락)
+ *   order by gmkey : 4,192행 / 고유 4,192개
+ * 받은 행 수(4,192)는 기대값과 같아서 이 함수의 재시도·예외 경로로는 잡히지 않는다. 즉 조용히
+ * 틀린 표본이 화면에 올라간다 - 실제로 예측 성적표가 4,192경기를 2,857경기로 집계해 배포됐다.
+ */
 export async function fetchAllPagesBounded<T>(
   makeQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown; count?: number | null }>
 ): Promise<T[]> {
@@ -169,6 +180,7 @@ async function fetchCoachShotsAllSeasons(coachId: string): Promise<ShotWithSeaso
       supabase
         .from("games")
         .select("gmkey, home_tcode, season_name", { count: "exact" })
+        .order("gmkey", { ascending: true })
         .eq("home_coach_id", coachId)
         .range(from, to)
     ),
@@ -176,6 +188,7 @@ async function fetchCoachShotsAllSeasons(coachId: string): Promise<ShotWithSeaso
       supabase
         .from("games")
         .select("gmkey, away_tcode, season_name", { count: "exact" })
+        .order("gmkey", { ascending: true })
         .eq("away_coach_id", coachId)
         .range(from, to)
     ),
@@ -190,7 +203,12 @@ async function fetchCoachShotsAllSeasons(coachId: string): Promise<ShotWithSeaso
   for (let i = 0; i < gmkeys.length; i += 100) {
     const chunk = gmkeys.slice(i, i + 100);
     const chunkShots = await fetchAllPagesBounded<{ gmkey: string; tcode: string } & ShotXYDM>((from, to) =>
-      supabase.from("shot_log").select("gmkey, tcode, x, y, d, made", { count: "exact" }).in("gmkey", chunk).range(from, to)
+      supabase
+        .from("shot_log")
+        .select("gmkey, tcode, x, y, d, made", { count: "exact" })
+        .in("gmkey", chunk)
+        .order("shot_id", { ascending: true })
+        .range(from, to)
     );
     for (const s of chunkShots) {
       const m = meta.get(s.gmkey);
@@ -208,6 +226,7 @@ async function getCoachGameTcodesForSeason(coachId: string, seasonName: string):
       supabase
         .from("games")
         .select("gmkey, home_tcode", { count: "exact" })
+        .order("gmkey", { ascending: true })
         .eq("season_name", seasonName)
         .eq("home_coach_id", coachId)
         .range(from, to)
@@ -216,6 +235,7 @@ async function getCoachGameTcodesForSeason(coachId: string, seasonName: string):
       supabase
         .from("games")
         .select("gmkey, away_tcode", { count: "exact" })
+        .order("gmkey", { ascending: true })
         .eq("season_name", seasonName)
         .eq("away_coach_id", coachId)
         .range(from, to)
@@ -237,7 +257,7 @@ export async function getShotGrid(dim: Dimension, entityId: string, seasonName: 
         .select("x, y, d, made, games!inner(season_name)", { count: "exact" })
         .eq("games.season_name", seasonName);
       if (dim === "team") q = q.eq("tcode", entityId);
-      return q.range(from, to) as unknown as PromiseLike<{ data: ShotXYDM[] | null; error: unknown; count: number | null }>;
+      return q.order("shot_id", { ascending: true }).range(from, to) as unknown as PromiseLike<{ data: ShotXYDM[] | null; error: unknown; count: number | null }>;
     });
     return toGrid(shots);
   }
@@ -247,6 +267,7 @@ export async function getShotGrid(dim: Dimension, entityId: string, seasonName: 
         supabase
           .from("shot_log")
           .select("x, y, d, made, games!inner(season_name)", { count: "exact" })
+          .order("shot_id", { ascending: true })
           .eq("games.season_name", seasonName)
           .eq("pcode", entityId)
           .range(from, to) as unknown as PromiseLike<{ data: ShotXYDM[] | null; error: unknown; count: number | null }>
@@ -262,7 +283,12 @@ export async function getShotGrid(dim: Dimension, entityId: string, seasonName: 
   for (let i = 0; i < gmkeys.length; i += 100) {
     const chunk = gmkeys.slice(i, i + 100);
     const chunkShots = await fetchAllPagesBounded<{ gmkey: string; tcode: string } & ShotXYDM>((from, to) =>
-      supabase.from("shot_log").select("gmkey, tcode, x, y, d, made", { count: "exact" }).in("gmkey", chunk).range(from, to)
+      supabase
+        .from("shot_log")
+        .select("gmkey, tcode, x, y, d, made", { count: "exact" })
+        .in("gmkey", chunk)
+        .order("shot_id", { ascending: true })
+        .range(from, to)
     );
     for (const s of chunkShots) {
       if (s.tcode === tcodeByGmkey.get(s.gmkey)) shots.push(s);
@@ -307,7 +333,7 @@ async function computeEntitySeasonGrids(dim: Dimension, entityId: string): Promi
       let q = supabase.from("shot_log").select("x, y, d, made, games!inner(season_name)", { count: "exact" });
       if (dim === "team") q = q.eq("tcode", entityId);
       if (dim === "player") q = q.eq("pcode", entityId);
-      return q.range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: unknown; count: number | null }>;
+      return q.order("shot_id", { ascending: true }).range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: unknown; count: number | null }>;
     });
     shots = rows.map((r) => {
       const g = Array.isArray(r.games) ? r.games[0] : r.games;
