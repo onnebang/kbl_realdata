@@ -139,6 +139,16 @@ describe("computePredictionAudit", () => {
     const tov = audit.checks.find((c) => c.label.startsWith("턴오버율"))!;
     expect(Math.sign(tov.expectedEdge)).not.toBe(Math.sign(tov.actualEdge));
     expect(tov.flipped).toBe(false);
+    // "일치"라고도 쓰지 않는다 - 부호가 실제로 다르다(실측 S49G14N3의 리바운드 점유율이
+    // 기대 -0.7%p / 실제 +10.0%p인데 "방향 일치"로 나갔던 자리).
+    expect(tov.kind).toBe("negligible");
+  });
+
+  it("부호가 같으면 aligned, 둘 다 유의미하게 뒤집히면 flipped", () => {
+    const ts = audit.checks.find((c) => c.label.startsWith("슛 효율"))!;
+    expect(ts.kind).toBe("flipped");
+    const reb = audit.checks.find((c) => c.label.startsWith("리바운드"))!;
+    expect(reb.kind).toBe("negligible"); // 기대 +2.1 / 실제 0.0
   });
 
   it("경기 전 예측이 두 갈래로 갈린 경우를 숨기지 않는다", () => {

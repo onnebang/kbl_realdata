@@ -1,5 +1,5 @@
 import { iGa } from "@/lib/josa";
-import { fmtProbPct } from "@/lib/predictionVerdict";
+import { VERDICT_TEXT, fmtProbPct, gradePredictions } from "@/lib/predictionVerdict";
 import type { AuditCheck, PredictionAudit } from "@/lib/report/predictionAudit";
 import { TeamInk } from "./tags";
 
@@ -25,13 +25,13 @@ function CheckRow({ c }: { c: AuditCheck }) {
       <th scope="row">{c.label}</th>
       <td>{pp(c.expectedEdge)}</td>
       <td>{pp(c.actualEdge)}</td>
-      <td>{c.flipped ? "반대로 나옴" : "방향 일치"}</td>
+      <td>{c.kind === "flipped" ? "반대로 나옴" : c.kind === "negligible" ? "차이 미미" : "방향 일치"}</td>
     </tr>
   );
 }
 
 export function PredictionAuditSection({ audit }: { audit: PredictionAudit }) {
-  const { home, away, verdict, preProb, homeWon, trace, quarterTicks, homeAheadShare, homeMaxProb, objMaxProb, checks, modelSplit } = audit;
+  const { home, away, preProb, entryProb, homeWon, trace, quarterTicks, homeAheadShare, homeMaxProb, objMaxProb, checks, modelSplit } = audit;
   const hColor = home.color ?? "#888888";
   const winner = homeWon ? home : away;
 
@@ -50,17 +50,23 @@ export function PredictionAuditSection({ audit }: { audit: PredictionAudit }) {
   const maxDisp = fmtProbPct(homeMaxProb, Math.abs(homeMaxProb - 0.5) < 0.005);
   // 점수판만 보면 앞섰는데 전력 보정 승률은 끝까지 50%를 못 넘은 경우(실측 S49G14N4).
   const objCrossedButActualDidNot = neverAhead && objMaxProb != null && objMaxProb > 0.5;
+  const graded = gradePredictions(preProb, entryProb, homeWon);
+  // 두 예측의 판정이 갈린 경기는 그 사실 자체가 정보다(오픈매치 10경기 중 5경기가 그랬다).
+  const verdictsDiffer = graded.length > 1 && graded[0].verdict !== graded[1].verdict;
 
   return (
     <>
+      {/* 경기 전 예측이 두 개(시즌 기준 / 엔트리 반영)라 둘 다 채점한다 - 예전엔 시즌 기준만
+          채점해서 엔트리로 맞춘 경기가 "빗나감"으로 보였다(제보 2026-10-01). */}
+      <ul className="report-list">
+        {graded.map((g) => (
+          <li key={g.label}>
+            {g.label} <b>{VERDICT_TEXT[g.verdict]}</b> - <TeamInk team={home} /> {g.homePct}% : <TeamInk team={away} /> {g.awayPct}%
+            {g.verdict === "coinflip" ? <> (어느 쪽도 우세라고 부를 수 없는 차이)</> : null}
+          </li>
+        ))}
+      </ul>
       <p className="report-text">
-        {verdict === "coinflip" ? (
-          <>경기 전 승률은 <TeamInk team={home} /> {fmtProbPct(preProb, true)}% : <TeamInk team={away} /> {fmtProbPct(1 - preProb, true)}%로 사실상 반반이었습니다.</>
-        ) : verdict === "hit" ? (
-          <>경기 전 예측(<TeamInk team={home} /> {fmtProbPct(preProb, false)}%)은 결과와 방향이 같았습니다.</>
-        ) : (
-          <>경기 전 예측(<TeamInk team={home} /> {fmtProbPct(preProb, false)}%)은 결과와 방향이 달랐습니다.</>
-        )}{" "}
         경기 중 <TeamInk team={home} /> 승률은{" "}
         {neverAhead ? (
           <><b>한 번도 50%를 넘지 않았습니다</b>(최고 {maxDisp}%)</>
@@ -101,6 +107,14 @@ export function PredictionAuditSection({ audit }: { audit: PredictionAudit }) {
         </p>
       )}
 
+      {verdictsDiffer && (
+        <p className="report-text">
+          두 예측의 판정이 갈렸습니다 - <b>엔트리 발표 뒤 승률이 달라진 것이 결과와 더 가까웠는지</b>가 여기서 갈립니다.
+          엔트리 반영 승률은 결장자를 빼고 다시 계산한 값이라, 시즌 기준과 다른 쪽을 가리켰다면 그 차이가 실제로 유효했다는
+          뜻입니다(경기 하나로는 확인되지 않습니다).
+        </p>
+      )}
+
       {checks.length > 0 && (
         <>
           <div className="report-section-title audit-table-title">
@@ -127,7 +141,7 @@ export function PredictionAuditSection({ audit }: { audit: PredictionAudit }) {
                 기대와 <b>반대 방향</b>으로 나온 항목은 {flips.map((f) => f.label).join(", ")}입니다 - 예측이 어긋난 지점은 여기입니다.
               </>
             ) : (
-              <>세 항목 모두 기대한 방향과 같게 나왔습니다 - 지표 방향이 아니라 크기에서 갈린 경기입니다.</>
+              <>기대와 반대 방향으로 뒤집힌 항목은 없습니다 - 지표 방향이 아니라 크기에서 갈린 경기입니다.</>
             )}
           </p>
         </>

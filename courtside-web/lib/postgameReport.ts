@@ -4,7 +4,7 @@ import type { H2H, SeasonStats } from "./matchups";
 // 섹션별 분석은 report/ 아래로 하나씩 옮기는 중이다(계산/문장 분리, report/renderKit.ts 주석 참고).
 // 의존 방향은 여기 -> report/* 한쪽뿐. 옮겨간 타입·함수는 하위호환을 위해 그대로 re-export한다.
 import { createReportTags, escHtml, fmtDuration, type ReportSection, type ReportSectionData, type ReportTags, type ReportTeamMeta } from "./report/renderKit";
-import { fmtProbPct, gradePrediction } from "./predictionVerdict";
+import { VERDICT_TEXT, gradePredictions } from "./predictionVerdict";
 import { computeLineupSynergy, renderLineupSynergySection, type FiveManUnit } from "./report/lineupSynergy";
 import { computeHotZoneEdge, renderHotZoneSection } from "./report/shotHotZone";
 import { computeAceDuel, type AceDuel } from "./report/aceDuel";
@@ -1129,21 +1129,34 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
   // 채점 규칙은 lib/predictionVerdict.ts 한 곳에만 있다(여기와 matchupInsights.ts의
   // gradeMatchupInsights가 같은 예측을 정반대로 채점해 같은 페이지에 내보낸 버그 때문).
   {
-    const verdict = gradePrediction(preProb, homeWon);
-    const coinflip = verdict === "coinflip";
-    const favHome = preProb >= 0.5;
-    const favTname = favHome ? homeTname : awayTname;
-    const favTcode = favHome ? homeTcode : awayTcode;
-    const favPct = fmtProbPct(favHome ? preProb : 1 - preProb, coinflip);
+    // 경기 전 승률은 **두 개**다(시즌 기준 / 엔트리 반영). 둘 다 채점한다 - 예전엔 시즌 기준
+    // 하나만 채점해서, 엔트리로는 맞춘 경기가 "빗나감"으로 나갔다(제보 2026-10-01, 오픈매치
+    // 10경기 중 5경기에서 두 판정이 갈렸다 - lib/predictionVerdict.ts의 gradePredictions 주석).
+    const graded = gradePredictions(preProb, input.lineupWinProb?.lineupProb, homeWon);
+    const rows = graded
+      .map((g) => {
+        const favHome = g.homeProb >= 0.5;
+        const favTname = favHome ? homeTname : awayTname;
+        const favTcode = favHome ? homeTcode : awayTcode;
+        const favPct = favHome ? g.homePct : g.awayPct;
+        const detail =
+          g.verdict === "coinflip"
+            ? `${teamTag(homeTcode, homeTname)} ${g.homePct}% : ${teamTag(awayTcode, awayTname)} ${g.awayPct}% - 어느 쪽도 우세라고 부를 수 없는 차이`
+            : g.verdict === "hit"
+              ? `${teamTag(favTcode, favTname)}${iGa(favTname)} 이길 확률을 ${favPct}%로 더 높게 봤고, 실제로 그대로 됨`
+              : `${teamTag(favTcode, favTname)}${iGa(favTname)} 더 유력했지만(${favPct}%), 실제로는 ${teamTag(winnerTcode, winnerTname)}${iGa(winnerTname)} 이김`;
+        return `<li>${escHtml(g.label)} - <b>${VERDICT_TEXT[g.verdict]}</b>: ${detail}.</li>`;
+      })
+      .join("");
     let html =
-      `<p class="report-text">최종 스코어 ${teamTag(winnerTcode, winnerTname)} <b>${winnerScore} : ${loserScore}</b> ${teamTag(loserTcode, loserTname)}. ` +
-      (coinflip
-        ? // 표시값이 양쪽 다 50%인 구간 - '우세한 쪽'이 없으므로 적중/빗나감을 매기지 않는다.
-          `예측은 <b>반반</b> - 경기 전 승률이 ${teamTag(homeTcode, homeTname)} ${fmtProbPct(preProb, true)}% : ${teamTag(awayTcode, awayTname)} ${fmtProbPct(1 - preProb, true)}%로, 어느 쪽도 우세라고 부를 수 없는 차이였음(사실상 동전 던지기). 실제로는 ${teamTag(winnerTcode, winnerTname)}${iGa(winnerTname)} 이김.`
-        : verdict === "hit"
-          ? `예측은 <b>적중</b> - 경기 전 ${teamTag(favTcode, favTname)}${iGa(favTname)} 이길 확률을 ${favPct}%로 더 높게 봤고, 실제로 그대로 됨.`
-          : `예측은 <b>빗나감</b> - 경기 전엔 ${teamTag(favTcode, favTname)}${iGa(favTname)} 더 유력했지만(${favPct}%), 실제로는 ${teamTag(winnerTcode, winnerTname)}${iGa(winnerTname)} 이김. 확률 예측은 100% 확신이 아니라 "이 정도 비율로 이런 결과가 나온다"는 뜻이라, 이런 이변도 정상적인 범위임.`) +
-      `</p>`;
+      `<p class="report-text">최종 스코어 ${teamTag(winnerTcode, winnerTname)} <b>${winnerScore} : ${loserScore}</b> ${teamTag(loserTcode, loserTname)}.` +
+      (graded.length > 1 ? ` 경기 전 예측이 두 개라 따로 채점합니다.` : "") +
+      `</p><ul class="report-list">${rows}</ul>`;
+    // '빗나감'이 하나라도 있을 때만 확률 예측의 성질을 덧붙인다(적중만 있는 경기에 변명처럼
+    // 붙는 것을 막는다).
+    if (graded.some((g) => g.verdict === "miss")) {
+      html += `<p class="report-caveat">확률 예측은 100% 확신이 아니라 "이 정도 비율로 이런 결과가 나온다"는 뜻이라, 이런 이변도 정상적인 범위입니다.</p>`;
+    }
     if (rarity) {
       const marginPct = Math.round((rarity.marginPercentile || 0) * 100);
       const margin = winnerScore - loserScore;
@@ -1207,6 +1220,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       homeStats: homeStatLine,
       awayStats: awayStatLine,
       expectation: input.expectation ?? null,
+      entryProb: input.lineupWinProb?.lineupProb ?? null,
     });
     if (audit) sections.push({ title: "예측 오차 진단 (Prediction Audit)", data: audit });
   }

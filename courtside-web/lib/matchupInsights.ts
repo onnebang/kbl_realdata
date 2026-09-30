@@ -3,7 +3,7 @@ import { classifyShot } from "./formIndex";
 import { isCornerThree } from "./zoneCompare";
 import { computeFinalPlusMinus, type PlayerStartInfo } from "./gameLineups";
 import { teamTopPerformer, gameScore, type GameEvent, type PlayerBox } from "./postgameReport";
-import { fmtProbPct, gradePrediction } from "./predictionVerdict";
+import { VERDICT_TEXT, gradePredictions } from "./predictionVerdict";
 import type { ScheduleGame, SeasonStats } from "./matchups";
 
 // 요청 항목 1~7("직전 경기 활약 선수 주의/직전 경기 수비 약점/조합 시너지/최근 추세/오펜스
@@ -811,6 +811,12 @@ export type GradingContext = {
   awayScore: number;
   homeTname: string;
   awayTname: string;
+  /**
+   * 12인 엔트리 반영 홈 승률(pregame_features.home_win_prob_lineup). 카드는 이미 이 숫자를
+   * 같이 보여주는데(components/InsightCard.tsx의 win_prob 분기) 채점은 시즌 기준만 하고 있었다 -
+   * 엔트리로 맞춘 경기가 "빗나감"으로 나갔다(제보 2026-10-01). 없으면 시즌 기준만 채점한다.
+   */
+  lineupProb?: number | null;
 };
 
 export function gradeMatchupInsights(insights: PreviewInsight[], ctx: GradingContext): (string | null)[] {
@@ -832,14 +838,18 @@ export function gradeMatchupInsights(insights: PreviewInsight[], ctx: GradingCon
         // 채점은 lib/predictionVerdict.ts 한 곳에서만 한다 - 예전엔 여기와
         // postgameReport.ts '경기 결과'가 각자 판정했고(한쪽은 원값, 한쪽은 반올림한 정수),
         // S49G14N4에서 같은 예측을 "적중"과 "빗나감"으로 동시에 내보냈다.
+        //
+        // 이 카드는 시즌 기준과 엔트리 반영 두 숫자를 같이 보여주므로 **둘 다** 채점한다
+        // (예전엔 시즌 기준만 채점해서 엔트리로 맞춘 경기가 빗나감으로 보였다).
         const actualHomeWon = ctx.homeScore > ctx.awayScore;
-        const verdict = gradePrediction(insight.homeProb, actualHomeWon);
         const winnerName = actualHomeWon ? ctx.homeTname : ctx.awayTname;
-        const tail =
-          verdict === "coinflip"
-            ? `예측은 반반(${fmtProbPct(insight.homeProb, true)}% : ${fmtProbPct(1 - insight.homeProb, true)}%)이어서 적중 여부를 매기지 않음.`
-            : `예측 ${verdict === "hit" ? "적중" : "빗나감"}.`;
-        return `실제 결과 ${winnerName} 승(${ctx.homeScore}-${ctx.awayScore}) - ${tail}`;
+        const graded = gradePredictions(insight.homeProb, ctx.lineupProb, actualHomeWon);
+        const parts = graded.map((g) =>
+          g.verdict === "coinflip"
+            ? `${g.label} 반반(${g.homePct}% : ${g.awayPct}%) - 적중 여부를 매기지 않음`
+            : `${g.label} ${VERDICT_TEXT[g.verdict]}`
+        );
+        return `실제 결과 ${winnerName} 승(${ctx.homeScore}-${ctx.awayScore}) - ${parts.join(" / ")}.`;
       }
       case "watch_player": {
         const p = boxByPcode.get(insight.pcode);

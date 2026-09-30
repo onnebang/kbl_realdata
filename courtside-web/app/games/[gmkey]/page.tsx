@@ -828,6 +828,9 @@ export default async function GamePage({
         awayScore: game.away_score,
         homeTname: game.home_team.name,
         awayTname: game.away_team.name,
+        // 카드가 시즌 기준과 엔트리 반영 두 숫자를 같이 보여주므로 채점도 둘 다 해야 한다
+        // (예전엔 시즌 기준만 채점해 엔트리로 맞춘 경기가 "빗나감"으로 나갔다).
+        lineupProb: lineupWinProbs.get(gmkey)?.lineupProb ?? null,
       });
     }
   }

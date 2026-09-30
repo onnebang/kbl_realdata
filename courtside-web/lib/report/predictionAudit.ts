@@ -45,6 +45,12 @@ export type AuditCheck = {
   actualEdge: number;
   /** 부호가 뒤집혔다 = 모델이 기대한 방향과 반대로 나왔다. */
   flipped: boolean;
+  /**
+   * 화면에 찍는 판정. `flipped`만으로 두 갈래로 나누면, 부호가 실제로 다른데도 어느 한쪽이
+   * 잡음 수준이라 flip 판정을 안 한 경우까지 "방향 일치"라고 쓰게 된다 - 실측 S49G14N3의
+   * 리바운드 점유율은 기대 −0.7%p / 실제 +10.0%p였는데 "방향 일치"로 나갔다. 셋으로 나눈다.
+   */
+  kind: "aligned" | "flipped" | "negligible";
 };
 
 export type TracePoint = { x: number; actual: number; objective: number | null };
@@ -54,8 +60,13 @@ export type PredictionAudit = {
   home: ReportTeamMeta;
   away: ReportTeamMeta;
   verdict: PredictionVerdict;
-  /** 카드에 찍힌 경기 전 홈 승률(game_events PRE행). */
+  /** 카드에 찍힌 경기 전 홈 승률(game_events PRE행 = 시즌 기준). */
   preProb: number;
+  /**
+   * 12인 엔트리 반영 홈 승률. 이 절은 원래 시즌 기준만 채점했는데, 화면에는 예측이 두 개 있어서
+   * 엔트리로 맞춘 경기가 틀린 것처럼 읽혔다(제보 2026-10-01). 없으면 그 줄을 만들지 않는다.
+   */
+  entryProb: number | null;
   homeWon: boolean;
   trace: TracePoint[];
   quarterTicks: { x: number; q: string }[];
@@ -101,16 +112,20 @@ export function rebShare(mine: number, theirs: number): number {
 const FLIP_MIN_EDGE_PP = 1.0;
 
 function mkCheck(label: string, expectedEdge: number, actualEdge: number): AuditCheck {
-  const flipped =
-    Math.sign(expectedEdge) !== Math.sign(actualEdge) &&
-    Math.abs(expectedEdge) >= FLIP_MIN_EDGE_PP &&
-    Math.abs(actualEdge) >= FLIP_MIN_EDGE_PP;
-  return { label, expectedEdge, actualEdge, flipped };
+  const signsDiffer = Math.sign(expectedEdge) !== Math.sign(actualEdge);
+  const bothMeaningful = Math.abs(expectedEdge) >= FLIP_MIN_EDGE_PP && Math.abs(actualEdge) >= FLIP_MIN_EDGE_PP;
+  const flipped = signsDiffer && bothMeaningful;
+  // 부호는 달라도 한쪽이 잡음 수준이면 "반대로 나왔다"고 주장하지 않는다 - 그렇다고
+  // "일치"라고 쓰지도 않는다.
+  const kind: AuditCheck["kind"] = flipped ? "flipped" : signsDiffer ? "negligible" : "aligned";
+  return { label, expectedEdge, actualEdge, flipped, kind };
 }
 
 export type PredictionAuditInput = {
   home: ReportTeamMeta;
   away: ReportTeamMeta;
+  /** 12인 엔트리 반영 홈 승률(없으면 null). */
+  entryProb?: number | null;
   events: GameEvent[];
   homeScore: number;
   awayScore: number;
@@ -197,6 +212,7 @@ export function computePredictionAudit(input: PredictionAuditInput): PredictionA
     away,
     verdict: gradePrediction(preProb, homeWon),
     preProb,
+    entryProb: input.entryProb ?? null,
     homeWon,
     trace,
     quarterTicks,

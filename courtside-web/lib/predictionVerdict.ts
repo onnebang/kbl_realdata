@@ -38,3 +38,61 @@ export function gradePrediction(homeProb: number, homeWon: boolean): PredictionV
 export function fmtProbPct(prob: number, coinflip: boolean): string {
   return coinflip ? (prob * 100).toFixed(1) : String(Math.round(prob * 100));
 }
+
+export const VERDICT_TEXT: Record<PredictionVerdict, string> = {
+  hit: "적중",
+  miss: "빗나감",
+  coinflip: "반반",
+};
+
+/**
+ * 이 사이트는 경기 전 승률을 **두 개** 보여준다(시즌 기준 / 12인 엔트리 발표 후 결장자 반영).
+ * 그래서 채점도 두 개여야 한다 - 하나만 채점하면 나머지 하나가 맞았는지 틀렸는지를 독자가
+ * 알 수 없고, 더 나쁘게는 맞은 예측이 틀린 것처럼 읽힌다.
+ *
+ * 실측 버그(2026-10-01 제보): 리포트가 시즌 기준만 채점하고 있었다. 오픈매치 10경기 중
+ * **5경기에서 두 판정이 갈렸다** - S49G14N3(소노 99:86 SK)은 시즌 49.3% 빗나감인데 엔트리
+ * 56.2%는 적중, S49G14N6(SK 85:103 DB)은 시즌 58.8% 빗나감인데 엔트리 47.0%는 적중이다.
+ * 그 두 경기에서 사용자는 "엔트리로는 맞췄는데 틀렸다고 나온다"를 본 것이다.
+ *
+ * 라벨은 화면에 이미 쓰는 말을 그대로 쓴다(components/InsightCard.tsx의 "시즌 기준"/"엔트리 반영").
+ */
+export const SEASON_LABEL = "시즌 기준";
+export const ENTRY_LABEL = "엔트리 반영";
+
+export type GradedPrediction = {
+  label: string;
+  /** 홈 승률(0~1). */
+  homeProb: number;
+  verdict: PredictionVerdict;
+  /** 표시용 - 반반이면 소수 첫째 자리. */
+  homePct: string;
+  awayPct: string;
+};
+
+function grade(label: string, homeProb: number, homeWon: boolean): GradedPrediction {
+  const verdict = gradePrediction(homeProb, homeWon);
+  const coinflip = verdict === "coinflip";
+  return {
+    label,
+    homeProb,
+    verdict,
+    homePct: fmtProbPct(homeProb, coinflip),
+    awayPct: fmtProbPct(1 - homeProb, coinflip),
+  };
+}
+
+/**
+ * 있는 예측만 채점해 순서대로 돌려준다(시즌 → 엔트리). 엔트리 승률은 12인 발표 전 경기나
+ * 과거 경기에는 없으므로 null이면 그 줄을 만들지 않는다.
+ */
+export function gradePredictions(
+  seasonProb: number | null | undefined,
+  entryProb: number | null | undefined,
+  homeWon: boolean
+): GradedPrediction[] {
+  const out: GradedPrediction[] = [];
+  if (seasonProb != null) out.push(grade(SEASON_LABEL, seasonProb, homeWon));
+  if (entryProb != null) out.push(grade(ENTRY_LABEL, entryProb, homeWon));
+  return out;
+}
