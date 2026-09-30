@@ -520,10 +520,12 @@ export default async function GamePage({
     soft("pregameFeatures", getPregameFeatures(gmkey, ttl), null),
     getActionLabels(),
     soft("shots", getShots(gmkey, ttl), []),
-    // 12인 엔트리 반영 승률 - 예정 경기에만 쓴다(홈 목록 카드와 같은 규칙, lib/homeGames.ts 주석 참고).
-    status === "scheduled"
-      ? soft("lineupWinProbs", getLineupWinProbs([gmkey]), new Map<string, LineupWinProb>())
-      : Promise.resolve(new Map<string, LineupWinProb>()),
+    // 12인 엔트리 반영 승률. 예정 경기의 프리뷰 카드가 원래 소비처였지만(홈 목록 카드와 같은
+    // 규칙, lib/homeGames.ts 주석), 종료 경기에서도 필요해졌다 - 리포트의 '엔트리 대비 실제
+    // 출전' 절이 "엔트리 기준 예측은 이 12인이 뛴다고 보고 계산한 값"이라고 말하려면 그 값과
+    // 발표 시점 결장자가 있어야 한다. status === "scheduled"로 잠가 뒀던 탓에 배포본에서 그
+    // 절의 승률과 결장자 줄이 빠진 채로 나갔다(2026-09-30 실측).
+    status === "live" ? Promise.resolve(new Map<string, LineupWinProb>()) : soft("lineupWinProbs", getLineupWinProbs([gmkey]), new Map<string, LineupWinProb>()),
   ]);
 
   const homeTeam = teamStats.find((t) => t.tcode === game.home_team?.tcode);
