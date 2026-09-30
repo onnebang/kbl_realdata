@@ -1,0 +1,203 @@
+/* 예측 성적표 - 전역 토큰(--ink/--ink-soft/--gold/--surface…)을 그대로 쓴다. 이 프로젝트의
+   다른 리더보드 페이지들은 표준 HTML 템플릿에서 이식돼 자기 토큰을 스코프로 재정의하지만,
+   이 페이지는 앱 안에서 새로 만든 것이라 재정의할 이유가 없다. */
+
+.intro {
+  font-size: var(--fs-300);
+  line-height: var(--lh-prose);
+  color: var(--ink-soft);
+  margin: 0 0 12px;
+  word-break: keep-all;
+}
+.intro b {
+  color: var(--ink);
+}
+
+/* 시즌·계열 선택 - 순수 링크(클라이언트 JS 0, 이 프로젝트 컨벤션). */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.tab {
+  padding: 4px 10px;
+  border-radius: var(--r-chip, 999px);
+  border: 1px solid rgba(var(--line-rgb), 0.22);
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.tab:hover {
+  border-color: rgba(var(--line-rgb), 0.45);
+}
+.tabOn {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--surface);
+  font-weight: 700;
+}
+.tabsLabel {
+  font-size: 12px;
+  color: var(--ink-faint);
+  align-self: center;
+  margin-right: 2px;
+}
+
+/* 지표 타일 */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 10px 0 4px;
+}
+.tile {
+  border: 1px solid rgba(var(--line-rgb), 0.16);
+  border-radius: 8px;
+  padding: 9px 11px;
+}
+.tileLabel {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin-bottom: 3px;
+}
+.tileValue {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.tileSub {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin-top: 3px;
+}
+/* 기준선보다 나음/못함 - 색만으로 구분하지 않도록 기호(▼/▲)를 같이 쓴다. */
+.better {
+  color: var(--good, #1f7a3d);
+}
+.worse {
+  color: var(--bad, #b3261e);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .better {
+    color: #5ed17f;
+  }
+  :root:not([data-theme="light"]) .worse {
+    color: #ff8a80;
+  }
+}
+
+/* 차트 */
+.charts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 8px;
+}
+.chartCol {
+  flex: 1 1 300px;
+  min-width: 0;
+  max-width: 440px;
+}
+.chartTitle {
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  margin-bottom: 4px;
+}
+.calSvg,
+.cumSvg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.axisLine {
+  stroke: var(--ink-faint);
+  stroke-width: 0.4;
+  opacity: 0.6;
+}
+.refLine {
+  stroke: var(--ink-faint);
+  stroke-width: 0.5;
+  stroke-dasharray: 2 2;
+  opacity: 0.85;
+}
+.calBar {
+  fill: var(--ink-faint);
+  opacity: 0.28;
+}
+.calCi {
+  stroke: var(--gold);
+  stroke-width: 0.7;
+  opacity: 0.75;
+}
+.calDot {
+  fill: var(--gold);
+}
+.svgLabel {
+  fill: var(--ink-faint);
+  font-size: 3.1px;
+  font-family: "IBM Plex Mono", monospace;
+}
+.cumModel {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 0.8;
+}
+.cumBase {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-width: 0.6;
+  stroke-dasharray: 2 2;
+}
+
+/* 시즌별 표 */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  margin-top: 6px;
+}
+.table th,
+.table td {
+  padding: 5px 6px;
+  text-align: right;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.16);
+  white-space: nowrap;
+}
+.table thead th {
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+.table th[scope="row"],
+.table thead th:first-child {
+  text-align: left;
+  color: var(--ink-soft);
+}
+/* 학습에서 빠진 시즌 = 진짜 성적표 구간 */
+.rowOut th[scope="row"] {
+  box-shadow: inset 3px 0 0 var(--gold);
+  font-weight: 700;
+}
+
+.note {
+  font-size: 12.5px;
+  line-height: var(--lh-prose);
+  color: var(--ink-soft);
+  margin: 10px 0 0;
+  word-break: keep-all;
+}
+
+@media (max-width: 480px) {
+  .tileValue {
+    font-size: 17px;
+  }
+  .table {
+    font-size: 11.5px;
+  }
+  .table th,
+  .table td {
+    padding: 4px 3px;
+  }
+}
