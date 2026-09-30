@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { attachDerivedFields, clockStr, estimatePossessions, isOvertimeQuarter, buildPostgameReport, type GameEvent, type PlayerBox, type ReportSection } from "./postgameReport";
+import {
+  type GameEvent,
+  type PlayerBox,
+  type ReportSection,
+  attachDerivedFields,
+  buildPostgameReport,
+  clockStr,
+  dramaticSwingKind,
+  estimatePossessions,
+  isOvertimeQuarter,
+} from "./postgameReport";
 import { shotXPTS } from "./zoneCompare";
 
 /**
@@ -237,5 +247,25 @@ describe("템포와 페이스 섹션의 렌더 결과 (연장 경기 회귀)", (
   it("회귀: 연장 경기가 자동으로 '빠름'이 되지 않는다", () => {
     expect(htmlOf(pace)).toContain("보통 (Average)");
     expect(htmlOf(pace)).not.toContain("빠름");
+  });
+});
+
+// '극적인 흐름' 마지막 절 - 두 번 틀린 자리라 세 갈래를 고정한다(dramaticSwingKind 주석 참고).
+describe("dramaticSwingKind", () => {
+  it("이미 앞서 있던 팀이 더 달아나면 extend - 따라붙었다고 쓰면 안 된다", () => {
+    // 제보 실측: 대구 한국가스공사 54% -> 99%인데 "맹렬히 따라붙었지만 역전선까지 닿지 못함"이 나갔다.
+    expect(dramaticSwingKind(54, 99)).toBe("extend");
+    expect(dramaticSwingKind(50, 51)).toBe("extend");
+  });
+
+  it("50% 아래에서 50% 이상으로 넘어서면 flip", () => {
+    expect(dramaticSwingKind(31, 74)).toBe("flip");
+    expect(dramaticSwingKind(49, 50)).toBe("flip");
+  });
+
+  it("끝까지 50% 아래면 chase", () => {
+    // 1차 버그의 경기(S49G14N4): KCC 8% -> 41%, 한 번도 50%를 넘지 못했다.
+    expect(dramaticSwingKind(8, 41)).toBe("chase");
+    expect(dramaticSwingKind(1, 49)).toBe("chase");
   });
 });

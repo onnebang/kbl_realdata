@@ -734,6 +734,25 @@ function quarterBoundaries(events: GameEvent[]): { i: number; q: string }[] {
 }
 
 /**
+ * '극적인 흐름' 문장의 마지막 절을 고르는 규칙. 순수 함수로 꺼낸 이유는 두 번 틀렸기 때문이다.
+ *
+ *  1차 버그(S49G14N4): "완전히 뒤집어놓음"이 스윙 크기만 보고 무조건 붙었다. 그 경기에서 KCC
+ *     승률은 8%→41%까지만 올랐고 경기 내내 한 번도 50%를 넘지 못했다(628개 이벤트 전수 확인).
+ *  2차 버그(제보 2026-10-01): 그걸 고치면서 갈래를 둘로만 나눠서, **이미 앞서 있던 팀이 더
+ *     달아난 경우**가 "따라붙었지만 못 닿았다"로 떨어졌다 - 대구 한국가스공사가 54%→99%로
+ *     올랐는데 "맹렬히 따라붙었지만 역전선(50%)까지는 닿지 못함"이라고 나갔다.
+ *
+ * beneficiary(승률이 오른 쪽) 기준이라 toPct > fromPct는 보장된다. 갈래는 세 개다:
+ *  - flip   : 50% 아래에서 시작해 50% 이상으로 넘어섰다 = 실제로 역전했다.
+ *  - extend : 시작부터 이미 50% 이상이었다 = 뒤집은 게 아니라 달아난 것이다.
+ *  - chase  : 끝까지 50% 아래였다 = 따라붙었지만 역전선에 닿지 못했다.
+ */
+export function dramaticSwingKind(fromPct: number, toPct: number): "flip" | "extend" | "chase" {
+  if (fromPct >= 50) return "extend";
+  return toPct >= 50 ? "flip" : "chase";
+}
+
+/**
  * 쿼터별 득실 막대(홈 기준). 위로 자라면 홈이 그 쿼터를 이겼다는 뜻이고, 막대 높이의 합이
  * 정확히 최종 마진이다 - 독자가 그림만 보고 검산할 수 있다.
  *
@@ -1446,21 +1465,20 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       const toPct = Math.round((homeBenefits ? (toRow.home_win_prob ?? 0.5) : 1 - (toRow.home_win_prob ?? 0.5)) * 100);
       const homeGain = toRow.home_score - fromRow.home_score;
       const awayGain = toRow.away_score - fromRow.away_score;
-      // 실측 버그(S49G14N4): "완전히 뒤집어놓음"이 스윙 크기만 보고 무조건 붙었다. 그 경기에서
-      // KCC 승률은 8%→41%까지만 올랐고 **경기 내내 한 번도 50%를 넘지 못했다**(628개 이벤트
-      // 전수 확인) - 뒤집힌 적이 없는데 뒤집었다고 쓰고 있었다. 실제로 역전선(50%)을 넘었을
-      // 때만 '뒤집었다'고 한다.
-      const flipped = fromPct < 50 && toPct >= 50;
       // "단 N분 만에"도 무조건 붙었다 - 40분 경기의 24%(9분 38초)를 "단"이라고 불렀다.
       const brief = dramatic.durationSec < DRAMATIC_BRIEF_SEC;
+      const beneficiaryTag = teamTag(homeBenefits ? homeTcode : awayTcode, beneficiary);
+      const tail = {
+        flip: `${beneficiaryTag}${iGa(beneficiary)} 이 구간에 경기 흐름을 뒤집어놓음.`,
+        extend: `이미 앞서 있던 ${beneficiaryTag}${iGa(beneficiary)} 이 구간에 승기를 굳힘.`,
+        chase: `${beneficiaryTag}${iGa(beneficiary)} 맹렬히 따라붙었지만 역전선(50%)까지는 닿지 못함.`,
+      }[dramaticSwingKind(fromPct, toPct)];
       sections.push({
         title: "극적인 흐름",
         html:
-          `<p class="report-text">⚡ ${jumpLink(dramatic.startIdx, clockStr(fromRow))}부터 ${jumpLink(dramatic.endIdx, clockStr(toRow))}까지 ${brief ? "단 " : ""}${fmtDuration(dramatic.durationSec)} 만에 ${teamTag(homeBenefits ? homeTcode : awayTcode, beneficiary)} 승률이 ${fromPct}%에서 ${toPct}%로 요동침` +
+          `<p class="report-text">⚡ ${jumpLink(dramatic.startIdx, clockStr(fromRow))}부터 ${jumpLink(dramatic.endIdx, clockStr(toRow))}까지 ${brief ? "단 " : ""}${fmtDuration(dramatic.durationSec)} 만에 ${beneficiaryTag} 승률이 ${fromPct}%에서 ${toPct}%로 요동침` +
           `(이 구간 ${teamTag(homeTcode, homeTname)} ${homeGain}점, ${teamTag(awayTcode, awayTname)} ${awayGain}점) - ` +
-          (flipped
-            ? `${teamTag(homeBenefits ? homeTcode : awayTcode, beneficiary)}${iGa(beneficiary)} 이 구간에 경기 흐름을 뒤집어놓음.</p>`
-            : `${teamTag(homeBenefits ? homeTcode : awayTcode, beneficiary)}${iGa(beneficiary)} 맹렬히 따라붙었지만 역전선(50%)까지는 닿지 못함.</p>`),
+          `${tail}</p>`,
       });
     }
   }
