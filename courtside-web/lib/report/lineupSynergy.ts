@@ -77,15 +77,24 @@ export function renderLineupSynergySection(
     const names = (u: SynergyUnit) => u.pcodes.map((pc) => tags.playerTag(nameOf(pc), tcode)).join(" · ");
     if (synergy.best) {
       items.push(
-        `${tags.liOpen(tcode)}📈 ${tags.teamTag(tcode, tname)} <b>최고의 5인 조합</b>: ${names(synergy.best)} - 이 라인업이 코트에 있던 ${fmtDuration(synergy.best.dur)} 동안 상대를 압도하며 득실마진 <b>+${synergy.best.diff}점</b>을 기록했습니다.</li>`
+        `${tags.liOpen(tcode)}📈 ${tags.teamTag(tcode, tname)} <b>최고의 5인 조합</b>: ${names(synergy.best)} - 이 라인업이 코트에 있던 ${fmtDuration(synergy.best.dur)} 동안 득실마진 <b>+${synergy.best.diff}점</b>입니다.</li>`
       );
     }
     if (synergy.worst) {
       items.push(
-        `${tags.liOpen(tcode)}📉 ${tags.teamTag(tcode, tname)} <b>최악의 5인 조합</b>: ${names(synergy.worst)} - 이 조합이 가동된 ${fmtDuration(synergy.worst.dur)} 동안 공수가 무너지며 득실마진 <b>${synergy.worst.diff}점</b>을 잃어 뼈아픈 타격이 되었습니다.</li>`
+        `${tags.liOpen(tcode)}📉 ${tags.teamTag(tcode, tname)} <b>최악의 5인 조합</b>: ${names(synergy.worst)} - 이 조합이 가동된 ${fmtDuration(synergy.worst.dur)} 동안 득실마진 <b>${synergy.worst.diff}점</b>입니다.</li>`
       );
     }
   }
   if (!items.length) return null;
-  return { title: "라인업 시너지 흥망성쇠", html: `<ul class="report-list">${items.join("")}</ul>` };
+  // "상대를 압도하며" / "공수가 무너지며 … 뼈아픈 타격" 같은 수사를 뺐다: 임계값이 ±8점이고
+  // 표본이 2~3분인 조합도 걸리므로(SYNERGY_MIN_SEC=120) 그 정도 득실을 압도라고 부르면 데이터
+  // 보다 센 주장이 된다. 게다가 한 경기 스플릿이라 인과도 아니다 - 그 한계를 말로 한 번 적고
+  // 문장은 숫자만 말하게 둔다(이 모듈 머리주석의 한계 설명과 같은 취지).
+  return {
+    title: "라인업 시너지 흥망성쇠",
+    html:
+      `<ul class="report-list">${items.join("")}</ul>` +
+      `<p class="report-caveat">상대 라인업을 통제하지 않은 한 경기 득실입니다. 가동 시간이 짧은 조합일수록 잡음이 큽니다.</p>`,
+  };
 }

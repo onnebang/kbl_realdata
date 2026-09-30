@@ -3,16 +3,21 @@ import { shotXPTS, type ShotRow } from "./zoneCompare";
 import type { H2H, SeasonStats } from "./matchups";
 // 섹션별 분석은 report/ 아래로 하나씩 옮기는 중이다(계산/문장 분리, report/renderKit.ts 주석 참고).
 // 의존 방향은 여기 -> report/* 한쪽뿐. 옮겨간 타입·함수는 하위호환을 위해 그대로 re-export한다.
-import { createReportTags, fmtDuration, type ReportSection, type ReportSectionData, type ReportTeamMeta } from "./report/renderKit";
+import { createReportTags, escHtml, fmtDuration, type ReportSection, type ReportSectionData, type ReportTags, type ReportTeamMeta } from "./report/renderKit";
+import { fmtProbPct, gradePrediction } from "./predictionVerdict";
 import { computeLineupSynergy, renderLineupSynergySection, type FiveManUnit } from "./report/lineupSynergy";
 import { computeHotZoneEdge, renderHotZoneSection } from "./report/shotHotZone";
 import { computeAceDuel, type AceDuel } from "./report/aceDuel";
 import { computeUnsungHeroes } from "./report/unsungHero";
 import { computeStockWatch } from "./report/stockWatch";
+import { computeFourFactors, type TeamStatLine } from "./report/fourFactors";
+import { computePredictionAudit, type PregameExpectation } from "./report/predictionAudit";
 
 export { fmtDuration };
 export type { ReportSection, ReportSectionData, ReportTeamMeta };
 export type { AceDuel };
+export type { TeamStatLine };
+export type { PregameExpectation };
 
 // courtside_template.html(35차, "경기가 종료되면 주요 이벤트들을 하나의 보고서로")의
 // A1-A8 분석 엔진을 TypeScript로 포팅 - 원본은 클라이언트에 미리 구운 JSON(timeline 배열)을
@@ -725,6 +730,65 @@ function quarterBoundaries(events: GameEvent[]): { i: number; q: string }[] {
   return bounds;
 }
 
+/**
+ * 쿼터별 득실 막대(홈 기준). 위로 자라면 홈이 그 쿼터를 이겼다는 뜻이고, 막대 높이의 합이
+ * 정확히 최종 마진이다 - 독자가 그림만 보고 검산할 수 있다.
+ *
+ * SVG 안에 글자를 넣지 않는다(viewBox 스케일에 따라 글자 크기가 달라지는 문제를 이 프로젝트가
+ * 이미 겪었다 - components/GameReplay.tsx의 WinProbLiveChart 주석). 쿼터 이름과 점수는 아래
+ * HTML 축에 둔다.
+ */
+function renderQuarterMargins(
+  events: GameEvent[],
+  homeTeam: ReportTeamMeta,
+  awayTeam: ReportTeamMeta,
+  tags: ReportTags
+): string | null {
+  const bounds = quarterBoundaries(events);
+  if (bounds.length < 2) return null;
+  const rows: { q: string; delta: number }[] = [];
+  for (let qi = 0; qi < bounds.length; qi++) {
+    const startI = bounds[qi].i;
+    const endI = qi + 1 < bounds.length ? bounds[qi + 1].i - 1 : events.length - 1;
+    const s = events[startI],
+      e = events[endI];
+    // 쿼터 첫 행은 그 쿼터 **시작 시점**의 누적 점수다(그 행의 득점은 아직 반영 전) - 직전
+    // 쿼터 마지막 행과 같은 값이라 경계에서 점수가 새거나 겹치지 않는다.
+    rows.push({ q: bounds[qi].q, delta: e.home_score - s.home_score - (e.away_score - s.away_score) });
+  }
+  const maxAbs = Math.max(1, ...rows.map((r) => Math.abs(r.delta)));
+  const W = 320,
+    H = 96,
+    mid = H / 2;
+  const slot = W / rows.length;
+  const barW = Math.min(34, slot * 0.6);
+  const hColor = homeTeam.color ?? "#888888";
+  const aColor = awayTeam.color ?? "#888888";
+  const bars = rows
+    .map((r, i) => {
+      const cx = slot * (i + 0.5);
+      const h = (Math.abs(r.delta) / maxAbs) * (mid - 6);
+      const up = r.delta > 0; // 홈 우세는 위로
+      const y = up ? mid - h : mid;
+      return `<rect x="${(cx - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(1, h).toFixed(1)}" fill="${up ? hColor : aColor}" opacity="0.85" rx="2"/>`;
+    })
+    .join("");
+  const svg = `<svg class="qm-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="쿼터별 득실 마진"><line x1="0" y1="${mid}" x2="${W}" y2="${mid}" stroke="var(--ink-faint)" stroke-width="1"/>${bars}</svg>`;
+  const axis = rows
+    .map((r) => {
+      const t = r.delta > 0 ? homeTeam : r.delta < 0 ? awayTeam : null;
+      const label = `${r.delta > 0 ? "+" : r.delta < 0 ? "−" : ""}${Math.abs(r.delta)}`;
+      return `<span><b>${escHtml(r.q)}</b>${t ? tags.teamTag(t.tcode, label) : label}</span>`;
+    })
+    .join("");
+  const total = rows.reduce((s, r) => s + r.delta, 0);
+  const winner = total > 0 ? homeTeam : awayTeam;
+  return (
+    `<div class="qm-wrap">${svg}<div class="qm-axis">${axis}</div></div>` +
+    `<p class="report-caveat">위로 자란 막대는 ${escHtml(homeTeam.abbr)}(홈)가 그 쿼터를 이겼다는 뜻입니다. 막대 합 = 최종 마진 ${tags.teamTag(winner.tcode, `${Math.abs(total)}점`)}.</p>`
+  );
+}
+
 function explainLosingDespiteTopPerformer(
   events: GameEvent[],
   box: PlayerBox[],
@@ -765,7 +829,8 @@ function explainLosingDespiteTopPerformer(
       worstQ = qBounds[qi].q;
     }
   }
-  if (worstQ && worstDelta <= -8) reasons.push(`${worstQ} 쿼터에서만 ${Math.abs(worstDelta)}점 열세`);
+  // "Q1 쿼터"는 "1쿼터 쿼터"다 - 쿼터 태그(Q1~Q4/X1~)를 그대로 쓰고 '쿼터'를 덧붙이지 않는다.
+  if (worstQ && worstDelta <= -8) reasons.push(`${worstQ}에서만 ${Math.abs(worstDelta)}점 열세`);
 
   const benchPts = (tcode: string) => box.filter((b) => b.tcode === tcode && b.is_starter === false).reduce((s, b) => s + b.pts, 0);
   const wBench = benchPts(winnerTcode),
@@ -830,15 +895,23 @@ export type BuildReportInput = {
   /** 이 경기 슛 로그(page.tsx getShots) - '경기를 가른 구역'. */
   shots?: ShotRow[];
   /**
-   * game_team_stats의 3점 공식 기록. 좌표로 역산한 3점 판정은 팀-경기 단위로 공식 tpa와
-   * |차이|<=1이 73%뿐이라(정확히 일치 51.3%) 3점 구역만은 이걸 쓴다. 2점 4개 구역은 좌표.
+   * game_team_stats 팀별 두 행. page.tsx가 화면 아래 '팀 스탯' 바용으로 이미 받아 둔 것을
+   * 그대로 넘긴다(새 왕복 0회). 예전엔 여기서 3점(tpm/tpa)만 떼어 받았는데, 그 탓에 자유투와
+   * 파울이 리포트에 아예 들어오지 못했다 - lib/report/fourFactors.ts 머리주석 참고.
+   *
+   * 쓰는 곳:
+   *  - 3점 공식 기록: 좌표로 역산한 3점 판정은 팀-경기 단위로 공식 tpa와 |차이|<=1이 73%뿐
+   *    이라(정확히 일치 51.3%) 3점 구역만은 이걸 쓴다. 2점 4개 구역은 좌표.
+   *  - 네 가지 요인 / 예측 오차 진단 / 공식 페이스.
    */
-  teamThrees?: { tcode: string; tpm: number; tpa: number }[];
+  teamStats?: TeamStatLine[];
   /** 이 경기 이전 역대 맞대결 - '맞대결의 매듭'. */
   h2h?: H2H | null;
   /** 이 경기 이전 정규시즌 누적(리크프리) - '평소의 그 팀이 아니었다'. */
   homeSeason?: SeasonStats | null;
   awaySeason?: SeasonStats | null;
+  /** pregame_features에서 모델이 경기 전에 본 입력값 - '예측 오차 진단'. 없으면 그 표만 빠진다. */
+  expectation?: PregameExpectation | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -850,6 +923,11 @@ export type BuildReportInput = {
 const CRISIS_MAX_PROB = 0.2;
 /** '극적인 흐름'(98.5%에서 뜬다)의 시작점과 이 안이면 같은 사건이라 생략 - 58건 중 11건. */
 const CRISIS_DEDUP_SEC = 60;
+/**
+ * '극적인 흐름'에 "단 N분 만에"를 붙일 상한. 40분 경기의 10%(4분)까지가 "단"이라 부를 만한
+ * 길이다 - 예전엔 조건 없이 붙어서 9분 38초(경기의 24%)에도 "단"이 붙었다.
+ */
+const DRAMATIC_BRIEF_SEC = 240;
 /** 최다 사용 5인의 함께 뛴 시간 - 중앙 618초, 10%분위 388초. 300초는 하위 5%만 자른다. */
 const CORE_FIVE_MIN_SEC = 300;
 /** 그 5인이 있을 때의 득실차 - ±10이면 30%, ±12면 23%, ±14면 16%. */
@@ -863,6 +941,12 @@ const ONOFF_MIN_DIFF = 8;
 const H2H_MIN_STREAK = 4;
 /** 5경기 미만의 '시즌 최다'는 의미가 없다. */
 const SEASON_EXTREME_MIN_GP = 5;
+/**
+ * 클러치 요약에서 "끝까지 맞섰다"고 부를 최종 점수차. isClutchGame 판정(마지막 5분 중
+ * **한 순간이라도** 5점 이내)은 진입 조건이라 느슨해도 되지만, 요약 문구는 경기가 실제로 어떻게
+ * 끝났는지를 봐야 한다 - 안 그러면 9점 차로 끝난 경기를 "한 치의 양보도 없는 혈투"라고 쓴다.
+ */
+const CLUTCH_TIGHT_MARGIN = 5;
 
 // ---------------------------------------------------------------------------
 // 라인업 세그먼트 - '주력 5인'과 '그가 코트에 없던 시간'이 나눠 쓴다.
@@ -1024,21 +1108,31 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
   const loserTname = homeWon ? awayTname : homeTname;
   const winnerScore = homeWon ? homeScore : awayScore;
   const loserScore = homeWon ? awayScore : homeScore;
-  const preActPct = Math.round((events[0]?.home_win_prob ?? 0.5) * 100);
+  // 원값을 그대로 들고 있는다 - 채점에 반올림한 정수를 쓰면 49.5~49.99%가 "홈 우세"로
+  // 뒤집힌다(lib/predictionVerdict.ts 주석의 실측 버그). preActPct는 표시·3절 폴백 전용.
+  const preProb = events[0]?.home_win_prob ?? 0.5;
+  const preActPct = Math.round(preProb * 100);
 
   const sections: ReportSection[] = [];
 
-  // 1. 경기 결과 + 예측 적중/실패 + 마진 희귀도
+  // 1. 경기 결과 + 예측 채점 + 마진 희귀도
+  // 채점 규칙은 lib/predictionVerdict.ts 한 곳에만 있다(여기와 matchupInsights.ts의
+  // gradeMatchupInsights가 같은 예측을 정반대로 채점해 같은 페이지에 내보낸 버그 때문).
   {
-    const predictedWinner = preActPct >= 50 ? homeTname : awayTname;
-    const predictedWinnerTcode = preActPct >= 50 ? homeTcode : awayTcode;
-    const predictionCorrect = predictedWinner === winnerTname;
-    const predictedWinnerPct = predictedWinner === homeTname ? preActPct : 100 - preActPct;
+    const verdict = gradePrediction(preProb, homeWon);
+    const coinflip = verdict === "coinflip";
+    const favHome = preProb >= 0.5;
+    const favTname = favHome ? homeTname : awayTname;
+    const favTcode = favHome ? homeTcode : awayTcode;
+    const favPct = fmtProbPct(favHome ? preProb : 1 - preProb, coinflip);
     let html =
-      `<p class="report-text">최종 스코어 ${teamTag(winnerTcode, winnerTname)} <b>${winnerScore} : ${loserScore}</b> ${teamTag(loserTcode, loserTname)}. 예측은 <b>${predictionCorrect ? "적중" : "빗나감"}</b>` +
-      (predictionCorrect
-        ? ` - 경기 전 ${teamTag(predictedWinnerTcode, predictedWinner)}${iGa(predictedWinner)} 이길 확률을 ${predictedWinnerPct}%로 더 높게 봤고, 실제로 그대로 됨.`
-        : ` - 경기 전엔 ${teamTag(predictedWinnerTcode, predictedWinner)}${iGa(predictedWinner)} 더 유력했지만(${predictedWinnerPct}%), 실제로는 ${teamTag(winnerTcode, winnerTname)}${iGa(winnerTname)} 이김. 확률 예측은 100% 확신이 아니라 "이 정도 비율로 이런 결과가 나온다"는 뜻이라, 이런 이변도 정상적인 범위임.`) +
+      `<p class="report-text">최종 스코어 ${teamTag(winnerTcode, winnerTname)} <b>${winnerScore} : ${loserScore}</b> ${teamTag(loserTcode, loserTname)}. ` +
+      (coinflip
+        ? // 표시값이 양쪽 다 50%인 구간 - '우세한 쪽'이 없으므로 적중/빗나감을 매기지 않는다.
+          `예측은 <b>반반</b> - 경기 전 승률이 ${teamTag(homeTcode, homeTname)} ${fmtProbPct(preProb, true)}% : ${teamTag(awayTcode, awayTname)} ${fmtProbPct(1 - preProb, true)}%로, 어느 쪽도 우세라고 부를 수 없는 차이였음(사실상 동전 던지기). 실제로는 ${teamTag(winnerTcode, winnerTname)}${iGa(winnerTname)} 이김.`
+        : verdict === "hit"
+          ? `예측은 <b>적중</b> - 경기 전 ${teamTag(favTcode, favTname)}${iGa(favTname)} 이길 확률을 ${favPct}%로 더 높게 봤고, 실제로 그대로 됨.`
+          : `예측은 <b>빗나감</b> - 경기 전엔 ${teamTag(favTcode, favTname)}${iGa(favTname)} 더 유력했지만(${favPct}%), 실제로는 ${teamTag(winnerTcode, winnerTname)}${iGa(winnerTname)} 이김. 확률 예측은 100% 확신이 아니라 "이 정도 비율로 이런 결과가 나온다"는 뜻이라, 이런 이변도 정상적인 범위임.`) +
       `</p>`;
     if (rarity) {
       const marginPct = Math.round((rarity.marginPercentile || 0) * 100);
@@ -1049,6 +1143,62 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
           : `<p class="report-text">최종 마진은 ${margin}점 - 15시즌 ${rarity.marginTotalGames}경기 중 ${marginPct}%가 이 정도로 접전이었음.</p>`;
     }
     sections.push({ title: "경기 결과", html });
+  }
+
+  // 1.5 네 가지 요인 & 득점 출처 - "무엇이 승부를 갈랐나". 계산은 report/fourFactors.ts,
+  // 문장·막대는 components/report/FourFactorsSection.tsx.
+  //
+  // 오펜스/디펜스 리바운드는 중계 이벤트로 직접 센다: game_team_stats.oreb/dreb는 8,444행
+  // 전부 NULL이고(2026-09-30 실측), 209=공격리바운드 / 210=수비리바운드가 정확한 소스다.
+  // 이 파일이 이미 events를 한 번 훑고 있으니 그 안에서 같이 센다(추가 순회 1회, 새 쿼리 0회).
+  const homeStatLine = input.teamStats?.find((t) => t.tcode === homeTcode) ?? null;
+  const awayStatLine = input.teamStats?.find((t) => t.tcode === awayTcode) ?? null;
+  if (homeStatLine && awayStatLine) {
+    let homeOreb = 0,
+      homeDreb = 0,
+      awayOreb = 0,
+      awayDreb = 0;
+    for (const e of events) {
+      if (!e.tcode || (e.action_code !== "209" && e.action_code !== "210")) continue;
+      const off = e.action_code === "209";
+      if (e.tcode === homeTcode) {
+        if (off) homeOreb++;
+        else homeDreb++;
+      } else if (e.tcode === awayTcode) {
+        if (off) awayOreb++;
+        else awayDreb++;
+      }
+    }
+    const ff = computeFourFactors({
+      home: homeTeam,
+      away: awayTeam,
+      homeStats: homeStatLine,
+      awayStats: awayStatLine,
+      homeOreb,
+      homeDreb,
+      awayOreb,
+      awayDreb,
+      homeScore,
+      awayScore,
+    });
+    if (ff) sections.push({ title: "무엇이 승부를 갈랐나 (Four Factors)", data: ff });
+  }
+
+  // 1.6 예측 오차 진단 - 요청: "예상이 틀렸다면 왜 틀렸는지에 대한 분석". 계산은
+  // report/predictionAudit.ts(그 파일 머리주석에 근거), 차트·표는
+  // components/report/PredictionAuditSection.tsx.
+  {
+    const audit = computePredictionAudit({
+      home: homeTeam,
+      away: awayTeam,
+      events,
+      homeScore,
+      awayScore,
+      homeStats: homeStatLine,
+      awayStats: awayStatLine,
+      expectation: input.expectation ?? null,
+    });
+    if (audit) sections.push({ title: "예측 오차 진단 (Prediction Audit)", data: audit });
   }
 
   // 2. 팀별 스포트라이트 + 최고 활약이 패배로 이어진 이유 - 요청: "팀별 스포트라이트 선수를
@@ -1076,11 +1226,19 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     if (html) sections.push({ title: "팀별 스포트라이트", html });
   }
 
+  // 2-0.5 쿼터별 마진 - '팀별 스포트라이트'가 문장으로 "OO에서만 N점 열세"라고 한 줄 말하는
+  // 그 구조를 그림으로 한 번에 보여준다. 쿼터 득실은 이미 explainLosingDespiteTopPerformer가
+  // 계산하던 것과 같은 값이고(quarterBoundaries), 막대 합이 정확히 최종 마진이라 검산이 된다.
+  {
+    const html = renderQuarterMargins(events, homeTeam, awayTeam, tags);
+    if (html) sections.push({ title: "쿼터별 마진 (합 = 최종 마진)", html });
+  }
+
   // 2-1. 경기를 가른 구역 - 계산·문장 전부 report/shotHotZone.ts.
   if (input.shots && input.shots.length) {
     const zoneEdge = computeHotZoneEdge({
       shots: input.shots,
-      teamThrees: input.teamThrees,
+      teamThrees: input.teamStats,
       homeTcode,
       awayTcode,
       homeScore,
@@ -1138,7 +1296,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       [awayTcode, awayTname, input.awaySeason, awayScore, homeScore],
     ] as const) {
       if (!season || season.gp < SEASON_EXTREME_MIN_GP) continue;
-      const tpm = input.teamThrees?.find((t) => t.tcode === tcode)?.tpm;
+      const tpm = input.teamStats?.find((t) => t.tcode === tcode)?.tpm;
       if (pts > season.maxPts) {
         lines.push(`${liOpen(tcode)}${teamTag(tcode, tname)} ${pts}점 - 이 경기 전까지 ${season.gp}경기 평균 ${season.ppg.toFixed(1)}점이던 팀이 시즌 최다 득점을 새로 씀(종전 ${season.maxPts}점).</li>`);
       }
@@ -1210,12 +1368,21 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       const toPct = Math.round((homeBenefits ? (toRow.home_win_prob ?? 0.5) : 1 - (toRow.home_win_prob ?? 0.5)) * 100);
       const homeGain = toRow.home_score - fromRow.home_score;
       const awayGain = toRow.away_score - fromRow.away_score;
+      // 실측 버그(S49G14N4): "완전히 뒤집어놓음"이 스윙 크기만 보고 무조건 붙었다. 그 경기에서
+      // KCC 승률은 8%→41%까지만 올랐고 **경기 내내 한 번도 50%를 넘지 못했다**(628개 이벤트
+      // 전수 확인) - 뒤집힌 적이 없는데 뒤집었다고 쓰고 있었다. 실제로 역전선(50%)을 넘었을
+      // 때만 '뒤집었다'고 한다.
+      const flipped = fromPct < 50 && toPct >= 50;
+      // "단 N분 만에"도 무조건 붙었다 - 40분 경기의 24%(9분 38초)를 "단"이라고 불렀다.
+      const brief = dramatic.durationSec < DRAMATIC_BRIEF_SEC;
       sections.push({
         title: "극적인 흐름",
         html:
-          `<p class="report-text">⚡ ${jumpLink(dramatic.startIdx, clockStr(fromRow))}부터 ${jumpLink(dramatic.endIdx, clockStr(toRow))}까지, 단 ${fmtDuration(dramatic.durationSec)} 만에 ${teamTag(homeBenefits ? homeTcode : awayTcode, beneficiary)} 승률이 ${fromPct}%에서 ${toPct}%로 요동침` +
+          `<p class="report-text">⚡ ${jumpLink(dramatic.startIdx, clockStr(fromRow))}부터 ${jumpLink(dramatic.endIdx, clockStr(toRow))}까지 ${brief ? "단 " : ""}${fmtDuration(dramatic.durationSec)} 만에 ${teamTag(homeBenefits ? homeTcode : awayTcode, beneficiary)} 승률이 ${fromPct}%에서 ${toPct}%로 요동침` +
           `(이 구간 ${teamTag(homeTcode, homeTname)} ${homeGain}점, ${teamTag(awayTcode, awayTname)} ${awayGain}점) - ` +
-          `${teamTag(homeBenefits ? homeTcode : awayTcode, beneficiary)}${iGa(beneficiary)} 이 짧은 구간에 경기 흐름을 완전히 뒤집어놓음.</p>`,
+          (flipped
+            ? `${teamTag(homeBenefits ? homeTcode : awayTcode, beneficiary)}${iGa(beneficiary)} 이 구간에 경기 흐름을 뒤집어놓음.</p>`
+            : `${teamTag(homeBenefits ? homeTcode : awayTcode, beneficiary)}${iGa(beneficiary)} 맹렬히 따라붙었지만 역전선(50%)까지는 닿지 못함.</p>`),
       });
     }
   }
@@ -1258,16 +1425,27 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     }
   }
 
-  // 6. 이 경기의 식스맨 - 요청: "그래서 이 투입 이후 상황이 어떻게 흘러갔는지" - 넷레이팅
-  // 변화 숫자만이 아니라 투입 후 실제 관찰 구간 동안 양 팀이 각각 몇 점을 냈는지도 표시.
+  // 6. 이 경기의 식스맨 - 요청: "그래서 이 투입 이후 상황이 어떻게 흘러갔는지" - 투입 후 실제
+  // 관찰 구간 동안 양 팀이 각각 몇 점을 냈는지 표시.
+  //
+  // 식스맨으로 뽑힌 교체는 8절('결정적 교체 타이밍')에서 제외한다 - 두 절이 같은
+  // subSparkHits를 보므로 최고 스파크가 양쪽에 다 걸려, 같은 사건이 거의 같은 문장으로 두 번
+  // 나왔다(실측: 장민국 Q2 4:20 건이 식스맨·결정적 교체·라인업 시너지 세 절에 중복 노출).
+  let sixthManIdx: number | null = null;
   {
     const sixthMan = findBestSixthManSpark(subSparkHits, boxByPcode);
     if (sixthMan) {
       const p = boxByPcode.get(sixthMan.pcode);
-      const { delta, afterDur, homeGain, awayGain } = sixthMan.spark;
+      // delta(넷레이팅 환산)는 순위를 정하는 데만 쓰고 문장에는 안 낸다 - 아래 주석 참고.
+      const { afterDur, homeGain, awayGain } = sixthMan.spark;
+      sixthManIdx = sixthMan.idx;
       sections.push({
         title: "이 경기의 식스맨",
-        html: `<p class="report-text">🔋 ${playerTag(p?.name ?? "", p?.tcode ?? null)}${iGa(p?.name ?? "")} ${jumpLink(sixthMan.idx, clockStr(sixthMan.row))} 투입된 뒤 팀 흐름이 확실히 좋아짐(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${teamTag(homeTcode, homeTname)} ${homeGain}점 · ${teamTag(awayTcode, awayTname)} ${awayGain}점) - 이 경기 최고의 벤치 임팩트.</p>`,
+        // 넷레이팅 변화 숫자(delta)를 문장에서 뺐다: 관찰 구간이 2~3분인 경우가 흔해 100포제션
+        // 환산이 +167.2처럼 읽을 수 없는 값으로 찍혔다(2026-09-30 실측, 장민국 2분 43초).
+        // 바로 뒤에 있는 "이후 N분간 몇 점 대 몇 점"이 같은 사실을 표본 크기까지 드러내며
+        // 말하므로, 환산값은 순위를 정하는 데만 쓰고(findBestSixthManSpark) 화면에는 안 낸다.
+        html: `<p class="report-text">🔋 ${playerTag(p?.name ?? "", p?.tcode ?? null)}${iGa(p?.name ?? "")} ${jumpLink(sixthMan.idx, clockStr(sixthMan.row))} 투입된 뒤 팀 흐름이 좋아짐(이후 ${fmtDuration(afterDur)}간 ${teamTag(homeTcode, homeTname)} ${homeGain}점 · ${teamTag(awayTcode, awayTname)} ${awayGain}점) - 이 경기 최고의 벤치 임팩트.</p>`,
       });
     }
   }
@@ -1383,15 +1561,18 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
   {
     const subItems: string[] = [];
     const notableSubs = findNotableSubSparks(subSparkHits)
+      // 6절에서 이미 말한 교체는 뺀다(위 sixthManIdx 주석 - 같은 사건 중복 노출).
+      .filter((s) => s.idx !== sixthManIdx)
       .sort((a, b) => Math.abs(b.spark.delta) - Math.abs(a.spark.delta))
       .slice(0, 2);
     for (const s of notableSubs) {
       const name = boxByPcode.get(s.pcode)?.name ?? "";
       const dir = s.spark.delta > 0 ? "좋아짐" : "나빠짐";
-      const { delta, afterDur, homeGain, awayGain } = s.spark;
+      const { afterDur, homeGain, awayGain } = s.spark;
       const sTcode = boxByPcode.get(s.pcode)?.tcode ?? null;
+      // 넷레이팅 환산값은 안 찍는다 - 6절과 같은 이유(소표본 100포제션 환산이 +167.2로 나온다).
       subItems.push(
-        `${liOpen(sTcode)}🔄 ${playerTag(name, sTcode)}${iGa(name)} ${jumpLink(s.idx, clockStr(s.row))} 투입된 뒤 팀 흐름이 뚜렷하게 ${dir}(넷레이팅 변화 ${fmtRating(delta)}, 이후 ${fmtDuration(afterDur)}간 ${teamTag(homeTcode, homeTname)} ${homeGain}점 · ${teamTag(awayTcode, awayTname)} ${awayGain}점).</li>`
+        `${liOpen(sTcode)}🔄 ${playerTag(name, sTcode)}${iGa(name)} ${jumpLink(s.idx, clockStr(s.row))} 투입된 뒤 팀 흐름이 ${dir}(이후 ${fmtDuration(afterDur)}간 ${teamTag(homeTcode, homeTname)} ${homeGain}점 · ${teamTag(awayTcode, awayTname)} ${awayGain}점).</li>`
       );
     }
     if (subItems.length) sections.push({ title: "결정적 교체 타이밍", html: `<ul class="report-list">${subItems.join("")}</ul>` });
@@ -1460,13 +1641,25 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
        items.push(`${liOpen(homeTcode)}${teamTag(homeTcode, homeTname)} - 클러치 구간 득점 <b>${hPts}점</b> (야투 ${hFGM}/${hFGA} <b>${hPct}%</b>), 턴오버 <b>${hTO}개</b></li>`);
        items.push(`${liOpen(awayTcode)}${teamTag(awayTcode, awayTname)} - 클러치 구간 득점 <b>${aPts}점</b> (야투 ${aFGM}/${aFGA} <b>${aPct}%</b>), 턴오버 <b>${aTO}개</b></li>`);
        
+       // 요약 문구를 **클러치 구간 득점차만** 보고 골랐던 자리. 실측(S49G14N4): 8 대 10점이라
+       // 세 번째 갈래로 떨어져 "한 치의 양보도 없는 팽팽한 혈투"가 나갔는데, 실제로는 종료
+       // 49초 전 9점 차였고 야투 성공률이 33% 대 80%였다. 구간 득점이 비슷한 것과 승부가
+       // 접전이었던 것은 다른 얘기라서, **끝날 때 실제로 몇 점 차였는지**를 같이 본다.
+       const lastRow = last5Events[last5Events.length - 1];
+       const finalGap = Math.abs(lastRow.home_score - lastRow.away_score);
+       const tight = finalGap <= CLUTCH_TIGHT_MARGIN;
        let summary = "";
        if (hPts > aPts + 3) {
-         summary = `${teamTag(homeTcode, homeTname)}${iGa(homeTname)} 숨 막히는 승부처에서 놀라운 집중력을 발휘하며 상대를 제압했습니다.`;
+         summary = `${teamTag(homeTcode, homeTname)}${iGa(homeTname)} 승부처 득점에서 앞서며 경기를 가져갔습니다.`;
        } else if (aPts > hPts + 3) {
-         summary = `${teamTag(awayTcode, awayTname)}${iGa(awayTname)} 피 말리는 승부처에서 강심장을 뽐내며 경기 후반 흐름을 지배했습니다.`;
+         summary = `${teamTag(awayTcode, awayTname)}${iGa(awayTname)} 승부처 득점에서 앞서며 경기를 가져갔습니다.`;
+       } else if (tight) {
+         summary = `양 팀이 승부처 득점(${hPts} 대 ${aPts})에서도, 최종 점수차(${finalGap}점)에서도 끝까지 맞섰습니다.`;
        } else {
-         summary = `양 팀 모두 마지막까지 한 치의 양보도 없는 팽팽한 혈투를 벌였습니다.`;
+         // 구간 득점은 비슷했지만 점수차가 이미 벌어져 있던 경우 - 접전이라고 부르지 않는다.
+         // 숫자 바로 뒤에 조사를 붙이지 않는다(josa()는 한글이 아닌 글자에 받침 없는 쪽으로
+         // 폴백해서 "10로"처럼 틀린 조사가 나온다 - 10은 '십'이라 '으로'여야 한다).
+         summary = `승부처 득점(${hPts} 대 ${aPts})은 비슷했지만, 점수차가 이미 ${finalGap}점으로 벌어진 뒤라 흐름이 뒤집히지는 않았습니다.`;
        }
        
        sections.push({ 
@@ -1482,26 +1675,32 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
     // 두되 40분 환산 페이스에만 적용한다 - 최근 4시즌 568경기의 공식 페이스로 재보면
     // 빠름 26% / 보통 60% / 느림 14%로 갈려 라벨이 실제로 구실을 한다(예전 원시 추정치
     // 기준으로는 빠름 58% / 느림 2.3%로 사실상 "빠름" 고정이었다).
+    // game_team_stats.pace가 있으면 그걸 쓴다(8,444행 중 8,434행에 있음 - 2026-09-30 실측).
+    // 추정은 아직 정산 전인 경기(방금 끝난 경기는 pace=0으로 들어온다 - S49 개막전들이 그랬다)
+    // 폴백으로만 남긴다. 리포트가 "추정"이라고 쓰면서 옆 테이블은 공식값을 쓰는 상태를 없앤다.
+    const officialPace = input.teamStats?.find((t) => (t.pace ?? 0) > 0)?.pace ?? null;
     const possEst = estimatePossessions(box, events, homeTcode, awayTcode);
-    const avgPoss = Math.round(possEst.pacePer40);
-    const otNote = possEst.playedMin > 40 ? ` (연장 포함 ${Math.round(possEst.playedMin)}분 → 40분 환산)` : "";
-    
+    const avgPoss = Math.round(officialPace ?? possEst.pacePer40);
+    const source = officialPace != null ? "공식 기록" : "추정";
+    const otNote = officialPace == null && possEst.playedMin > 40 ? ` (연장 포함 ${Math.round(possEst.playedMin)}분 → 40분 환산)` : "";
+
     let paceLabel = "보통 (Average)";
     if (avgPoss >= 75) paceLabel = "빠름 (Up-Tempo)";
     else if (avgPoss <= 67) paceLabel = "느림 (Slow Pace)";
-    
-    let summary = "";
-    if (avgPoss <= 67) {
-       summary = `양 팀 모두 철저한 지공 위주의 하프코트 세트 오펜스를 전개하며 끈적한 늪 농구 양상을 띠었습니다.`;
-    } else if (avgPoss >= 75) {
-       summary = `양 팀 모두 쉴 새 없이 달리는 빠른 템포의 난타전을 펼쳤습니다.`;
-    } else {
-       summary = `양 팀이 무난한 템포 속에서 공수 전환을 주고받았습니다.`;
-    }
-    
-    sections.push({ 
-      title: "템포와 페이스 진단 (Pace & Transition)", 
-      html: `<p class="report-text">🏃 <b>추정 경기 페이스: 40분당 ${avgPoss} 포제션 (템포 ${paceLabel})</b>${otNote}<br/>${summary}</p>` 
+
+    // 예전엔 "끈적한 늪 농구" / "쉴 새 없이 달리는 난타전"처럼 임계값 한 개에 과장된 수사를
+    // 붙였다. 75포제션은 최근 4시즌 기준 상위 26%지 '난타전'이 아니고, 이 경기는 78포제션에
+    // 합계 170점·6점 차였다. 분포상 어디쯤인지만 말한다(위 임계값 주석의 실측 비율).
+    const summary =
+      avgPoss <= 67
+        ? `최근 4시즌 기준 느린 쪽 14%에 해당하는 템포로, 하프코트 공격 비중이 컸습니다.`
+        : avgPoss >= 75
+          ? `최근 4시즌 기준 빠른 쪽 26%에 해당하는 템포였습니다.`
+          : `최근 4시즌 경기의 60%가 속하는 보통 템포였습니다.`;
+
+    sections.push({
+      title: "템포와 페이스 진단 (Pace & Transition)",
+      html: `<p class="report-text">🏃 <b>경기 페이스: 40분당 ${avgPoss} 포제션 (템포 ${paceLabel})</b>${otNote}<br/>${summary}</p><p class="report-caveat">${source} 기준.</p>`,
     });
   }
 

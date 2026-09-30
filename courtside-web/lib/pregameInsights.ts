@@ -33,8 +33,21 @@ export type PregameFeatures = {
   away_avg_vertical_jump_cm: number | null;
   home_vertical_jump_coverage: number | null;
   away_vertical_jump_coverage: number | null;
-  // 예정 경기의 경기 전 모델 승률(tools/sync_upcoming_games.py가 적재) - 종료 경기는
-  // game_events의 event_order=0 행이 같은 역할이라 과거 행에선 null.
+  /**
+   * 경기 전 모델(pregame_model.joblib)의 승률. tools/sync_upcoming_games.py가 적재한다.
+   *
+   * 2026-09-30 정정: 예전 주석은 "종료 경기는 game_events의 event_order=0 행이 같은 역할이라
+   * 과거 행에선 null"이라고 적어 뒤 있었는데 **둘 다 틀렸다.**
+   *  - null이 아니다: 이 스크립트를 거친 경기는 끝난 뒤에도 값이 남는다(지우지 않는다 -
+   *    저장된 피처로는 재계산이 불가능해서, 지우면 경기 전 예측 기록이 영구히 사라진다).
+   *  - 같은 역할이 아니다: game_events PRE행은 **라이브 모델을 0-0·풀타임 잔여 상태로 평가한
+   *    값**(피처 5개)이고 이쪽은 경기 전 모델(팀당 피처 30개)이다. 실측 S49G14N4에서 0.4977
+   *    대 0.6397로 우세팀이 반대였다.
+   * 그래서 이 값과 PRE행을 `??`로 이어 "하나의 경기 전 승률"처럼 쓰면 경기 시작 시점에 모델이
+   * 조용히 바뀐다. 적중/빗나감 판정은 lib/predictionVerdict.ts 한 곳에서만 하고, 두 값이 서로
+   * 다른 팀을 우세로 볼 때는 리포트가 그 사실을 드러낸다(PredictionAuditSection의 modelSplit).
+   * 역사적 경기(4,182건)는 이 스크립트가 생기기 전이라 여전히 null이다.
+   */
   home_win_prob: number | null;
 };
 

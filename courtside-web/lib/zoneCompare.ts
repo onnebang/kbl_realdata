@@ -17,7 +17,12 @@ export const COURT_Y: [number, number] = [27, 384];
 // 있었음(mirrorShotX). COURT_X[1]에서 HOOP_RIGHT까지의 여백을 그대로 반대쪽에 대칭 적용.
 export const HOOP_LEFT: [number, number] = [COURT_X[0] + (COURT_X[1] - HOOP_RIGHT[0]), HOOP_RIGHT[1]];
 export const SCALE_M_PER_UNIT = 0.0413;
-const ZONE_BOUNDS_M: [string, number, number, string][] = [
+/**
+ * 구역 경계 - [키, 하한(m), 상한(m), 한글 라벨]. 전부 골대로부터의 거리 하나로만 갈린다(각도
+ * 무관)는 뜻이라, 화면에 그릴 때도 골대를 중심으로 한 동심원 밴드가 정확한 모양이다 -
+ * lib/report/zoneHeatmap.ts가 이 표를 그대로 읽어 그린다(구역 경계를 두 벌로 두지 않는다).
+ */
+export const ZONE_BOUNDS_M: [string, number, number, string][] = [
   ["rim", 0, 1.2, "림"],
   ["close", 1.2, 3.0, "근거리"],
   ["midShort", 3.0, 5.0, "중거리"],

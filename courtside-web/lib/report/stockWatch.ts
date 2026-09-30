@@ -57,14 +57,23 @@ export type StockUp = {
   ast: number;
   gameScore: number;
 };
-/** 하한가 - 문장이 쓰는 스탯만(야투와 턴오버). */
+/**
+ * 하한가 - 문장이 쓰는 스탯만.
+ *
+ * turnovers/fouls는 값이 아니라 **말할 만한 값일 때만** 문장에 나간다. 예전엔 턴오버를 무조건
+ * 나열해서 "턴오버 0개에 그치며 유독 고전했습니다"가 배포돼 있었다(2026-09-30 실측, 정인덕 -
+ * 턴오버 0은 잘한 것이다). 하한가로 걸린 사유(downQualifies)와 문장이 드는 근거가 같아야 한다.
+ */
 export type StockDown = {
   team: ReportTeamMeta | null;
   name: string;
   pts: number;
   fgm: number;
   fga: number;
-  turnovers: number;
+  /** STOCK_DOWN_MIN_TURNOVERS 미만이면 null - 문장에 넣지 않는다. */
+  turnovers: number | null;
+  /** STOCK_DOWN_MIN_FOULS 미만이면 null - 문장에 넣지 않는다. */
+  fouls: number | null;
 };
 
 export type StockWatch = { kind: "stock_watch"; up: StockUp; down: StockDown };
@@ -89,6 +98,14 @@ export function computeStockWatch(candidates: StockCandidate[]): StockWatch | nu
   return {
     kind: "stock_watch",
     up: { team: up.team, name: up.name, pts: up.pts, reb: up.reb, ast: up.ast, gameScore: up.gameScore },
-    down: { team: down.team, name: down.name, pts: down.pts, fgm: down.fgm, fga: down.fga, turnovers: down.turnovers },
+    down: {
+      team: down.team,
+      name: down.name,
+      pts: down.pts,
+      fgm: down.fgm,
+      fga: down.fga,
+      turnovers: down.turnovers >= STOCK_DOWN_MIN_TURNOVERS ? down.turnovers : null,
+      fouls: down.fouls >= STOCK_DOWN_MIN_FOULS ? down.fouls : null,
+    },
   };
 }

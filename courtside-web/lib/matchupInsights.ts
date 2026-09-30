@@ -3,6 +3,7 @@ import { classifyShot } from "./formIndex";
 import { isCornerThree } from "./zoneCompare";
 import { computeFinalPlusMinus, type PlayerStartInfo } from "./gameLineups";
 import { teamTopPerformer, gameScore, type GameEvent, type PlayerBox } from "./postgameReport";
+import { fmtProbPct, gradePrediction } from "./predictionVerdict";
 import type { ScheduleGame, SeasonStats } from "./matchups";
 
 // 요청 항목 1~7("직전 경기 활약 선수 주의/직전 경기 수비 약점/조합 시너지/최근 추세/오펜스
@@ -828,11 +829,17 @@ export function gradeMatchupInsights(insights: PreviewInsight[], ctx: GradingCon
   return insights.map((insight): string | null => {
     switch (insight.kind) {
       case "win_prob": {
-        const predictedHome = insight.homeProb >= 0.5;
+        // 채점은 lib/predictionVerdict.ts 한 곳에서만 한다 - 예전엔 여기와
+        // postgameReport.ts '경기 결과'가 각자 판정했고(한쪽은 원값, 한쪽은 반올림한 정수),
+        // S49G14N4에서 같은 예측을 "적중"과 "빗나감"으로 동시에 내보냈다.
         const actualHomeWon = ctx.homeScore > ctx.awayScore;
-        const hit = predictedHome === actualHomeWon;
+        const verdict = gradePrediction(insight.homeProb, actualHomeWon);
         const winnerName = actualHomeWon ? ctx.homeTname : ctx.awayTname;
-        return `실제 결과 ${winnerName} 승(${ctx.homeScore}-${ctx.awayScore}) - 예측 ${hit ? "적중" : "빗나감"}.`;
+        const tail =
+          verdict === "coinflip"
+            ? `예측은 반반(${fmtProbPct(insight.homeProb, true)}% : ${fmtProbPct(1 - insight.homeProb, true)}%)이어서 적중 여부를 매기지 않음.`
+            : `예측 ${verdict === "hit" ? "적중" : "빗나감"}.`;
+        return `실제 결과 ${winnerName} 승(${ctx.homeScore}-${ctx.awayScore}) - ${tail}`;
       }
       case "watch_player": {
         const p = boxByPcode.get(insight.pcode);

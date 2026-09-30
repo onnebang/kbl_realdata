@@ -3382,3 +3382,182 @@ footer.foot {
     color: var(--ti-d, inherit);
   }
 }
+
+/* ══ AI 리포트: 새로 붙은 그래픽/표 ═══════════════════════════════════════════
+   요청("그래픽적으로 추가, 고차원적인 표·차트, 예상이 틀린 이유 분석")으로 들어온 네 가지:
+   승률 궤적(.audit-*), 경기 전 기대 vs 실제 표(.audit-table), 구역 히트맵(.zone-*),
+   쿼터별 마진(.qm-*). 막대 비교는 새 CSS 없이 기존 .ts-row/.ts-bar를 그대로 쓴다
+   (components/report/TeamSplitBar.tsx) - .ts-group만 그룹 사이 간격용으로 추가. */
+.ts-group {
+  margin-top: 14px;
+}
+
+/* ── 승률 궤적 ─────────────────────────────────────────────────────────────
+   .wp-chart와 같은 구조: 높이는 래퍼가 고정하고 SVG가 그 안을 채운다(선만 SVG,
+   글자는 HTML - SVG <text>는 뷰박스 배율 탓에 화면 폭마다 크기가 달라진다). */
+.audit-chart {
+  margin: 6px 0 12px;
+}
+.audit-chart-svg {
+  display: block;
+  width: 100%;
+  height: 132px;
+  overflow: visible;
+}
+.audit-mid {
+  stroke: var(--ink-faint);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  opacity: 0.7;
+}
+.audit-tick {
+  stroke: var(--line, var(--ink-faint));
+  stroke-width: 1;
+  opacity: 0.25;
+}
+.audit-line-obj {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-width: 1.4;
+  opacity: 0.8;
+  vector-effect: non-scaling-stroke;
+}
+.audit-line-actual {
+  fill: none;
+  stroke-width: 2.2;
+  vector-effect: non-scaling-stroke;
+}
+.audit-chart-axis {
+  position: relative;
+  height: 14px;
+  margin-top: 2px;
+}
+.audit-chart-axis span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+/* ── 표(경기 전 기대 vs 실제 / 구역별) ────────────────────────────────────── */
+.audit-table-title {
+  margin-top: 12px;
+}
+.audit-table,
+.zone-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0 4px;
+  font-size: 12.5px;
+}
+.audit-table th,
+.audit-table td,
+.zone-table th,
+.zone-table td {
+  padding: 5px 6px;
+  text-align: right;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.16);
+  white-space: nowrap;
+}
+.audit-table thead th,
+.zone-table thead th {
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+.audit-table th[scope="row"],
+.zone-table th[scope="row"],
+.audit-table thead th:first-child,
+.zone-table thead th:first-child {
+  text-align: left;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+/* 기대와 반대로 나온 항목 - 색만으로 구분하지 않도록 왼쪽 굵은 선도 같이 준다. */
+.audit-table tr.audit-flip th[scope="row"] {
+  box-shadow: inset 3px 0 0 var(--gold);
+}
+.audit-table tr.audit-flip td:last-child {
+  color: var(--gold);
+  font-weight: 700;
+}
+.zone-table tr.zone-row-top th[scope="row"] {
+  box-shadow: inset 3px 0 0 var(--gold);
+}
+.zone-pct {
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  margin-left: 3px;
+}
+
+/* ── 구역 히트맵 ───────────────────────────────────────────────────────────
+   기울이지 않는다(.zc-court의 rotateX와 다른 점): 밴드가 골대 중심 '원'이라는 게 이 그림의
+   요점인데 기울이면 타원이 되어 거리 밴드로 안 읽힌다. */
+.zone-heat {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0 4px;
+}
+.zone-heat-col {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.zone-heat-cap {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin-bottom: 3px;
+}
+.zone-heat-court {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+}
+
+/* ── 쿼터별 마진 ───────────────────────────────────────────────────────────
+   막대 높이의 합이 최종 마진이라, 눈으로 검산이 된다. */
+.qm-wrap {
+  margin: 6px 0 4px;
+  max-width: 420px;
+}
+.qm-chart {
+  display: block;
+  width: 100%;
+  height: 96px;
+}
+.qm-axis {
+  display: flex;
+  margin-top: 2px;
+}
+.qm-axis span {
+  flex: 1 1 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.qm-axis span b {
+  color: var(--ink-soft);
+  margin-right: 3px;
+}
+
+/* 좁은 화면 - 히트맵 두 장을 위아래로, 표는 글자만 한 단 줄인다. */
+@media (max-width: 480px) {
+  .zone-heat {
+    display: block;
+  }
+  .zone-heat-col + .zone-heat-col {
+    margin-top: 10px;
+  }
+  .audit-table,
+  .zone-table {
+    font-size: 11.5px;
+  }
+  .audit-table th,
+  .audit-table td,
+  .zone-table th,
+  .zone-table td {
+    padding: 4px 3px;
+  }
+}

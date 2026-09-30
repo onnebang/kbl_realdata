@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { fmtDuration } from "@/lib/report/renderKit";
 import type { UnsungChore, UnsungHeroes } from "@/lib/report/unsungHero";
-import { PlayerTag, ReportLi, TeamInk } from "./tags";
+import { PlayerTag, ReportLi } from "./tags";
 
 // AI 코트사이드 리포트 2.5 "스탯에 보이지 않은 선수" - 기존 문자열 조립을 선언적 컴포넌트로
 // 옮긴 두 번째 섹션(AceDuelSection.tsx가 첫 번째). 렌더 결과는 기존과 **바이트 단위로 같다**
@@ -18,22 +18,37 @@ import { PlayerTag, ReportLi, TeamInk } from "./tags";
 /** renderKit의 sign()과 같은 규칙(+만 붙이고 -는 그대로). 한 줄짜리라 옮기지 않고 여기 둔다. */
 const signed = (v: number) => (v > 0 ? `+${v}` : `${v}`);
 
-/** 궂은일 스탯 나열. 하나도 없으면 문장이 통째로 달라진다(원본과 같은 두 갈래). */
+/**
+ * 궂은일 스탯 나열. 하나도 없으면 문장이 통째로 달라진다(원본과 같은 두 갈래).
+ *
+ * "비록 득점은 적었으나"를 뺐다 - 바로 앞에 이미 "N득점에 그쳤지만"이 있어서 같은 말을 두 번
+ * 하고 있었다(2026-09-30 실측 배포본).
+ */
 function Chores({ chores }: { chores: UnsungChore[] }) {
-  if (!chores.length) return <> 비록 스탯 라인은 단출했으나,</>;
+  if (!chores.length) return <> 스탯 라인은 단출했지만,</>;
   return (
-    <> 비록 득점은 적었으나 {chores.map((c, i) => (<Fragment key={c.label}>{i > 0 ? " " : ""}<b>{c.value}{c.label}</b></Fragment>))} 등 궂은일을 도맡았으며,</>
+    <> {chores.map((c, i) => (<Fragment key={c.label}>{i > 0 ? " " : ""}<b>{c.value}{c.label}</b></Fragment>))} 등 궂은일을 도맡았고,</>
   );
 }
 
 export function UnsungHeroSection({ heroes }: { heroes: UnsungHeroes }) {
   return (
-    <ul className="report-list">
-      {heroes.heroes.map((h) => (
-        <ReportLi team={h.team} key={`${h.team.tcode}:${h.name}`}>
-          <b><PlayerTag team={h.team} name={h.name} /></b> - 오늘 <b>{h.pts}득점</b>에 그쳤지만,<Chores chores={h.chores} /> 그가 코트를 밟은 {fmtDuration(h.onSec)} 동안 팀은 마진 <b>{signed(h.onMargin)}</b>를 기록했습니다. 반면 벤치에서 쉰 {fmtDuration(h.offSec)} 동안에는 팀 마진이 <b>{signed(h.offMargin)}</b>로 무너졌습니다. 코트 위에서 <TeamInk team={h.team} />의 공수 밸런스를 든든하게 지탱했습니다.
-        </ReportLi>
-      ))}
-    </ul>
+    <>
+      <ul className="report-list">
+        {heroes.heroes.map((h) => (
+          <ReportLi team={h.team} key={`${h.team.tcode}:${h.name}`}>
+            <b><PlayerTag team={h.team} name={h.name} /></b> - 오늘 <b>{h.pts}득점</b>에 그쳤지만,<Chores chores={h.chores} /> 그가 코트를 밟은 {fmtDuration(h.onSec)} 동안 팀은 마진 <b>{signed(h.onMargin)}</b>, 벤치에서 쉰 {fmtDuration(h.offSec)} 동안에는 <b>{signed(h.offMargin)}</b>였습니다.
+          </ReportLi>
+        ))}
+      </ul>
+      {/* 예전엔 각 줄 끝에 "코트 위에서 OO의 공수 밸런스를 든든하게 지탱했습니다"가 값과 무관하게
+          무조건 붙었다. 양 팀 두 선수에게 토씨 하나 안 틀리고 똑같이 붙어서 템플릿인 게 그대로
+          드러났고, 이 모듈이 스스로 적어둔 한계(상대 라인업을 통제하지 않은 한 경기 온/오프
+          스플릿이라 인과가 아니다)와도 어긋나는 주장이었다. 그 한계를 미사여구 대신 여기 한 번만
+          적는다 - 다른 섹션(shotHotZone/xPTS)이 이미 쓰는 .report-caveat와 같은 자리. */}
+      <p className="report-caveat">
+        한 경기 온/오프 스플릿입니다. 상대 라인업을 통제하지 않았으므로 &quot;이 선수 때문&quot;이라는 인과로는 읽을 수 없습니다.
+      </p>
+    </>
   );
 }

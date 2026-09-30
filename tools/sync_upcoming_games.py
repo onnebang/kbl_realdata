@@ -9,12 +9,31 @@ raw/analysis/upcoming_predictions.json에만 쓰고 끝났는데, 코트사이�
      상태 판정은 lib/gameStatus.ts가 home_score부터 보므로 is_ended 값 자체는 예정 경기에서
      의미가 없지만, "종료만 true" 규칙을 지키기 위해 false로 넣음)
   3. 경기 전 모델 승률 + 프리뷰 인사이트용 피처를 pregame_features에 UPSERT
-     (home_win_prob 컬럼 - 종료 경기는 game_events의 event_order=0 행이 같은 역할이라
-     이 컬럼은 예정 경기 전용)
 
-games UPSERT는 "이미 스코어가 있거나 끝난 행은 절대 건드리지 않음"(WHERE 가드) - 경기가
-끝나면 daily_batch의 migrate_to_supabase.py 경로가 스코어를 채우는데, 그 뒤에 이 스크립트가
-다시 돌아도 예정 상태로 되돌리는 사고가 없도록.
+pregame_features.home_win_prob이 무엇인지(2026-09-30 정정): **경기 전 모델
+(pregame_model.joblib)의 예측**이고, 경기가 끝난 뒤에도 **지우지 않고 남긴다**.
+
+예전 주석은 "종료 경기는 game_events의 event_order=0 행이 같은 역할이라 이 컬럼은 예정 경기
+전용"이라고 적어 뒀는데 **사실이 아니다.** 두 값은 서로 다른 모델이다:
+  - pregame_features.home_win_prob : pregame_model.joblib. 팀당 30개 피처(offrtg/defrtg/
+    efgRt/astRt/restDays/coachWinPct/teamPWR/last1·last5 등)를 쓴다.
+  - game_events(quarter='PRE').home_win_prob : live_winprob_model.joblib을 **0-0·풀타임
+    잔여 상태로 평가한 값**. 피처가 5개뿐이다(scoreDiff/remaining/scaled/netrtgDiff/synergyDiff).
+실측(S49G14N4, 2026-09-25): 앞은 0.6397(홈 우세), 뒤는 0.4977(원정 우세)로 **우세팀이 반대**다.
+이 컬럼이 종료 경기에서 null일 거라고 가정한 웹 폴백 때문에, 같은 경기 페이지가 "예측 적중"과
+"예측 빗나감"을 동시에 표시했다(courtside-web/lib/predictionVerdict.ts 참고).
+
+왜 안 지우는가: 이 표에 저장하는 피처는 모델이 쓰는 30개 중 일부뿐이라 저장된 값으로
+home_win_prob을 **다시 계산할 수 없다**. 지우면 "경기 전에 무엇을 예측했는지"가 영구히
+사라져 모델 캘리브레이션을 사후에 볼 수 없게 된다. recalc_lineup_winprob.py가 이미 똑같은
+사고를 낸 적이 있다(그 파일 머리주석의 "그 변동을 보여줄 '이전' 값 자체가 이미 지워진 상태" -
+그때 컬럼을 갈라 "두 값이 항상 공존"하게 고쳤다). 같은 실수를 반복하지 않는다.
+
+대신 **끝난 경기의 행은 다시 쓰지 않는다**(아래 WHERE 가드). games UPSERT에는 원래 그 가드가
+있었는데("이미 스코어가 있거나 끝난 행은 절대 건드리지 않음" - 경기가 끝나면 daily_batch의
+migrate_to_supabase.py 경로가 스코어를 채우고, 그 뒤 이 스크립트가 다시 돌아도 예정 상태로
+되돌리지 않도록) pregame_features에는 빠져 있었다. 그래서 종료 경기의 경기 전 기록이
+스케줄 시점 값으로 덮여 쓰일 수 있었다 - 같은 규칙을 세 UPSERT 전부에 적용한다.
 
 시즌 이름 매핑: match/list 응답의 seasonName은 null이라 seasonCode에서 유도 -
 KBL 시즌코드는 시즌마다 +2 (47="2025-2026" 확인됨, predict_upcoming_games.py의
@@ -124,6 +143,41 @@ def build_game_rows(schedule_games):
     return rows
 
 
+# ── "끝난 경기의 행은 다시 쓰지 않는다" 가드 ────────────────────────────────────
+# 규칙은 하나인데 표현이 둘이다(games는 자기 컬럼, pregame_features는 games를 참조).
+# 한 곳에 모아 두는 이유: 원래 games에만 있고 pregame_features에는 빠져 있었다 - 가드를
+# UPSERT마다 손으로 적으면 새 UPSERT를 추가할 때 또 빠진다. test_sync_guards.py가 세 문장
+# 전부에 가드가 들어 있는지 고정한다.
+GAMES_NOT_ENDED = "where games.home_score is null and games.is_ended = false"
+
+
+def not_ended_guard(table):
+    """`table`의 gmkey에 해당하는 games 행이 아직 끝나지 않았을 때만 UPDATE."""
+    return (
+        "where not exists (select 1 from games g where g.gmkey = "
+        f"{table}.gmkey and (g.is_ended or g.home_score is not null))"
+    )
+
+
+def predictions_upsert_sql(cols):
+    set_clause = ", ".join(f"{c}=excluded.{c}" for c in cols if c != "gmkey")
+    return (
+        f"insert into pregame_features ({', '.join(cols)}) values %s\n"
+        f"        on conflict (gmkey) do update set {set_clause}\n"
+        f"        {not_ended_guard('pregame_features')}"
+    )
+
+
+def lineup_upsert_sql():
+    return (
+        "insert into pregame_features (gmkey, home_win_prob_lineup, lineup_absences) values %s\n"
+        "        on conflict (gmkey) do update set\n"
+        "            home_win_prob_lineup = excluded.home_win_prob_lineup,\n"
+        "            lineup_absences = excluded.lineup_absences\n"
+        f"        {not_ended_guard('pregame_features')}"
+    )
+
+
 def upsert_games(cur, schedule_games):
     from psycopg2.extras import execute_values
     rows = build_game_rows(schedule_games)
@@ -139,8 +193,8 @@ def upsert_games(cur, schedule_games):
     """, [(name, season_codes.get(name)) for name, _ in season_rows])
 
     # 가드: 이미 스코어가 있거나 끝난 행은 절대 예정 상태로 되돌리지 않음. 아직 예정인
-    # 행만 일정 변경(날짜/시각/구장)을 따라감.
-    execute_values(cur, """
+    # 행만 일정 변경(날짜/시각/구장)을 따라감(위 GAMES_NOT_ENDED).
+    execute_values(cur, f"""
         insert into games (gmkey, season_name, season_category, game_date, game_start,
             home_tcode, away_tcode, home_coach_id, away_coach_id, home_score, away_score,
             is_ended, stadium, attendance) values %s
@@ -148,7 +202,7 @@ def upsert_games(cur, schedule_games):
             game_date = excluded.game_date,
             game_start = excluded.game_start,
             stadium = excluded.stadium
-        where games.home_score is null and games.is_ended = false
+        {GAMES_NOT_ENDED}
     """, rows)
     return len(rows)
 
@@ -203,36 +257,39 @@ def compute_prediction_rows(ctx, model_bundle, schedule_games, lineups=None):
     return rows, skipped
 
 
-def upsert_predictions(cur, rows):
+def prediction_columns():
+    """UPSERT 컬럼 순서 - compute_prediction_rows()가 만드는 튜플 순서와 반드시 같아야 한다."""
     from migrate_pregame_features_to_supabase import FIELDS
-    from psycopg2.extras import execute_values
-    if not rows:
-        return
     cols = ["gmkey"]
     for pg_key, _ in FIELDS:
         cols.append(f"home_{pg_key}")
         cols.append(f"away_{pg_key}")
     cols.append("home_win_prob")
-    set_clause = ", ".join(f"{c}=excluded.{c}" for c in cols if c != "gmkey")
-    execute_values(cur, f"""
-        insert into pregame_features ({", ".join(cols)}) values %s
-        on conflict (gmkey) do update set {set_clause}
-    """, rows)
+    return cols
+
+
+def upsert_predictions(cur, rows):
+    """끝난 경기는 건너뛴다(not_ended_guard). 실제로 쓰인 행 수를 돌려준다 - 호출부가
+    '몇 건이 종료돼서 보호됐는지' 로그에 남긴다."""
+    from psycopg2.extras import execute_values
+    if not rows:
+        return 0
+    execute_values(cur, predictions_upsert_sql(prediction_columns()), rows)
+    return cur.rowcount if cur.rowcount is not None and cur.rowcount >= 0 else len(rows)
 
 
 def upsert_lineup_predictions(cur, rows):
     """rows: [(gmkey, home_win_prob_lineup, lineup_absences_json), ...] - recalc_lineup_winprob.py
     전용. home_win_prob(엔트리 없는 시즌 전체 기준 예측)은 절대 안 건드린다 - 그 값은
-    upsert_predictions()만 쓴다(같은 gmkey 행이라도 컬럼이 갈려서 서로 안 덮어씀)."""
+    upsert_predictions()만 쓴다(같은 gmkey 행이라도 컬럼이 갈려서 서로 안 덮어씀).
+
+    끝난 경기를 건너뛰는 이유: live_collector가 10분마다 --today로 이 경로를 부르므로, 오늘
+    이미 끝난 경기가 대상 목록에 남아 경기 전 기록을 사후 값으로 덮을 수 있다."""
     from psycopg2.extras import execute_values
     if not rows:
-        return
-    execute_values(cur, """
-        insert into pregame_features (gmkey, home_win_prob_lineup, lineup_absences) values %s
-        on conflict (gmkey) do update set
-            home_win_prob_lineup = excluded.home_win_prob_lineup,
-            lineup_absences = excluded.lineup_absences
-    """, rows)
+        return 0
+    execute_values(cur, lineup_upsert_sql(), rows)
+    return cur.rowcount if cur.rowcount is not None and cur.rowcount >= 0 else len(rows)
 
 
 def main():
@@ -274,9 +331,11 @@ def main():
         with conn.cursor() as cur:
             n_games = upsert_games(cur, schedule_games)
             print(f"[sync_upcoming] games UPSERT {n_games}건", flush=True)
-            upsert_predictions(cur, pred_rows)
-            print(f"[sync_upcoming] pregame_features UPSERT {len(pred_rows)}건"
-                  f"{f' (표본 부족 보류 {n_skip}건)' if n_skip else ''}", flush=True)
+            n_written = upsert_predictions(cur, pred_rows)
+            n_protected = len(pred_rows) - n_written
+            print(f"[sync_upcoming] pregame_features UPSERT {n_written}건"
+                  f"{f' (표본 부족 보류 {n_skip}건)' if n_skip else ''}"
+                  f"{f' (종료 경기라 보호 {n_protected}건)' if n_protected > 0 else ''}", flush=True)
         conn.commit()
         print("[sync_upcoming] 커밋 완료.", flush=True)
         # 2026-09-25(revalidateTag 연동) - 한 번에 수백 경기를 건드릴 수 있어서(실측 277건)

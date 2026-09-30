@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
 import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBox, type ReportSection } from "@/lib/postgameReport";
 import { DataSectionBody } from "@/components/report/DataSectionBody";
+import { TeamSplitBar, awayFillBackground } from "@/components/report/TeamSplitBar";
 import { teamInkStyle } from "@/lib/teamAccent";
 import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights";
 import { getGameRarity } from "@/lib/rarity";
@@ -60,6 +61,8 @@ type TeamStatRow = {
   tpa: number | null;
   ftm: number | null;
   fta: number | null;
+  /** 공식 페이스(40분당 포제션). 아직 정산 안 된 경기는 0으로 들어온다 - 리포트가 그때만 추정 폴백. */
+  pace: number | null;
 };
 
 type PlayerStatRow = {
@@ -144,7 +147,7 @@ async function getTeamStats(gmkey: string, ttl: number) {
   const load = async () => {
     const { data } = await supabase
       .from("game_team_stats")
-      .select("tcode, score, reb, ast, stl, blk, turnovers, fouls, fgm, fga, tpm, tpa, ftm, fta")
+      .select("tcode, score, reb, ast, stl, blk, turnovers, fouls, fgm, fga, tpm, tpa, ftm, fta, pace")
       .eq("gmkey", gmkey);
     return (data ?? []) as TeamStatRow[];
   };
@@ -378,26 +381,9 @@ async function buildPriorGameData(
 // 색상거리 공식(단순 유클리드보다 사람 눈 인지에 가까움)으로 두 팀 색이 너무 가까우면
 // 원정 쪽만 대각선 줄무늬로 텍스처를 줘서 구분(예: 서울 SK #E4002B vs 안양 정관장 #C8102E는
 // 둘 다 빨강이라 거리 ~57로 트리거됨 - threshold는 실측 KBL 팀 색상표 기준으로 잡음).
-function hexToRgb(hex: string): [number, number, number] {
-  const clean = hex.replace("#", "");
-  return [parseInt(clean.slice(0, 2), 16) || 0, parseInt(clean.slice(2, 4), 16) || 0, parseInt(clean.slice(4, 6), 16) || 0];
-}
-function colorDistance(hex1: string, hex2: string): number {
-  const [r1, g1, b1] = hexToRgb(hex1);
-  const [r2, g2, b2] = hexToRgb(hex2);
-  const rMean = (r1 + r2) / 2;
-  const dr = r1 - r2,
-    dg = g1 - g2,
-    db = b1 - b2;
-  return Math.sqrt((2 + rMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rMean) / 256) * db * db);
-}
-const SIMILAR_COLOR_THRESHOLD = 90;
-// 원정 막대 배경 - 색이 비슷하면 팀 색 그대로 위에 흰색 대각선 줄무늬를 겹쳐서(그 팀 색 자체는
-// 유지한 채 질감만 다르게) 홈과 눈으로 구분되게. 안 비슷하면 그냥 단색.
-function awayFillBackground(homeColor: string, awayColor: string): string {
-  if (colorDistance(homeColor, awayColor) >= SIMILAR_COLOR_THRESHOLD) return awayColor;
-  return `repeating-linear-gradient(45deg, transparent 0 4px, rgba(255,255,255,0.45) 4px 8px), ${awayColor}`;
-}
+// hexToRgb/colorDistance/awayFillBackground/tsBarRow는 components/report/TeamSplitBar.tsx로
+// 옮겼다 - 리포트의 '네 가지 요인' 섹션이 정확히 같은 마주보는 막대를 쓰기 때문에, 여기 두면
+// 두 벌이 되고 한쪽만 손보면 같은 화면의 막대 두 종류가 서로 달라진다.
 
 // 팀 스탯 바 비교 - courtside_template.html의 tsBarHtml/tsPctRow/tsCountRow(3387~3400행)를
 // 그대로 이식. 정밀 대조 전에는 이 자리가 그냥 숫자만 나열한 data-table이었는데, 원본은
@@ -412,25 +398,7 @@ function tsBarRow(
   hColor: string,
   aColor: string
 ) {
-  const total = hVal + aVal;
-  const hPct = total > 0 ? (hVal / total) * 100 : 50;
-  return (
-    <div className="ts-row" key={label}>
-      <div className="ts-nums">
-        <span className="ts-home team-ink" style={teamInkStyle(hColor)}>
-          {hDisp}
-        </span>
-        <span className="ts-label">{label}</span>
-        <span className="ts-away team-ink" style={teamInkStyle(aColor)}>
-          {aDisp}
-        </span>
-      </div>
-      <div className="ts-bar">
-        <div className="ts-bar-fill" style={{ width: `${hPct}%`, background: hColor }} />
-        <div className="ts-bar-fill" style={{ width: `${100 - hPct}%`, background: awayFillBackground(hColor, aColor) }} />
-      </div>
-    </div>
-  );
+  return <TeamSplitBar key={label} label={label} hVal={hVal} aVal={aVal} hDisp={hDisp} aDisp={aDisp} hColor={hColor} aColor={aColor} />;
 }
 // 요청: "같은 40%라도 3점 10개 들어간 40%랑 3개 들어간 40%는 다른 느낌을 주도록" - 예전엔
 // 성공률(%) 값 자체를 45:38처럼 나눠서, 시도 수가 아무리 달라도 같은 %면 항상 반반으로
@@ -663,10 +631,40 @@ export default async function GamePage({
       // 추가 섹션 6개의 재료 - 전부 이 위에서 이미 받아 둔 것이라 새 왕복이 없다. 그래서 이 블록을
       // 시즌 스탯·맞대결 조회 뒤로 옮겼다(예전에는 그 앞에 있었다).
       shots,
-      teamThrees: teamStats.map((t) => ({ tcode: t.tcode, tpm: t.tpm ?? 0, tpa: t.tpa ?? 0 })),
+      // 예전엔 tpm/tpa만 떼어 넘겼다(teamThrees). 그 탓에 자유투·파울·페이스가 리포트에
+      // 아예 들어오지 못했고, 자유투로 10점이 갈린 경기의 리포트에 자유투가 한 줄도 없었다
+      // (lib/report/fourFactors.ts 머리주석). 같은 행을 통째로 넘긴다 - 새 조회 0회.
+      teamStats: teamStats.map((t) => ({
+        tcode: t.tcode,
+        score: t.score ?? 0,
+        fgm: t.fgm ?? 0,
+        fga: t.fga ?? 0,
+        tpm: t.tpm ?? 0,
+        tpa: t.tpa ?? 0,
+        ftm: t.ftm ?? 0,
+        fta: t.fta ?? 0,
+        reb: t.reb ?? 0,
+        ast: t.ast ?? 0,
+        turnovers: t.turnovers ?? 0,
+        fouls: t.fouls ?? 0,
+        pace: t.pace ?? null,
+      })),
       h2h,
       homeSeason: homeSeasonStats,
       awaySeason: awaySeasonStats,
+      // '예측 오차 진단'이 "경기 전에 모델이 본 값"으로 쓰는 것 - 프리뷰 카드가 이미 쓰는
+      // pregameFeatures 그대로다(새 조회 0회).
+      expectation: pregameFeatures
+        ? {
+            homeTsRt: pregameFeatures.home_ts_rt ?? null,
+            awayTsRt: pregameFeatures.away_ts_rt ?? null,
+            homeRebRt: pregameFeatures.home_reb_rt ?? null,
+            awayRebRt: pregameFeatures.away_reb_rt ?? null,
+            homeTovRt: pregameFeatures.home_tov_rt ?? null,
+            awayTovRt: pregameFeatures.away_tov_rt ?? null,
+            homeWinProb: pregameFeatures.home_win_prob ?? null,
+          }
+        : null,
     });
   }
   // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - allTeams는 teams 전체를 시즌
@@ -1222,11 +1220,15 @@ export default async function GamePage({
         {/* 요청 항목 7("예측값이 얼마나 맞았는지") - Act 1에서 만든 것과 정확히 같은
             PreviewInsight 배열(previewInsights)을 그대로 다시 순회하며, 각 항목 옆에 이번 경기
             실제 값을 나란히 보여줌(lib/matchupInsights.ts의 gradeMatchupInsights). win_prob만
-            "적중/빗나감"을 명시적으로 판정(postgameReport.ts의 "경기 결과" 문장과 같은
-            preActPct 기준이라 서로 모순되지 않음) - 나머지는 예측-실제를 나란히 보여주기만 하고
+            "적중/빗나감"을 명시적으로 판정 - 나머지는 예측-실제를 나란히 보여주기만 하고
             자동으로 "맞았다/틀렸다"를 억지로 판정하지 않음(이 프로젝트의 정직성 원칙 - 성급한
             확신 대신 근거를 그대로 노출). trend는 채점 대상에서 제외(gradeMatchupInsights가
-            null 반환) - 참고 정보로만 카드가 남음. */}
+            null 반환) - 참고 정보로만 카드가 남음.
+
+            채점 규칙은 lib/predictionVerdict.ts 한 곳에만 있다. 예전 주석은 이 카드와
+            postgameReport.ts의 '경기 결과'가 "같은 기준이라 모순되지 않음"이라고 적어 뒀지만
+            사실이 아니었다 - 한쪽은 원값(p >= 0.5), 한쪽은 반올림한 정수(round(p*100) >= 50)를
+            비교해서, S49G14N4(p=0.4977)에서 같은 예측을 "적중"과 "빗나감"으로 동시에 내보냈다. */}
         {previewInsights.length > 0 && insightGrades.length > 0 && (
           <div className="panel">
             <div className="panel-title">예측 정확도 (프리뷰 인사이트 vs 실제 결과)</div>

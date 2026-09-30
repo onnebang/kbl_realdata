@@ -21,13 +21,19 @@ function StockName({ team, name }: { team: ReportTeamMeta | null; name: string }
 
 export function StockWatchSection({ stock }: { stock: StockWatch }) {
   const { up, down } = stock;
+  // 하한가 근거는 실제로 나쁜 값만 든다(stockWatch.ts의 StockDown 주석 - 0개 턴오버를
+  // "그치며 고전"의 근거로 대던 실측 버그). 둘 다 없으면 야투 한 줄로만 말한다.
+  const extras = [
+    down.turnovers != null ? `턴오버 ${down.turnovers}개` : null,
+    down.fouls != null ? `${down.fouls}반칙` : null,
+  ].filter((x): x is string => x !== null);
   return (
     <ul className="report-list">
       <StockLi team={up.team}>
-        📈 <b>상한가: <StockName team={up.team} name={up.name} /></b> - 오늘 <b>{up.pts}점 {up.reb}리바운드 {up.ast}어시스트</b>를 쏟아부으며 게임스코어 <b>{up.gameScore.toFixed(1)}</b>을 기록, 다음 라운드 OVR 급상승이 유력합니다!
+        📈 <b>상한가: <StockName team={up.team} name={up.name} /></b> - 오늘 <b>{up.pts}점 {up.reb}리바운드 {up.ast}어시스트</b>로 게임스코어 <b>{up.gameScore.toFixed(1)}</b>, 이 경기 양 팀 최고치입니다.
       </StockLi>
       <StockLi team={down.team}>
-        📉 <b>하한가: <StockName team={down.team} name={down.name} /></b> - 오늘 <b>{down.pts}점 (야투 {down.fgm}/{down.fga})</b>, 턴오버 <b>{down.turnovers}개</b>에 그치며 유독 고전했습니다. 하루빨리 폼 회복이 시급합니다.
+        📉 <b>하한가: <StockName team={down.team} name={down.name} /></b> - 오늘 <b>{down.pts}점 (야투 {down.fgm}/{down.fga})</b>{extras.length ? <>, <b>{extras.join(" · ")}</b></> : null}로 이 경기에서는 고전했습니다.
       </StockLi>
     </ul>
   );
