@@ -783,6 +783,9 @@ select {
 
 .matchup-banner-side {
   flex: 1;
+  /* 기본값 min-width:auto면 내용보다 작아지지 않아서 자식(이름)에게 축소가 전달되지 않는다.
+     390px 폭 실측에서 두 side 합계가 378px로 배너 318px를 넘겨 서로 겹쳤다. */
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -807,6 +810,22 @@ select {
 
 .matchup-banner-name {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  /* 실측 버그(2026-09-30, 390px 폭): 줄바꿈이 허용돼 있어서 "대구 한국가스공사"가 8줄로
+     접히며 폭 14px / 높이 211px가 됐고, 배너가 height:64px + overflow:hidden이라 위아래로
+     각 74px씩 잘려 나갔다. 한 줄로 고정하고 넘치면 말줄임으로 끝낸다 - 어떤 팀 이름이
+     들어와도 배너 밖으로 나갈 수 없게 하는 안전장치다(아래 미디어쿼리와 별개로 항상 적용). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* 좁은 화면에서 쓰는 약어(KCC/GAS…). 기본은 숨기고 아래 미디어쿼리에서 이름과 맞바꾼다 -
+   서버 렌더 그대로라 클라이언트 JS가 없다. */
+.matchup-banner-abbr {
+  display: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
 }
 
 /* 팀 파워 배지(요청: "라이브 중계에도 오버롤 붙여서 직관적으로") - 스코어보다 눈에 덜 띄게,
@@ -3584,4 +3603,49 @@ footer.foot {
 }
 .entry-usage-min {
   color: var(--ink-soft);
+}
+
+/* ══ 매치업 배너 반응형 (2026-09-30 제보: "모바일에서 최상단 팀 명이 크기를 벗어나는 현상") ══
+   배너에는 미디어쿼리가 아예 없어서 데스크톱 치수(패딩 20/34, gap 10, 배지 36, 16px)가 폭
+   360px 화면에도 그대로 적용됐다. 한 side에 필요한 폭은 배지 36 + gap 10 + 이름 114
+   ("대구 한국가스공사") + gap 10 + PWR 52 + gap 10 + 스코어 25 + 패딩 54 = 311px인데,
+   390px 화면의 side 폭은 약 159px뿐이다.
+   두 단계로 줄인다 - 640px 아래에서는 치수를 조여 풀네임을 최대한 살리고, 480px 아래에서는
+   풀네임 대신 약어로 바꾼다(배지에 이미 팀 로고가 있어 약어만으로도 구분된다). */
+@media (max-width: 640px) {
+  .matchup-banner-side {
+    gap: 7px;
+    padding: 0 12px;
+    font-size: 15px;
+  }
+  /* 대각선 clip-path가 먹는 만큼만 남긴다(12% × side 폭). */
+  .matchup-banner-side.home {
+    padding-right: 26px;
+  }
+  .matchup-banner-side.away {
+    padding-left: 26px;
+  }
+  .matchup-banner-pwr {
+    font-size: 10px;
+    padding: 1px 5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .matchup-banner-name {
+    display: none;
+  }
+  .matchup-banner-abbr {
+    display: inline;
+  }
+  .matchup-banner-side {
+    gap: 6px;
+    padding: 0 10px;
+  }
+  .matchup-banner-side.home {
+    padding-right: 22px;
+  }
+  .matchup-banner-side.away {
+    padding-left: 22px;
+  }
 }

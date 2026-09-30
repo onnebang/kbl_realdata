@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import {
   SCORECARD_EVIDENCE,
   SERIES_LABEL,
@@ -28,7 +29,26 @@ import styles from "./predictions.module.css";
 export const metadata: Metadata = {
   title: "예측 성적표 | 코트사이드",
   description: "코트사이드 승률 예측의 log-loss·Brier·캘리브레이션을 시즌별로 누적해 보여줍니다. 적중률이 아니라 확률이 맞았는지를 봅니다.",
+  // 운영자 전용 - 검색에 걸리지 않게(robots.ts의 disallow와 이중으로).
+  robots: { index: false, follow: false },
 };
+
+/**
+ * 운영자 전용 게이트. 사용자 결정(2026-09-30): "예측 성적표는 우리만 가지고 있고, 유저들에게
+ * 공개를 하지 않는게 좋을것 같아 - 우리의 핵심 내용들을 스스로 유출시키는것 같아서". 모델의
+ * 캘리브레이션과 실력 수준(기준선 대비 skill)이 그대로 드러나는 내부 지표다.
+ *
+ * 새 환경변수를 만들지 않고 REVALIDATE_TOKEN을 재사용한다 - 이미 Vercel에 서버 전용으로 있고
+ * (app/api/revalidate/route.ts가 쓴다) NEXT_PUBLIC_ 접두사가 없어 클라이언트로 내려가지 않는다.
+ *
+ * 토큰이 없는 환경(로컬 개발)에서는 그냥 열어 준다 - 프로덕션에서 토큰이 비면 fail-closed로
+ * 404다(열린 채로 방치되는 쪽보다 안 보이는 쪽이 낫다).
+ */
+function gateOk(key: string | undefined): boolean {
+  const token = process.env.REVALIDATE_TOKEN;
+  if (!token) return process.env.NODE_ENV !== "production";
+  return key === token;
+}
 
 const SERIES_ORDER: SeriesKey[] = ["live", "pregame", "entry"];
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
@@ -208,9 +228,11 @@ function SeasonTable({ games, series }: { games: ScoredGame[]; series: SeriesKey
 export default async function PredictionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string; series?: string }>;
+  searchParams: Promise<{ season?: string; series?: string; key?: string }>;
 }) {
-  const { season, series } = await searchParams;
+  const { season, series, key } = await searchParams;
+  // 게이트를 데이터 조회보다 먼저 - 404가 될 요청으로 4,000행씩 세 번 긁지 않는다.
+  if (!gateOk(key)) notFound();
   const games = await getScoredGames();
   const seasons = seasonsOf(games);
   const activeSeries: SeriesKey = SERIES_ORDER.includes(series as SeriesKey) ? (series as SeriesKey) : "live";
@@ -232,6 +254,8 @@ export default async function PredictionsPage({
 
   const tabHref = (next: { season?: string; series?: string }) => {
     const q = new URLSearchParams({ season: next.season ?? activeSeason, series: next.series ?? activeSeries });
+    // 게이트 키를 링크에 유지하지 않으면 탭을 누르는 순간 404가 된다.
+    if (key) q.set("key", key);
     return `/predictions?${q.toString()}`;
   };
 

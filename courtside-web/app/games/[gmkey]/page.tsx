@@ -856,7 +856,12 @@ export default async function GamePage({
             team={game.home_team ? { name: game.home_team.name, abbr: game.home_team.abbr, color: "#ffffff33", logoUrl: game.home_team.logo_url } : null}
             size={36}
           />
+          {/* 좁은 화면에서는 CSS가 이름을 숨기고 약어를 대신 보여준다(globals.css의
+              .matchup-banner-abbr - 480px 아래에서 "대구 한국가스공사"는 어떤 치수로도 안 들어간다). */}
           <span className="matchup-banner-name">{game.home_team?.name ?? game.gmkey}</span>
+          <span className="matchup-banner-abbr" aria-label={game.home_team?.name ?? game.gmkey}>
+            {game.home_team?.abbr ?? game.gmkey}
+          </span>
           {/* 요청("실시간 라이브 중계에서도 오버롤 시스템... 지금 파워에서 누가 더 강력한지
               직관적으로") - 승률 모델과는 별개로, 로스터 오버롤 기반 팀 파워만 배지로 상시 노출. */}
           {homePower && <span className="matchup-banner-pwr" title="팀 파워(로스터 오버롤)">PWR {homePower.ovr}</span>}
@@ -867,6 +872,9 @@ export default async function GamePage({
         <div className="matchup-banner-side away" style={{ background: game.away_team?.color ?? "#888" }}>
           {status !== "scheduled" && <LiveScore side="away" initial={game.away_score} />}
           <span className="matchup-banner-name">{game.away_team?.name ?? ""}</span>
+          <span className="matchup-banner-abbr" aria-label={game.away_team?.name ?? ""}>
+            {game.away_team?.abbr ?? ""}
+          </span>
           {awayPower && <span className="matchup-banner-pwr" title="팀 파워(로스터 오버롤)">PWR {awayPower.ovr}</span>}
           <TeamBadge
             team={game.away_team ? { name: game.away_team.name, abbr: game.away_team.abbr, color: "#ffffff33", logoUrl: game.away_team.logo_url } : null}
