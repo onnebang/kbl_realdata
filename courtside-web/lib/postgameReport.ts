@@ -12,6 +12,9 @@ import { computeUnsungHeroes } from "./report/unsungHero";
 import { computeStockWatch } from "./report/stockWatch";
 import { computeFourFactors, type TeamStatLine } from "./report/fourFactors";
 import { computePredictionAudit, type PregameExpectation } from "./report/predictionAudit";
+import { computeEntryUsage, type EntryPlayer } from "./report/entryUsage";
+import { getPlayerOvrHistory } from "./ovr";
+import { pickRecord } from "./courtCardInfo";
 
 export { fmtDuration };
 export type { ReportSection, ReportSectionData, ReportTeamMeta };
@@ -912,6 +915,13 @@ export type BuildReportInput = {
   awaySeason?: SeasonStats | null;
   /** pregame_features에서 모델이 경기 전에 본 입력값 - '예측 오차 진단'. 없으면 그 표만 빠진다. */
   expectation?: PregameExpectation | null;
+  /**
+   * 엔트리(12인) 기준 예측과 그 시점의 결장자 - '엔트리 대비 실제 출전'.
+   * lib/homeGames.ts의 getLineupWinProbs 결과 그대로다(결장자 이름까지 이미 풀려 있음).
+   */
+  lineupWinProb?: { lineupProb: number; absentHome: string[]; absentAway: string[] } | null;
+  /** 선수별 OVR 조회에 필요한 시즌명(games.season_name). 없으면 최신 레코드로 폴백된다. */
+  seasonName?: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -1199,6 +1209,60 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       expectation: input.expectation ?? null,
     });
     if (audit) sections.push({ title: "예측 오차 진단 (Prediction Audit)", data: audit });
+  }
+
+  // 1.7 엔트리 대비 실제 출전 - 요청: "예측을 깨고 지게된 이유에는, 엔트리에 들어온 선수들을
+  // 활용을 못했던 점도 언급을 해주면 좋겠어". 계산·판정은 report/entryUsage.ts(그 파일
+  // 머리주석에 실측 사례와 '이유를 추정하지 않는' 이유가 있다), 문장은
+  // components/report/EntryUsageSection.tsx.
+  //
+  // 출전 시간은 game_player_stats.min_played가 아니라 **교체 이벤트로 재구성한 값**을 쓴다:
+  // 이 파일이 이미 그렇게 세그먼트를 만들어 두었고(rollupBySide), 화면 박스스코어의 MIN 열도
+  // 같은 방식이라 리포트와 표가 어긋나지 않는다. 추가 조회·추가 순회 없음.
+  {
+    // 투입(101)/교체아웃(102) 기록 - "0분"과 "짧게 뛰다 완전히 빠졌다"를 구분하는 데 쓴다.
+    const enteredAt = new Map<string, number>(); // pcode -> 마지막 투입 event index
+    const leftAt = new Map<string, number>(); // pcode -> 마지막 교체아웃 event index
+    events.forEach((e, i) => {
+      if (!e.pcode) return;
+      if (e.action_code === "101") enteredAt.set(e.pcode, i);
+      else if (e.action_code === "102") leftAt.set(e.pcode, i);
+    });
+    const ovrOf = (pcode: string): number | null =>
+      pickRecord(getPlayerOvrHistory(pcode), input.seasonName ?? null)?.OVR ?? null;
+
+    const usage = computeEntryUsage({
+      home: homeTeam,
+      away: awayTeam,
+      lineupProb: input.lineupWinProb?.lineupProb ?? null,
+      loserTcode,
+      sides: ([
+        ["home", homeTeam, input.lineupWinProb?.absentHome ?? []],
+        ["away", awayTeam, input.lineupWinProb?.absentAway ?? []],
+      ] as const).map(([side, team, absentBeforeEntry]) => ({
+        team,
+        absentBeforeEntry,
+        players: box
+          .filter((p) => p.tcode === team.tcode)
+          .map((p): EntryPlayer => {
+            const onSec = onOffOf(rollupBySide[side], p.pcode).on.seconds;
+            const inIdx = enteredAt.get(p.pcode);
+            const outIdx = leftAt.get(p.pcode);
+            // 마지막 기록이 '교체아웃'이면 그 뒤로 다시 안 들어온 것이다.
+            const leftForGood = outIdx != null && (inIdx == null || outIdx > inIdx);
+            return {
+              pcode: p.pcode,
+              name: p.name,
+              isStarter: p.is_starter === true,
+              onSec,
+              ovr: ovrOf(p.pcode),
+              neverEntered: inIdx == null && onSec === 0,
+              leftForGoodAt: leftForGood ? clockStr(events[outIdx]) : null,
+            };
+          }),
+      })),
+    });
+    if (usage) sections.push({ title: "엔트리 대비 실제 출전 (Entry vs Actual)", data: usage });
   }
 
   // 2. 팀별 스포트라이트 + 최고 활약이 패배로 이어진 이유 - 요청: "팀별 스포트라이트 선수를

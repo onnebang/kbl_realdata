@@ -4,6 +4,7 @@ import { UnsungHeroSection } from "./UnsungHeroSection";
 import { StockWatchSection } from "./StockWatchSection";
 import { FourFactorsSection } from "./FourFactorsSection";
 import { PredictionAuditSection } from "./PredictionAuditSection";
+import { EntryUsageSection } from "./EntryUsageSection";
 
 // 문자열 HTML에서 컴포넌트로 옮긴 리포트 섹션들의 분기 한 곳(renderKit.ts의 ReportSectionData
 // 주석에서 예고한 dispatcher - 옮긴 섹션이 둘이 되면서 필요해졌다).
@@ -22,5 +23,7 @@ export function DataSectionBody({ data }: { data: ReportSectionData }) {
       return <FourFactorsSection ff={data} />;
     case "prediction_audit":
       return <PredictionAuditSection audit={data} />;
+    case "entry_usage":
+      return <EntryUsageSection usage={data} />;
   }
 }

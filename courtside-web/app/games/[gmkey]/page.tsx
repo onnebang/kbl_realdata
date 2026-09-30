@@ -665,6 +665,10 @@ export default async function GamePage({
             homeWinProb: pregameFeatures.home_win_prob ?? null,
           }
         : null,
+      // '엔트리 대비 실제 출전' - 엔트리 기준 예측과 그 시점 결장자(이름까지 이미 풀려 있음).
+      // 위 Promise.all에서 이미 받아 둔 값이라 새 조회 0회.
+      lineupWinProb: lineupWinProbs.get(gmkey) ?? null,
+      seasonName: game.season_name,
     });
   }
   // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - allTeams는 teams 전체를 시즌

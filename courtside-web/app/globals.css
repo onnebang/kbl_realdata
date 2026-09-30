@@ -3561,3 +3561,27 @@ footer.foot {
     padding: 4px 3px;
   }
 }
+
+/* 엔트리 대비 실제 출전(리포트) - 이름 · OVR · 출전시간 세 조각을 한 줄에. 마커는 부모
+   .report-li가 이미 팀 색으로 그리므로 여기서는 마커를 없애고 들여쓰기만 준다. */
+.entry-usage-list {
+  list-style: none;
+  margin: 4px 0 6px;
+  padding: 0 0 0 2px;
+}
+.entry-usage-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 2px;
+  font-size: 13px;
+}
+.entry-usage-ovr {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+.entry-usage-min {
+  color: var(--ink-soft);
+}
