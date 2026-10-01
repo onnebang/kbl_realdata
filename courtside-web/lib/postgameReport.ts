@@ -6,7 +6,7 @@ import type { H2H, SeasonStats } from "./matchups";
 import { createReportTags, escHtml, fmtDuration, type ReportSection, type ReportSectionData, type ReportTags, type ReportTeamMeta } from "./report/renderKit";
 import { VERDICT_TEXT, gradePredictions } from "./predictionVerdict";
 import { computeLineupSynergy, renderLineupSynergySection, type FiveManUnit } from "./report/lineupSynergy";
-import { computeHotZoneEdge, renderHotZoneSection } from "./report/shotHotZone";
+import { computeHotZoneEdge, computeZoneTotals, renderHotZoneSection } from "./report/shotHotZone";
 import { computeAceDuel, type AceDuel } from "./report/aceDuel";
 import { computeUnsungHeroes } from "./report/unsungHero";
 import { computeStockWatch } from "./report/stockWatch";
@@ -1211,6 +1211,11 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
         else awayDreb++;
       }
     }
+    // 득점 출처를 5구역+자유투로 쪼개려면 구역 집계가 필요하다 - 핫존 절과 **같은 함수**(같은
+    // 숫자). 슛 좌표가 없는 경기는 null이라 3분류로 그려진다.
+    const zones = input.shots?.length
+      ? computeZoneTotals({ shots: input.shots, teamThrees: input.teamStats, homeTcode, awayTcode })
+      : null;
     const ff = computeFourFactors({
       home: homeTeam,
       away: awayTeam,
@@ -1222,6 +1227,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       awayDreb,
       homeScore,
       awayScore,
+      zones,
     });
     if (ff) sections.push({ title: "무엇이 승부를 갈랐나 (Four Factors)", data: ff });
   }

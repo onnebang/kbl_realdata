@@ -13,7 +13,7 @@ import { escHtml, type HtmlSection, type ReportTags, type ReportTeamMeta } from 
 // computeHotZoneEdge()는 HTML을 모르는 순수 계산, renderHotZoneSection()은 문장만 만든다.
 // ---------------------------------------------------------------------------
 
-const ZONE_LABEL: Record<string, string> = { rim: "림", close: "근거리", midShort: "중거리", midLong: "롱2", three: "3점" };
+export const ZONE_LABEL: Record<string, string> = { rim: "림", close: "근거리", midShort: "중거리", midLong: "롱2", three: "3점" };
 
 /** 최대 구역 득점차 - p50 12 / p75 18 / p90 24. '최종 마진보다 크다' 조건과 함께 15면 33.7%. */
 export const ZONE_MIN_DIFF = 15;
@@ -21,7 +21,7 @@ export const ZONE_MIN_DIFF = 15;
 const MADE_UP_MIN_DIFF = 6;
 
 /** 좌표(2점 4구역) 기준. 3점만 공식 기록을 쓴다 - 아래 teamThrees 주석 참고. */
-const COORD_ZONE_KEYS = ["rim", "close", "midShort", "midLong"] as const;
+export const COORD_ZONE_KEYS = ["rim", "close", "midShort", "midLong"] as const;
 
 export type ZoneSide = { att: number; made: number; pts: number };
 export type ZoneTotal = { key: string; home: ZoneSide; away: ZoneSide };
@@ -54,9 +54,19 @@ export type HotZoneInput = {
   awayScore: number;
 };
 
-/** 말할 만한 구역 격차가 없으면 null. */
-export function computeHotZoneEdge(input: HotZoneInput): HotZoneEdge | null {
-  const { shots, homeTcode, awayTcode, homeScore, awayScore } = input;
+/**
+ * 5개 구역(림/근거리/중거리/롱2/3점)의 팀별 성공·시도·득점. 슛이 없으면 null.
+ *
+ * computeHotZoneEdge()에서 뽑아냈다 - '득점 출처' 차트(report/fourFactors.ts)가 같은 숫자를
+ * 써야 한다. 두 곳이 각자 집계하면 같은 화면에서 같은 구역이 다른 수치로 나올 수 있다.
+ *
+ * 2점 4구역은 좌표, 3점은 공식 기록(teamThrees가 있으면)이다. 좌표 쪽은 공식 2점 득점과
+ * **정확히 일치하지 않는다** - 실측(2026-09-30, 8,444 팀-경기): 일치 71.4%, 슛 2개(4점) 이내
+ * 93.2%, 최근 시즌은 2025-26 97.7% / 2026-27 100%(20 팀-경기). 이 함수는 좌표 그대로 돌려주고,
+ * 공식 기록과의 대조는 쓰는 쪽이 한다(fourFactors.ts의 ZONE_MAX_GAP_PTS).
+ */
+export function computeZoneTotals(input: Pick<HotZoneInput, "shots" | "teamThrees" | "homeTcode" | "awayTcode">): ZoneTotal[] | null {
+  const { shots, homeTcode, awayTcode } = input;
   if (!shots.length) return null;
 
   const zh = teamZoneStats(shots, homeTcode);
@@ -78,6 +88,14 @@ export function computeHotZoneEdge(input: HotZoneInput): HotZoneEdge | null {
           away: { att: za.three.att, made: za.three.made, pts: za.three.made * 3 },
         }
   );
+  return zones;
+}
+
+/** 말할 만한 구역 격차가 없으면 null. */
+export function computeHotZoneEdge(input: HotZoneInput): HotZoneEdge | null {
+  const { homeScore, awayScore } = input;
+  const zones = computeZoneTotals(input);
+  if (!zones) return null;
 
   const top = zones.reduce((b, z) => (Math.abs(z.home.pts - z.away.pts) > Math.abs(b.home.pts - b.away.pts) ? z : b));
   const diff = top.home.pts - top.away.pts;

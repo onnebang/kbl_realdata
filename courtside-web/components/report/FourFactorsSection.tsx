@@ -1,19 +1,22 @@
 import { iGa } from "@/lib/josa";
 import type { FourFactors } from "@/lib/report/fourFactors";
 import { TeamInk } from "./tags";
+import { ScoreSourceChart } from "./ScoreSourceChart";
 import { TeamSplitBar } from "./TeamSplitBar";
 
 // 리포트 '네 가지 요인 & 득점 출처' - 계산은 lib/report/fourFactors.ts(그 파일 머리주석에 왜
 // 이 섹션이 생겼는지 실측 근거가 있다: 자유투로 +10점이 난 경기의 리포트에 자유투가 한 줄도
 // 없었다).
 //
-// 막대는 화면 아래 '팀 스탯' 블록과 **같은** TeamSplitBar를 쓴다 - 같은 페이지에서 같은 뜻의
-// 막대가 두 종류로 보이지 않게. 그룹 제목도 새 CSS 없이 .report-section-title을 그대로 쓴다.
+// 득점 출처는 ScoreSourceChart(5구역+자유투, 모든 줄이 같은 눈금)로 그린다. 예전엔 여기서도
+// TeamSplitBar를 썼는데, 그건 줄마다 두 팀 합 대비 비율이라 줄끼리 크기를 비교할 수 없었다(자유투
+// 7:15가 2점 30:44보다 길어 보였다). 네 가지 요인은 서로 단위가 다른 비율이라 줄끼리 비교하지
+// 않으므로 아래에서 여전히 '팀 스탯' 블록과 같은 TeamSplitBar를 쓴다.
 
 const signedPts = (v: number) => (v > 0 ? `+${v}점` : `${v}점`);
 
 export function FourFactorsSection({ ff }: { ff: FourFactors }) {
-  const { home, away, factors, scoring, decisive, conceded, margin, winnerIsHome, ft } = ff;
+  const { home, away, factors, decisive, conceded, margin, winnerIsHome, ft } = ff;
   const hColor = home.color ?? "#888888";
   const aColor = away.color ?? "#888888";
   const winner = winnerIsHome ? home : away;
@@ -33,7 +36,7 @@ export function FourFactorsSection({ ff }: { ff: FourFactors }) {
         {conceded.length > 0 ? (
           <> 반대로 {conceded.map((c) => `${c.label}에서는 ${Math.abs(c.pts)}점`).join(", ")} 밀렸습니다.</>
         ) : (
-          <> 세 가지 득점 출처 모두에서 앞섰습니다.</>
+          <> 2점·3점·자유투 모두에서 앞섰습니다.</>
         )}
         {ftDecided ? (
           <> 자유투 시도가 {winFta}회 대 {loseFta}회였고, 파울은 <TeamInk team={loser} /> {loseFouls}개 · <TeamInk team={winner} /> {winFouls}개였습니다.</>
@@ -41,25 +44,14 @@ export function FourFactorsSection({ ff }: { ff: FourFactors }) {
       </p>
 
       <div className="ts-group">
-        <div className="report-section-title">
-          득점 출처 · 합이 최종 점수 (왼쪽 <TeamInk team={home} /> 홈 / 오른쪽 <TeamInk team={away} /> 원정)
+        <div className="report-section-title ss-title">
+          득점 출처 (왼쪽 <TeamInk team={home} /> 홈 / 오른쪽 <TeamInk team={away} /> 원정)
         </div>
-        {scoring.map((s) => (
-          <TeamSplitBar
-            key={s.label}
-            label={s.label}
-            hVal={s.home}
-            aVal={s.away}
-            hDisp={`${s.home}점`}
-            aDisp={`${s.away}점`}
-            hColor={hColor}
-            aColor={aColor}
-          />
-        ))}
+        <ScoreSourceChart ff={ff} />
       </div>
 
       <div className="ts-group">
-        <div className="report-section-title">네 가지 요인 (Four Factors)</div>
+        <div className="report-section-title ss-title">네 가지 요인 (Four Factors)</div>
         {factors.map((f) => (
           <TeamSplitBar
             key={f.label}

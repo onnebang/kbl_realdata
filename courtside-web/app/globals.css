@@ -3649,3 +3649,186 @@ footer.foot {
     padding-left: 22px;
   }
 }
+
+/* ══ 리포트 '득점 출처' 차트 (components/report/ScoreSourceChart.tsx) ═══════════════════════
+   요청(2026-10-01, 스크린샷): "2점 44점보다 자유투 15점의 크기가 더 커서 구분이 어렵다". 예전 막대
+   (.ts-bar)는 줄마다 두 팀 합 대비 비율이라 막대 길이가 점수가 아니라 점유율이었다. 여기는 가운데
+   기준 좌우 막대이고 **모든 줄이 같은 눈금**이다(막대 폭 = 점수 ÷ 눈금 최댓값, 인라인 width).
+   눈금선(--ss-step)은 10점마다 - 줄끼리 길이를 눈으로 비교하게 해 준다.
+   레이아웃은 뷰포트가 아니라 컨테이너 폭으로 정해진다(grid 1fr auto 1fr) - 354px 폭(390px 폰 - 여백
+   36)에서 미디어쿼리 없이 그대로 들어간다. 미디어쿼리는 아래 340px 이하에서 성공/시도를 접는 한 군데뿐이다. 오래된 iOS Safari 대응으로 inset 단축 속성,
+   aspect-ratio, :has()를 쓰지 않는다. */
+.ss-chart {
+  --ss-grid-line: rgba(var(--line-rgb), 0.3);
+  margin-top: 6px;
+}
+/* 섹션 제목이 한글 글자 중간에서 끊기던 문제 - 390px 폭에서 "원정)"이 "원 / 정)"으로 갈라졌다
+   (2026-10-01 실물 렌더 확인). 공백에서만 줄을 바꾼다. */
+.ss-title {
+  word-break: keep-all;
+}
+.ss-row {
+  margin-bottom: 12px;
+}
+.ss-head {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
+  column-gap: 6px;
+  margin-bottom: 4px;
+}
+.ss-side {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.ss-home {
+  justify-content: flex-start;
+}
+.ss-away {
+  justify-content: flex-end;
+}
+.ss-pts {
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.ss-pts small {
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 1px;
+}
+/* 우세한 쪽은 굵게 - 색이 아니라 굵기와 "+N" 칩으로 알아보게 한다(색각 이상 대비). */
+.ss-lead .ss-pts {
+  font-weight: 800;
+}
+.ss-raw {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+.ss-chip {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+.ss-label {
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.ss-tag {
+  margin-left: 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--ink-faint);
+}
+
+.ss-track {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 10px;
+}
+.ss-half {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--surface-soft);
+}
+.ss-half-home {
+  border-radius: 5px 0 0 5px;
+}
+.ss-half-away {
+  border-radius: 0 5px 5px 0;
+}
+/* 눈금선과 가운데 선 - 막대 위에 얹어서 막대 안쪽에서도 보이게 한다. 홈 반은 가운데가 오른쪽 끝이라
+   오른쪽 기준으로 타일을 깐다. 둘 다 0점 위치(가운데)에서 시작해 --ss-step 간격으로 바깥으로 간다. */
+.ss-half::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+  background-repeat: repeat-x;
+  background-size: var(--ss-step, 33.33%) 100%;
+}
+.ss-half-home::after {
+  background-image: linear-gradient(to left, var(--ss-grid-line) 1px, transparent 1px);
+  background-position: right top;
+}
+.ss-half-away::after {
+  background-image: linear-gradient(to right, var(--ss-grid-line) 1px, transparent 1px);
+  background-position: left top;
+}
+/* 팀 색은 --tb-l/--tb-d(teamBarStyle: 라이트/다크 배경 각각 3:1 이상) - 서버는 테마를 모르므로 두 색을
+   같이 받고 여기서 고른다. 원색을 그대로 쓰면 다크에서 남색 막대가 배경에 묻힌다. */
+.ss-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background-color: var(--tb-l, var(--ink-faint));
+}
+@media (prefers-color-scheme: dark) {
+  .ss-fill {
+    background-color: var(--tb-d, var(--ink-faint));
+  }
+}
+.ss-fill-home {
+  right: 0;
+}
+.ss-fill-away {
+  left: 0;
+}
+/* 두 팀 색이 비슷하면 원정 막대에 줄무늬(TeamSplitBar의 awayFillBackground와 같은 규칙). */
+.ss-fill-striped {
+  background-image: repeating-linear-gradient(45deg, transparent 0 4px, rgba(255, 255, 255, 0.45) 4px 8px);
+}
+
+/* 자유투는 야투가 아니라 한 줄 띄워 구분한다. */
+.ss-row-ft {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(var(--line-rgb), 0.3);
+}
+
+/* '구역 미확인' - 공식 2점 득점 중 슛 좌표로 구역을 못 정한 몫. 빗금으로 "여기는 추정이 아니라 빈칸"임을 보인다. */
+.ss-row-unplaced .ss-label {
+  color: var(--ink-faint);
+  font-weight: 500;
+}
+.ss-row-unplaced .ss-fill {
+  background-color: transparent;
+  background-image: repeating-linear-gradient(135deg, var(--ink-faint) 0 2px, transparent 2px 5px);
+  box-shadow: inset 0 0 0 1px var(--ink-faint);
+}
+
+.ss-total {
+  margin: 14px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.3);
+}
+.ss-total .ss-label {
+  color: var(--ink);
+  font-weight: 700;
+}
+.ss-total .ss-pts {
+  font-size: 17px;
+}
+
+/* 아주 좁은 화면에서는 성공/시도를 접는다 - 점수와 막대가 먼저다. */
+@media (max-width: 340px) {
+  .ss-raw {
+    display: none;
+  }
+}

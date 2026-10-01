@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { computeFourFactors, effectiveFgPct, orebPct, turnoverPct, type TeamStatLine } from "./fourFactors";
+import { computeFourFactors, effectiveFgPct, orebPct, turnoverPct, ZONE_MAX_GAP_PTS, type TeamStatLine } from "./fourFactors";
+import type { ZoneTotal } from "./shotHotZone";
 import { computePredictionAudit, rebShare, trueShootingPct } from "./predictionAudit";
 import type { GameEvent } from "../postgameReport";
 
@@ -193,5 +194,120 @@ describe("computePredictionAudit objMaxProb", () => {
       homeScore: 82, awayScore: 88, homeStats: KCC, awayStats: LG, expectation: null,
     })!;
     expect(a.objMaxProb).toBeNull();
+  });
+});
+
+
+// ── 득점 출처 5구역 분해 ──────────────────────────────────────────────────────────
+// 요청(2026-10-01): "존별 득점이 2점, 3점, 자유투로만 있는데 5구역으로 나눠서". 구역은 슛 좌표라
+// 공식 2점 득점과 어긋나는 경기가 있다(실측 8,444 팀-경기 중 정확히 일치 71.4%) - 그 대조를 고정한다.
+// 픽스처는 실측 S49G14N4의 구역 집계(핫존 절과 같은 computeZoneTotals 출력)다.
+describe("득점 출처 구역 분해", () => {
+  const zt = (key: string, hMade: number, hAtt: number, aMade: number, aAtt: number, per = 2): ZoneTotal => ({
+    key,
+    home: { att: hAtt, made: hMade, pts: hMade * per },
+    away: { att: aAtt, made: aMade, pts: aMade * per },
+  });
+  // 좌표 기준. three는 좌표 판정(KCC 7/25, LG 5/25 - LG 공식 시도는 24)이라 쓰지 않는다는 걸 아래서 확인한다.
+  const realZones = (): ZoneTotal[] => [
+    zt("rim", 5, 6, 15, 17),
+    zt("close", 16, 31, 9, 11),
+    zt("midShort", 3, 6, 1, 6),
+    zt("midLong", 1, 4, 1, 2),
+    zt("three", 7, 25, 5, 25, 3),
+  ];
+  const input = (zones: ZoneTotal[] | null | undefined) => ({
+    home: homeTeam, away: awayTeam, homeStats: KCC, awayStats: LG,
+    homeOreb: 10, homeDreb: 26, awayOreb: 6, awayDreb: 30,
+    homeScore: 82, awayScore: 88,
+    zones,
+  });
+
+  it("공식 2점과 일치하면 림·근거리·중거리·롱2·3점·자유투 6줄이고 합이 최종 점수다", () => {
+    const ff = computeFourFactors(input(realZones()))!;
+    expect(ff.zoneStatus).toBe("zones");
+    expect(ff.scoring.map((r) => r.key)).toEqual(["rim", "close", "midShort", "midLong", "three", "ft"]);
+    expect(ff.scoring.map((r) => r.label)).toEqual(["림", "근거리", "중거리", "롱2", "3점", "자유투"]);
+    // KCC: 10+32+6+2 + 21 + 11 = 82 / LG: 30+18+2+2 + 15 + 21 = 88
+    expect(ff.scoring.reduce((t, r) => t + r.home, 0)).toBe(82);
+    expect(ff.scoring.reduce((t, r) => t + r.away, 0)).toBe(88);
+    expect(ff.zoneReconcile).toEqual({ home: { zone: 50, official: 50 }, away: { zone: 52, official: 52 } });
+  });
+
+  it("성공/시도를 줄마다 같이 든다(구역은 좌표, 3점·자유투는 공식)", () => {
+    const ff = computeFourFactors(input(realZones()))!;
+    const rim = ff.scoring[0];
+    expect([rim.homeMade, rim.homeAtt, rim.awayMade, rim.awayAtt]).toEqual([5, 6, 15, 17]);
+    const ft = ff.scoring[5];
+    expect([ft.home, ft.homeMade, ft.homeAtt, ft.away, ft.awayMade, ft.awayAtt]).toEqual([11, 11, 16, 21, 21, 28]);
+  });
+
+  it("3점 줄은 좌표가 아니라 공식 기록을 쓴다(좌표 3점은 공식과 |차이|<=1이 73%뿐)", () => {
+    const wrong = realZones().map((z) => (z.key === "three" ? zt("three", 9, 30, 9, 30, 3) : z));
+    const ff = computeFourFactors(input(wrong))!;
+    const three = ff.scoring.find((r) => r.key === "three")!;
+    // 공식 KCC 7/25 -> 21점, LG 5/24 -> 15점. 좌표 쪽 값(27점)이 새면 안 된다.
+    expect([three.home, three.homeMade, three.homeAtt]).toEqual([21, 7, 25]);
+    expect([three.away, three.awayMade, three.awayAtt]).toEqual([15, 5, 24]);
+  });
+
+  it("허용 안쪽의 어긋남은 구역 줄을 그리되 대조 수치를 그대로 낸다", () => {
+    // KCC 근거리 16 -> 14개: 구역 합 46점, 공식 50점(4점 부족 = 허용 경계 ZONE_MAX_GAP_PTS).
+    const off = realZones().map((z) => (z.key === "close" ? zt("close", 14, 31, 9, 11) : z));
+    const ff = computeFourFactors(input(off))!;
+    expect(ZONE_MAX_GAP_PTS).toBe(4);
+    expect(ff.zoneStatus).toBe("zones");
+    expect(ff.zoneReconcile!.home).toEqual({ zone: 46, official: 50 });
+    // 구역 줄의 합은 최종 점수보다 4점 적다 - 그 차이를 감추지 않는다(categories는 정확히 맞다).
+    expect(ff.scoring.reduce((t, r) => t + r.home, 0)).toBe(78);
+    expect(ff.categories.reduce((t, r) => t + r.home, 0)).toBe(82);
+  });
+
+  it("구역 합이 공식보다 많아도(좌표가 3점을 2점으로 센 경우) 같은 규칙", () => {
+    const over = realZones().map((z) => (z.key === "midLong" ? zt("midLong", 3, 4, 1, 2) : z));
+    const ff = computeFourFactors(input(over))!;
+    expect(ff.zoneReconcile!.home).toEqual({ zone: 54, official: 50 });
+    expect(ff.zoneStatus).toBe("zones");
+  });
+
+  it("허용을 넘으면(공식보다 6점 어긋남) 구역 분해를 포기하고 3분류로 물러난다", () => {
+    const far = realZones().map((z) => (z.key === "close" ? zt("close", 13, 31, 9, 11) : z));
+    const ff = computeFourFactors(input(far))!;
+    expect(ff.zoneStatus).toBe("too_far");
+    expect(ff.zoneReconcile!.home).toEqual({ zone: 44, official: 50 });
+    expect(ff.scoring).toEqual(ff.categories);
+    expect(ff.scoring.map((r) => r.key)).toEqual(["two", "three", "ft"]);
+  });
+
+  it("한쪽 팀만 허용을 넘어도 물러난다(원정이 어긋난 경우)", () => {
+    const far = realZones().map((z) => (z.key === "rim" ? zt("rim", 5, 6, 12, 17) : z)); // LG 림 15 -> 12: 6점 부족
+    expect(computeFourFactors(input(far))!.zoneStatus).toBe("too_far");
+  });
+
+  it("슛 좌표가 없으면 3분류다 - null, 빈 구역, 키가 빠진 경우 모두", () => {
+    for (const z of [null, undefined, realZones().filter((x) => x.key !== "rim"),
+                     realZones().map((x) => zt(x.key, 0, 0, 0, 0))]) {
+      const ff = computeFourFactors(input(z as ZoneTotal[] | null | undefined))!;
+      expect(ff.zoneStatus).toBe("unavailable");
+      expect(ff.zoneReconcile).toBeNull();
+      expect(ff.scoring.map((r) => r.key)).toEqual(["two", "three", "ft"]);
+    }
+  });
+
+  it("공식 3분류는 구역 상태와 무관하게 합이 정확히 최종 점수다", () => {
+    const far = realZones().map((z) => (z.key === "close" ? zt("close", 13, 31, 9, 11) : z));
+    for (const z of [realZones(), far, null]) {
+      const ff = computeFourFactors(input(z))!;
+      expect(ff.categories.reduce((t, r) => t + r.home, 0)).toBe(82);
+      expect(ff.categories.reduce((t, r) => t + r.away, 0)).toBe(88);
+    }
+  });
+
+  it("문장이 쓰는 decisive/conceded는 구역과 무관하게 공식 3분류로 센다(자유투 +10 이야기를 잃지 않는다)", () => {
+    const withZones = computeFourFactors(input(realZones()))!;
+    const without = computeFourFactors(input(null))!;
+    expect(withZones.decisive).toEqual(without.decisive);
+    expect(withZones.decisive).toEqual({ label: "자유투 득점", pts: 10 });
+    expect(withZones.conceded).toEqual(without.conceded);
   });
 });
