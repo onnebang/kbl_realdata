@@ -3534,6 +3534,320 @@ footer.foot {
   border-radius: 6px;
 }
 
+/* ── NBA 2K 스타일 슈팅 브레이크다운 카드 ────────────────────────────── */
+.nba-shot-card {
+  background: linear-gradient(180deg, #181d24 0%, #11151a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 12px 0 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  color: #f1f5f9;
+  position: relative;
+  overflow: hidden;
+}
+
+.nba-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.nba-team-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.nba-team-box.away {
+  justify-content: flex-end;
+}
+
+.nba-team-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 12px;
+  color: #ffffff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.nba-team-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.nba-team-meta.away {
+  text-align: right;
+}
+
+.nba-team-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nba-team-stat {
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+.nba-team-stat b {
+  color: #f8fafc;
+}
+
+.nba-center-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex-shrink: 0;
+  padding: 0 6px;
+}
+
+.nba-badge-top {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: #f59f00;
+  text-transform: uppercase;
+}
+
+.nba-badge-title {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* 코트 서브라벨 */
+.nba-court-sublabels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 6px 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.nba-sublabel.home {
+  color: #60a5fa;
+}
+.nba-sublabel.away {
+  color: #f87171;
+}
+
+/* SVG 코트 공통 */
+.nba-court-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+  background: #14181f;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.5);
+}
+
+.nba-zone-path {
+  transition: filter 0.15s ease, opacity 0.15s ease;
+  cursor: pointer;
+}
+.nba-zone-path:hover {
+  filter: brightness(1.22);
+  stroke: #ffffff !important;
+  stroke-width: 2.2px !important;
+}
+
+/* 숨김 라디오 버튼 */
+.nba-tab-input-dual,
+.nba-tab-input-home,
+.nba-tab-input-away {
+  display: none !important;
+}
+
+/* 모바일 전용 탭 내비게이션 */
+.nba-mobile-nav {
+  display: none;
+}
+
+/* 모바일 단일 하프코트 섹션 */
+.nba-mobile-courts-section {
+  display: none;
+}
+
+/* 범례 */
+.nba-legend-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+}
+
+.nba-legend-scale {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.nba-legend-item {
+  display: inline-flex;
+  align-items: center;
+  color: #94a3b8;
+}
+.nba-legend-item b {
+  color: #e2e8f0;
+  margin-right: 2px;
+}
+
+.nba-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 5px;
+}
+
+.nba-legend-note {
+  color: #64748b;
+  font-size: 10.5px;
+}
+
+/* ── 반응형 분기: PC (641px 이상) vs 모바일 (640px 이하) ─────────────────────── */
+@media (min-width: 641px) {
+  .nba-dual-court-section {
+    display: block;
+  }
+  .nba-mobile-courts-section {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .nba-shot-card {
+    padding: 12px 10px 10px;
+    border-radius: 10px;
+  }
+  .nba-card-header {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+  }
+  .nba-team-badge {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
+  .nba-team-name {
+    font-size: 12px;
+  }
+  .nba-team-stat {
+    font-size: 10px;
+  }
+  .nba-badge-top {
+    font-size: 8px;
+  }
+  .nba-badge-title {
+    font-size: 11px;
+  }
+
+  /* 모바일 탭 바 표시 */
+  .nba-mobile-nav {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin: 8px 0 10px;
+  }
+  .nba-nav-btn {
+    padding: 5px 12px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #94a3b8;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  /* 라디오 탭 활성화 상태 */
+  .nba-tab-input-dual:checked ~ .nba-mobile-nav .dual-btn,
+  .nba-tab-input-home:checked ~ .nba-mobile-nav .home-btn,
+  .nba-tab-input-away:checked ~ .nba-mobile-nav .away-btn {
+    background: #f59f00;
+    color: #0f172a;
+    border-color: #f59f00;
+    font-weight: 800;
+  }
+
+  /* 모바일에서는 듀얼 코트 대신 싱글 코트 섹션 기본 활성화 */
+  .nba-dual-court-section {
+    display: none;
+  }
+  .nba-mobile-courts-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .nba-mobile-single-panel {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .nba-panel-head {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .nba-panel-chip {
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  /* 탭 선택에 따른 패널 표시 제어 */
+  .nba-tab-input-home:checked ~ .nba-mobile-courts-section .away-panel {
+    display: none;
+  }
+  .nba-tab-input-away:checked ~ .nba-mobile-courts-section .home-panel {
+    display: none;
+  }
+  .nba-tab-input-dual:checked ~ .nba-mobile-courts-section .home-panel,
+  .nba-tab-input-dual:checked ~ .nba-mobile-courts-section .away-panel {
+    display: block;
+  }
+
+  .nba-legend-bar {
+    font-size: 10px;
+    gap: 6px;
+  }
+  .nba-legend-scale {
+    gap: 8px;
+  }
+}
+
 /* ── 쿼터별 마진 ───────────────────────────────────────────────────────────
    막대 높이의 합이 최종 마진이라, 눈으로 검산이 된다. */
 .qm-wrap {

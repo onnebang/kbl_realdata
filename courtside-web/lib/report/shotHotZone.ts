@@ -1,6 +1,13 @@
 import { eunNeun } from "../josa";
 import { teamZoneStats, type ShotRow } from "../zoneCompare";
-import { buildZoneHeatmapSvg, HEATMAP_VIEWBOX } from "./zoneHeatmap";
+import {
+  computeNbaZoneStats,
+  fallbackZoneTotalsToNbaMap,
+  buildNbaDualCourtSvg,
+  buildNbaSingleCourtSvg,
+  NBA_DUAL_VIEWBOX,
+  NBA_SINGLE_RIGHT_VIEWBOX,
+} from "./nbaShotZones";
 import { escHtml, type HtmlSection, type ReportTags, type ReportTeamMeta } from "./renderKit";
 
 // ---------------------------------------------------------------------------
@@ -39,6 +46,10 @@ export type HotZoneEdge = {
   paradox: boolean;
   /** paradox일 때만: 경기 승자가 MADE_UP_MIN_DIFF 이상 더 넣은 다른 구역 상위 2개. */
   madeUp: ZoneTotal[];
+  /** 12구역 NBA 브레이크다운 렌더링용 */
+  shots?: ShotRow[];
+  homeTcode?: string;
+  awayTcode?: string;
 };
 
 export type HotZoneInput = {
@@ -93,7 +104,7 @@ export function computeZoneTotals(input: Pick<HotZoneInput, "shots" | "teamThree
 
 /** 말할 만한 구역 격차가 없으면 null. */
 export function computeHotZoneEdge(input: HotZoneInput): HotZoneEdge | null {
-  const { homeScore, awayScore } = input;
+  const { homeScore, awayScore, homeTcode, awayTcode, shots } = input;
   const zones = computeZoneTotals(input);
   if (!zones) return null;
 
@@ -115,7 +126,7 @@ export function computeHotZoneEdge(input: HotZoneInput): HotZoneEdge | null {
         .map((x) => x.z)
     : [];
 
-  return { zones, top, diff, margin, zoneWinner, paradox, madeUp };
+  return { zones, top, diff, margin, zoneWinner, paradox, madeUp, shots, homeTcode, awayTcode };
 }
 
 export function renderHotZoneSection(
@@ -174,19 +185,36 @@ export function renderHotZoneSection(
  * 나머지 네 곳은 버렸다. 버리는 대신 보여준다 - 계산이 이미 끝나 있어서 추가 비용이 없다.
  * 숫자는 SVG 밖 표에 둔다(lib/report/zoneHeatmap.ts 주석 - SVG 글자 크기 문제).
  */
+/**
+ * NBA 2K 스타일 구역별 슈팅 브레이크다운 (Spatial Shot Analysis)
+ *
+ * 12개 기하학적 구역(림, 페인트 3구역, 미드레인지 3구역, 3점 5구역) 안에
+ * 시도-성공(made-att) 및 성공률(pct%)을 직접 표시하고,
+ * 핫(Red) / 콜드(Blue) / 뉴트럴(Dark) 색상으로 한눈에 파악할 수 있는 디자인.
+ *
+ * - PC: 중앙선을 맞대고 있는 가로 대칭 듀얼 코트 (좌: 홈팀, 우: 원정팀)
+ * - 모바일: 반응형 단일 하프코트 및 팀 탭 토글로 글자 시인성 100% 보장
+ */
 function renderZoneHeatmap(edge: HotZoneEdge, homeTeam: ReportTeamMeta, awayTeam: ReportTeamMeta): string {
   const shares = (side: "home" | "away") =>
     edge.zones.map((z) => ({ key: z.key, made: z[side].made, att: z[side].att }));
-  const court = (team: ReportTeamMeta, side: "home" | "away") => {
-    // 합계에 '구역 합계'라고 붙이는 이유: 3점만 공식 기록이고 2점 4구역은 좌표라, 이 합이
-    // 페이지 아래 '팀 스탯'의 공식 야투 시도와 1~2개 어긋날 수 있다(실측 LG 60 vs 공식 61).
-    // 라벨 없이 숫자만 두면 같은 화면의 두 값이 다른 것처럼 보인다.
-    const total = edge.zones.reduce((s, z) => ({ made: s.made + z[side].made, att: s.att + z[side].att }), { made: 0, att: 0 });
-    return (
-      `<div class="zone-heat-col"><div class="zone-heat-cap">${escHtml(team.abbr)} · 구역 합계 ${total.made}/${total.att}</div>` +
-      `<svg class="zone-heat-court" viewBox="${HEATMAP_VIEWBOX}" role="img" aria-label="${escHtml(team.name)} 구역별 성공률">${buildZoneHeatmapSvg(shares(side), team.color ?? "#888888")}</svg></div>`
-    );
-  };
+
+  // 12구역 통계 집계 (슛 로그가 있으면 정밀 집계, 없으면 5구역 분할 폴백)
+  const homeStats = edge.shots
+    ? computeNbaZoneStats(edge.shots, homeTeam.tcode)
+    : fallbackZoneTotalsToNbaMap(shares("home"));
+  const awayStats = edge.shots
+    ? computeNbaZoneStats(edge.shots, awayTeam.tcode)
+    : fallbackZoneTotalsToNbaMap(shares("away"));
+
+  const homeTotal = edge.zones.reduce((s, z) => ({ made: s.made + z.home.made, att: s.att + z.home.att }), { made: 0, att: 0 });
+  const awayTotal = edge.zones.reduce((s, z) => ({ made: s.made + z.away.made, att: s.att + z.away.att }), { made: 0, att: 0 });
+
+  const homePct = homeTotal.att > 0 ? Math.round((homeTotal.made / homeTotal.att) * 100) : 0;
+  const awayPct = awayTotal.att > 0 ? Math.round((awayTotal.made / awayTotal.att) * 100) : 0;
+
+  const uid = Math.random().toString(36).substring(2, 7);
+
   const pctOf = (s: { made: number; att: number }) => (s.att > 0 ? `${Math.round((s.made / s.att) * 100)}%` : "-");
   const rows = edge.zones
     .map((z) => {
@@ -199,9 +227,82 @@ function renderZoneHeatmap(edge: HotZoneEdge, homeTeam: ReportTeamMeta, awayTeam
       );
     })
     .join("");
+
   return (
-    `<div class="zone-heat">${court(homeTeam, "home")}${court(awayTeam, "away")}</div>` +
-    `<p class="report-caveat">진한 쪽이 성공률이 높은 구역입니다. 밴드는 골대로부터의 거리로만 갈립니다(림 1.2m · 근거리 3m · 중거리 5m · 롱2 6.75m · 그 밖은 3점).</p>` +
+    `<div class="nba-shot-card">` +
+    // 카드 헤더 (팀 메타 및 2K 브레이크다운 타이틀)
+    `<div class="nba-card-header">` +
+    `<div class="nba-team-box home">` +
+    `<span class="nba-team-badge" style="background:${escHtml(homeTeam.color || '#3b82f6')}">${escHtml(homeTeam.abbr)}</span>` +
+    `<div class="nba-team-meta">` +
+    `<span class="nba-team-name">${escHtml(homeTeam.name)}</span>` +
+    `<span class="nba-team-stat">야투 <b>${homeTotal.made}/${homeTotal.att}</b> (${homePct}%)</span>` +
+    `</div>` +
+    `</div>` +
+    `<div class="nba-center-badge">` +
+    `<span class="nba-badge-top">SPATIAL BREAKDOWN</span>` +
+    `<span class="nba-badge-title">SHOOTING CHART</span>` +
+    `</div>` +
+    `<div class="nba-team-box away">` +
+    `<div class="nba-team-meta away">` +
+    `<span class="nba-team-name">${escHtml(awayTeam.name)}</span>` +
+    `<span class="nba-team-stat">야투 <b>${awayTotal.made}/${awayTotal.att}</b> (${awayPct}%)</span>` +
+    `</div>` +
+    `<span class="nba-team-badge" style="background:${escHtml(awayTeam.color || '#ef4444')}">${escHtml(awayTeam.abbr)}</span>` +
+    `</div>` +
+    `</div>` +
+
+    // 모바일 전용 네이티브 라디오 탭 컨트롤 (JS 불필요)
+    `<input type="radio" id="nba-tab-dual-${uid}" name="nba-tab-${uid}" class="nba-tab-input-dual" checked>` +
+    `<input type="radio" id="nba-tab-home-${uid}" name="nba-tab-${uid}" class="nba-tab-input-home">` +
+    `<input type="radio" id="nba-tab-away-${uid}" name="nba-tab-${uid}" class="nba-tab-input-away">` +
+    `<div class="nba-mobile-nav">` +
+    `<label for="nba-tab-dual-${uid}" class="nba-nav-btn dual-btn">양팀 비교</label>` +
+    `<label for="nba-tab-home-${uid}" class="nba-nav-btn home-btn">${escHtml(homeTeam.abbr)}</label>` +
+    `<label for="nba-tab-away-${uid}" class="nba-nav-btn away-btn">${escHtml(awayTeam.abbr)}</label>` +
+    `</div>` +
+
+    // PC 듀얼 대칭 쇼다운 코트 (풀코트 뷰)
+    `<div class="nba-dual-court-section">` +
+    `<div class="nba-court-sublabels">` +
+    `<span class="nba-sublabel home">◀ ${escHtml(homeTeam.name)}</span>` +
+    `<span class="nba-sublabel away">${escHtml(awayTeam.name)} ▶</span>` +
+    `</div>` +
+    `<svg class="nba-court-svg nba-dual-svg" viewBox="${NBA_DUAL_VIEWBOX}" role="img" aria-label="${escHtml(homeTeam.name)} 대 ${escHtml(awayTeam.name)} 슛 브레이크다운">` +
+    buildNbaDualCourtSvg(homeStats, awayStats) +
+    `</svg>` +
+    `</div>` +
+
+    // 모바일 단일 하프코트 뷰 (탭에 따라 전환 또는 상하 스택)
+    `<div class="nba-mobile-courts-section">` +
+    `<div class="nba-mobile-single-panel home-panel">` +
+    `<div class="nba-panel-head"><span class="nba-panel-chip" style="background:${escHtml(homeTeam.color || '#3b82f6')}">${escHtml(homeTeam.abbr)}</span> ${escHtml(homeTeam.name)} · <b>${homeTotal.made}/${homeTotal.att}</b> (${homePct}%)</div>` +
+    `<svg class="nba-court-svg nba-single-svg" viewBox="${NBA_SINGLE_RIGHT_VIEWBOX}" role="img" aria-label="${escHtml(homeTeam.name)} 슛 차트">` +
+    buildNbaSingleCourtSvg(homeStats, false) +
+    `</svg>` +
+    `</div>` +
+    `<div class="nba-mobile-single-panel away-panel">` +
+    `<div class="nba-panel-head"><span class="nba-panel-chip" style="background:${escHtml(awayTeam.color || '#ef4444')}">${escHtml(awayTeam.abbr)}</span> ${escHtml(awayTeam.name)} · <b>${awayTotal.made}/${awayTotal.att}</b> (${awayPct}%)</div>` +
+    `<svg class="nba-court-svg nba-single-svg" viewBox="${NBA_SINGLE_RIGHT_VIEWBOX}" role="img" aria-label="${escHtml(awayTeam.name)} 슛 차트">` +
+    buildNbaSingleCourtSvg(awayStats, false) +
+    `</svg>` +
+    `</div>` +
+    `</div>` +
+
+    // 핫 & 콜드 컬러 범례 바
+    `<div class="nba-legend-bar">` +
+    `<div class="nba-legend-scale">` +
+    `<span class="nba-legend-item"><i class="nba-dot" style="background:#c92a2a"></i> <b>핫존</b> (50%+)</span>` +
+    `<span class="nba-legend-item"><i class="nba-dot" style="background:#a8383b"></i> <b>보통</b> (40~49%)</span>` +
+    `<span class="nba-legend-item"><i class="nba-dot" style="background:#2e3440"></i> <b>평균</b> (30~39%)</span>` +
+    `<span class="nba-legend-item"><i class="nba-dot" style="background:#1565c0"></i> <b>콜드존</b> (0~29%)</span>` +
+    `</div>` +
+    `<div class="nba-legend-note">구역 수치: [성공-시도] / [성공률%]</div>` +
+    `</div>` +
+    `</div>` +
+
+    // 설명 및 5개 구역 상세 비교 표
+    `<p class="report-caveat">NBA 2K 스타일 12구역 슛 차트입니다. 🔥 붉은색은 고성공률 핫존(50%+), 🧊 푸른색은 저성공률 콜드존(30% 미만 및 0%)을 나타냅니다. 구역 안의 숫자는 [성공-시도] 및 [성공률%]입니다.</p>` +
     `<table class="zone-table"><thead><tr><th scope="col">구역</th><th scope="col">${escHtml(homeTeam.abbr)}</th><th scope="col">${escHtml(awayTeam.abbr)}</th><th scope="col">득점차</th></tr></thead><tbody>${rows}</tbody></table>`
   );
 }
