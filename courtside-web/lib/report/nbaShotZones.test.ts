@@ -6,6 +6,8 @@ import {
   buildNbaDualCourtSvg,
   buildNbaSingleCourtSvg,
   fallbackZoneTotalsToNbaMap,
+  computeZonePlayerBreakdowns,
+  renderZoneInspectorHtml,
   RIGHT_HALF_PATHS,
   LEFT_HALF_PATHS,
 } from "./nbaShotZones";
@@ -108,5 +110,54 @@ describe("nbaShotZones", () => {
     expect(fallback.rim.att).toBe(6);
     expect(fallback.paint_center.att).toBeGreaterThan(0);
     expect(fallback.three_top.att).toBeGreaterThan(0);
+  });
+
+  it("선수별 슈팅 브레이크다운(득점 주도 및 실패 많은 선수)을 정확히 계산한다", () => {
+    const shots: ShotRow[] = [
+      // 선수 1: 림 3시도 3성공
+      { x: 680, y: 205, d: "1", made: true, tcode: "SONO", pcode: "P1" },
+      { x: 680, y: 205, d: "1", made: true, tcode: "SONO", pcode: "P1" },
+      { x: 680, y: 205, d: "1", made: true, tcode: "SONO", pcode: "P1" },
+      // 선수 2: 림 2시도 0성공
+      { x: 680, y: 205, d: "1", made: false, tcode: "SONO", pcode: "P2" },
+      { x: 680, y: 205, d: "1", made: false, tcode: "SONO", pcode: "P2" },
+    ];
+    const playerNames = { P1: "이정현", P2: "전성현" };
+    const breakdowns = computeZonePlayerBreakdowns(shots, "SONO", "고양 소노", "#002b49", playerNames);
+
+    const rim = breakdowns.rim;
+    expect(rim.totalMade).toBe(3);
+    expect(rim.totalAtt).toBe(5);
+    expect(rim.totalPct).toBe(60);
+
+    // 선수 리스트 정렬 (시도 많은 순)
+    expect(rim.players[0].name).toBe("이정현");
+    expect(rim.players[0].made).toBe(3);
+    expect(rim.players[1].name).toBe("전성현");
+    expect(rim.players[1].missed).toBe(2);
+
+    // 득점 주도 & 실패 난조
+    expect(rim.topMakers[0].name).toBe("이정현");
+    expect(rim.topMissers[0].name).toBe("전성현");
+
+    // SVG 렌더링 시 data 속성과 <title> 툴팁 포함 검증
+    const homeTeam = { tcode: "SONO", name: "고양 소노", abbr: "소노", color: "#002b49" };
+    const awayTeam = { tcode: "KT", name: "수원 KT", abbr: "KT", color: "#000000" };
+    const stats = computeNbaZoneStats(shots, "SONO");
+    const dualSvg = buildNbaDualCourtSvg(stats, stats, homeTeam, awayTeam, breakdowns, breakdowns);
+
+    expect(dualSvg).toContain('data-makers=');
+    expect(dualSvg).toContain("이정현");
+    expect(dualSvg).toContain('data-missers=');
+    expect(dualSvg).toContain("전성현");
+    expect(dualSvg).toContain("<title>");
+  });
+
+  it("인스펙터 패널 HTML이 정상적으로 생성된다", () => {
+    const html = renderZoneInspectorHtml("test123");
+    expect(html).toContain('id="nba-insp-test123"');
+    expect(html).toContain('document.getElementById("nba-card-test123")');
+    expect(html).toContain("선수별 슈팅 구성률");
+    expect(html).toContain("nba-zone-path");
   });
 });

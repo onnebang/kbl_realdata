@@ -135,7 +135,7 @@ export function isCornerThree(x: number, y: number, d: string): boolean {
   return inSideBand && inStraightSeg && shotValue(x, y, d) === 3;
 }
 
-export type ShotRow = { x: number; y: number; d: string; made: boolean; tcode: string };
+export type ShotRow = { x: number; y: number; d: string; made: boolean; tcode: string; pcode?: string | null };
 export type ZoneStats = Record<string, { att: number; made: number }>;
 
 export function teamZoneStats(shots: ShotRow[], tcode: string): ZoneStats {

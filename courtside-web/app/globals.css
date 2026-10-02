@@ -3737,6 +3737,186 @@ footer.foot {
   font-size: 10.5px;
 }
 
+/* ── NBA 선수별 슈팅 인스펙터 패널 (Mouseover & Touch Breakdown) ─────── */
+.nba-inspector-panel {
+  margin-top: 12px;
+  background: rgba(15, 20, 28, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.nba-insp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-wrap: wrap;
+}
+
+.nba-insp-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nba-insp-badge {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding: 2px 6px;
+  background: rgba(245, 159, 0, 0.15);
+  color: #f59f00;
+  border: 1px solid rgba(245, 159, 0, 0.3);
+  border-radius: 4px;
+}
+
+.nba-insp-title {
+  font-size: 13px;
+  color: #f1f5f9;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nba-insp-team-tag {
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.nba-insp-stat-tag {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.nba-insp-hint {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.nba-insp-body {
+  padding-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.nba-insp-placeholder {
+  color: #64748b;
+  font-size: 11.5px;
+}
+.nba-insp-placeholder b {
+  color: #94a3b8;
+}
+
+.nba-insp-empty {
+  color: #64748b;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.nba-insp-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.nba-insp-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+}
+
+.nba-insp-group.makers {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.22);
+}
+.nba-insp-group.makers .nba-group-label {
+  color: #4ade80;
+  font-weight: 700;
+  font-size: 11px;
+}
+.nba-insp-group.makers .nba-group-val {
+  color: #f0fdf4;
+  font-weight: 600;
+}
+
+.nba-insp-group.missers {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+}
+.nba-insp-group.missers .nba-group-label {
+  color: #f87171;
+  font-weight: 700;
+  font-size: 11px;
+}
+.nba-insp-group.missers .nba-group-val {
+  color: #fef2f2;
+  font-weight: 600;
+}
+
+.nba-insp-player-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.nba-list-title {
+  font-size: 11px;
+  color: #64748b;
+  margin-right: 2px;
+}
+
+.nba-player-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 12px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+}
+
+.nba-player-chip.hot {
+  background: rgba(220, 38, 38, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+.nba-player-chip.hot b {
+  color: #ffffff;
+}
+
+.nba-player-chip.cold {
+  background: rgba(30, 64, 175, 0.2);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+}
+.nba-player-chip.cold b {
+  color: #e0f2fe;
+}
+
+.nba-player-chip.neutral b {
+  color: #f1f5f9;
+}
+
 /* ── 반응형 분기: PC (641px 이상) vs 모바일 (640px 이하) ─────────────────────── */
 @media (min-width: 641px) {
   .nba-dual-court-section {
@@ -3854,6 +4034,26 @@ footer.foot {
   }
   .nba-legend-scale {
     gap: 8px;
+  }
+
+  .nba-inspector-panel {
+    padding: 8px 10px;
+    margin-top: 10px;
+  }
+  .nba-insp-cards {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .nba-insp-title {
+    font-size: 12px;
+  }
+  .nba-insp-group {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+  .nba-player-chip {
+    font-size: 10.5px;
+    padding: 2px 6px;
   }
 }
 

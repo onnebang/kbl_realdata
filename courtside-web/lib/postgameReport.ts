@@ -1339,6 +1339,12 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
 
   // 2-1. 경기를 가른 구역 - 계산·문장 전부 report/shotHotZone.ts.
   if (input.shots && input.shots.length) {
+    const playerNames: Record<string, string> = {};
+    if (input.box) {
+      for (const p of input.box) {
+        if (p.pcode && p.name) playerNames[p.pcode] = p.name;
+      }
+    }
     const zoneEdge = computeHotZoneEdge({
       shots: input.shots,
       teamThrees: input.teamStats,
@@ -1346,6 +1352,7 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
       awayTcode,
       homeScore,
       awayScore,
+      playerNames,
     });
     if (zoneEdge) sections.push(renderHotZoneSection(zoneEdge, { homeTeam, awayTeam, tags }));
   }

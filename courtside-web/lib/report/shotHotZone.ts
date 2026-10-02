@@ -5,6 +5,8 @@ import {
   fallbackZoneTotalsToNbaMap,
   buildNbaDualCourtSvg,
   buildNbaSingleCourtSvg,
+  computeZonePlayerBreakdowns,
+  renderZoneInspectorHtml,
   NBA_DUAL_VIEWBOX,
   NBA_SINGLE_RIGHT_VIEWBOX,
 } from "./nbaShotZones";
@@ -50,6 +52,7 @@ export type HotZoneEdge = {
   shots?: ShotRow[];
   homeTcode?: string;
   awayTcode?: string;
+  playerNames?: Record<string, string>;
 };
 
 export type HotZoneInput = {
@@ -63,6 +66,7 @@ export type HotZoneInput = {
   awayTcode: string;
   homeScore: number;
   awayScore: number;
+  playerNames?: Record<string, string>;
 };
 
 /**
@@ -104,7 +108,7 @@ export function computeZoneTotals(input: Pick<HotZoneInput, "shots" | "teamThree
 
 /** 말할 만한 구역 격차가 없으면 null. */
 export function computeHotZoneEdge(input: HotZoneInput): HotZoneEdge | null {
-  const { homeScore, awayScore, homeTcode, awayTcode, shots } = input;
+  const { homeScore, awayScore, homeTcode, awayTcode, shots, playerNames } = input;
   const zones = computeZoneTotals(input);
   if (!zones) return null;
 
@@ -126,7 +130,7 @@ export function computeHotZoneEdge(input: HotZoneInput): HotZoneEdge | null {
         .map((x) => x.z)
     : [];
 
-  return { zones, top, diff, margin, zoneWinner, paradox, madeUp, shots, homeTcode, awayTcode };
+  return { zones, top, diff, margin, zoneWinner, paradox, madeUp, shots, homeTcode, awayTcode, playerNames };
 }
 
 export function renderHotZoneSection(
@@ -207,6 +211,26 @@ function renderZoneHeatmap(edge: HotZoneEdge, homeTeam: ReportTeamMeta, awayTeam
     ? computeNbaZoneStats(edge.shots, awayTeam.tcode)
     : fallbackZoneTotalsToNbaMap(shares("away"));
 
+  // 12구역 선수별 세부 통계 (누가 많이 시도했고, 누가 넣었고, 누가 놓쳤는지)
+  const homeBreakdowns = edge.shots
+    ? computeZonePlayerBreakdowns(
+        edge.shots,
+        homeTeam.tcode,
+        homeTeam.name,
+        homeTeam.color || "#3b82f6",
+        edge.playerNames
+      )
+    : undefined;
+  const awayBreakdowns = edge.shots
+    ? computeZonePlayerBreakdowns(
+        edge.shots,
+        awayTeam.tcode,
+        awayTeam.name,
+        awayTeam.color || "#ef4444",
+        edge.playerNames
+      )
+    : undefined;
+
   const homeTotal = edge.zones.reduce((s, z) => ({ made: s.made + z.home.made, att: s.att + z.home.att }), { made: 0, att: 0 });
   const awayTotal = edge.zones.reduce((s, z) => ({ made: s.made + z.away.made, att: s.att + z.away.att }), { made: 0, att: 0 });
 
@@ -229,7 +253,7 @@ function renderZoneHeatmap(edge: HotZoneEdge, homeTeam: ReportTeamMeta, awayTeam
     .join("");
 
   return (
-    `<div class="nba-shot-card">` +
+    `<div class="nba-shot-card" id="nba-card-${uid}">` +
     // 카드 헤더 (팀 메타 및 2K 브레이크다운 타이틀)
     `<div class="nba-card-header">` +
     `<div class="nba-team-box home">` +
@@ -269,7 +293,7 @@ function renderZoneHeatmap(edge: HotZoneEdge, homeTeam: ReportTeamMeta, awayTeam
     `<span class="nba-sublabel away" style="color:${escHtml(awayTeam.color || '#f87171')}">${escHtml(awayTeam.name)} ▶</span>` +
     `</div>` +
     `<svg class="nba-court-svg nba-dual-svg" viewBox="${NBA_DUAL_VIEWBOX}" role="img" aria-label="${escHtml(homeTeam.name)} 대 ${escHtml(awayTeam.name)} 슛 브레이크다운">` +
-    buildNbaDualCourtSvg(homeStats, awayStats, homeTeam, awayTeam) +
+    buildNbaDualCourtSvg(homeStats, awayStats, homeTeam, awayTeam, homeBreakdowns, awayBreakdowns) +
     `</svg>` +
     `</div>` +
 
@@ -278,13 +302,13 @@ function renderZoneHeatmap(edge: HotZoneEdge, homeTeam: ReportTeamMeta, awayTeam
     `<div class="nba-mobile-single-panel home-panel">` +
     `<div class="nba-panel-head"><span class="nba-panel-chip" style="background:${escHtml(homeTeam.color || '#3b82f6')}">${escHtml(homeTeam.abbr)}</span> ${escHtml(homeTeam.name)} · <b>${homeTotal.made}/${homeTotal.att}</b> (${homePct}%)</div>` +
     `<svg class="nba-court-svg nba-single-svg" viewBox="${NBA_SINGLE_RIGHT_VIEWBOX}" role="img" aria-label="${escHtml(homeTeam.name)} 슛 차트">` +
-    buildNbaSingleCourtSvg(homeStats, homeTeam, false) +
+    buildNbaSingleCourtSvg(homeStats, homeTeam, false, homeBreakdowns) +
     `</svg>` +
     `</div>` +
     `<div class="nba-mobile-single-panel away-panel">` +
     `<div class="nba-panel-head"><span class="nba-panel-chip" style="background:${escHtml(awayTeam.color || '#ef4444')}">${escHtml(awayTeam.abbr)}</span> ${escHtml(awayTeam.name)} · <b>${awayTotal.made}/${awayTotal.att}</b> (${awayPct}%)</div>` +
     `<svg class="nba-court-svg nba-single-svg" viewBox="${NBA_SINGLE_RIGHT_VIEWBOX}" role="img" aria-label="${escHtml(awayTeam.name)} 슛 차트">` +
-    buildNbaSingleCourtSvg(awayStats, awayTeam, false) +
+    buildNbaSingleCourtSvg(awayStats, awayTeam, false, awayBreakdowns) +
     `</svg>` +
     `</div>` +
     `</div>` +
@@ -299,6 +323,9 @@ function renderZoneHeatmap(edge: HotZoneEdge, homeTeam: ReportTeamMeta, awayTeam
     `</div>` +
     `<div class="nba-legend-note">구역 수치: [성공-시도] / [성공률%]</div>` +
     `</div>` +
+
+    // 하단 선수별 슈팅 구성 인스펙터 패널 (마우스 호버 & 모바일 터치)
+    renderZoneInspectorHtml(uid) +
     `</div>` +
 
     // 설명 및 5개 구역 상세 비교 표
