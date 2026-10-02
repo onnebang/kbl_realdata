@@ -265,11 +265,11 @@ function renderZoneHeatmap(edge: HotZoneEdge, homeTeam: ReportTeamMeta, awayTeam
     // PC 듀얼 대칭 쇼다운 코트 (풀코트 뷰)
     `<div class="nba-dual-court-section">` +
     `<div class="nba-court-sublabels">` +
-    `<span class="nba-sublabel home">◀ ${escHtml(homeTeam.name)}</span>` +
-    `<span class="nba-sublabel away">${escHtml(awayTeam.name)} ▶</span>` +
+    `<span class="nba-sublabel home" style="color:${escHtml(homeTeam.color || '#60a5fa')}">◀ ${escHtml(homeTeam.name)}</span>` +
+    `<span class="nba-sublabel away" style="color:${escHtml(awayTeam.color || '#f87171')}">${escHtml(awayTeam.name)} ▶</span>` +
     `</div>` +
     `<svg class="nba-court-svg nba-dual-svg" viewBox="${NBA_DUAL_VIEWBOX}" role="img" aria-label="${escHtml(homeTeam.name)} 대 ${escHtml(awayTeam.name)} 슛 브레이크다운">` +
-    buildNbaDualCourtSvg(homeStats, awayStats) +
+    buildNbaDualCourtSvg(homeStats, awayStats, homeTeam, awayTeam) +
     `</svg>` +
     `</div>` +
 
@@ -278,13 +278,13 @@ function renderZoneHeatmap(edge: HotZoneEdge, homeTeam: ReportTeamMeta, awayTeam
     `<div class="nba-mobile-single-panel home-panel">` +
     `<div class="nba-panel-head"><span class="nba-panel-chip" style="background:${escHtml(homeTeam.color || '#3b82f6')}">${escHtml(homeTeam.abbr)}</span> ${escHtml(homeTeam.name)} · <b>${homeTotal.made}/${homeTotal.att}</b> (${homePct}%)</div>` +
     `<svg class="nba-court-svg nba-single-svg" viewBox="${NBA_SINGLE_RIGHT_VIEWBOX}" role="img" aria-label="${escHtml(homeTeam.name)} 슛 차트">` +
-    buildNbaSingleCourtSvg(homeStats, false) +
+    buildNbaSingleCourtSvg(homeStats, homeTeam, false) +
     `</svg>` +
     `</div>` +
     `<div class="nba-mobile-single-panel away-panel">` +
     `<div class="nba-panel-head"><span class="nba-panel-chip" style="background:${escHtml(awayTeam.color || '#ef4444')}">${escHtml(awayTeam.abbr)}</span> ${escHtml(awayTeam.name)} · <b>${awayTotal.made}/${awayTotal.att}</b> (${awayPct}%)</div>` +
     `<svg class="nba-court-svg nba-single-svg" viewBox="${NBA_SINGLE_RIGHT_VIEWBOX}" role="img" aria-label="${escHtml(awayTeam.name)} 슛 차트">` +
-    buildNbaSingleCourtSvg(awayStats, false) +
+    buildNbaSingleCourtSvg(awayStats, awayTeam, false) +
     `</svg>` +
     `</div>` +
     `</div>` +

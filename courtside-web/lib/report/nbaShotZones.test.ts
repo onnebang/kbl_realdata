@@ -6,6 +6,8 @@ import {
   buildNbaDualCourtSvg,
   buildNbaSingleCourtSvg,
   fallbackZoneTotalsToNbaMap,
+  RIGHT_HALF_PATHS,
+  LEFT_HALF_PATHS,
 } from "./nbaShotZones";
 import type { ShotRow } from "../zoneCompare";
 
@@ -60,15 +62,39 @@ describe("nbaShotZones", () => {
     expect(aStats.three_top.made).toBe(0);
     expect(aStats.three_top.att).toBe(1);
 
-    const dualSvg = buildNbaDualCourtSvg(hStats, aStats);
+    const homeTeam = { tcode: "SK", name: "서울 SK", abbr: "SK", color: "#e11932" };
+    const awayTeam = { tcode: "DB", name: "원주 DB", abbr: "DB", color: "#006738" };
+    const dualSvg = buildNbaDualCourtSvg(hStats, aStats, homeTeam, awayTeam);
     expect(dualSvg).toContain('data-zone="rim"');
     expect(dualSvg).toContain("1-1");
     expect(dualSvg).toContain("100%");
     expect(dualSvg).toContain("0-1");
     expect(dualSvg).toContain("0%");
+    // 팀 워터마크 및 외곽 테두리선 검증
+    expect(dualSvg).toContain('fill="#e11932"');
+    expect(dualSvg).toContain('fill="#006738"');
+    expect(dualSvg).toContain('stroke="#e11932"');
+    expect(dualSvg).toContain('stroke="#006738"');
+    expect(dualSvg).toContain("SK");
+    expect(dualSvg).toContain("DB");
 
-    const singleSvg = buildNbaSingleCourtSvg(hStats);
+    const singleSvg = buildNbaSingleCourtSvg(hStats, homeTeam);
     expect(singleSvg).toContain('data-zone="rim"');
+    expect(singleSvg).toContain('stroke="#e11932"');
+  });
+
+  it("하단 윙과 미드레인지 사이 빈틈(Gap) 없이 아크가 일치한다", () => {
+    // RIGHT_HALF_PATHS에서 three_wing_bottom과 mid_bottom의 아크 sweep 방향 일치 검증
+    const rightWingBot = RIGHT_HALF_PATHS.find((p) => p.key === "three_wing_bottom")!;
+    const rightMidBot = RIGHT_HALF_PATHS.find((p) => p.key === "mid_bottom")!;
+    expect(rightWingBot.d).toContain("A 163.4 163.4 0 0 1 634.6,362.2");
+    expect(rightMidBot.d).toContain("A 163.4 163.4 0 0 1 634.6,362.2");
+
+    // LEFT_HALF_PATHS에서도 일치 검증
+    const leftWingBot = LEFT_HALF_PATHS.find((p) => p.key === "three_wing_bottom")!;
+    const leftMidBot = LEFT_HALF_PATHS.find((p) => p.key === "mid_bottom")!;
+    expect(leftWingBot.d).toContain("A 163.4 163.4 0 0 0 115.4,362.2");
+    expect(leftMidBot.d).toContain("A 163.4 163.4 0 0 0 115.4,362.2");
   });
 
   it("5구역 폴백 매핑이 안전하게 동작한다", () => {

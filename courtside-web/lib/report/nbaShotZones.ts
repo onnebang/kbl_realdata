@@ -1,4 +1,5 @@
 import { mirrorShotX, type ShotRow } from "../zoneCompare";
+import type { ReportTeamMeta } from "./renderKit";
 
 // ---------------------------------------------------------------------------
 // NBA 2K 스타일 구역별 슈팅 브레이크다운 (NBA-Style Shooting Breakdown)
@@ -140,9 +141,6 @@ export function getZoneColorStyle(stat: ZoneStats, zoneKey: NbaZoneKey): ZoneCol
   const isThree = zoneKey.startsWith("three");
   const isRim = zoneKey === "rim";
 
-  // 3점은 40% 이상이면 Hot, 33~39% Neutral, 32% 이하 Cold (0%는 강력한 Cold)
-  // 림은 65% 이상 Hot, 50~64% Neutral, 49% 이하 Cold
-  // 미드/페인트는 50% 이상 Hot, 38~49% Neutral, 37% 이하 Cold
   if (pct === 0) {
     return {
       fill: "#1565c0", // 선명한 블루 (0%)
@@ -185,11 +183,11 @@ type ZonePathDef = {
 };
 
 export const RIGHT_HALF_PATHS: ZonePathDef[] = [
-  // 1. 림 구역
+  // 1. 림 구역 (골대 hx=681, 텍스트 cx=660)
   {
     key: "rim",
     d: "M 720,175.2 L 681,175.2 A 30.3 30.3 0 0 0 681,235.8 L 720,235.8 Z",
-    cx: 664,
+    cx: 660,
     cy: 205.5,
   },
   // 2. 페인트 상단
@@ -199,11 +197,11 @@ export const RIGHT_HALF_PATHS: ZonePathDef[] = [
     cx: 645,
     cy: 160.7,
   },
-  // 3. 페인트 중앙 (플로터 구역)
+  // 3. 페인트 중앙 (플로터 구역, 텍스트 cx=615)
   {
     key: "paint_center",
     d: "M 681,175.2 L 579.6,175.2 L 579.6,235.8 L 681,235.8 A 30.3 30.3 0 0 1 681,175.2 Z",
-    cx: 625,
+    cx: 615,
     cy: 205.5,
   },
   // 4. 페인트 하단
@@ -255,10 +253,10 @@ export const RIGHT_HALF_PATHS: ZonePathDef[] = [
     cx: 432,
     cy: 205.5,
   },
-  // 11. 3점 하단 윙
+  // 11. 3점 하단 윙 (아크 sweep-flag = 1 로 빈틈 없이 mid_bottom과 정확히 일치)
   {
     key: "three_wing_bottom",
-    d: "M 375,354.6 L 534.1,277.1 A 163.4 163.4 0 0 0 634.6,362.2 L 634.6,384 L 375,384 Z",
+    d: "M 375,354.6 L 534.1,277.1 A 163.4 163.4 0 0 1 634.6,362.2 L 634.6,384 L 375,384 Z",
     cx: 485,
     cy: 331,
   },
@@ -277,7 +275,7 @@ export const LEFT_HALF_PATHS: ZonePathDef[] = [
   {
     key: "rim",
     d: "M 30,175.2 L 69,175.2 A 30.3 30.3 0 0 1 69,235.8 L 30,235.8 Z",
-    cx: 86,
+    cx: 90,
     cy: 205.5,
   },
   {
@@ -289,7 +287,7 @@ export const LEFT_HALF_PATHS: ZonePathDef[] = [
   {
     key: "paint_center",
     d: "M 69,175.2 L 170.4,175.2 L 170.4,235.8 L 69,235.8 A 30.3 30.3 0 0 0 69,175.2 Z",
-    cx: 125,
+    cx: 135,
     cy: 205.5,
   },
   {
@@ -334,9 +332,10 @@ export const LEFT_HALF_PATHS: ZonePathDef[] = [
     cx: 318,
     cy: 205.5,
   },
+  // 11. 3점 하단 윙 (아크 sweep-flag = 0 으로 mid_bottom과 빈틈 없이 일치)
   {
     key: "three_wing_bottom",
-    d: "M 375,354.6 L 215.9,277.1 A 163.4 163.4 0 0 1 115.4,362.2 L 115.4,384 L 375,384 Z",
+    d: "M 375,354.6 L 215.9,277.1 A 163.4 163.4 0 0 0 115.4,362.2 L 115.4,384 L 375,384 Z",
     cx: 265,
     cy: 331,
   },
@@ -349,58 +348,100 @@ export const LEFT_HALF_PATHS: ZonePathDef[] = [
 ];
 
 /**
- * 하프코트 섹터와 텍스트를 렌더링하는 SVG 조각 생성
+ * 1. 구역 패스 (배경 채움 및 테두리선)
  */
-export function renderZoneSectors(paths: ZonePathDef[], stats: NbaZoneMap): string {
+export function renderZonePaths(paths: ZonePathDef[], stats: NbaZoneMap): string {
   let svg = "";
-
-  // 1. 패스 (구역 배경 채움 및 테두리선)
   for (const p of paths) {
     const s = stats[p.key];
     const style = getZoneColorStyle(s, p.key);
     svg += `<path class="nba-zone-path" data-zone="${p.key}" d="${p.d}" fill="${style.fill}" stroke="${style.stroke}" stroke-width="1.8" stroke-linejoin="round" />`;
   }
+  return svg;
+}
 
-  // 2. 텍스트 라벨 (시도-성공 및 성공률)
+/**
+ * 2. 텍스트 라벨 (시도-성공 및 성공률) - 모든 선 위에 최상위 레이어로 얹힘
+ */
+export function renderZoneLabels(paths: ZonePathDef[], stats: NbaZoneMap): string {
+  let svg = "";
   for (const p of paths) {
     const s = stats[p.key];
     if (s.att === 0) continue;
 
     const pct = Math.round((s.made / s.att) * 100);
-    // 두 줄 텍스트: 상단 made-att, 하단 pct%
     svg += `<g class="nba-zone-label" pointer-events="none">`;
-    svg += `<text x="${p.cx}" y="${p.cy - 4}" text-anchor="middle" dominant-baseline="central" fill="#ffffff" font-size="11.5" font-weight="800" letter-spacing="-0.2px" filter="drop-shadow(0 1px 2px rgba(0,0,0,0.85))">${s.made}-${s.att}</text>`;
-    svg += `<text x="${p.cx}" y="${p.cy + 9}" text-anchor="middle" dominant-baseline="central" fill="#ffffff" font-size="10.5" font-weight="700" letter-spacing="-0.2px" filter="drop-shadow(0 1px 2px rgba(0,0,0,0.85))">${pct}%</text>`;
+    svg += `<text x="${p.cx}" y="${p.cy - 4}" text-anchor="middle" dominant-baseline="central" fill="#ffffff" font-size="11.5" font-weight="800" letter-spacing="-0.2px" filter="drop-shadow(0 1px 3px rgba(0,0,0,0.9))">${s.made}-${s.att}</text>`;
+    svg += `<text x="${p.cx}" y="${p.cy + 9}" text-anchor="middle" dominant-baseline="central" fill="#ffffff" font-size="10.5" font-weight="700" letter-spacing="-0.2px" filter="drop-shadow(0 1px 3px rgba(0,0,0,0.9))">${pct}%</text>`;
     svg += `</g>`;
   }
-
   return svg;
 }
 
-/** 코트 기본 마킹 선 (센터서클, 하프라인, 림/백보드) */
-export function renderCourtCourtLines(view: "full" | "right" | "left"): string {
-  let svg = `<g class="nba-court-markings" pointer-events="none" stroke="rgba(255, 255, 255, 0.45)" stroke-width="1.5" fill="none">`;
+/** 하위 호환용 래퍼 */
+export function renderZoneSectors(paths: ZonePathDef[], stats: NbaZoneMap): string {
+  return renderZonePaths(paths, stats) + renderZoneLabels(paths, stats);
+}
 
-  // 외곽선
-  if (view === "full") {
-    svg += `<rect x="30" y="27" width="690" height="357" stroke-width="2.2" />`;
-    // 하프라인
-    svg += `<line x1="375" y1="27" x2="375" y2="384" stroke-width="2" />`;
-    // 센터서클
-    svg += `<circle cx="375" cy="205.5" r="43.6" />`;
-  } else if (view === "right") {
-    svg += `<rect x="375" y="27" width="345" height="357" stroke-width="2.2" />`;
-    svg += `<path d="M 375,161.9 A 43.6 43.6 0 0 1 375,249.1" />`;
-  } else {
-    svg += `<rect x="30" y="27" width="345" height="357" stroke-width="2.2" />`;
-    svg += `<path d="M 375,161.9 A 43.6 43.6 0 0 0 375,249.1" />`;
+/** 코트 바닥에 팀 로고/약어 워터마크 */
+function renderTeamWatermark(team: ReportTeamMeta, isRight: boolean): string {
+  const cx = isRight ? 550 : 200;
+  const cy = 205.5;
+  const color = team.color || "#ffffff";
+  let svg = `<g class="nba-team-watermark" pointer-events="none">`;
+
+  // 팀 약어 워터마크 텍스트 (은은한 백그라운드)
+  svg += `<text x="${cx}" y="${cy + 6}" text-anchor="middle" dominant-baseline="central" fill="${color}" opacity="0.13" font-size="78" font-weight="900" letter-spacing="-1px" font-family="'Pretendard', sans-serif">${team.abbr}</text>`;
+
+  // 팀 로고 URL이 제공된 경우 SVG image로 함께 오버레이
+  if (team.logo_url) {
+    svg += `<image href="${team.logo_url}" x="${cx - 55}" y="${cy - 55}" width="110" height="110" opacity="0.15" preserveAspectRatio="xMidYMid meet" />`;
   }
 
-  // 골대 & 백보드
+  svg += `</g>`;
+  return svg;
+}
+
+/** 코트 기본 마킹 선 (센터서클, 하프라인, 림/백보드) 및 팀 컬러 외곽선 */
+export function renderCourtCourtLines(
+  view: "full" | "right" | "left",
+  homeTeam?: ReportTeamMeta,
+  awayTeam?: ReportTeamMeta
+): string {
+  let svg = `<g class="nba-court-markings" pointer-events="none">`;
+
+  const homeColor = homeTeam?.color || "rgba(255, 255, 255, 0.45)";
+  const awayColor = awayTeam?.color || "rgba(255, 255, 255, 0.45)";
+
+  // 1. 코트 외곽선 및 테두리 (팀 컬러 악센트)
+  if (view === "full") {
+    // 왼쪽 홈팀 외곽 테두리 (상단, 좌측, 하단)
+    svg += `<path d="M 375,27 L 30,27 L 30,384 L 375,384" fill="none" stroke="${homeColor}" stroke-width="3.2" stroke-linecap="round" />`;
+    // 오른쪽 원정팀 외곽 테두리 (상단, 우측, 하단)
+    svg += `<path d="M 375,27 L 720,27 L 720,384 L 375,384" fill="none" stroke="${awayColor}" stroke-width="3.2" stroke-linecap="round" />`;
+    // 중앙 하프라인
+    svg += `<line x1="375" y1="27" x2="375" y2="384" stroke="rgba(255, 255, 255, 0.75)" stroke-width="2.2" />`;
+    // 센터서클
+    svg += `<circle cx="375" cy="205.5" r="43.6" fill="none" stroke="rgba(255, 255, 255, 0.75)" stroke-width="2" />`;
+  } else if (view === "right") {
+    // 우측 단일 하프코트 외곽 테두리
+    svg += `<path d="M 375,27 L 720,27 L 720,384 L 375,384" fill="none" stroke="${awayColor}" stroke-width="3.2" stroke-linecap="round" />`;
+    svg += `<line x1="375" y1="27" x2="375" y2="384" stroke="rgba(255, 255, 255, 0.75)" stroke-width="2.2" />`;
+    svg += `<path d="M 375,161.9 A 43.6 43.6 0 0 1 375,249.1" fill="none" stroke="rgba(255, 255, 255, 0.75)" stroke-width="2" />`;
+  } else {
+    // 좌측 단일 하프코트 외곽 테두리
+    svg += `<path d="M 375,27 L 30,27 L 30,384 L 375,384" fill="none" stroke="${homeColor}" stroke-width="3.2" stroke-linecap="round" />`;
+    svg += `<line x1="375" y1="27" x2="375" y2="384" stroke="rgba(255, 255, 255, 0.75)" stroke-width="2.2" />`;
+    svg += `<path d="M 375,161.9 A 43.6 43.6 0 0 0 375,249.1" fill="none" stroke="rgba(255, 255, 255, 0.75)" stroke-width="2" />`;
+  }
+
+  // 2. 골대 & 백보드 (선명하고 고급스러운 농구 골대 마킹)
   const drawSingleHoop = (hx: number, isRight: boolean) => {
     const bbX = isRight ? hx + 18 : hx - 18;
-    let hSvg = `<line x1="${bbX}" y1="${205.5 - 24}" x2="${bbX}" y2="${205.5 + 24}" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" />`;
-    hSvg += `<circle cx="${hx}" cy="205.5" r="10.5" stroke="#f08c00" stroke-width="3" />`;
+    // 백보드
+    let hSvg = `<line x1="${bbX}" y1="${205.5 - 24}" x2="${bbX}" y2="${205.5 + 24}" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.9" />`;
+    // 골대 림 (주황색 링)
+    hSvg += `<circle cx="${hx}" cy="205.5" r="9.5" fill="none" stroke="#f08c00" stroke-width="2.6" opacity="0.85" />`;
     return hSvg;
   };
 
@@ -417,31 +458,61 @@ export const NBA_SINGLE_LEFT_VIEWBOX = "25 20 355 370";
 
 /**
  * PC 화면용 듀얼 쇼다운 코트 SVG (왼쪽: 홈팀, 오른쪽: 원정팀)
+ *
+ * 레이어 계층:
+ * 1. 바닥 (#12151b)
+ * 2. 팀 로고/약어 은은한 워터마크
+ * 3. 12개 구역 패스 (Zone Paths)
+ * 4. 코트 라인 & 팀 컬러 외곽 테두리 & 림
+ * 5. 구역 텍스트 라벨 (Zone Labels: 최상단에서 크리스탈처럼 선명하게!)
  */
-export function buildNbaDualCourtSvg(homeStats: NbaZoneMap, awayStats: NbaZoneMap): string {
-  let svg = `<rect x="30" y="27" width="690" height="357" fill="#14181f" />`;
-  // 왼쪽 홈팀 섹터
-  svg += renderZoneSectors(LEFT_HALF_PATHS, homeStats);
-  // 오른쪽 원정팀 섹터
-  svg += renderZoneSectors(RIGHT_HALF_PATHS, awayStats);
-  // 코트 라인
-  svg += renderCourtCourtLines("full");
+export function buildNbaDualCourtSvg(
+  homeStats: NbaZoneMap,
+  awayStats: NbaZoneMap,
+  homeTeam?: ReportTeamMeta,
+  awayTeam?: ReportTeamMeta
+): string {
+  let svg = `<rect x="30" y="27" width="690" height="357" fill="#12151b" />`;
+
+  // 2. 바닥 팀 워터마크 로고/약어
+  if (homeTeam) svg += renderTeamWatermark(homeTeam, false);
+  if (awayTeam) svg += renderTeamWatermark(awayTeam, true);
+
+  // 3. 12구역 패스
+  svg += renderZonePaths(LEFT_HALF_PATHS, homeStats);
+  svg += renderZonePaths(RIGHT_HALF_PATHS, awayStats);
+
+  // 4. 코트 라인 및 팀 컬러 외곽 테두리
+  svg += renderCourtCourtLines("full", homeTeam, awayTeam);
+
+  // 5. 텍스트 라벨 (최상단 레이어)
+  svg += renderZoneLabels(LEFT_HALF_PATHS, homeStats);
+  svg += renderZoneLabels(RIGHT_HALF_PATHS, awayStats);
+
   return svg;
 }
 
 /**
  * 모바일 화면용 단일 하프코트 SVG
  */
-export function buildNbaSingleCourtSvg(stats: NbaZoneMap, isLeft: boolean = false): string {
+export function buildNbaSingleCourtSvg(
+  stats: NbaZoneMap,
+  team?: ReportTeamMeta,
+  isLeft: boolean = false
+): string {
   if (isLeft) {
-    let svg = `<rect x="30" y="27" width="345" height="357" fill="#14181f" />`;
-    svg += renderZoneSectors(LEFT_HALF_PATHS, stats);
-    svg += renderCourtCourtLines("left");
+    let svg = `<rect x="30" y="27" width="345" height="357" fill="#12151b" />`;
+    if (team) svg += renderTeamWatermark(team, false);
+    svg += renderZonePaths(LEFT_HALF_PATHS, stats);
+    svg += renderCourtCourtLines("left", team, undefined);
+    svg += renderZoneLabels(LEFT_HALF_PATHS, stats);
     return svg;
   }
-  let svg = `<rect x="375" y="27" width="345" height="357" fill="#14181f" />`;
-  svg += renderZoneSectors(RIGHT_HALF_PATHS, stats);
-  svg += renderCourtCourtLines("right");
+  let svg = `<rect x="375" y="27" width="345" height="357" fill="#12151b" />`;
+  if (team) svg += renderTeamWatermark(team, true);
+  svg += renderZonePaths(RIGHT_HALF_PATHS, stats);
+  svg += renderCourtCourtLines("right", undefined, team);
+  svg += renderZoneLabels(RIGHT_HALF_PATHS, stats);
   return svg;
 }
 
@@ -487,4 +558,3 @@ export function fallbackZoneTotalsToNbaMap(
     three_corner_bottom: p3,
   };
 }
-

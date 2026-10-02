@@ -14,8 +14,8 @@ import type { UnsungHeroes } from "./unsungHero";
 // 런타임 import하지 않는다). 그래서 순환 import가 생기지 않고, 이 파일의 타입/함수는
 // 하위호환을 위해 postgameReport.ts가 그대로 re-export한다.
 
-/** 리포트가 선수·팀 이름에 색과 약어를 붙이는 데 필요한 최소 정보. */
-export type ReportTeamMeta = { tcode: string; name: string; abbr: string; color: string | null };
+/** 리포트가 선수·팀 이름에 색과 약어, 로고를 붙이는 데 필요한 최소 정보. */
+export type ReportTeamMeta = { tcode: string; name: string; abbr: string; color: string | null; logo_url?: string | null };
 
 /** 문자열 HTML을 만드는 섹션. 아직 옮기지 않은 섹션 전부와 render*Section() 반환값. */
 export type HtmlSection = { title: string; html: string };

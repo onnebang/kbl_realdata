@@ -3669,6 +3669,15 @@ footer.foot {
   stroke-width: 2.2px !important;
 }
 
+.nba-team-watermark text {
+  user-select: none;
+  font-family: 'Pretendard', -apple-system, sans-serif;
+}
+.nba-team-watermark image {
+  filter: grayscale(15%) contrast(1.1);
+  pointer-events: none;
+}
+
 /* 숨김 라디오 버튼 */
 .nba-tab-input-dual,
 .nba-tab-input-home,
