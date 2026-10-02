@@ -8,6 +8,7 @@ import {
   fallbackZoneTotalsToNbaMap,
   computeZonePlayerBreakdowns,
   renderZoneInspectorHtml,
+  ensureReadableColor,
   RIGHT_HALF_PATHS,
   LEFT_HALF_PATHS,
 } from "./nbaShotZones";
@@ -72,31 +73,30 @@ describe("nbaShotZones", () => {
     expect(dualSvg).toContain("100%");
     expect(dualSvg).toContain("0-1");
     expect(dualSvg).toContain("0%");
-    // 팀 워터마크 및 외곽 테두리선 검증
+    // 팀 워터마크 및 통일된 코트 라인 검증
     expect(dualSvg).toContain('fill="#e11932"');
     expect(dualSvg).toContain('fill="#006738"');
-    expect(dualSvg).toContain('stroke="#e11932"');
-    expect(dualSvg).toContain('stroke="#006738"');
+    expect(dualSvg).toContain('<rect x="30" y="27" width="690" height="357"');
     expect(dualSvg).toContain("SK");
     expect(dualSvg).toContain("DB");
 
     const singleSvg = buildNbaSingleCourtSvg(hStats, homeTeam);
     expect(singleSvg).toContain('data-zone="rim"');
-    expect(singleSvg).toContain('stroke="#e11932"');
+    expect(singleSvg).toContain('<path d="M 375,27 L 720,27 L 720,384 L 375,384 Z"');
   });
 
-  it("하단 윙과 미드레인지 사이 빈틈(Gap) 없이 아크가 일치한다", () => {
-    // RIGHT_HALF_PATHS에서 three_wing_bottom과 mid_bottom의 아크 sweep 방향 일치 검증
+  it("하단 윙과 미드레인지 사이 빈틈(Gap) 없이 공식 3점 라인 호와 일치한다", () => {
+    // RIGHT_HALF_PATHS에서 three_wing_bottom과 mid_bottom의 아크 sweep 방향(0) 일치 검증
     const rightWingBot = RIGHT_HALF_PATHS.find((p) => p.key === "three_wing_bottom")!;
     const rightMidBot = RIGHT_HALF_PATHS.find((p) => p.key === "mid_bottom")!;
-    expect(rightWingBot.d).toContain("A 163.4 163.4 0 0 1 634.6,362.2");
-    expect(rightMidBot.d).toContain("A 163.4 163.4 0 0 1 634.6,362.2");
+    expect(rightWingBot.d).toContain("A 163.4 163.4 0 0 0 634.6,362.2");
+    expect(rightMidBot.d).toContain("A 163.4 163.4 0 0 0 634.6,362.2");
 
-    // LEFT_HALF_PATHS에서도 일치 검증
+    // LEFT_HALF_PATHS에서도 sweep 방향(1) 일치 검증
     const leftWingBot = LEFT_HALF_PATHS.find((p) => p.key === "three_wing_bottom")!;
     const leftMidBot = LEFT_HALF_PATHS.find((p) => p.key === "mid_bottom")!;
-    expect(leftWingBot.d).toContain("A 163.4 163.4 0 0 0 115.4,362.2");
-    expect(leftMidBot.d).toContain("A 163.4 163.4 0 0 0 115.4,362.2");
+    expect(leftWingBot.d).toContain("A 163.4 163.4 0 0 1 115.4,362.2");
+    expect(leftMidBot.d).toContain("A 163.4 163.4 0 0 1 115.4,362.2");
   });
 
   it("5구역 폴백 매핑이 안전하게 동작한다", () => {
@@ -159,5 +159,16 @@ describe("nbaShotZones", () => {
     expect(html).toContain('document.getElementById("nba-card-test123")');
     expect(html).toContain("선수별 슈팅 구성률");
     expect(html).toContain("nba-zone-path");
+  });
+
+  it("어두운 팀 색상(KT #000000 등)은 다크 배경에서 읽히는 밝은 색상으로 안전하게 보정된다", () => {
+    // 검은색 -> fallback 반환
+    expect(ensureReadableColor("#000000", "#ffffff")).toBe("#ffffff");
+    expect(ensureReadableColor("#000", "#ffffff")).toBe("#ffffff");
+    // 어두운 남색 계열 -> fallback 반환
+    expect(ensureReadableColor("#091f2c", "#f1f5f9")).toBe("#f1f5f9");
+    // 밝은 색상(빨강, 하늘색 등) -> 원본 유지
+    expect(ensureReadableColor("#e11932")).toBe("#e11932");
+    expect(ensureReadableColor("#3b82f6")).toBe("#3b82f6");
   });
 });

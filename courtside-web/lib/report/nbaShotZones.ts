@@ -325,7 +325,7 @@ export const RIGHT_HALF_PATHS: ZonePathDef[] = [
   },
   {
     key: "mid_bottom",
-    d: "M 720,264.8 L 579.6,264.8 L 534.1,277.1 A 163.4 163.4 0 0 1 634.6,362.2 L 720,362.2 Z",
+    d: "M 720,264.8 L 579.6,264.8 L 534.1,277.1 A 163.4 163.4 0 0 0 634.6,362.2 L 720,362.2 Z",
     cx: 630,
     cy: 311,
   },
@@ -349,7 +349,7 @@ export const RIGHT_HALF_PATHS: ZonePathDef[] = [
   },
   {
     key: "three_wing_bottom",
-    d: "M 375,354.6 L 534.1,277.1 A 163.4 163.4 0 0 1 634.6,362.2 L 634.6,384 L 375,384 Z",
+    d: "M 375,354.6 L 534.1,277.1 A 163.4 163.4 0 0 0 634.6,362.2 L 634.6,384 L 375,384 Z",
     cx: 485,
     cy: 331,
   },
@@ -401,7 +401,7 @@ export const LEFT_HALF_PATHS: ZonePathDef[] = [
   },
   {
     key: "mid_bottom",
-    d: "M 30,264.8 L 170.4,264.8 L 215.9,277.1 A 163.4 163.4 0 0 0 115.4,362.2 L 30,362.2 Z",
+    d: "M 30,264.8 L 170.4,264.8 L 215.9,277.1 A 163.4 163.4 0 0 1 115.4,362.2 L 30,362.2 Z",
     cx: 120,
     cy: 311,
   },
@@ -425,7 +425,7 @@ export const LEFT_HALF_PATHS: ZonePathDef[] = [
   },
   {
     key: "three_wing_bottom",
-    d: "M 375,354.6 L 215.9,277.1 A 163.4 163.4 0 0 0 115.4,362.2 L 115.4,384 L 375,384 Z",
+    d: "M 375,354.6 L 215.9,277.1 A 163.4 163.4 0 0 1 115.4,362.2 L 115.4,384 L 375,384 Z",
     cx: 265,
     cy: 331,
   },
@@ -504,49 +504,74 @@ export function renderZoneSectors(paths: ZonePathDef[], stats: NbaZoneMap): stri
   return renderZonePaths(paths, stats) + renderZoneLabels(paths, stats);
 }
 
+/**
+ * 다크 테마 배경(#14181f)에서 항상 선명하게 읽히도록 색상 휘도 보정
+ */
+export function ensureReadableColor(hex?: string | null, fallback: string = "#f1f5f9"): string {
+  if (!hex) return fallback;
+  const cleaned = hex.replace("#", "").trim();
+  if (cleaned.length !== 6 && cleaned.length !== 3) return fallback;
+  let r: number, g: number, b: number;
+  if (cleaned.length === 3) {
+    r = parseInt(cleaned[0] + cleaned[0], 16);
+    g = parseInt(cleaned[1] + cleaned[1], 16);
+    b = parseInt(cleaned[2] + cleaned[2], 16);
+  } else {
+    r = parseInt(cleaned.substring(0, 2), 16);
+    g = parseInt(cleaned.substring(2, 4), 16);
+    b = parseInt(cleaned.substring(4, 6), 16);
+  }
+  const maxC = Math.max(r, g, b);
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // 검은색(#000000) 및 극도로 어두운 톤 (최대 채널값 < 45 또는 휘도 < 25)
+  if (maxC < 45 || lum < 25) {
+    return fallback;
+  }
+  return hex;
+}
+
 /** 코트 바닥에 팀 로고/약어 워터마크 */
 function renderTeamWatermark(team: ReportTeamMeta, isRight: boolean): string {
   const cx = isRight ? 550 : 200;
   const cy = 205.5;
-  const color = team.color || "#ffffff";
+  const color = ensureReadableColor(team.color, "#ffffff");
   let svg = `<g class="nba-team-watermark" pointer-events="none">`;
 
-  // 팀 약어 워터마크
-  svg += `<text x="${cx}" y="${cy + 6}" text-anchor="middle" dominant-baseline="central" fill="${color}" opacity="0.13" font-size="78" font-weight="900" letter-spacing="-1px" font-family="'Pretendard', sans-serif">${team.abbr}</text>`;
+  // 팀 약어 워터마크 (선명하면서도 은은한 불투명도)
+  svg += `<text x="${cx}" y="${cy + 6}" text-anchor="middle" dominant-baseline="central" fill="${color}" opacity="0.14" font-size="78" font-weight="900" letter-spacing="-1px" font-family="'Pretendard', sans-serif">${team.abbr}</text>`;
 
   // 팀 로고 이미지 오버레이
   if (team.logo_url) {
-    svg += `<image href="${team.logo_url}" x="${cx - 55}" y="${cy - 55}" width="110" height="110" opacity="0.15" preserveAspectRatio="xMidYMid meet" />`;
+    svg += `<image href="${team.logo_url}" x="${cx - 55}" y="${cy - 55}" width="110" height="110" opacity="0.18" preserveAspectRatio="xMidYMid meet" />`;
   }
 
   svg += `</g>`;
   return svg;
 }
 
-/** 코트 기본 마킹 선 (센터서클, 하프라인, 림/백보드) 및 팀 컬러 외곽선 */
+/** 코트 기본 마킹 선 (센터서클, 하프라인, 림/백보드) */
 export function renderCourtCourtLines(
   view: "full" | "right" | "left",
-  homeTeam?: ReportTeamMeta,
-  awayTeam?: ReportTeamMeta
+  _homeTeam?: ReportTeamMeta,
+  _awayTeam?: ReportTeamMeta
 ): string {
   let svg = `<g class="nba-court-markings" pointer-events="none">`;
-
-  const homeColor = homeTeam?.color || "rgba(255, 255, 255, 0.45)";
-  const awayColor = awayTeam?.color || "rgba(255, 255, 255, 0.45)";
+  const courtBorder = "rgba(255, 255, 255, 0.4)";
 
   if (view === "full") {
-    svg += `<path d="M 375,27 L 30,27 L 30,384 L 375,384" fill="none" stroke="${homeColor}" stroke-width="3.2" stroke-linecap="round" />`;
-    svg += `<path d="M 375,27 L 720,27 L 720,384 L 375,384" fill="none" stroke="${awayColor}" stroke-width="3.2" stroke-linecap="round" />`;
-    svg += `<line x1="375" y1="27" x2="375" y2="384" stroke="rgba(255, 255, 255, 0.75)" stroke-width="2.2" />`;
-    svg += `<circle cx="375" cy="205.5" r="43.6" fill="none" stroke="rgba(255, 255, 255, 0.75)" stroke-width="2" />`;
+    // 단일 통일 코트 외곽 직사각형 라인
+    svg += `<rect x="30" y="27" width="690" height="357" fill="none" stroke="${courtBorder}" stroke-width="1.8" />`;
+    // 하프라인 및 센터서클
+    svg += `<line x1="375" y1="27" x2="375" y2="384" stroke="rgba(255, 255, 255, 0.65)" stroke-width="2" />`;
+    svg += `<circle cx="375" cy="205.5" r="43.6" fill="none" stroke="rgba(255, 255, 255, 0.65)" stroke-width="1.8" />`;
   } else if (view === "right") {
-    svg += `<path d="M 375,27 L 720,27 L 720,384 L 375,384" fill="none" stroke="${awayColor}" stroke-width="3.2" stroke-linecap="round" />`;
-    svg += `<line x1="375" y1="27" x2="375" y2="384" stroke="rgba(255, 255, 255, 0.75)" stroke-width="2.2" />`;
-    svg += `<path d="M 375,161.9 A 43.6 43.6 0 0 1 375,249.1" fill="none" stroke="rgba(255, 255, 255, 0.75)" stroke-width="2" />`;
+    svg += `<path d="M 375,27 L 720,27 L 720,384 L 375,384 Z" fill="none" stroke="${courtBorder}" stroke-width="1.8" />`;
+    svg += `<line x1="375" y1="27" x2="375" y2="384" stroke="rgba(255, 255, 255, 0.65)" stroke-width="2" />`;
+    svg += `<path d="M 375,161.9 A 43.6 43.6 0 0 1 375,249.1" fill="none" stroke="rgba(255, 255, 255, 0.65)" stroke-width="1.8" />`;
   } else {
-    svg += `<path d="M 375,27 L 30,27 L 30,384 L 375,384" fill="none" stroke="${homeColor}" stroke-width="3.2" stroke-linecap="round" />`;
-    svg += `<line x1="375" y1="27" x2="375" y2="384" stroke="rgba(255, 255, 255, 0.75)" stroke-width="2.2" />`;
-    svg += `<path d="M 375,161.9 A 43.6 43.6 0 0 0 375,249.1" fill="none" stroke="rgba(255, 255, 255, 0.75)" stroke-width="2" />`;
+    svg += `<path d="M 375,27 L 30,27 L 30,384 L 375,384 Z" fill="none" stroke="${courtBorder}" stroke-width="1.8" />`;
+    svg += `<line x1="375" y1="27" x2="375" y2="384" stroke="rgba(255, 255, 255, 0.65)" stroke-width="2" />`;
+    svg += `<path d="M 375,161.9 A 43.6 43.6 0 0 0 375,249.1" fill="none" stroke="rgba(255, 255, 255, 0.65)" stroke-width="1.8" />`;
   }
 
   const drawSingleHoop = (hx: number, isRight: boolean) => {

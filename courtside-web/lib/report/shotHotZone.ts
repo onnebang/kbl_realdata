@@ -289,8 +289,8 @@ function renderZoneHeatmap(edge: HotZoneEdge, homeTeam: ReportTeamMeta, awayTeam
     // PC 듀얼 대칭 쇼다운 코트 (풀코트 뷰)
     `<div class="nba-dual-court-section">` +
     `<div class="nba-court-sublabels">` +
-    `<span class="nba-sublabel home" style="color:${escHtml(homeTeam.color || '#60a5fa')}">◀ ${escHtml(homeTeam.name)}</span>` +
-    `<span class="nba-sublabel away" style="color:${escHtml(awayTeam.color || '#f87171')}">${escHtml(awayTeam.name)} ▶</span>` +
+    `<span class="nba-sublabel home"><i class="nba-sub-dot" style="background:${escHtml(homeTeam.color || '#3b82f6')}"></i> ◀ ${escHtml(homeTeam.name)}</span>` +
+    `<span class="nba-sublabel away">${escHtml(awayTeam.name)} ▶ <i class="nba-sub-dot" style="background:${escHtml(awayTeam.color || '#ef4444')}"></i></span>` +
     `</div>` +
     `<svg class="nba-court-svg nba-dual-svg" viewBox="${NBA_DUAL_VIEWBOX}" role="img" aria-label="${escHtml(homeTeam.name)} 대 ${escHtml(awayTeam.name)} 슛 브레이크다운">` +
     buildNbaDualCourtSvg(homeStats, awayStats, homeTeam, awayTeam, homeBreakdowns, awayBreakdowns) +
