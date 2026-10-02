@@ -49,7 +49,7 @@ def team_features_now(tcode, prefix, ctx, today_str, lineup=None):
     form = {f"{prefix}_{k}": v for k, v in ett.multi_window_form(hist).items()}
     age_curve = {f"{prefix}_{k}": v for k, v in ett.age_curve_team_feature(roster, ctx["bio"], ctx["age_curves"], today_str).items()}
     continuity = ett.roster_continuity(roster, ctx["season_roster_minutes"], tcode, ctx["current_season_code"])
-    foreign_conc, foreign_n = ett.foreign_usage_concentration(roster, ctx["bio"])
+    foreign_conc, foreign_n = ett.foreign_usage_concentration(roster, ctx["foreign_pcodes"])
     run_vuln = ett.run_vulnerability_features(window)
     pwr = ett.team_pwr_feature(roster, ctx["ovr_by_pcode_season"], ctx["prev_season_name"], prefix)
 
@@ -101,6 +101,7 @@ def build_context(current_season_code=None):
         games, key_fn=lambda g: g.get("mainReferee"),
         outcome_fn=lambda g: 1 if g["homeRecord"]["score"] > g["awayRecord"]["score"] else 0)
     player_stats_by_game = ett.load_player_stats_by_game()
+    foreign_pcodes = ett.foreign_pcodes_from_stats(player_stats_by_game)
     season_roster_minutes = ett.build_season_roster_minutes(games, player_stats_by_game)
     latest_manager = ett.latest_manager_per_team(games)
 
@@ -140,6 +141,7 @@ def build_context(current_season_code=None):
         "venue_timelines": venue_timelines, "referee_timeline": referee_timeline,
         "player_stats_by_game": player_stats_by_game, "season_roster_minutes": season_roster_minutes,
         "latest_manager": latest_manager, "bio": bio, "latest_onoff": latest_onoff,
+        "foreign_pcodes": foreign_pcodes,
         "age_curves": age_curves, "current_season_code": current_season_code,
         "ovr_by_pcode_season": ovr_by_pcode_season, "prev_season_name": prev_season_name,
         "active_roster": active_roster,

@@ -83,12 +83,26 @@ OUT_PATH = os.path.join(ANALYSIS_DIR, "pregame_training_table.json")
 ROLL_WINDOW = 10
 MIN_HISTORY = 3
 FORM_WINDOWS = [1, 3, 5, 10]
+# EWMA 동적 윈도우(ewma_form 참고) - 표본이 적을 때 span을 좁혀 최근 경기 비중을 키운다.
+# max는 기존 롤링 창(ROLL_WINDOW=10)과 같게 둬서 "표본이 쌓이면 지금과 같은 해상도"로 수렴시킨다.
+EWMA_MIN_SPAN = 3
+EWMA_MAX_SPAN = 10
 FEATURE_KEYS = ["offrtg", "defrtg", "netrtg", "pace", "efgRt", "tsRt", "rebRt", "astRt", "tovRt"]
-FOREIGN_NATIONALITIES = {"외국", "아시아쿼터"}
+
+# player-stat.json의 player.playerFlag - 0=국내 / 1=외국 / 2=아시아쿼터. 공식 API가 경기별로
+# 직접 주는 값이라 스냅샷처럼 낡지 않는다. 예전엔 player_bio.json의 nationality(=kbl540 카드게임
+# 프로젝트의 kbl540_players_final.json 스냅샷)로 갈랐는데, 그 스냅샷은 새 시즌 영입을 모르기
+# 때문에 2026-27 신규 외국선수/아시아쿼터 7명이 전원 bio에 없었고(2026-09-29 실측: 오픈매치
+# 10경기 출전 127명 중 13명 누락), 그 선수들이 조용히 '국내'로 세어져 foreignPlayerCount/
+# foreignConcentration이 틀린 값으로 모델에 들어갔다. playerFlag로 바꾼 뒤 정답셋 대조:
+# 610경기 14,360행에서 flag 0/1/2 <-> 국내/외국/아시아쿼터가 모순 0건으로 완전 일치,
+# 한 선수가 경기마다 다른 flag를 갖는 경우도 0건.
+FOREIGN_FLAGS = {"1", "2"}
 
 
 def load_player_stats_by_game():
-    """gmkey -> [{pcode, tcode, playMin, playSec}] - 팀별 로테이션/출전시간 파악용."""
+    """gmkey -> [{pcode, tcode, minutes, flag}] - 팀별 로테이션/출전시간 파악용.
+    flag는 playerFlag(FOREIGN_FLAGS 참고) - 외국선수 판정을 여기서 같이 들고 나간다."""
     out = {}
     for gmkey in os.listdir(GAMES_DIR):
         path = os.path.join(GAMES_DIR, gmkey, "player-stat.json")
@@ -102,9 +116,18 @@ def load_player_stats_by_game():
             minutes = (r.get("playMin") or 0) + (r.get("playSec") or 0) / 60
             if minutes <= 0:
                 continue
-            entries.append({"pcode": p["pcode"], "tcode": p["tcode"], "minutes": minutes})
+            entries.append({"pcode": p["pcode"], "tcode": p["tcode"], "minutes": minutes,
+                            "flag": p.get("playerFlag")})
         out[gmkey] = entries
     return out
+
+
+def foreign_pcodes_from_stats(player_stats_by_game):
+    """playerFlag가 외국/아시아쿼터인 pcode 집합. 한 선수의 flag는 경기마다 바뀌지 않으므로
+    (실측 0건) 전 경기를 합쳐 한 번만 만들면 된다. 아직 KBL 경기를 한 번도 안 뛴 선수는 여기
+    없지만, 그런 선수는 로테이션 윈도우에도 없어서 이 피처와 무관하다."""
+    return {e["pcode"] for entries in player_stats_by_game.values() for e in entries
+            if e.get("flag") in FOREIGN_FLAGS}
 
 
 def age_on(birth_date_str, on_date_str):
@@ -243,9 +266,44 @@ def venue_rating_before(venue_timeline, gmkey=None, min_games=2):
     return round(sum(vals) / len(vals), 2) if vals else None
 
 
+def ewma_form(history_before, min_span=EWMA_MIN_SPAN, max_span=EWMA_MAX_SPAN):
+    """지수가중 이동평균(EWMA) 폼 - 표본 수에 따라 span이 움직이는 동적 윈도우.
+
+    고정 윈도우 평균(last1/3/5/10)은 창 안의 10경기를 전부 같은 무게로 보므로 (1) 가장 최근
+    경기가 9경기 전과 동일하게 취급되고 (2) 시즌 초반엔 창이 덜 차서 해상도가 들쭉날쭉하다.
+    여기서는 span = clamp(len(history), min_span, max_span), alpha = 2/(span+1)로 두어
+    **경기 수가 적을 때 alpha가 크고(최근 경기에 훨씬 민감) 표본이 쌓이면 10경기 평균에
+    가까워지게** 한다. 예: 3경기 시점 alpha=0.5, 10경기 이후 alpha=2/11≈0.18.
+
+    history_before는 그 경기 '이전' 경기만 담고 있어야 한다 - 다른 롤링 피처와 같은 누수 원칙.
+    (호출부가 home_hist[:home_idx]로 자른 값을 넘긴다.)
+
+    FEATURE_KEYS에 바로 넣지 않는다 - 이 저장소의 절차는 '테이블에 만들어두고 애블레이션으로
+    홀드아웃 성능을 확인한 뒤 채택'이다(나이곡선·로스터연속성이 importance는 높았는데 성능은
+    떨어져 탈락한 전례가 있다). ablate_form_features.py의 plus_ewma 참고."""
+    n = len(history_before)
+    span = min(max(n, min_span), max_span)
+    alpha = 2.0 / (span + 1)
+    out = {"ewma_netrtg": None, "ewma_winPct": None, "ewma_alpha": round(alpha, 3)}
+    if not history_before:
+        return out
+    for key, src in (("ewma_netrtg", lambda g: g["record"].get("netrtg")),
+                     ("ewma_winPct", lambda g: float(g["won"]))):
+        acc = None
+        for g in history_before:  # 오래된 경기부터 - 최근 경기가 마지막에 가장 큰 무게로 들어간다
+            v = src(g)
+            if v is None:
+                continue
+            acc = v if acc is None else alpha * v + (1 - alpha) * acc
+        out[key] = round(acc, 3) if acc is not None else None
+    return out
+
+
 def multi_window_form(history_before, windows=FORM_WINDOWS):
-    """직전 N경기 평균을 여러 N(1/3/5/10)에 대해 각각 계산 - '최근 폼'을 여러 해상도로."""
-    feats = {}
+    """직전 N경기 평균을 여러 N(1/3/5/10)에 대해 각각 계산 - '최근 폼'을 여러 해상도로.
+    EWMA(동적 윈도우) 폼도 같이 붙여 나간다 - 두 호출부(학습 테이블/실시간 예측)가 항상 같은
+    폼 피처 집합을 갖게 하려고 여기 한 곳에서 합친다."""
+    feats = dict(ewma_form(history_before))
     for n in windows:
         window = history_before[-n:]
         if not window:
@@ -349,15 +407,17 @@ def roster_continuity(roster_minutes, season_roster_minutes, tcode, season_code,
     return round(retained / total_prev, 3)
 
 
-def foreign_usage_concentration(roster_minutes, bio):
+def foreign_usage_concentration(roster_minutes, foreign_pcodes):
     """이 팀 로테이션(직전 ROLL_WINDOW경기 평균 출전분) 중 외국선수/아시아쿼터 선수들 사이에서,
     가장 많이 뛴 한 명이 그 그룹 전체 출전시간에서 차지하는 비율. 연봉 데이터가 없어서 쓰는
     대리지표 - "확실한 1옵을 만드는 팀"(비율 높음) vs "용병 두 명을 고르게 쓰는 팀"(비율 0.5대)
-    구분을 실제 출전시간으로 직접 잼. 외국선수가 로스터 윈도우에 아예 없으면(결측/이례적) None."""
+    구분을 실제 출전시간으로 직접 잼. 외국선수가 로스터 윈도우에 아예 없으면(결측/이례적) None.
+
+    foreign_pcodes: foreign_pcodes_from_stats()의 집합. 예전엔 bio를 받아 nationality를 봤는데
+    스냅샷 누락으로 신규 용병을 못 셌다(FOREIGN_FLAGS 주석 참고)."""
     foreign_mins = []
     for pcode, mins in roster_minutes.items():
-        b = bio.get(pcode)
-        if b and b.get("nationality") in FOREIGN_NATIONALITIES:
+        if pcode in foreign_pcodes:
             foreign_mins.append(mins)
     if not foreign_mins:
         return None, 0
@@ -596,6 +656,7 @@ def main():
         games, key_fn=lambda g: g.get("mainReferee"),
         outcome_fn=lambda g: 1 if g["homeRecord"]["score"] > g["awayRecord"]["score"] else 0)
     player_stats_by_game = load_player_stats_by_game()
+    foreign_pcodes = foreign_pcodes_from_stats(player_stats_by_game)
     season_roster_minutes = build_season_roster_minutes(games, player_stats_by_game)
 
     with open(os.path.join(ANALYSIS_DIR, "player_bio.json"), encoding="utf-8") as f:
@@ -638,8 +699,8 @@ def main():
         away_coach_rate = cumulative_rate_before(coach_timelines.get(g.get("awayManager"), []), g["gmkey"])
         ref_home_win_rate = cumulative_rate_before(referee_timeline.get(g.get("mainReferee"), []), g["gmkey"])
 
-        home_foreign_conc, home_foreign_n = foreign_usage_concentration(home_roster, bio)
-        away_foreign_conc, away_foreign_n = foreign_usage_concentration(away_roster, bio)
+        home_foreign_conc, home_foreign_n = foreign_usage_concentration(home_roster, foreign_pcodes)
+        away_foreign_conc, away_foreign_n = foreign_usage_concentration(away_roster, foreign_pcodes)
 
         home_age_curve = age_curve_team_feature(home_roster, bio, age_curves, g["gameDate"])
         away_age_curve = age_curve_team_feature(away_roster, bio, age_curves, g["gameDate"])

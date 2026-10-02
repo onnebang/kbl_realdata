@@ -62,10 +62,18 @@ BASE_KEYS = [
     "restDays", "venueNetRtg", "coachWinPct", "foreignConcentration", "foreignPlayerCount",
     "last1_netrtg", "last1_winPct", "last3_netrtg", "last3_winPct",
     "last5_netrtg", "last5_winPct", "last10_netrtg", "last10_winPct",
+    # 2026-09-24 tune_hyperparams.py에 추가됐는데 여기 BASE_KEYS엔 안 따라와서 "지금 배포된
+    # 피처셋"이라는 위 설명과 어긋나 있었다(2026-09-29 맞춤). 그래서 아래 base 정확도는 주석에
+    # 적힌 64.31%와 바로 비교되지 않는다 - teamPWR이 들어간 현재 배포 상태의 기준선이다.
+    "teamPWR",
 ]
 FORM_KEYS = ["last1_netrtg", "last1_winPct", "last3_netrtg", "last3_winPct",
              "last5_netrtg", "last5_winPct", "last10_netrtg", "last10_winPct"]
 NON_FORM = [k for k in BASE_KEYS if k not in FORM_KEYS]
+# 동적 윈도우 EWMA 폼(export_training_table.ewma_form). 표본이 적을 때 alpha가 커져 최근 경기에
+# 민감해진다 - 시즌 초반 트렌드 지연을 줄이려는 의도. ewma_alpha는 경기 수의 결정적 함수라
+# (= 시즌 진행도 대리지표, 이미 month가 있음) 피처로는 안 넣는다.
+EWMA_KEYS = ["ewma_netrtg", "ewma_winPct"]
 EXTRA_RTG = ["last1_offrtg", "last1_defrtg", "last3_offrtg", "last3_defrtg",
              "last5_offrtg", "last5_defrtg", "last10_offrtg", "last10_defrtg"]
 GAME_KEYS = ["dayOfWeek", "month", "refHomeWinRate"]
@@ -106,7 +114,10 @@ SETS = {
     "plus_rtg (+최근 off/def)": (BASE_KEYS + EXTRA_RTG, [], GAME_KEYS),
     "plus_p75 (+페이스 환산)": (BASE_KEYS, DERIVED_P75, GAME_KEYS),
     "plus_mom (+모멘텀)": (BASE_KEYS, DERIVED_MOM, GAME_KEYS),
-    "all (전부)": (BASE_KEYS + EXTRA_RTG, DERIVED_P75 + DERIVED_MOM, GAME_KEYS),
+    # 동적 윈도우가 (a) 기존 SMA 위에 더 얹혀 도움이 되나 (b) SMA 8종을 아예 대체할 수 있나
+    "plus_ewma (+동적윈도우)": (BASE_KEYS + EWMA_KEYS, [], GAME_KEYS),
+    "ewma_instead (SMA->EWMA)": (NON_FORM + EWMA_KEYS, [], GAME_KEYS),
+    "all (전부)": (BASE_KEYS + EXTRA_RTG + EWMA_KEYS, DERIVED_P75 + DERIVED_MOM, GAME_KEYS),
 }
 
 
@@ -175,12 +186,23 @@ def main():
         for mname, (est, params) in space.items():
             search = RandomizedSearchCV(est, params, n_iter=25, cv=cv, scoring="neg_log_loss",
                                         random_state=0, n_jobs=-1)
-            search.fit(Xt, yt)
+            try:
+                search.fit(Xt, yt)
+            except ValueError as e:
+                # tune_hyperparams.py:146과 같은 처리 - teamPWR처럼 초기 시즌 커버리지가 0%인
+                # 피처가 있으면 HistGradientBoosting의 구간화가 "distinct_values 2개 미만"으로
+                # 터진다. 그 모델만 건너뛰고 나머지 모델로 그 피처셋을 계속 평가한다 - 예전엔
+                # 이 try가 없어서 HistGB 하나 때문에 애블레이션 전체가 첫 피처셋에서 죽었다.
+                print("  %-24s [%s] 학습 실패, 건너뜀: %s" % (label, mname, e), flush=True)
+                continue
             probs = search.best_estimator_.predict_proba(Xh)[:, 1]
             acc = accuracy_score(yh, probs >= 0.5)
             ll = log_loss(yh, probs)
             if best_row is None or acc > best_row["acc"]:
                 best_row = {"model": mname, "acc": acc, "ll": ll}
+        if best_row is None:  # 세 모델이 전부 실패한 피처셋 - 비교표에서 빼고 계속
+            print("  %-24s 피처 %3d  전 모델 학습 실패 - 제외" % (label, Xt.shape[1]), flush=True)
+            continue
         results.append({"set": label, "nFeat": Xt.shape[1], **best_row})
         print("  %-24s 피처 %3d  최고 %-13s 정확도 %5.2f%%  로그손실 %.4f"
               % (label, Xt.shape[1], best_row["model"], best_row["acc"] * 100, best_row["ll"]), flush=True)
