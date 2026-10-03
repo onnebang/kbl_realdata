@@ -74,7 +74,8 @@ const SECURITY_HEADERS: Record<string, string> = {
     "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com",
     // blob: - PNG 내보내기(ScoringInfographicStudio.tsx)가 SVG를 Blob URL로 만들어 <img>에 태움.
     "img-src 'self' data: blob: https://kbl.or.kr https://www.kbl.or.kr https://*.supabase.co",
-    "connect-src 'self' https://*.supabase.co",
+    // wss: - 라이브 탭의 Supabase Realtime 구독(websocket). 없으면 구독이 CSP로 차단돼 push가 안 온다.
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

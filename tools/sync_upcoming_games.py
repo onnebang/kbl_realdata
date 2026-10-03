@@ -104,7 +104,10 @@ def get_conn():
     last_err = None
     for attempt in range(6):
         try:
-            return psycopg2.connect(url)
+            # keepalives: 와이파이 순간 끊김으로 연결이 반쯤 죽어도(half-open) ~60초 안에 에러로 깨어나게 한다.
+            # 없으면 recv에서 무한 대기해 수집기가 조용히 멈춘다(2026-10-03 17:19 관측).
+            return psycopg2.connect(url, connect_timeout=15, keepalives=1, keepalives_idle=20,
+                                    keepalives_interval=10, keepalives_count=3)
         except psycopg2.OperationalError as e:
             last_err = e
             if attempt < 5:
