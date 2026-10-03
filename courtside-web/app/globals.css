@@ -2039,7 +2039,10 @@ table.data-table td:nth-child(2) {
   border-radius: var(--r-led);
   background: var(--gold-soft);
   color: var(--gold);
-  white-space: nowrap;
+  /* 긴 문구(파울트러블 + 마진 증발)가 폰 폭을 넘어 페이지를 가로로 밀던 문제 - 칩 안에서 줄바꿈 */
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 /* 요청: "현 시점 game leaders를 보여줌" - 팀별 최고 득점/리바운드/어시스트를 단순 텍스트
