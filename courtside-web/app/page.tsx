@@ -13,12 +13,18 @@ import {
   getGameMvps,
   getGameTags,
   getSeasonWinPcts,
+  getRoundGames,
+  getMonthGames,
+  getSeasonDateRange,
+  kstToday,
   HOME_PAGE_SIZE,
+  type GameRow,
 } from "@/lib/homeGames";
 import { deriveGameStatus } from "@/lib/gameStatus";
 import { absenceText } from "@/lib/lineupText";
 import HomeLiveRefresher from "@/components/HomeLiveRefresher";
 import { PreseasonBanner } from "@/components/PreseasonBanner";
+import HomeCalendar, { shiftMonth } from "@/components/HomeCalendar";
 
 // 실측(라이브 검증 중 발견) - 기본 진입(팀 필터 없음, 최근 시즌)이 예전엔 최대 200경기 x
 // 선수당 ~24행짜리 MVP 조회까지 겹쳐서 병렬화 전엔 20~30초 가까이 걸림(lib/homeGames.ts의
@@ -58,31 +64,61 @@ function soft<T>(label: string, p: Promise<T>, fallback: NoInfer<T>): Promise<T>
   });
 }
 
+type View = "list" | "calendar" | "round";
+const VIEWS: { key: View; label: string }[] = [
+  { key: "list", label: "목록" },
+  { key: "calendar", label: "달력" },
+  { key: "round", label: "라운드" },
+];
+
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string; team?: string; page?: string }>;
+  searchParams: Promise<{ season?: string; team?: string; page?: string; view?: string; month?: string; round?: string }>;
 }) {
-  const { season, team, page: pageParam } = await searchParams;
+  const { season, team, page: pageParam, view: viewParam, month: monthParam, round: roundParam } = await searchParams;
+  const view: View = viewParam === "calendar" || viewParam === "round" ? viewParam : "list";
   const seasons = await getSeasons();
   const activeSeason = season ?? seasons[0];
   // ?page=abc / ?page=-3 은 1페이지로. 범위를 넘긴 값은 getGames가 마지막 페이지로 클램프해
   // 실제 페이지를 돌려준다(빈 화면 대신 마지막 장을 보여준다).
   const requestedPage = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
-  const [teamOptions, { games, page, pageCount, total, offset, counts }] = await Promise.all([
-    getTeamsForSeason(activeSeason),
-    getGames(activeSeason, team, requestedPage),
-  ]);
+  const today = kstToday();
+  const teamOptions = await getTeamsForSeason(activeSeason);
 
-  // lib/homeGames.ts getGames와 같은 KST 기준 오늘 - 오늘 헤더에 배지를 단다.
-  const todayKst = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  // 보기별로 "이 화면에 카드로 그릴 경기(games)"만 다르다 - 카드·승률·MVP 조회는 아래에서 그대로 공유한다.
+  // 달력은 카드 대신 칸 안에 요약만 그리므로 games를 비우고 calGames를 따로 든다.
+  let games: GameRow[] = [];
+  let page = 1, pageCount = 1, total = 0, offset = 0;
+  let counts = { live: 0, scheduled: 0, final: 0 };
+  let calGames: GameRow[] = [];
+  let calMonth = "";
+  let calRange: { first: string; last: string } | null = null;
+  let roundInfo = { round: 1, roundCount: 1, perRound: 0 };
+  if (view === "list") {
+    ({ games, page, pageCount, total, offset, counts } = await getGames(activeSeason, team, requestedPage));
+  } else if (view === "round") {
+    const r = await getRoundGames(activeSeason, team, Number.parseInt(roundParam ?? "", 10) || undefined);
+    games = r.games;
+    total = games.length;
+    roundInfo = r;
+  } else {
+    calRange = await getSeasonDateRange(activeSeason);
+    // 기본 달: 오늘이 시즌 안이면 오늘 달, 아니면 시즌 마지막 달(끝난 시즌)/첫 달(개막 전).
+    const fallback = !calRange ? today.slice(0, 7) : today < calRange.first ? calRange.first.slice(0, 7) : today > calRange.last ? calRange.last.slice(0, 7) : today.slice(0, 7);
+    calMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(monthParam ?? "") ? (monthParam as string) : fallback;
+    calGames = await getMonthGames(activeSeason, team, calMonth);
+    total = calGames.length;
+  }
+
+  const allShown = view === "calendar" ? calGames : games;
   const gmkeys = games.map((g) => g.gmkey);
   // MVP는 승패가 확정된 종료 경기만(진행중 경기는 스코어가 있어도 승자가 아직 없음),
   // 진행중 경기는 "현재" 승률(최신 이벤트)을 따로 조회.
   const finalGames = games.filter((g) => deriveGameStatus(g) === "final");
   // **이 페이지에 실제로 그려지는** 라이브 경기만. 라이브는 목록 맨 앞 구간이라 사실상
   // 1페이지에만 나오고, 2페이지 이후에서는 이 배열이 비어 자동 갱신 타이머가 아예 안 붙는다.
-  const liveGmkeys = games.filter((g) => deriveGameStatus(g) === "live").map((g) => g.gmkey);
+  const liveGmkeys = allShown.filter((g) => deriveGameStatus(g) === "live").map((g) => g.gmkey);
   // 다섯 조회 전부 선택적 장식이라 각각 soft 폴백(빈 Map) - 어느 하나가 죽어도 카드의 그 칸만
   // 비고 일정은 그대로 그려진다. 폴백은 위 soft()가 console.error를 남긴 뒤에만 돌아온다.
   const [winProbs, liveProbs, mvps, lineupWinProbs, tags, seasonWinPcts] = await Promise.all([
@@ -100,14 +136,21 @@ export default async function HomePage({
   // 페이지 이동 링크 - **클라이언트 JS 없이** 쿼리스트링만 바꾼다(이 사이트 관례).
   // 사용자가 고른 필터(시즌·팀)는 그대로 유지하고, 고르지 않은 값은 URL에 넣지 않는다
   // (기본 진입 URL을 더럽히지 않기 위해). 1페이지는 ?page를 아예 안 붙인다.
-  const pageHref = (p: number) => {
+  // view·month·round도 같이 유지한다. 시즌/팀을 바꾸면 month·round·page는 떨어져 그 보기의 기본 위치로 돌아간다.
+  const href = (o: { view?: View; team?: string | null; month?: string; round?: number; page?: number }) => {
     const qs = new URLSearchParams();
     if (season) qs.set("season", season);
-    if (team) qs.set("team", team);
-    if (p > 1) qs.set("page", String(p));
+    const v = o.view ?? view;
+    if (v !== "list") qs.set("view", v);
+    const t = o.team === undefined ? team : o.team;
+    if (t) qs.set("team", t);
+    if (o.month) qs.set("month", o.month);
+    if (o.round) qs.set("round", String(o.round));
+    if (o.page && o.page > 1) qs.set("page", String(o.page));
     const q = qs.toString();
     return q ? `/?${q}` : "/";
   };
+  const pageHref = (p: number) => href({ page: p });
   const pagerLabel = { display: "inline-block", padding: "7px 6px", fontSize: "12px", color: "var(--ink-faint)" } as const;
   const pagerDisabled = { opacity: 0.35 } as const;
 
@@ -124,33 +167,115 @@ export default async function HomePage({
         {/* 개막 전(이 시즌 종료 경기 0, 예정 경기 있음)에만 - 첫 경기가 끝나면 자동으로 사라짐.
             판정은 시즌 전체 개수(counts)로 한다 - finalGames는 이제 "이 페이지의" 종료 경기라,
             예정 경기가 많은 시즌에서는 1페이지에 종료 경기가 한 건도 안 걸릴 수 있다. */}
-        {counts.final === 0 && total > 0 && <PreseasonBanner season={activeSeason} />}
+        {view === "list" && counts.final === 0 && total > 0 && <PreseasonBanner season={activeSeason} />}
 
         {/* id="games" - 히어로의 "오늘 경기 보기" 버튼이 여기로 스크롤한다. NavBar가
             sticky가 아니라서 scroll-margin-top 보정은 필요 없다(실측). */}
-        <form id="games" className="filter-form">
-        <select name="season" aria-label="시즌 선택" defaultValue={activeSeason}>
-          {seasons.map((s) => (
-            <option key={s} value={s}>
-              {s} 시즌
-            </option>
+        <div id="games" className="view-tabs" role="tablist" aria-label="경기 보기 방식">
+          {VIEWS.map((v) => (
+            <Link
+              key={v.key}
+              href={href({ view: v.key, page: 1 })}
+              role="tab"
+              aria-selected={view === v.key}
+              className={`view-tab${view === v.key ? " active" : ""}`}
+              prefetch={false}
+            >
+              {v.label}
+            </Link>
           ))}
-        </select>
-        <select name="team" aria-label="팀 선택" defaultValue={team ?? ""}>
-          <option value="">전체 팀</option>
-          {teamOptions.map((t) => (
-            <option key={t.tcode} value={t.tcode}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-        {/* GET 폼은 현재 쿼리스트링을 이 필드들로 통째로 갈아끼운다 - 필터를 바꾸면 page가
-            자동으로 떨어져 1페이지부터 다시 본다(원하는 동작). */}
-        <button type="submit" className="btn-primary">
-          보기
-        </button>
-      </form>
+          {/* 시즌만 폼으로 바꾼다 - 팀·보기는 숨은 필드로 같이 보내 시즌을 바꿔도 유지된다(월·라운드·페이지는 시즌마다 달라 버린다). */}
+          <form className="view-season">
+            {view !== "list" && <input type="hidden" name="view" value={view} />}
+            {team && <input type="hidden" name="team" value={team} />}
+            <select name="season" aria-label="시즌 선택" defaultValue={activeSeason}>
+              {seasons.map((s) => (
+                <option key={s} value={s}>
+                  {s} 시즌
+                </option>
+              ))}
+            </select>
+            <button type="submit" className="btn-primary">
+              보기
+            </button>
+          </form>
+        </div>
 
+        {/* 구단별 보기 - 드롭다운 뒤에 숨기지 않고 칩으로 항상 보이게. 모든 보기(목록·달력·라운드)에 적용된다. */}
+        <div className="team-chips" aria-label="구단 선택">
+          <Link href={href({ team: null, page: 1 })} className={`team-chip${!team ? " active" : ""}`} prefetch={false}>
+            전체
+          </Link>
+          {teamOptions.map((t) => (
+            <Link
+              key={t.tcode}
+              href={href({ team: t.tcode, page: 1 })}
+              className={`team-chip${team === t.tcode ? " active" : ""}`}
+              prefetch={false}
+            >
+              {t.name}
+            </Link>
+          ))}
+        </div>
+
+        {view === "round" && (
+          <div className="view-sub">
+            <div className="view-sub-nav">
+              {roundInfo.round > 1 ? (
+                <Link href={href({ round: roundInfo.round - 1 })} className="btn-primary" prefetch={false}>
+                  ← {roundInfo.round - 1}라운드
+                </Link>
+              ) : (
+                <span className="btn-primary" style={pagerDisabled} aria-disabled="true">← 이전</span>
+              )}
+              <strong className="view-sub-title">{roundInfo.round}라운드</strong>
+              {roundInfo.round < roundInfo.roundCount ? (
+                <Link href={href({ round: roundInfo.round + 1 })} className="btn-primary" prefetch={false}>
+                  {roundInfo.round + 1}라운드 →
+                </Link>
+              ) : (
+                <span className="btn-primary" style={pagerDisabled} aria-disabled="true">다음 →</span>
+              )}
+            </div>
+            <div className="view-sub-chips">
+              {Array.from({ length: roundInfo.roundCount }, (_, i) => i + 1).map((r) => (
+                <Link key={r} href={href({ round: r })} className={`team-chip${r === roundInfo.round ? " active" : ""}`} prefetch={false}>
+                  {r}R
+                </Link>
+              ))}
+            </div>
+            <div className="view-sub-note">
+              정규시즌 경기 순번을 {roundInfo.perRound}경기(전 팀이 서로 한 번씩)씩 끊어 계산한 라운드입니다. 공식 라운드와 경계가 어긋날 수 있습니다.
+            </div>
+          </div>
+        )}
+
+        {view === "calendar" && calRange && (
+          <div className="view-sub">
+            <div className="view-sub-nav">
+              {calMonth > calRange.first.slice(0, 7) ? (
+                <Link href={href({ month: shiftMonth(calMonth, -1) })} className="btn-primary" prefetch={false}>
+                  ← {shiftMonth(calMonth, -1).slice(5)}월
+                </Link>
+              ) : (
+                <span className="btn-primary" style={pagerDisabled} aria-disabled="true">← 이전</span>
+              )}
+              <strong className="view-sub-title">
+                {calMonth.slice(0, 4)}년 {Number(calMonth.slice(5))}월
+              </strong>
+              {calMonth < calRange.last.slice(0, 7) ? (
+                <Link href={href({ month: shiftMonth(calMonth, 1) })} className="btn-primary" prefetch={false}>
+                  {shiftMonth(calMonth, 1).slice(5)}월 →
+                </Link>
+              ) : (
+                <span className="btn-primary" style={pagerDisabled} aria-disabled="true">다음 →</span>
+              )}
+            </div>
+          </div>
+        )}
+
+      {view === "calendar" && <HomeCalendar ym={calMonth} games={calGames} today={today} />}
+      {view !== "calendar" && (
       <div className="game-list">
         {games.length === 0 && (
           <div className="empty-note">이 조건에 맞는 경기가 없습니다. 시즌이나 팀을 바꿔 보세요.</div>
@@ -181,7 +306,7 @@ export default async function HomePage({
               {showDateHeader && (
                 <div className="game-date-header">
                   <span className="game-date-header-main">
-                    {g.game_date === todayKst && <span className="game-date-header-today">오늘</span>}
+                    {g.game_date === today && <span className="game-date-header-today">오늘</span>}
                     {fmtDateHeader(g.game_date)}
                   </span>
                   <span className="game-date-header-count">{dayCount}경기</span>
@@ -343,11 +468,13 @@ export default async function HomePage({
         })}
       </div>
 
+      )}
+
       {/* 이전/다음 - 링크 두 개와 현재 위치뿐이다("더 보기"처럼 목록을 계속 이어 붙이면
           라이브 갱신이 다시 그 전체를 내려받게 되므로 쓰지 않는다).
           prefetch={false}: Next의 기본 프리페치는 다음 페이지 페이로드를 미리 당겨와서,
           페이지네이션으로 아낀 바이트를 사용자가 누르지도 않은 채 도로 쓴다. */}
-      {pageCount > 1 && (
+      {view === "list" && pageCount > 1 && (
         <nav className="filter-form" aria-label="경기 목록 페이지 이동">
           {page > 1 ? (
             <Link href={pageHref(page - 1)} className="btn-primary" rel="prev" prefetch={false}>
@@ -401,9 +528,20 @@ export default async function HomePage({
       </div>
 
       <footer className="foot">
-        {activeSeason} 시즌 · 전체 {total}경기 중{" "}
-        {games.length > 0 ? `${offset + 1}-${offset + games.length}번째` : "0번째"} 표시(
-        {page}/{pageCount} 페이지)
+        {view === "list" ? (
+          <>
+            {activeSeason} 시즌 · 전체 {total}경기 중 {games.length > 0 ? `${offset + 1}-${offset + games.length}번째` : "0번째"} 표시(
+            {page}/{pageCount} 페이지)
+          </>
+        ) : view === "round" ? (
+          <>
+            {activeSeason} 시즌 · {roundInfo.round}라운드 {total}경기
+          </>
+        ) : (
+          <>
+            {activeSeason} 시즌 · {calMonth} {total}경기
+          </>
+        )}
         {liveGmkeys.length > 0 && ` · 라이브 ${liveGmkeys.length}경기 진행중(30초마다 자동 갱신)`}
       </footer>
       </div>

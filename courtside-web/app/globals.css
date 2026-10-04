@@ -4383,3 +4383,36 @@ footer.foot {
     display: none;
   }
 }
+
+/* 홈 보기 전환 탭(목록/달력/라운드) + 구단 칩 + 달력 격자. 클라이언트 JS 없이 ?view= 링크로만 동작. */
+.view-tabs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.view-tab {
+  padding: 7px 16px; border-radius: var(--r-led); font-weight: 800; font-size: 14px;
+  color: var(--ink-faint); border: 1px solid var(--line, rgba(128,128,128,.3)); text-decoration: none;
+}
+.view-tab.active { background: var(--gold-soft); color: var(--gold); border-color: var(--gold); }
+.view-season { margin-left: auto; display: flex; gap: 6px; }
+.team-chips, .view-sub-chips { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 8px; margin-bottom: 4px; scrollbar-width: thin; }
+.team-chip {
+  flex: none; padding: 5px 11px; border-radius: var(--r-led); font-size: 13px; font-weight: 700; text-decoration: none;
+  color: var(--ink-faint); border: 1px solid var(--line, rgba(128,128,128,.3)); white-space: nowrap;
+}
+.team-chip.active { background: var(--gold-soft); color: var(--gold); border-color: var(--gold); }
+.view-sub { margin-bottom: 8px; }
+.view-sub-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.view-sub-title { font-size: 16px; font-weight: 800; }
+.view-sub-note { font-size: 12px; color: var(--ink-faint); }
+.cal-head, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.cal-head > div { text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-faint); padding: 4px 0; }
+.cal-cell { min-height: 74px; padding: 3px; border-radius: 6px; background: var(--gold-soft); min-width: 0; }
+.cal-cell.empty { background: transparent; }
+.cal-cell.today { outline: 2px solid var(--gold); }
+.cal-day { font-size: 11px; font-weight: 800; color: var(--ink-faint); margin-bottom: 2px; }
+.cal-game {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 3px; margin-top: 2px; padding: 2px 4px; border-radius: 4px;
+  font-size: 11px; line-height: 1.25; text-decoration: none; color: inherit; background: var(--card, rgba(128,128,128,.12));
+}
+.cal-game.live { outline: 1px solid #d33; }
+.cal-game .w { font-weight: 900; }
+.cal-sc { font-family: "IBM Plex Mono", monospace; flex-basis: 100%; text-align: center; order: 3; }
+@media (min-width: 720px) { .cal-sc { flex-basis: auto; order: 0; } .cal-game { font-size: 12px; } .cal-cell { min-height: 96px; } }

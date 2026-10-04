@@ -209,6 +209,11 @@ async function fetchSegment(seg: Segment, from: number, to: number, scope: Segme
 // 개수는 캐시하지 않는다. 경기가 하나 끝나면 live -> final로 옮겨가는데 그 개수가 낡으면
 // 페이지 경계가 통째로 밀린다(캐시로 아낄 바이트보다 잃을 정확도가 크다). HEAD 요청이라
 // 바이트도 거의 들지 않는다.
+/** KST 기준 오늘(YYYY-MM-DD). 컴포넌트 렌더 중 Date.now()는 react-hooks/purity에 걸리므로 page.tsx도 이걸 부른다. */
+export function kstToday(): string {
+  return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
 export async function getGames(
   seasonName: string | undefined,
   tcode: string | undefined,
@@ -216,7 +221,7 @@ export async function getGames(
 ): Promise<GamesPage> {
   // KBL 경기 날짜는 한국 시간 기준 - UTC 그대로 자르면 KST 00:00~09:00 사이에 "오늘"이
   // 하루 이르게 잡혀 어제 예정 경기가 잠깐 예정으로 남아 보임(검증 지적). +9h 보정.
-  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const today = kstToday();
   const scheduledUntil = new Date(Date.now() + 9 * 3600 * 1000 + SCHEDULED_WINDOW_DAYS * 86400 * 1000)
     .toISOString()
     .slice(0, 10);
@@ -540,4 +545,72 @@ async function fetchGameTags(gmkeys: string[]): Promise<Map<string, GameTag>> {
     for (const r of data ?? []) map.set(r.gmkey, { key: r.tag_key, label: r.tag_label });
   }
   return writeCache(tagCache, ck, map);
+}
+
+
+// ── 라운드 / 달력 보기(홈 상단 탭) ───────────────────────────────────────────────────
+// games 테이블에는 라운드 컬럼이 없다. KBL 정규시즌 1라운드 = 전 팀이 서로 한 번씩(팀 N개면 N(N-1)/2경기)
+// 이고, gmkey가 S{시즌}G01N{경기순번}이라 순번을 그 크기로 끊으면 라운드가 된다(10팀 = 45경기, 6라운드).
+// 공식 라운드 표기와 경계가 하루 어긋날 수 있는 "계산값"이다 - 화면에도 그렇게 적는다.
+function renameTeams<T extends GameRow>(rows: T[]): T[] {
+  for (const g of rows) {
+    if (g.home_team) g.home_team.name = displayTeamName(g.home_team.tcode, g.home_team.name, g.season_name);
+    if (g.away_team) g.away_team.name = displayTeamName(g.away_team.tcode, g.away_team.name, g.season_name);
+  }
+  return rows;
+}
+const gameNo = (g: GameRow) => Number(/N(\d+)$/.exec(g.gmkey)?.[1] ?? 0);
+const byDateTime = (a: GameRow, b: GameRow) =>
+  a.game_date.localeCompare(b.game_date) || (a.game_start ?? "").localeCompare(b.game_start ?? "") || a.gmkey.localeCompare(b.gmkey);
+// 스코어가 바뀌는 중일 수 있어 캐시하지 않는다(라이브 구간과 같은 이유). 정규시즌 최대 ~270행 한 번.
+export async function getRoundGames(
+  seasonName: string,
+  tcode: string | undefined,
+  round: number | undefined // undefined = 오늘 이후 첫 경기가 속한 라운드(없으면 마지막)
+): Promise<{ games: GameRow[]; round: number; roundCount: number; perRound: number }> {
+  const { data } = await supabase
+    .from("games")
+    .select(`${GAME_SELECT}, home_tcode, away_tcode`)
+    .eq("season_name", seasonName)
+    .eq("season_category", "정규시즌");
+  const raw = (data ?? []) as unknown as (GameRow & { home_tcode: string | null; away_tcode: string | null })[];
+  // 팀 수는 이 시즌 경기의 원본 tcode 컬럼에서 직접 센다(팀 목록이나 teams 조인에 의존하면 그 조회가 비었을 때 라운드가 경기 수만큼 쪼개진다).
+  const teams = new Set<string>();
+  for (const g of raw) {
+    if (g.home_tcode) teams.add(g.home_tcode);
+    if (g.away_tcode) teams.add(g.away_tcode);
+  }
+  const all = renameTeams(raw).sort((a, b) => gameNo(a) - gameNo(b)) as typeof raw;
+  const perRound = Math.max(1, (teams.size * (teams.size - 1)) / 2);
+  const roundCount = Math.max(1, Math.ceil(all.length / perRound));
+  const today = kstToday();
+  const upcoming = all.find((g) => g.game_date >= today);
+  const wanted = round ?? (upcoming ? Math.ceil(gameNo(upcoming) / perRound) : roundCount);
+  const r = Math.min(Math.max(1, Math.trunc(wanted) || 1), roundCount);
+  let games = all.filter((g) => Math.ceil(gameNo(g) / perRound) === r);
+  if (tcode) games = games.filter((g) => g.home_tcode === tcode || g.away_tcode === tcode);
+  return { games: games.sort(byDateTime) as GameRow[], round: r, roundCount, perRound };
+}
+
+export async function getMonthGames(seasonName: string, tcode: string | undefined, ym: string): Promise<GameRow[]> {
+  const [y, m] = ym.split("-").map(Number);
+  const last = new Date(y, m, 0).getDate();
+  let q = supabase
+    .from("games")
+    .select(GAME_SELECT)
+    .eq("season_name", seasonName)
+    .gte("game_date", `${ym}-01`)
+    .lte("game_date", `${ym}-${String(last).padStart(2, "0")}`);
+  if (tcode) q = q.or(`home_tcode.eq.${tcode},away_tcode.eq.${tcode}`);
+  const { data } = await q;
+  return renameTeams((data ?? []) as unknown as GameRow[]).sort(byDateTime);
+}
+
+/** 시즌의 첫/마지막 경기 날짜 - 달력의 기본 달과 이전/다음 달 범위. 경기가 없으면 null. */
+export async function getSeasonDateRange(seasonName: string): Promise<{ first: string; last: string } | null> {
+  const pick = async (asc: boolean) =>
+    (await supabase.from("games").select("game_date").eq("season_name", seasonName).order("game_date", { ascending: asc }).limit(1)).data?.[0]
+      ?.game_date as string | undefined;
+  const [first, last] = await Promise.all([pick(true), pick(false)]);
+  return first && last ? { first, last } : null;
 }
