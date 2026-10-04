@@ -74,6 +74,8 @@ export default async function HomePage({
     getGames(activeSeason, team, requestedPage),
   ]);
 
+  // lib/homeGames.ts getGames와 같은 KST 기준 오늘 - 오늘 헤더에 배지를 단다.
+  const todayKst = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const gmkeys = games.map((g) => g.gmkey);
   // MVP는 승패가 확정된 종료 경기만(진행중 경기는 스코어가 있어도 승자가 아직 없음),
   // 진행중 경기는 "현재" 승률(최신 이벤트)을 따로 조회.
@@ -178,7 +180,10 @@ export default async function HomePage({
             <Fragment key={g.gmkey}>
               {showDateHeader && (
                 <div className="game-date-header">
-                  <span className="game-date-header-main">{fmtDateHeader(g.game_date)}</span>
+                  <span className="game-date-header-main">
+                    {g.game_date === todayKst && <span className="game-date-header-today">오늘</span>}
+                    {fmtDateHeader(g.game_date)}
+                  </span>
                   <span className="game-date-header-count">{dayCount}경기</span>
                 </div>
               )}

@@ -1222,6 +1222,24 @@ export default async function GamePage({
       )}
       {status === "final" && (
       <div className="game-act">
+        {/* 요청: 경기 종료 후 전체 스탯창(실시간 중계 탭의 "코트 위" 박스스코어)을 여기서도 한 번 더.
+            GameReplay boxOnly - 경기 종료 시점 고정이고 스크럽·라이브 구독과 무관하다. 박스에 필요 없는
+            shots/lineupRatings는 안 넘겨 직렬화 중복을 줄인다(events·players만 한 번 더 간다). */}
+        {game.home_team && game.away_team && derivedEvents.length > 0 && (
+          <WidgetBoundary name="경기 최종 스탯">
+            <GameReplay
+              boxOnly
+              events={events}
+              players={replayPlayers}
+              homeTeam={{ tcode: game.home_team.tcode, name: game.home_team.name, abbr: game.home_team.abbr, color: game.home_team.color, logoUrl: game.home_team.logo_url }}
+              awayTeam={{ tcode: game.away_team.tcode, name: game.away_team.name, abbr: game.away_team.abbr, color: game.away_team.color, logoUrl: game.away_team.logo_url }}
+              shots={[]}
+              playerOnOff={playerOnOff}
+              cardInfo={cardInfo}
+              actionLabels={Object.fromEntries(actionLabels)}
+            />
+          </WidgetBoundary>
+        )}
         {reportSections.length > 0 && (
           <div className="panel">
             <div className="panel-title">AI 코트사이드 리포트</div>

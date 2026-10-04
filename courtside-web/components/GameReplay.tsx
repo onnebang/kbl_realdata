@@ -603,6 +603,7 @@ export default function GameReplay({
   actionLabels = EMPTY_MAP,
   liveNames,
   cardInfo,
+  boxOnly = false,
 }: {
   // 파생 필드(elapsed/runHome/runAway/surge = 실측 34,382B)와 action_label/player_name까지
   // 뺀 **원본 game_events 행 그대로**. 전부 이 컴포넌트가 복원한다 - toGameEventShape 주석과
@@ -638,6 +639,8 @@ export default function GameReplay({
   // "코트 위" 선수 카드(OnCourtCards)의 OVR·플레이 스타일 - page.tsx가 서버에서 lib/courtCardInfo.ts로 뽑아 내려준다
   // (OVR JSON이 커서 클라이언트에서 직접 읽지 않는다). 없으면 카드는 OVR 없이 그려진다.
   cardInfo?: Record<string, CourtCardInfo>;
+  // true면 "코트 위" 박스스코어 패널만 그린다(경기 후 AI 분석 탭의 최종 스탯창). 이벤트로 최종 기록을 다시 계산하므로 live=false(종료 경기)에서만 쓴다.
+  boxOnly?: boolean;
 }) {
   // ---- B-1. events = 서버 prop ∪ 라이브 수신 행 --------------------------------
   // 로컬 state가 아니라 파생값(useMemo)으로 둔 것이 이 구현의 핵심 선택이다. state로 두면
@@ -1850,6 +1853,45 @@ export default function GameReplay({
     );
   };
 
+  const courtPanel = (
+    <div className="replay-court">
+      <div className="panel-title">코트 위</div>
+      {/* 게임식 선수 카드 - 아래 표(상세)와 같은 온코트 5인을 프로필 카드로. 경기 시작 전(PRE)에만 빈 상태 안내가 나온다. */}
+      <OnCourtCards teams={courtCardTeams} pre={row.quarter === "PRE"} topTitle={topBadgeTitle} />
+      {/* 표를 넘기는 탭(요청: "길어진다면, 표를 여러개 만들어서 항목을 넘기도록"). 세 장 모두
+          지금 스크럽 시점까지의 이벤트만으로 계산한다 - 아래 캡션이 그 사실을 들고 있다. */}
+      <div className="replay-boxtabs" role="tablist">
+        {BOX_VIEWS.map((v) => (
+          <button
+            key={v.key}
+            type="button"
+            role="tab"
+            aria-selected={boxView === v.key}
+            title={v.hint}
+            className={`replay-boxtab${boxView === v.key ? " active" : ""}`}
+            onClick={() => setBoxView(v.key)}
+          >
+            {v.label}
+          </button>
+        ))}
+        <span className="replay-boxtab-hint">{BOX_VIEWS.find((v) => v.key === boxView)?.hint}</span>
+      </div>
+      <div className="replay-court-grid">
+        {onCourtColumn(homeTeam, homePlayers, homeOnCourt)}
+        {onCourtColumn(awayTeam, awayPlayers, awayOnCourt)}
+      </div>
+      <div className="replay-box-note">
+        MIN은 교체 기록으로 다시 센 &quot;지금까지 코트 위에 있던 시간&quot;입니다(경기 종료 시점에서 공식 기록과 일치). eFG% =
+        (FG성공 + 0.5×3점성공) ÷ FG시도, TS% = 득점 ÷ (2 × (FG시도 + 0.44×자유투시도)), USG% = 이 선수가 쓴 팀 포제션 비율. 세 표
+        전부 이 순간까지의 이벤트만으로 계산하며, 오른쪽 온/오프만 15시즌 통산값입니다.
+      </div>
+    </div>
+  );
+
+  // 경기 후 AI 분석 탭용(page.tsx) - 위 "코트 위" 박스스코어만, 경기 종료 시점 고정(pinnedIdx가 null이면
+  // idx = lastIdx). 훅은 전부 위에서 끝났으므로 여기서 일찍 반환해도 된다.
+  if (boxOnly) return <div className="panel replay-panel">{courtPanel}</div>;
+
   return (
     <div className="panel replay-panel" ref={panelRef}>
       {/* 푸시 알림 스택(요청 3) - position:fixed로 항상 문서 최상단에 떠서 어디에
@@ -2163,38 +2205,7 @@ export default function GameReplay({
 
       {/* "코트 위" 패널을 M7 라인업 넷레이팅 바로 위에 붙여서 "지금 누가 뛰고 있고, 이 조합이
           통산 얼마나 잘했는지"를 한 섹션처럼 읽히게 배치(요청). */}
-      <div className="replay-court">
-        <div className="panel-title">코트 위</div>
-        {/* 게임식 선수 카드 - 아래 표(상세)와 같은 온코트 5인을 프로필 카드로. 경기 시작 전(PRE)에만 빈 상태 안내가 나온다. */}
-        <OnCourtCards teams={courtCardTeams} pre={row.quarter === "PRE"} topTitle={topBadgeTitle} />
-        {/* 표를 넘기는 탭(요청: "길어진다면, 표를 여러개 만들어서 항목을 넘기도록"). 세 장 모두
-            지금 스크럽 시점까지의 이벤트만으로 계산한다 - 아래 캡션이 그 사실을 들고 있다. */}
-        <div className="replay-boxtabs" role="tablist">
-          {BOX_VIEWS.map((v) => (
-            <button
-              key={v.key}
-              type="button"
-              role="tab"
-              aria-selected={boxView === v.key}
-              title={v.hint}
-              className={`replay-boxtab${boxView === v.key ? " active" : ""}`}
-              onClick={() => setBoxView(v.key)}
-            >
-              {v.label}
-            </button>
-          ))}
-          <span className="replay-boxtab-hint">{BOX_VIEWS.find((v) => v.key === boxView)?.hint}</span>
-        </div>
-        <div className="replay-court-grid">
-          {onCourtColumn(homeTeam, homePlayers, homeOnCourt)}
-          {onCourtColumn(awayTeam, awayPlayers, awayOnCourt)}
-        </div>
-        <div className="replay-box-note">
-          MIN은 교체 기록으로 다시 센 &quot;지금까지 코트 위에 있던 시간&quot;입니다(경기 종료 시점에서 공식 기록과 일치). eFG% =
-          (FG성공 + 0.5×3점성공) ÷ FG시도, TS% = 득점 ÷ (2 × (FG시도 + 0.44×자유투시도)), USG% = 이 선수가 쓴 팀 포제션 비율. 세 표
-          전부 이 순간까지의 이벤트만으로 계산하며, 오른쪽 온/오프만 15시즌 통산값입니다.
-        </div>
-      </div>
+      {courtPanel}
 
       {lineupRatings && (
         <div className="replay-lineups">

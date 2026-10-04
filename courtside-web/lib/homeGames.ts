@@ -98,9 +98,11 @@ const GAME_SELECT = `gmkey, game_date, game_start, home_score, away_score, is_en
        home_team:teams!games_home_tcode_fkey(tcode, name, abbr, color, logo_url),
        away_team:teams!games_away_tcode_fkey(tcode, name, abbr, color, logo_url)`;
 
-/** 목록의 세 구간. 화면에 나가는 순서와 같다(진행중 -> 예정 -> 종료). */
-type Segment = "live" | "scheduled" | "final";
-const SEGMENTS: readonly Segment[] = ["live", "scheduled", "final"];
+/** 목록의 네 구간. 화면에 나가는 순서와 같다(오늘 -> 진행중 -> 예정 -> 종료).
+ *  "today"는 오늘 날짜 경기 전부(예정·진행중·종료 무관, 시작 시각순) - 경기가 끝나도 아래 종료
+ *  구간으로 내려가지 않고 맨 위에 남는다. 나머지 세 구간은 오늘 경기를 빼고 센다(중복 방지). */
+type Segment = "today" | "live" | "scheduled" | "final";
+const SEGMENTS: readonly Segment[] = ["today", "live", "scheduled", "final"];
 
 type SegmentScope = { seasonName: string | undefined; tcode: string | undefined; today: string; scheduledUntil: string };
 
@@ -137,10 +139,15 @@ function segmentQuery(seg: Segment, cols: string, head: boolean, scope: SegmentS
   const sel = supabase.from("games").select(cols, { count: "exact", head });
   // 상태 판정은 lib/gameStatus.ts와 같은 규칙 - 스코어부터 보고 is_ended는 그 다음.
   const q =
-    seg === "scheduled"
+    seg === "today"
+      ? sel
+          .eq("game_date", scope.today)
+          .order("game_start", { ascending: true })
+          .order("gmkey", { ascending: true })
+      : seg === "scheduled"
       ? sel
           .is("home_score", null)
-          .gte("game_date", scope.today)
+          .gt("game_date", scope.today)
           .lte("game_date", scope.scheduledUntil)
           .order("game_date", { ascending: true })
           .order("game_start", { ascending: true })
@@ -148,6 +155,7 @@ function segmentQuery(seg: Segment, cols: string, head: boolean, scope: SegmentS
       : sel
           .not("home_score", "is", null)
           .eq("is_ended", seg === "final")
+          .neq("game_date", scope.today)
           .order("game_date", { ascending: false })
           .order("gmkey", { ascending: true });
   let scoped = q as unknown as ScopedBuilder;
@@ -178,7 +186,7 @@ async function fetchSegment(seg: Segment, from: number, to: number, scope: Segme
     }
     return rows;
   };
-  if (seg === "live") return run();
+  if (seg === "live" || seg === "today") return run(); // today는 스코어가 바뀌는 중 - 캐시 금지
   // 종료 경기는 정산이 끝나면 불변, 예정 경기는 sync_upcoming_games(하루 1회)만 건드린다.
   const ttl = seg === "final" ? TTL.final : TTL.batchDaily;
   return cached(
@@ -216,6 +224,15 @@ export async function getGames(
 
   const counts = await Promise.all(SEGMENTS.map(async (seg) => (await segmentQuery(seg, "gmkey", true, scope)).count ?? 0));
   const total = counts.reduce((a, b) => a + b, 0);
+  // 오늘 구간에 든 종료 경기 수 - counts.final에 되돌려 더한다(아래 counts 주석).
+  let todayFinal = 0;
+  if (counts[0]) {
+    let q = supabase.from("games").select("gmkey", { count: "exact", head: true })
+      .eq("game_date", today).not("home_score", "is", null).eq("is_ended", true);
+    if (seasonName) q = q.eq("season_name", seasonName);
+    if (tcode) q = q.or(`home_tcode.eq.${tcode},away_tcode.eq.${tcode}`);
+    todayFinal = (await q).count ?? 0;
+  }
   const pageCount = Math.max(1, Math.ceil(total / HOME_PAGE_SIZE));
   const page = Math.min(Math.max(1, Math.trunc(requestedPage) || 1), pageCount);
   const offset = (page - 1) * HOME_PAGE_SIZE;
@@ -238,7 +255,8 @@ export async function getGames(
     pageCount,
     total,
     offset,
-    counts: { live: counts[0], scheduled: counts[1], final: counts[2] },
+    // "final"은 시즌 종료 경기 총수(오늘 끝난 경기 포함) - 개막 배너 판정이 이 값으로 한다.
+    counts: { live: counts[1], scheduled: counts[2], final: counts[3] + todayFinal },
   };
 }
 

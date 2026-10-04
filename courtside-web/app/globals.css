@@ -483,6 +483,15 @@ select {
   font-weight: 800;
   letter-spacing: -0.02em;
 }
+.game-date-header-today {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 7px;
+  border-radius: var(--r-led);
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-size: 12px;
+}
 .game-date-header-count {
   font-family: "IBM Plex Mono", monospace;
   font-size: 12px;
