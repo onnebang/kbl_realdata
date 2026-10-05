@@ -6,6 +6,7 @@ import { supabaseServer as supabase } from "@/lib/supabaseServer";
 import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBox, type ReportSection } from "@/lib/postgameReport";
 import { DataSectionBody } from "@/components/report/DataSectionBody";
 import { HtmlSectionRenderer } from "@/components/report/HtmlSectionRenderer";
+import { HighlightReel } from "@/components/report/HighlightReel";
 import { TeamSplitBar, awayFillBackground } from "@/components/report/TeamSplitBar";
 import { teamInkStyle } from "@/lib/teamAccent";
 import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights";
@@ -1241,6 +1242,7 @@ export default async function GamePage({
             />
           </WidgetBoundary>
         )}
+        {reportSections.length > 0 && <HighlightReel sections={reportSections} />}
         {reportSections.length > 0 && (
           <div className="panel">
             <div className="panel-title">AI 코트사이드 리포트</div>
