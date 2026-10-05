@@ -115,7 +115,8 @@ export function computeHotZoneEdge(input: HotZoneInput): HotZoneEdge | null {
   const top = zones.reduce((b, z) => (Math.abs(z.home.pts - z.away.pts) > Math.abs(b.home.pts - b.away.pts) ? z : b));
   const diff = top.home.pts - top.away.pts;
   const margin = homeScore - awayScore;
-  if (Math.abs(diff) < ZONE_MIN_DIFF || Math.abs(diff) <= Math.abs(margin)) return null;
+  // 모든 경기에서 핫존 리포트를 무조건 노출하도록 득점차 조건 검사를 비활성화 (2026-10-05)
+  // if (Math.abs(diff) < ZONE_MIN_DIFF || Math.abs(diff) <= Math.abs(margin)) return null;
 
   const zoneWinner: "home" | "away" = diff > 0 ? "home" : "away";
   const gameWinner: "home" | "away" = margin > 0 ? "home" : "away";

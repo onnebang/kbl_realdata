@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
 import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBox, type ReportSection } from "@/lib/postgameReport";
 import { DataSectionBody } from "@/components/report/DataSectionBody";
+import { HtmlSectionRenderer } from "@/components/report/HtmlSectionRenderer";
 import { TeamSplitBar, awayFillBackground } from "@/components/report/TeamSplitBar";
 import { teamInkStyle } from "@/lib/teamAccent";
 import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights";
@@ -1248,7 +1249,7 @@ export default async function GamePage({
                 <div className="report-section-title">{s.title}</div>
                 {/* 문자열 HTML 섹션과 컴포넌트로 옮긴 섹션이 섞여 온다(renderKit.ts의
                     ReportSection 주석). 옮긴 섹션의 종류별 분기는 DataSectionBody 한 곳. */}
-                {"data" in s ? <DataSectionBody data={s.data} /> : <div dangerouslySetInnerHTML={{ __html: s.html }} />}
+                {"data" in s ? <DataSectionBody data={s.data} /> : <HtmlSectionRenderer html={s.html} />}
               </div>
             ))}
           </div>
