@@ -9,6 +9,7 @@ import Link from "next/link";
 // 감독)는 어느 폭에서도 탭으로 보이고, 분석(리더보드류)은 좁은 화면에서 접힌다.
 const MAIN_LINKS = [
   { href: "/", label: "경기 목록" },
+  { href: "/rankings/teams", label: "팀 순위" },
   { href: "/preseason", label: "개막 리포트" },
   { href: "/teams", label: "팀 자세히 보기" },
   { href: "/players", label: "선수 자세히 보기" },
@@ -21,6 +22,7 @@ const ANALYSIS_LINKS = [
   // { href: "/rankings/ovr", label: "OVR 랭킹 (2K)" },
   // { href: "/rankings/legends", label: "명예의 전당 (리빙 레전드)" },
   { href: "/lineups", label: "선수별 조합" },
+  { href: "/awards/round-mvp", label: "라운드 MVP" },
   { href: "/season-browser", label: "시즌 브라우저" },
   { href: "/leaderboards/season", label: "시즌 리더보드" },
   { href: "/leaderboards/win-contribution", label: "승부를 가른 순간" },

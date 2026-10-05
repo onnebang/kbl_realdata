@@ -147,7 +147,7 @@ export type PlayerGameRow = {
   per: number | null; usage_rtg: number | null;
 };
 
-const PLAYER_SELECT =
+export const PLAYER_SELECT =
   "gmkey, pcode, tcode, pos, back_num, min_played, pts, reb, ast, stl, blk, fgm, fga, tpm, tpa, ftm, fta, per, usage_rtg";
 
 /**

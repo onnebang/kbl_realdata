@@ -175,7 +175,7 @@ function pwrTierStyle(powers: ReturnType<typeof getAllTeamPowers>, teamName: str
 }
 
 // ── 팀 파워 사다리 - 4팩터 패널과 같은 .pctRow 시각 언어를 재사용, 새 CSS 없이 리그 10팀을
-// 한눈에(요청: "팀끼리 파워를 좀더 느낌있게 표시"). 전체 카드 보기는 이미 /rankings/teams에
+// 한눈에(요청: "팀끼리 파워를 좀더 느낌있게 표시"). 전체 카드 보기는 이미 /rankings/power에
 // 있어서(lib/teamPower.ts 공용 계산) 여긴 그 데이터를 압축 막대로만 보여주고 링크로 보낸다.
 function TeamPowerLadderPanel({
   powers, currentTeamName, teamByName, accent,
@@ -221,7 +221,7 @@ function TeamPowerLadderPanel({
       </div>
       <div className={styles.pctNote}>
         {powers[0]?.season} 로스터 오버롤(주전 5명 70% + 다음 4명 30% 가중) · 세로선 = 리그 평균({avg.toFixed(1)}) ·{" "}
-        <Link href="/rankings/teams">전체 카드로 보기 →</Link>
+        <Link href="/rankings/power">전체 카드로 보기 →</Link>
       </div>
     </>
   );
@@ -781,7 +781,7 @@ export default async function TeamPage({
   // team 필드가 그 선수의 "현재" 소속 기준이라 과거 시즌 기준 팀 매칭은 애초에 부정확함).
   const teamPower = getTeamPowerByName(teamName);
 
-  // 요청("팀 자세히보기에서 게임 같은 느낌으로 팀끼리 파워 비교") - /rankings/teams가 이미
+  // 요청("팀 자세히보기에서 게임 같은 느낌으로 팀끼리 파워 비교") - /rankings/power가 이미
   // 10팀 전체를 카드로 보여주니 그걸 다시 만들지 않고, 이 페이지엔 같은 데이터(getAllTeamPowers)로
   // 압축된 막대 사다리만 붙이고 전체 보기는 그 페이지로 링크한다.
   const allPowers = teamPower ? getAllTeamPowers(teamPower.season) : [];

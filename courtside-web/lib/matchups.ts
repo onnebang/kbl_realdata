@@ -58,7 +58,22 @@ export type H2H = {
   lastWinDate: Record<string, string | null>;
 };
 
-export type StandingsRow = { tcode: string; wins: number; losses: number; pct: number };
+export type StandingsRow = {
+  tcode: string;
+  wins: number;
+  losses: number;
+  pct: number;
+  /** 1위와의 게임차. 1위 본인은 0. */
+  gb: number;
+  /** 현재 연승/연패. 경기가 없으면 null. */
+  streak: { result: "W" | "L"; length: number } | null;
+  /** 최근 10경기(그보다 적으면 치른 만큼) 승-패. */
+  last10: { wins: number; losses: number };
+  home: { wins: number; losses: number };
+  away: { wins: number; losses: number };
+  /** 경기당 평균 득실마진. */
+  diff: number;
+};
 
 // 이 팀의 이 시즌, 이 날짜 이전(리크프리) 정규시즌 경기들의 팀 평균 스탯. game_team_stats엔
 // 상대 득점이 없어서(자기 팀 stat만) games 테이블의 home_score/away_score에서 상대 득점을
@@ -254,31 +269,82 @@ export async function getHeadToHead(homeTcode: string, awayTcode: string, before
   };
 }
 
+export type StandingsGameRow = {
+  home_tcode: string;
+  away_tcode: string;
+  home_score: number;
+  away_score: number;
+  game_date: string;
+  game_start: string | null;
+};
+
+// 순수 계산부만 분리(Supabase 없이 단위 테스트 가능 - lib/matchups.test.ts).
+// 연승연패/최근10경기/홈원정/득실마진/게임차까지 한 번에 계산한다(팀 순위 테이블용 확장 -
+// 기존 호출부는 wins/losses/pct만 쓰므로 필드 추가는 그쪽을 깨지 않는다).
+export function computeStandings(games: StandingsGameRow[]): StandingsRow[] {
+  if (!games.length) return [];
+  const sorted = [...games].sort(
+    (a, b) => a.game_date.localeCompare(b.game_date) || (a.game_start ?? "").localeCompare(b.game_start ?? "")
+  );
+  type Result = { won: boolean; isHome: boolean; diff: number };
+  const byTeam = new Map<string, Result[]>();
+  const push = (tcode: string, r: Result) => {
+    const list = byTeam.get(tcode) ?? [];
+    list.push(r);
+    byTeam.set(tcode, list);
+  };
+  for (const g of sorted) {
+    const homeWon = g.home_score > g.away_score;
+    push(g.home_tcode, { won: homeWon, isHome: true, diff: g.home_score - g.away_score });
+    push(g.away_tcode, { won: !homeWon, isHome: false, diff: g.away_score - g.home_score });
+  }
+  const splitWL = (results: Result[]) => ({
+    wins: results.filter((r) => r.won).length,
+    losses: results.filter((r) => !r.won).length,
+  });
+  const rows = Array.from(byTeam.entries()).map(([tcode, results]) => {
+    const { wins, losses } = splitWL(results);
+    const last = results[results.length - 1] ?? null;
+    let streak: StandingsRow["streak"] = null;
+    if (last) {
+      let length = 0;
+      for (let i = results.length - 1; i >= 0 && results[i].won === last.won; i--) length++;
+      streak = { result: last.won ? "W" : "L", length };
+    }
+    return {
+      tcode,
+      wins,
+      losses,
+      pct: wins / (wins + losses),
+      gb: 0, // 1위 확정 후 아래서 채움
+      streak,
+      last10: splitWL(results.slice(-10)),
+      home: splitWL(results.filter((r) => r.isHome)),
+      away: splitWL(results.filter((r) => !r.isHome)),
+      diff: results.reduce((sum, r) => sum + r.diff, 0) / results.length,
+    };
+  });
+  rows.sort((a, b) => b.pct - a.pct || b.diff - a.diff);
+  const leader = rows[0];
+  for (const r of rows) {
+    // 표시 순서는 승률(동률이면 득실마진)로 정하지만, 게임차 공식((승수차+패수차)/2)은
+    // 경기 수가 다르면 "2승0패"가 "1승0패"보다 공식상 반게임 앞서는 역전이 생길 수 있다
+    // (둘 다 승률 100%인데 그렇게 됨) - 그 경우 음수 게임차가 나오므로 0으로 바닥을 깐다.
+    r.gb = leader ? Math.max(0, (leader.wins - r.wins + (r.losses - leader.losses)) / 2) : 0;
+  }
+  return rows;
+}
+
 // 리그 순위 - 이 시즌 정규시즌 경기 중 이 날짜 이전 것만으로 승/패 집계(리크프리).
 export async function getStandingsAsOf(seasonName: string, beforeDate: string): Promise<StandingsRow[]> {
   const { data } = await supabase
     .from("games")
-    .select("home_tcode, away_tcode, home_score, away_score")
+    .select("home_tcode, away_tcode, home_score, away_score, game_date, game_start")
     .eq("season_name", seasonName)
     .eq("season_category", "정규시즌")
     .lte("game_date", beforeDate)
     .not("home_score", "is", null);
-  if (!data || !data.length) return [];
-  const record = new Map<string, { wins: number; losses: number }>();
-  const bump = (tcode: string, won: boolean) => {
-    const r = record.get(tcode) ?? { wins: 0, losses: 0 };
-    if (won) r.wins++;
-    else r.losses++;
-    record.set(tcode, r);
-  };
-  for (const g of data) {
-    const homeWon = (g.home_score as number) > (g.away_score as number);
-    bump(g.home_tcode as string, homeWon);
-    bump(g.away_tcode as string, !homeWon);
-  }
-  return Array.from(record.entries())
-    .map(([tcode, r]) => ({ tcode, wins: r.wins, losses: r.losses, pct: r.wins / (r.wins + r.losses) }))
-    .sort((a, b) => b.pct - a.pct);
+  return computeStandings((data ?? []) as StandingsGameRow[]);
 }
 
 // ── 팀 시즌 일정: 결과 + 예정 한 표(프로필 개편 1단계) ─────────────────────────────────

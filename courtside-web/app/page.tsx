@@ -510,6 +510,11 @@ export default async function HomePage({
           다 보고 난 자리(페이지네이션 바로 다음)에 다음 볼거리 세 장을 둔다. 시즌을 유지해서
           "지금 보던 그 시즌"으로 바로 넘어가게 한다. */}
       <div className="related-row">
+        <Link href={`/rankings/teams?season=${encodeURIComponent(activeSeason)}`} className="related-card">
+          <span className="related-kicker">팀 순위</span>
+          <span className="related-main">{activeSeason} 정규시즌 순위표</span>
+          <span className="related-sub">승-패, 승률, 게임차, 연속, 홈/원정 성적까지</span>
+        </Link>
         <Link href={`/season-browser?season=${encodeURIComponent(activeSeason)}`} className="related-card">
           <span className="related-kicker">시즌 브라우저</span>
           <span className="related-main">{activeSeason} 팀·선수 기록 한눈에</span>
