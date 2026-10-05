@@ -604,7 +604,8 @@ def load_pregame_context(cur, gmkeys):
         return ctx
     cur.execute("""
         select gmkey, home_netrtg, away_netrtg,
-               home_synergy_onoff_rating, away_synergy_onoff_rating
+               home_synergy_onoff_rating, away_synergy_onoff_rating,
+               home_win_prob, home_win_prob_lineup
         from pregame_features where gmkey = any(%s)
     """, (list(gmkeys),))
     found = {r[0]: r[1:] for r in cur.fetchall()}
@@ -612,9 +613,10 @@ def load_pregame_context(cur, gmkeys):
         row = found.get(gk)
         if row is None:
             ctx[gk] = {"netrtgDiff": 0.0, "synergyDiff": 0.0, "neutral": True,
+                       "seasonProb": None, "lineupProb": None,
                        "reason": "pregame_features 행 없음(시즌 극초반 표본 부족)"}
             continue
-        h_net, a_net, h_syn, a_syn = row
+        h_net, a_net, h_syn, a_syn, s_prob, l_prob = row
         net = (h_net - a_net) if (h_net is not None and a_net is not None) else None
         syn = (h_syn - a_syn) if (h_syn is not None and a_syn is not None) else None
         neutral = net is None and syn is None
@@ -623,6 +625,7 @@ def load_pregame_context(cur, gmkeys):
             reason = f"netrtg={'있음' if net is not None else '없음'}, synergy={'있음' if syn is not None else '없음'}"
         ctx[gk] = {"netrtgDiff": net if net is not None else 0.0,
                    "synergyDiff": syn if syn is not None else 0.0,
+                   "seasonProb": s_prob, "lineupProb": l_prob,
                    "neutral": neutral, "reason": reason}
     return ctx
 
@@ -765,8 +768,29 @@ def build_event_rows(gmkey, home_tcode, away_tcode, events, name_to_pcode, start
         })
 
     import numpy as np
+    
     probs = model.predict_proba(np.array(rows, dtype=float))[:, 1]
     probs_neutral = model.predict_proba(np.array(neutral_rows, dtype=float))[:, 1]
+    
+    # 엔트리 기준 승률(lineupProb) 보정 추가 (2026-10-05)
+    # 모델 자체의 base(netrtg/synergy)는 시즌 기준이므로, 예측된 확률에 logit 오프셋을 적용해
+    # 엔트리 기준 승률과 시작점을 맞춘다.
+    season_prob = ctx.get("seasonProb")
+    lineup_prob = ctx.get("lineupProb")
+    if season_prob is not None and lineup_prob is not None and season_prob != lineup_prob:
+        s_p = np.clip(season_prob, 0.01, 0.99)
+        l_p = np.clip(lineup_prob, 0.01, 0.99)
+        # logit(p) = log(p / (1 - p))
+        offset = np.log(l_p / (1 - l_p)) - np.log(s_p / (1 - s_p))
+
+        safe_probs = np.clip(probs, 0.01, 0.99)
+        adjusted_logits = np.log(safe_probs / (1 - safe_probs)) + offset
+        probs = 1 / (1 + np.exp(-adjusted_logits))
+        
+        safe_probs_neutral = np.clip(probs_neutral, 0.01, 0.99)
+        adjusted_logits_neutral = np.log(safe_probs_neutral / (1 - safe_probs_neutral)) + offset
+        probs_neutral = 1 / (1 + np.exp(-adjusted_logits_neutral))
+
     return mge.assemble_events(gmkey, meta_rows, probs, probs_neutral)
 
 
