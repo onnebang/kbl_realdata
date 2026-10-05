@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRoundMvpBoards, ROUND_QUALIFY, type PlayerDirectoryInfo } from "./roundAwards";
+import { buildPositionBestBoards, buildRoundMvpBoards, ROUND_QUALIFY, type PlayerDirectoryInfo } from "./roundAwards";
 import type { SeasonPlayerAgg } from "./seasonLeaders";
 import type { TeamInfo } from "./preseason";
 
@@ -112,5 +112,47 @@ describe("buildRoundMvpBoards", () => {
     const row = boards.find((b) => b.role === "domestic")!.rows[0];
     expect(row.team).toBeNull();
     expect(row.photoUrl).toBeNull();
+  });
+});
+
+describe("buildPositionBestBoards", () => {
+  it("pos로 G/F/C에 나눠 담고, 포지션 미확인(null)은 어느 보드에도 넣지 않는다", () => {
+    const boards = buildPositionBestBoards(
+      [agg("g1", "A", { pos: "G" }), agg("f1", "A", { pos: "F" }), agg("c1", "A", { pos: "C" }), agg("unk", "A", { pos: null })],
+      info([
+        ["g1", { role: null, name: "가드", photoUrl: null }],
+        ["f1", { role: null, name: "포워드", photoUrl: null }],
+        ["c1", { role: null, name: "센터", photoUrl: null }],
+        ["unk", { role: null, name: "미확인", photoUrl: null }],
+      ]),
+      TEAMS
+    );
+    expect(boards.find((b) => b.pos === "G")!.rows.map((r) => r.pcode)).toEqual(["g1"]);
+    expect(boards.find((b) => b.pos === "F")!.rows.map((r) => r.pcode)).toEqual(["f1"]);
+    expect(boards.find((b) => b.pos === "C")!.rows.map((r) => r.pcode)).toEqual(["c1"]);
+    expect(boards.every((b) => b.rows.every((r) => r.pcode !== "unk"))).toBe(true);
+  });
+
+  it("MVP와 같은 자격 기준을 쓴다(라운드 내 3경기 또는 50분 미달은 제외)", () => {
+    const boards = buildPositionBestBoards(
+      [agg("ok", "A", { pos: "G", gp: ROUND_QUALIFY.gp, minutes: 10 }), agg("short", "A", { pos: "G", gp: 1, minutes: 10 })],
+      info([
+        ["ok", { role: null, name: "출전만족", photoUrl: null }],
+        ["short", { role: null, name: "미달", photoUrl: null }],
+      ]),
+      TEAMS
+    );
+    const g = boards.find((b) => b.pos === "G")!;
+    expect(g.rows.map((r) => r.pcode)).toEqual(["ok"]);
+    expect(g.poolN).toBe(1);
+  });
+
+  it("기본 topN은 3이다(1~3위)", () => {
+    const aggs = Array.from({ length: 5 }, (_, i) => agg(`g${i}`, "A", { pos: "G", perW: i }));
+    const infos = info(aggs.map((a) => [a.pcode, { role: null, name: a.pcode, photoUrl: null } as PlayerDirectoryInfo]));
+    const boards = buildPositionBestBoards(aggs, infos, TEAMS);
+    const g = boards.find((b) => b.pos === "G")!;
+    expect(g.rows.map((r) => r.pcode)).toEqual(["g4", "g3", "g2"]);
+    expect(g.poolN).toBe(5);
   });
 });

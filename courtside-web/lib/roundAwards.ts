@@ -5,7 +5,9 @@ import { getSeasonDirectory, getTeams, type TeamInfo } from "./preseason";
 import { aggregateSeasonPlayers, PLAYER_SELECT, type PlayerGameRow, type SeasonPlayerAgg } from "./seasonLeaders";
 import { normalizePos, posLabel } from "./teamSeasonStats";
 
-// 라운드 MVP(국내/용병/아시아쿼터) - /awards/round-mvp.
+// 라운드 어워드(/awards/round) - 라운드 MVP(국내/용병/아시아쿼터) + 포지션별 베스트(G/F/C
+// 1~3위). 둘 다 같은 라운드 선수 집계(aggs) 하나에서 그룹 기준만 바꿔 뽑는다 - 쿼리도
+// game_player_stats 한 번뿐이다.
 //
 // 새 계산식을 만들지 않았다: game_player_stats에 경기별 PER이 이미 있고,
 // aggregateSeasonPlayers()(lib/seasonLeaders.ts)는 "선수-경기 행 묶음 → 선수별 집계(출전시간
@@ -13,8 +15,9 @@ import { normalizePos, posLabel } from "./teamSeasonStats";
 // 라운드 집계가 된다. 국내/용병/아시아쿼터 구분도 getSeasonDirectory(season_roster.note 기반,
 // lib/preseason.ts의 roleFromNote와 같은 규칙)를 그대로 쓴다.
 //
-// 선정 기준은 순수하게 스탯(출전시간 가중 PER 평균)이다 - 팀 성적·서사는 반영하지 않고 그
-// 사실을 화면에 명시한다(시즌 리더보드와 같은 "자격 기준 없는 순위표는 거짓말" 기조).
+// 선정 기준은 두 어워드 모두 순수하게 스탯(출전시간 가중 PER 평균)이다 - 팀 성적·서사는
+// 반영하지 않고 그 사실을 화면에 명시한다(시즌 리더보드와 같은 "자격 기준 없는 순위표는
+// 거짓말" 기조).
 
 export type RoundRoleKey = "domestic" | "import" | "asiaQuota";
 
@@ -24,17 +27,25 @@ export const ROUND_ROLE_LABEL: Record<RoundRoleKey, string> = {
   asiaQuota: "아시아쿼터",
 };
 
+export type PositionKey = "G" | "F" | "C";
+
+export const POSITION_LABEL: Record<PositionKey, string> = {
+  G: "가드",
+  F: "포워드",
+  C: "센터",
+};
+
 /** 시즌 리더보드 자격(15경기 또는 300분, lib/seasonLeaders.ts LEADER_QUALIFY)을 라운드 최대
  * 경기 수(10팀 기준 라운드당 9경기)에 맞춰 스케일: 15/54*9≈2.5→3경기, 300/54*9≈50분. */
 export const ROUND_QUALIFY = { gp: 3, minutes: 50 } as const;
 
-export type RoundMvpRow = {
+export type RoundAwardRow = {
   pcode: string;
   name: string;
   tcode: string;
   team: TeamInfo | null;
   photoUrl: string | null;
-  pos: "G" | "F" | "C" | null;
+  pos: PositionKey | null;
   posLabel: string;
   gp: number;
   minutes: number;
@@ -52,17 +63,25 @@ export type RoundMvpBoard = {
   label: string;
   /** 자격 통과 + 이 버킷에 속한 인원(화면에 "N명 중" 캡션용). */
   poolN: number;
-  rows: RoundMvpRow[];
+  rows: RoundAwardRow[];
 };
 
-export type RoundMvpResult = {
+export type PositionBestBoard = {
+  pos: PositionKey;
+  label: string;
+  poolN: number;
+  rows: RoundAwardRow[];
+};
+
+export type RoundAwardsResult = {
   seasonName: string;
   round: number;
   roundCount: number;
   gamesTotal: number;
   gamesEnded: number;
   qualify: typeof ROUND_QUALIFY;
-  boards: RoundMvpBoard[];
+  mvpBoards: RoundMvpBoard[];
+  positionBoards: PositionBestBoard[];
 };
 
 export type PlayerDirectoryInfo = { role: string | null; name: string; photoUrl: string | null };
@@ -72,6 +91,36 @@ function roleKey(role: string | null): RoundRoleKey {
   return role.includes("아시아") ? "asiaQuota" : "import";
 }
 
+/** 자격 통과(라운드 내 3경기 또는 50분 이상)한 선수만. 두 어워드가 같은 기준을 쓴다. */
+function qualifiedAggs(aggs: SeasonPlayerAgg[]): SeasonPlayerAgg[] {
+  return aggs.filter((a) => a.gp >= ROUND_QUALIFY.gp || a.minutes >= ROUND_QUALIFY.minutes);
+}
+
+function toRow(a: SeasonPlayerAgg, infoByPcode: Map<string, PlayerDirectoryInfo>, teams: Map<string, TeamInfo>): RoundAwardRow {
+  const info = infoByPcode.get(a.pcode);
+  const pos = normalizePos(a.pos);
+  return {
+    pcode: a.pcode,
+    name: info?.name ?? a.pcode,
+    tcode: a.tcode,
+    team: teams.get(a.tcode) ?? null,
+    photoUrl: info?.photoUrl ?? null,
+    pos,
+    posLabel: posLabel(pos),
+    gp: a.gp,
+    minutes: a.minutes,
+    perW: a.perW,
+    pts: a.pts,
+    reb: a.reb,
+    ast: a.ast,
+    stl: a.stl,
+    blk: a.blk,
+    tpm: a.tpm,
+  };
+}
+
+const byPerThenMinutes = (a: SeasonPlayerAgg, b: SeasonPlayerAgg) => b.perW - a.perW || b.minutes - a.minutes;
+
 /** 순수 버킷팅/정렬부 - Supabase 없이 단위 테스트 가능(lib/roundAwards.test.ts). */
 export function buildRoundMvpBoards(
   aggs: SeasonPlayerAgg[],
@@ -79,44 +128,59 @@ export function buildRoundMvpBoards(
   teams: Map<string, TeamInfo>,
   topN = 5
 ): RoundMvpBoard[] {
-  const qualified = aggs.filter((a) => a.gp >= ROUND_QUALIFY.gp || a.minutes >= ROUND_QUALIFY.minutes);
   const buckets: Record<RoundRoleKey, SeasonPlayerAgg[]> = { domestic: [], import: [], asiaQuota: [] };
-  for (const a of qualified) {
+  for (const a of qualifiedAggs(aggs)) {
     buckets[roleKey(infoByPcode.get(a.pcode)?.role ?? null)].push(a);
   }
   return (["domestic", "import", "asiaQuota"] as const).map((role) => {
-    const pool = [...buckets[role]].sort((a, b) => b.perW - a.perW || b.minutes - a.minutes);
-    const rows: RoundMvpRow[] = pool.slice(0, topN).map((a) => {
-      const info = infoByPcode.get(a.pcode);
-      const pos = normalizePos(a.pos);
-      return {
-        pcode: a.pcode,
-        name: info?.name ?? a.pcode,
-        tcode: a.tcode,
-        team: teams.get(a.tcode) ?? null,
-        photoUrl: info?.photoUrl ?? null,
-        pos,
-        posLabel: posLabel(pos),
-        gp: a.gp,
-        minutes: a.minutes,
-        perW: a.perW,
-        pts: a.pts,
-        reb: a.reb,
-        ast: a.ast,
-        stl: a.stl,
-        blk: a.blk,
-        tpm: a.tpm,
-      };
-    });
-    return { role, label: ROUND_ROLE_LABEL[role], poolN: pool.length, rows };
+    const pool = [...buckets[role]].sort(byPerThenMinutes);
+    return {
+      role,
+      label: ROUND_ROLE_LABEL[role],
+      poolN: pool.length,
+      rows: pool.slice(0, topN).map((a) => toRow(a, infoByPcode, teams)),
+    };
   });
 }
 
-export async function getRoundMvp(seasonName: string, round?: number, topN = 5): Promise<RoundMvpResult> {
+/** 포지션별 베스트(G/F/C 1~3위) - MVP와 같은 자격·같은 순위 기준(출전시간 가중 PER 평균),
+ * 그룹 기준만 국적 역할 대신 포지션. 포지션 미확인(null)인 행은 어느 보드에도 넣지 않는다. */
+export function buildPositionBestBoards(
+  aggs: SeasonPlayerAgg[],
+  infoByPcode: Map<string, PlayerDirectoryInfo>,
+  teams: Map<string, TeamInfo>,
+  topN = 3
+): PositionBestBoard[] {
+  const buckets: Record<PositionKey, SeasonPlayerAgg[]> = { G: [], F: [], C: [] };
+  for (const a of qualifiedAggs(aggs)) {
+    const pos = normalizePos(a.pos);
+    if (pos) buckets[pos].push(a);
+  }
+  return (["G", "F", "C"] as const).map((pos) => {
+    const pool = [...buckets[pos]].sort(byPerThenMinutes);
+    return {
+      pos,
+      label: POSITION_LABEL[pos],
+      poolN: pool.length,
+      rows: pool.slice(0, topN).map((a) => toRow(a, infoByPcode, teams)),
+    };
+  });
+}
+
+export async function getRoundAwards(seasonName: string, round?: number): Promise<RoundAwardsResult> {
   const { games, round: r, roundCount } = await getRoundGames(seasonName, undefined, round);
   const ended = games.filter((g) => g.is_ended);
   if (!ended.length) {
-    return { seasonName, round: r, roundCount, gamesTotal: games.length, gamesEnded: 0, qualify: ROUND_QUALIFY, boards: [] };
+    return {
+      seasonName,
+      round: r,
+      roundCount,
+      gamesTotal: games.length,
+      gamesEnded: 0,
+      qualify: ROUND_QUALIFY,
+      mvpBoards: [],
+      positionBoards: [],
+    };
   }
 
   const gmkeys = ended.map((g) => g.gmkey);
@@ -133,6 +197,14 @@ export async function getRoundMvp(seasonName: string, round?: number, topN = 5):
     }
   }
 
-  const boards = buildRoundMvpBoards(aggs, infoByPcode, teams, topN);
-  return { seasonName, round: r, roundCount, gamesTotal: games.length, gamesEnded: ended.length, qualify: ROUND_QUALIFY, boards };
+  return {
+    seasonName,
+    round: r,
+    roundCount,
+    gamesTotal: games.length,
+    gamesEnded: ended.length,
+    qualify: ROUND_QUALIFY,
+    mvpBoards: buildRoundMvpBoards(aggs, infoByPcode, teams, 5),
+    positionBoards: buildPositionBestBoards(aggs, infoByPcode, teams, 3),
+  };
 }
