@@ -97,7 +97,7 @@ describe("computeHotZoneEdge", () => {
     expect(renderHotZoneSection(edge, { homeTeam, awayTeam, tags }).html).toContain("3점 핫존 지배");
   });
 
-  it("구역 격차가 최종 마진보다 크지 않으면 null(그냥 경기 결과일 뿐이라 말하지 않는다)", () => {
+  it("이제는 구역 격차가 최종 마진보다 크지 않아도 리포트가 정상 생성된다", () => {
     expect(
       computeHotZoneEdge({
         shots: oneRimEach,
@@ -107,7 +107,7 @@ describe("computeHotZoneEdge", () => {
         homeScore: 110,
         awayScore: 80, // 마진 30 > 24
       })
-    ).toBeNull();
+    ).not.toBeNull();
   });
 
   it("구역을 이기고도 진 경기는 역설로 잡고, 승자가 벌린 구역을 같이 든다", () => {
