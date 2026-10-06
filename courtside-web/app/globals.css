@@ -209,9 +209,10 @@ a {
   color: var(--ink);
 }
 
-@media (min-width: 900px) {
+@media (min-width: 768px) {
   .nav-bar-inner {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     gap: 4px 4px;
   }

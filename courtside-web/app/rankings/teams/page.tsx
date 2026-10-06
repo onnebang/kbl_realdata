@@ -60,12 +60,42 @@ export default async function TeamStandingsPage({
   const activeSeason = seasons.includes(requested) ? requested : seasons[0];
   const fellBack = requested && requested !== activeSeason ? requested : null;
 
-  const [rows, teams, teamStats, quarterSplits] = await Promise.all([
+  const [dbRows, teams, teamStats, quarterSplits] = await Promise.all([
     getStandingsAsOfCached(activeSeason, "9999-12-31"),
     getTeams(activeSeason),
     getTeamSeasonStats(activeSeason),
     getTeamQuarterSplits(activeSeason),
   ]);
+
+  const activeTeams = [...teams.values()].filter((tm) => !["30", "65", "73"].includes(tm.tcode));
+  const rows = activeTeams
+    .map((tm) => {
+      const r = dbRows.find((row) => row.tcode === tm.tcode);
+      if (r) return { ...r };
+      return {
+        tcode: tm.tcode,
+        wins: 0,
+        losses: 0,
+        pct: 0,
+        gb: 0,
+        streak: null,
+        last10: { wins: 0, losses: 0 },
+        home: { wins: 0, losses: 0 },
+        away: { wins: 0, losses: 0 },
+        diff: 0,
+      };
+    })
+    .sort((a, b) => {
+      if (b.pct !== a.pct) return b.pct - a.pct;
+      return b.diff - a.diff;
+    });
+
+  if (rows.length > 0) {
+    const firstMargin = rows[0].wins - rows[0].losses;
+    for (const r of rows) {
+      r.gb = Math.max(0, (firstMargin - (r.wins - r.losses)) / 2);
+    }
+  }
 
   return (
     <div className="wrap">
@@ -171,8 +201,7 @@ export default async function TeamStandingsPage({
             {/* rows(승-패 기록)만 돌면 아직 치른 경기가 0인 팀(예: 개막 전 SK)이 빠진다 -
                 요청("SK까지 10팀 전부") - 팀 목록은 teams(시즌 로스터 10개 전체)를 기준으로
                 돌고, 기록이 없으면 "아직 기록 없음"으로 빈 카드를 보여준다. */}
-            {[...teams.values()]
-              .filter((tm) => !["30", "65", "73"].includes(tm.tcode))
+            {activeTeams
               .sort((a, b) => {
                 const ai = rows.findIndex((row) => row.tcode === a.tcode);
                 const bi = rows.findIndex((row) => row.tcode === b.tcode);
