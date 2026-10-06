@@ -50,12 +50,17 @@ export function mirrorShotX(x: number, d: string): number {
   return d === "2" ? 750 - x : x;
 }
 
+export function mirrorShotY(y: number, d: string): number {
+  return d === "2" ? 411 - y : y;
+}
+
 // 2점/3점 판정 - build_xpts_shot_quality.py에서 검증한 것과 같은 THREE_PT_M(6.75m)
 // 거리 기준. shot_log엔 값(2/3)을 직접 담은 컬럼이 없어서(x/y/d로 매번 역산) 여기서
 // 한 번만 export해두고 슛 종류 필터에서 재사용.
 export function shotValue(x: number, y: number, d: string): 2 | 3 {
   const mx = mirrorShotX(x, d);
-  return shotDistM(mx, y) >= THREE_PT_M ? 3 : 2;
+  const my = mirrorShotY(y, d);
+  return shotDistM(mx, my) >= THREE_PT_M ? 3 : 2;
 }
 
 // 슛 퀄리티 분석(xPTS)용 룩업. 각 구역별 리그 평균 슛 성공률 기준 기대득점.
@@ -76,7 +81,8 @@ const ZONE_XPTS: Record<string, number> = {
 };
 export function shotXPTS(x: number, y: number, d: string): number {
   const mx = mirrorShotX(x, d);
-  const distM = shotDistM(mx, y);
+  const my = mirrorShotY(y, d);
+  const distM = shotDistM(mx, my);
   const zone = classifyZone(distM)[0];
   return ZONE_XPTS[zone] ?? ZONE_XPTS.midShort;
 }
@@ -130,7 +136,8 @@ const cornerArchX = (() => {
 
 export function isCornerThree(x: number, y: number, d: string): boolean {
   const mx = mirrorShotX(x, d);
-  const inSideBand = y <= topY || y >= botY; // 사이드라인에서 THREE_SIDE_MARGIN_M 안쪽
+  const my = mirrorShotY(y, d);
+  const inSideBand = my <= topY || my >= botY; // 사이드라인에서 THREE_SIDE_MARGIN_M 안쪽
   const inStraightSeg = mx >= cornerArchX; // 호가 아니라 베이스라인까지 이어지는 직선 구간
   return inSideBand && inStraightSeg && shotValue(x, y, d) === 3;
 }
@@ -144,7 +151,8 @@ export function teamZoneStats(shots: ShotRow[], tcode: string): ZoneStats {
   for (const s of shots) {
     if (s.tcode !== tcode) continue;
     const x = mirrorShotX(s.x, s.d);
-    const [zoneKey] = classifyZone(shotDistM(x, s.y));
+    const y = mirrorShotY(s.y, s.d);
+    const [zoneKey] = classifyZone(shotDistM(x, y));
     stats[zoneKey].att++;
     if (s.made) stats[zoneKey].made++;
   }
@@ -177,15 +185,16 @@ export function buildCourtDotsSvg<T extends ShotRow>(shots: T[], color: string, 
 
   for (const s of shots) {
     const x = mirrorShotX(s.x, s.d);
+    const y = mirrorShotY(s.y, s.d);
     const r = shotValue(s.x, s.y, s.d) === 3 ? 4.2 : 3.4;
     const meta = getMeta ? getMeta(s) : null;
     const extraAttrs = meta?.jumpIdx != null ? ` class="zc-dot-jump" data-jump-idx="${meta.jumpIdx}"` : "";
     const titleEl = meta?.title ? `<title>${escapeSvgText(meta.title)}</title>` : "";
     const fillAttrs = s.made ? `fill="${color}" opacity="0.88"` : `fill="none" stroke="${color}" stroke-width="1.3" opacity="0.4"`;
     if (titleEl || extraAttrs) {
-      svg += `<circle cx="${x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="${r}" ${fillAttrs}${extraAttrs}>${titleEl}</circle>`;
+      svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" ${fillAttrs}${extraAttrs}>${titleEl}</circle>`;
     } else {
-      svg += `<circle cx="${x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="${r}" ${fillAttrs}/>`;
+      svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" ${fillAttrs}/>`;
     }
   }
 

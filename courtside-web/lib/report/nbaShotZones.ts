@@ -1,4 +1,4 @@
-import { mirrorShotX, type ShotRow } from "../zoneCompare";
+import { mirrorShotX, mirrorShotY, type ShotRow } from "../zoneCompare";
 import type { ReportTeamMeta } from "./renderKit";
 
 // ---------------------------------------------------------------------------
@@ -80,17 +80,18 @@ const escAttr = (s: string) =>
 
 export function classifyNbaZone(x: number, y: number, d: string): NbaZoneKey {
   const mx = mirrorShotX(x, d);
-  const distM = Math.hypot(mx - HOOP_RIGHT[0], y - HOOP_RIGHT[1]) * SCALE_M_PER_UNIT;
+  const my = mirrorShotY(y, d);
+  const distM = Math.hypot(mx - HOOP_RIGHT[0], my - HOOP_RIGHT[1]) * SCALE_M_PER_UNIT;
 
   // 1. 3점슛 판정 (거리 6.75m 이상 또는 코너 3점 직선 구역)
-  const isCornerThree = (y <= 48.8 || y >= 362.2) && mx >= 634.6;
+  const isCornerThree = (my <= 48.8 || my >= 362.2) && mx >= 634.6;
   const isThree = distM >= 6.75 || isCornerThree;
 
   if (isThree) {
-    if (y <= 48.8) return "three_corner_top";
-    if (y >= 362.2) return "three_corner_bottom";
-    if (y < 133.9) return "three_wing_top";
-    if (y > 277.1) return "three_wing_bottom";
+    if (my <= 48.8) return "three_corner_top";
+    if (my >= 362.2) return "three_corner_bottom";
+    if (my < 133.9) return "three_wing_top";
+    if (my > 277.1) return "three_wing_bottom";
     return "three_top";
   }
 
@@ -100,15 +101,15 @@ export function classifyNbaZone(x: number, y: number, d: string): NbaZoneKey {
   }
 
   // 3. 페인트존 구역 (자유투 라인 mx >= 579.6, 레인 폭 y: 146.2 ~ 264.8)
-  if (mx >= 579.6 && y >= 146.2 && y <= 264.8) {
-    if (y < 175.2) return "paint_top";
-    if (y > 235.8) return "paint_bottom";
+  if (mx >= 579.6 && my >= 146.2 && my <= 264.8) {
+    if (my < 175.2) return "paint_top";
+    if (my > 235.8) return "paint_bottom";
     return "paint_center";
   }
 
   // 4. 미드레인지 구역 (3점 라인 안쪽, 페인트존 및 림 바깥)
-  if (y < 146.2) return "mid_top";
-  if (y > 264.8) return "mid_bottom";
+  if (my < 146.2) return "mid_top";
+  if (my > 264.8) return "mid_bottom";
   return "mid_center";
 }
 
@@ -695,6 +696,7 @@ export function renderZoneInspectorHtml(uid: string): string {
     `paths.forEach(function(p){` +
     `p.addEventListener("mouseenter",function(){update(p);});` +
     `p.addEventListener("click",function(){update(p);});` +
+    `p.addEventListener("touchstart",function(e){e.preventDefault(); update(p);});` +
     `});` +
     `})();` +
     `</script>`
