@@ -4,11 +4,25 @@ import { TeamBadge } from "@/components/TeamBadge";
 import { getTeams, shortSeason } from "@/lib/preseason";
 import { getLeaderboardSeasons } from "@/lib/seasonLeaders";
 import { getStandingsAsOfCached } from "@/lib/teamPageData";
+import { getTeamSeasonStats, getTeamQuarterSplits, REGULATION_QUARTERS, type TeamStatKey } from "@/lib/teamSeasonStats";
 import { signed, signTone } from "@/lib/format";
 import styles from "./standings.module.css";
+import overview from "./team-overview.module.css";
+
+// 팀 전체 개요 그리드에 쓸 축약 지표 - 전체 24개 지표(lib/teamSeasonStats.ts TEAM_STAT_DEFS)
+// 중 "팀 색깔"을 한눈에 보여줄 6개만 고른다. 전체 표는 각 팀 상세 페이지(/teams/[tcode])에
+// 이미 있으니 여기서 중복으로 다 보여줄 필요 없음.
+const OVERVIEW_STAT_KEYS: TeamStatKey[] = ["net", "efg", "tpPct", "reb", "ast", "tov"];
 
 // 팀 순위 테이블(승-패 기반 실제 스탠딩). 기존 "TEAM POWER RANKINGS"(OVR 전력 평가)는 전혀
 // 다른 개념이라 /rankings/power로 옮겼고, 이 자리는 이제 진짜 순위표다.
+//
+// 2026-10-06(사용자 요청, "팀 순위 고도화 - 쿼터별 팀 분위기, 슈팅 구성비율 등 10개구단이
+// 전체적으로 보이게, 팀 자세히 보기로 유도") - 순위표 아래에 10개 팀 카드 그리드를 더했다.
+// 슈팅·리바운드·소유 지표는 getTeamSeasonStats(팀 상세 페이지와 같은 데이터 - 이미 전체
+// 24개 지표에 리그 순위까지 계산해 둔다, 여기선 6개만 추림)를 그대로 재사용. 쿼터별 분위기는
+// 기존 데이터에 없어 새로 추가(getTeamQuarterSplits, game_events의 쿼터 종료 시점 점수차를
+// 집계). 각 카드는 그 팀 상세 페이지로 링크해 "자세히 보기"로 자연스럽게 넘어가게 했다.
 export const dynamic = "force-dynamic";
 
 function diffClass(v: number): string | undefined {
@@ -46,9 +60,11 @@ export default async function TeamStandingsPage({
   const activeSeason = seasons.includes(requested) ? requested : seasons[0];
   const fellBack = requested && requested !== activeSeason ? requested : null;
 
-  const [rows, teams] = await Promise.all([
+  const [rows, teams, teamStats, quarterSplits] = await Promise.all([
     getStandingsAsOfCached(activeSeason, "9999-12-31"),
     getTeams(activeSeason),
+    getTeamSeasonStats(activeSeason),
+    getTeamQuarterSplits(activeSeason),
   ]);
 
   return (
@@ -149,6 +165,75 @@ export default async function TeamStandingsPage({
             </p>
             <p>{shortSeason(activeSeason)} 정규시즌 기준 · 플레이오프 제외</p>
           </div>
+
+          {teamStats && (
+            <>
+              <div className={overview.sectionHead}>
+                <h2 className="title" style={{ fontSize: "1.1rem" }}>
+                  팀 전체 개요
+                </h2>
+                <span className="empty-note">종합·슈팅·리바운드·소유 6개 지표 + 쿼터별 분위기 · 전체 지표는 팀 상세에서</span>
+              </div>
+              <div className={overview.grid}>
+                {rows.map((r) => {
+                  const stat = teamStats.byTcode[r.tcode];
+                  if (!stat) return null;
+                  const tm = teams.get(r.tcode);
+                  const badge = tm ? { name: tm.name, abbr: tm.abbr, color: tm.color, logoUrl: tm.logoUrl } : null;
+                  const qs = quarterSplits?.get(r.tcode);
+                  return (
+                    <Link key={r.tcode} href={`/teams/${r.tcode}`} className={overview.card}>
+                      <div className={overview.cardHead}>
+                        <TeamBadge team={badge} size={28} />
+                        <div>
+                          <div className={overview.cardName}>{tm?.name ?? r.tcode}</div>
+                          <div className={overview.cardRecord}>
+                            {r.wins}승 {r.losses}패 · {(r.pct * 100).toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={overview.statGrid}>
+                        {OVERVIEW_STAT_KEYS.map((key) => {
+                          const cell = stat.cellByKey[key];
+                          if (!cell) return null;
+                          return (
+                            <div key={key} className={overview.statCell}>
+                              <span className={overview.statLabel}>{cell.label}</span>
+                              <span className={cell.better === null ? undefined : cell.better ? overview.pos : overview.neg}>
+                                {cell.display}
+                              </span>
+                              <span className={overview.statRank}>{cell.rankLabel}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {qs && (
+                        <div className={overview.quarters}>
+                          <span className={overview.quarterCaption}>쿼터별 분위기(그 쿼터 평균 득실차)</span>
+                          <div className={overview.quarterBars}>
+                            {REGULATION_QUARTERS.map((q) => {
+                              const v = qs.quarters[q];
+                              const tone = v > 0.1 ? overview.pos : v < -0.1 ? overview.neg : undefined;
+                              return (
+                                <div key={q} className={overview.quarterBar}>
+                                  <span className={overview.quarterLabel}>{q}</span>
+                                  <span className={tone}>{signed(v, 1)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      <span className={overview.cta}>팀 자세히 보기 →</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
@@ -157,5 +242,5 @@ export default async function TeamStandingsPage({
 
 export const metadata: Metadata = {
   title: "팀 순위",
-  description: "KBL 정규시즌 팀 순위 - 승패, 승률, 게임차, 연속, 최근 10경기, 홈/원정 성적, 득실마진",
+  description: "KBL 정규시즌 팀 순위 + 10개 구단 전체 개요(슈팅 구성, 쿼터별 분위기) - 팀 상세로 이동",
 };

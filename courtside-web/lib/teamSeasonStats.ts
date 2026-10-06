@@ -666,3 +666,129 @@ async function computeTeamLeaders(tcode: string, seasonName: string): Promise<Te
       : `${shortSeason(seasonName)} 정규시즌 경기당 기록 · 팀 ${teamGp}경기의 30%인 ${minGp}경기 이상 출전한 ${pool.length}명 중 · 출전 경기는 0분 엔트리 제외`,
   };
 }
+
+// ---------------------------------------------------------------------------
+// 쿼터별 팀 분위기(사용자 요청, 2026-10-06 "팀 순위 고도화") - game_team_stats/RPC 어디에도
+// 쿼터별 컬럼이 없다(이 테이블들은 전체 경기 합계만). 유일한 원천은 game_events의 쿼터별
+// 누적 점수뿐이라, 이 파일 맨 위 주석의 원칙(RPC를 새로 못 만듦 - DB 스키마 불변)대로
+// PostgREST로 원본 이벤트를 받아 JS에서 집계한다. 정규시즌만, 연장(X1~)은 "쿼터별 분위기"의
+// 취지(매 경기 공통된 4쿼터 흐름 비교)에서 벗어나므로 뺀다.
+// ---------------------------------------------------------------------------
+
+export const REGULATION_QUARTERS = ["Q1", "Q2", "Q3", "Q4"] as const;
+export type RegulationQuarter = (typeof REGULATION_QUARTERS)[number];
+
+export type TeamQuarterSplit = {
+  tcode: string;
+  gp: number;
+  /** 쿼터별 "그 쿼터만의" 평균 득실차(우리팀 득점 - 상대팀 득점, 그 쿼터 한정). 양수면 그 쿼터에 대체로 앞선다. */
+  quarters: Record<RegulationQuarter, number>;
+  /** 가장 강한/약한 쿼터 - 카드 한 줄 요약용("4쿼터에 강하다" 등). */
+  bestQuarter: RegulationQuarter;
+  worstQuarter: RegulationQuarter;
+};
+
+type QuarterEventRow = { gmkey: string; quarter: string; event_order: number; home_score: number | null; away_score: number | null };
+
+const QUARTER_EVENT_SELECT = "gmkey, quarter, event_order, home_score, away_score";
+
+/** 경기별로 "그 쿼터의 마지막 이벤트" 점수(=쿼터 종료 시점 누적 점수)만 골라낸다. */
+async function fetchQuarterEndScores(gmkeys: string[]): Promise<Map<string, Partial<Record<RegulationQuarter, { home: number; away: number }>>>> {
+  const best = new Map<string, Map<string, { eventOrder: number; home: number; away: number }>>();
+  for (const part of chunk(gmkeys, GMKEY_CHUNK)) {
+    const rows = await fetchAllPagesBounded<QuarterEventRow>((from, to) =>
+      supabase
+        .from("game_events")
+        .select(QUARTER_EVENT_SELECT, { count: "exact" })
+        .in("gmkey", part)
+        .in("quarter", REGULATION_QUARTERS as unknown as string[])
+        .not("home_score", "is", null)
+        .range(from, to)
+    );
+    for (const r of rows) {
+      if (r.home_score == null || r.away_score == null) continue;
+      let byQuarter = best.get(r.gmkey);
+      if (!byQuarter) {
+        byQuarter = new Map();
+        best.set(r.gmkey, byQuarter);
+      }
+      const cur = byQuarter.get(r.quarter);
+      if (!cur || r.event_order > cur.eventOrder) {
+        byQuarter.set(r.quarter, { eventOrder: r.event_order, home: r.home_score, away: r.away_score });
+      }
+    }
+  }
+  const out = new Map<string, Partial<Record<RegulationQuarter, { home: number; away: number }>>>();
+  for (const [gmkey, byQuarter] of best) {
+    const o: Partial<Record<RegulationQuarter, { home: number; away: number }>> = {};
+    for (const q of REGULATION_QUARTERS) {
+      const v = byQuarter.get(q);
+      if (v) o[q] = { home: v.home, away: v.away };
+    }
+    out.set(gmkey, o);
+  }
+  return out;
+}
+
+/** 쿼터별 팀 분위기 - 팀 순위 개요 그리드용(getSeasonGames로 경기 목록을 이미 가진 호출부는
+ * games를 넘기면 중복 조회를 피한다). 표본이 부족한 경기(쿼터 종료 이벤트 누락)는 그 경기만
+ * 건너뛴다 - 한 경기 때문에 팀 전체를 빼지 않는다. */
+export const getTeamQuarterSplits = cachedFn(computeTeamQuarterSplits, {
+  name: "teamQuarterSplits",
+  ttl: TTL.batchDaily,
+  tags: (seasonName) => [TAG.batch, TAG.season(seasonName)],
+});
+
+async function computeTeamQuarterSplits(seasonName: string): Promise<Map<string, TeamQuarterSplit> | null> {
+  const games = await getSeasonGames(seasonName, { category: SEASON_CATEGORY_REGULAR });
+  if (!games.length) return null;
+
+  const endScores = await fetchQuarterEndScores(games.map((g) => g.gmkey));
+
+  type Acc = { gp: number; sums: Record<RegulationQuarter, number>; counts: Record<RegulationQuarter, number> };
+  const zeroSums = (): Record<RegulationQuarter, number> => ({ Q1: 0, Q2: 0, Q3: 0, Q4: 0 });
+  const accs = new Map<string, Acc>();
+  const accOf = (tcode: string): Acc => {
+    let a = accs.get(tcode);
+    if (!a) {
+      a = { gp: 0, sums: zeroSums(), counts: zeroSums() };
+      accs.set(tcode, a);
+    }
+    return a;
+  };
+
+  for (const g of games) {
+    const byQuarter = endScores.get(g.gmkey);
+    if (!byQuarter) continue;
+    const home = accOf(g.homeTcode);
+    const away = accOf(g.awayTcode);
+    home.gp += 1;
+    away.gp += 1;
+    let prevHome = 0;
+    let prevAway = 0;
+    for (const q of REGULATION_QUARTERS) {
+      const v = byQuarter[q];
+      if (!v) continue; // 이 쿼터 이벤트가 없으면 그 쿼터만 건너뛴다(앞/뒤 쿼터는 영향 없음)
+      const homePts = v.home - prevHome;
+      const awayPts = v.away - prevAway;
+      home.sums[q] += homePts - awayPts;
+      home.counts[q] += 1;
+      away.sums[q] += awayPts - homePts;
+      away.counts[q] += 1;
+      prevHome = v.home;
+      prevAway = v.away;
+    }
+  }
+
+  const out = new Map<string, TeamQuarterSplit>();
+  for (const [tcode, a] of accs) {
+    if (!a.gp) continue;
+    const quarters = zeroSums();
+    for (const q of REGULATION_QUARTERS) {
+      quarters[q] = a.counts[q] ? a.sums[q] / a.counts[q] : 0;
+    }
+    const ranked = [...REGULATION_QUARTERS].sort((x, y) => quarters[y] - quarters[x]);
+    out.set(tcode, { tcode, gp: a.gp, quarters, bestQuarter: ranked[0], worstQuarter: ranked[ranked.length - 1] });
+  }
+  return out;
+}
