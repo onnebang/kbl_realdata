@@ -30,12 +30,14 @@ export const dynamic = "force-dynamic";
 const GROUP_TABS: { key: string; label: string; group: LeaderGroup | null }[] = [
   { key: "all", label: "전체", group: null },
   { key: "basic", label: "기본", group: "기본" },
+  { key: "total", label: "총량", group: "총량" },
   { key: "shoot", label: "슈팅", group: "슈팅" },
   { key: "adv", label: "고급", group: "고급" },
 ];
 
 const GROUP_BLURB: Record<LeaderGroup, string> = {
   기본: "박스스코어 경기당 평균. 출전 경기는 0분 엔트리를 뺀 실제 출전만 셉니다.",
+  총량: "시즌 누적 합계(자격 기준 없음). 시즌 초반엔 경기당 평균보다 왜곡이 적습니다 - 적게 뛰고 한두 경기 잘한 선수가 평균에서는 과장되지만, 누적 총량은 많이·꾸준히 뛰어야 쌓입니다.",
   슈팅: "성공률은 시즌 길이에 맞춰 최소 시도를 요구합니다(팀 경기 수 × 경기당 시도).",
   고급: "출전 시간 가중 평균 또는 사전 집계 지표. 산식은 카드마다 적어 뒀습니다.",
 };
@@ -190,7 +192,7 @@ export default async function SeasonLeadersPage({
   ]);
   const logos: TeamLogos = new Map([...teams].map(([tcode, t]) => [tcode, t.logoUrl]));
 
-  const groupsShown: LeaderGroup[] = ["기본", "슈팅", "고급"];
+  const groupsShown: LeaderGroup[] = ["기본", "총량", "슈팅", "고급"];
   const linkTo = (opts: { season?: string; g?: string }) => {
     const s = opts.season ?? activeSeason;
     const key = opts.g ?? tab.key;

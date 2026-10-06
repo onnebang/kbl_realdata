@@ -42,11 +42,12 @@ export const SHOT_MIN_ATT_PER_TEAM_GAME = { tp: 1.5, fg: 3.0, ft: 1.0 } as const
 
 export type LeaderCategoryKey =
   | "pts" | "reb" | "ast" | "stl" | "blk"
+  | "totalPts" | "totalReb" | "totalAst" | "totalStl" | "totalBlk"
   | "tpm"
   | "tpPct" | "fgPct" | "ftPct"
   | "mpg" | "per" | "tsPct" | "usgPct";
 
-export type LeaderGroup = "기본" | "슈팅" | "고급";
+export type LeaderGroup = "기본" | "총량" | "슈팅" | "고급";
 
 export type LeaderCategoryDef = {
   key: LeaderCategoryKey;
@@ -67,6 +68,15 @@ export const LEADER_CATEGORIES: LeaderCategoryDef[] = [
   { key: "stl", label: "스틸", unit: "SPG", group: "기본", rate: true, note: "경기당 스틸" },
   { key: "blk", label: "블록", unit: "BPG", group: "기본", rate: true, note: "경기당 블록" },
   { key: "mpg", label: "경기당 출전", unit: "분", group: "기본", rate: true, note: "출전 경기당 평균 출전 시간" },
+
+  // 사용자 요청(2026-10-06, 시즌 초반) - 경기당 평균은 적게 뛴 선수가 한두 경기 잘하면 과장되기
+  // 쉽지만, 시즌 누적 총량은 "많이, 꾸준히 뛰어야" 쌓이므로 표본이 적은 시즌 초반엔 평균보다
+  // 왜곡이 덜하다. tpm과 같은 패턴(rate: false = 자격 기준 없음, 그냥 누적 합계 순위).
+  { key: "totalPts", label: "총 득점", unit: "점", group: "총량", rate: false, note: "시즌 누적 득점 - 누적 기록이라 자격 기준 없음(경기당 평균과 달리 적게 뛴 선수가 유리해지지 않음)" },
+  { key: "totalReb", label: "총 리바운드", unit: "개", group: "총량", rate: false, note: "시즌 누적 리바운드" },
+  { key: "totalAst", label: "총 어시스트", unit: "개", group: "총량", rate: false, note: "시즌 누적 어시스트" },
+  { key: "totalStl", label: "총 스틸", unit: "개", group: "총량", rate: false, note: "시즌 누적 스틸" },
+  { key: "totalBlk", label: "총 블록", unit: "개", group: "총량", rate: false, note: "시즌 누적 블록" },
 
   { key: "tpm", label: "3P 성공", unit: "개", group: "슈팅", rate: false, note: "시즌 누적 3점 성공 수 - 누적 기록이라 자격 기준 없음" },
   { key: "tpPct", label: "3P%", unit: "%", group: "슈팅", rate: true, note: "tpm / tpa" },
@@ -287,6 +297,11 @@ const EXTRACT: Record<LeaderCategoryKey, Extractor> = {
   stl: { value: (a) => (a.gp ? a.stl / a.gp : null), display: fmt1 },
   blk: { value: (a) => (a.gp ? a.blk / a.gp : null), display: fmt1 },
   mpg: { value: (a) => (a.gp ? a.minutes / a.gp : null), display: fmt1 },
+  totalPts: { value: (a) => a.pts, display: fmtInt, sample: (a) => `${a.gp}경기` },
+  totalReb: { value: (a) => a.reb, display: fmtInt, sample: (a) => `${a.gp}경기` },
+  totalAst: { value: (a) => a.ast, display: fmtInt, sample: (a) => `${a.gp}경기` },
+  totalStl: { value: (a) => a.stl, display: fmtInt, sample: (a) => `${a.gp}경기` },
+  totalBlk: { value: (a) => a.blk, display: fmtInt, sample: (a) => `${a.gp}경기` },
   tpm: { value: (a) => a.tpm, display: fmtInt, sample: (a) => `${a.tpm}/${a.tpa} · ${a.gp}경기` },
   tpPct: {
     value: (a) => (a.tpa ? (a.tpm / a.tpa) * 100 : null),

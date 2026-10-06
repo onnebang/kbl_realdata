@@ -46,7 +46,7 @@ export default async function SeasonHubPage({
   const [standings, teams, leaders, awards, games] = await Promise.all([
     getStandingsAsOfCached(activeSeason, "9999-12-31"),
     getTeams(activeSeason),
-    getSeasonLeaderboards(activeSeason, { categories: ["pts", "reb", "ast"], topN: 3 }),
+    getSeasonLeaderboards(activeSeason, { categories: ["totalPts", "totalReb", "totalAst"], topN: 5 }),
     getRoundAwards(activeSeason),
     getSeasonGames(activeSeason),
   ]);
@@ -137,32 +137,39 @@ export default async function SeasonHubPage({
       {!leaders ? (
         <div className="empty-note">아직 리더보드를 만들 수 없습니다.</div>
       ) : (
-        <div className={styles.grid}>
-          {leaders.boards.map((b) => (
-            <section key={b.key} className={styles.card}>
-              <header className={styles.cardHead}>
-                <h3 className={styles.cardTitle}>{b.label}</h3>
-                <span className={styles.cardPool}>{b.unit}</span>
-              </header>
-              {b.rows.length === 0 ? (
-                <div className={styles.note}>자격을 통과한 선수가 없습니다.</div>
-              ) : (
-                <div className={styles.rows}>
-                  {b.rows.map((r, i) => (
-                    <Link key={r.pcode} href={`/players/${r.pcode}`} className={styles.row}>
-                      <div className={styles.rank}>{i + 1}</div>
-                      <div className={styles.rowBody}>
-                        <div className={styles.rowName}>{r.name}</div>
-                        <div className={styles.rowSub}>{[r.teamAbbr, r.posLabel || null].filter(Boolean).join(" · ")}</div>
-                      </div>
-                      <div className={styles.rowValue}>{b.unit === "%" ? `${r.display}%` : r.display}</div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-          ))}
-        </div>
+        <>
+          <p className={styles.lede}>
+            시즌 초반엔 경기당 평균 대신 <strong>누적 총량</strong>을 보여드립니다 - 적게 뛴 선수가 한두
+            경기 잘하면 과장되는 평균과 달리, 총량은 자격 기준 없이 그대로 쌓인 기록입니다. 평균·슈팅·고급
+            지표는 전체 보기에서 확인하세요.
+          </p>
+          <div className={styles.grid}>
+            {leaders.boards.map((b) => (
+              <section key={b.key} className={styles.card}>
+                <header className={styles.cardHead}>
+                  <h3 className={styles.cardTitle}>{b.label}</h3>
+                  <span className={styles.cardPool}>{b.unit}</span>
+                </header>
+                {b.rows.length === 0 ? (
+                  <div className={styles.note}>자격을 통과한 선수가 없습니다.</div>
+                ) : (
+                  <div className={styles.rows}>
+                    {b.rows.map((r, i) => (
+                      <Link key={r.pcode} href={`/players/${r.pcode}`} className={styles.row}>
+                        <div className={styles.rank}>{i + 1}</div>
+                        <div className={styles.rowBody}>
+                          <div className={styles.rowName}>{r.name}</div>
+                          <div className={styles.rowSub}>{[r.teamAbbr, r.posLabel || null].filter(Boolean).join(" · ")}</div>
+                        </div>
+                        <div className={styles.rowValue}>{b.unit === "%" ? `${r.display}%` : r.display}</div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ))}
+          </div>
+        </>
       )}
 
       <div className={hub.sectionHead}>
@@ -225,5 +232,5 @@ export default async function SeasonHubPage({
 
 export const metadata: Metadata = {
   title: "시즌 허브",
-  description: "팀 순위, 시즌 리더보드, 라운드 MVP, 최근 경기를 한 화면에 모아 보기",
+  description: "팀 순위, 시즌 리더보드(누적 총량), 라운드 MVP, 최근 경기를 한 화면에 모아 보기",
 };
