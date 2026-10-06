@@ -2,14 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getLeaderboardSeasons } from "@/lib/seasonLeaders";
-import { getRoundAwards, type RoundAwardRow } from "@/lib/roundAwards";
+import { getRoundAwards, type AllStarTeam, type RoundAwardRow } from "@/lib/roundAwards";
+import type { BigPlay, Comeback } from "@/lib/winMoments";
 import styles from "@/app/leaderboards/season/season-leaders.module.css";
 
-// 라운드 어워드 - MVP(국내/용병/아시아쿼터) + 포지션별 베스트(G/F/C 1~3위). 기존 시즌
+// 라운드 어워드 - MVP(국내/용병/아시아쿼터) + 포지션별 베스트(G/F/C 1~3위) + 코트사이드
+// 올스타팀(퍼스트/세컨드/써드, 2가드+2포워드+1센터) + 최고의 순간(역전승 top5) + 가장
+// 임팩트있는 장면(개인 플레이 top10, 2026-10-06 사용자 요청). 올스타팀까지는 기존 시즌
 // 리더보드와 같은 카드 뼈대(hero + 압축 행)를 그대로 쓴다. 계산은 lib/roundAwards.ts:
 // 라운드 경기들의 game_player_stats를 aggregateSeasonPlayers(시즌 리더보드와 같은 함수)로
 // 집계하고, 출전시간 가중 PER 평균으로 줄 세운다. 선정은 순수 스탯 기준이고 팀 성적·서사는
-// 반영하지 않는다는 점을 캡션에 남긴다.
+// 반영하지 않는다는 점을 캡션에 남긴다. 최고의 순간/임팩트있는 장면은 lib/winMoments.ts의
+// season_big_plays·season_comebacks RPC(기존 "승부를 가른 순간" 페이지가 쓰는 것과 동일)를
+// 그 라운드 gmkey로만 걸러서 재사용 - 새 RPC를 만들지 않았다.
 export const dynamic = "force-dynamic";
 
 type Board = { label: string; poolN: number; rows: RoundAwardRow[] };
@@ -89,6 +94,76 @@ function BoardCard({ board, titleSuffix }: { board: Board; titleSuffix: string }
         </>
       )}
     </section>
+  );
+}
+
+/** 올스타팀 한 팀(5명) - 순위가 아니라 포지션 배정이라 번호 대신 포지션을 왼쪽에 쓴다. */
+function AllStarRow({ r }: { r: RoundAwardRow }) {
+  return (
+    <Link href={`/players/${r.pcode}`} className={styles.row}>
+      <div className={styles.rank}>{r.pos ?? "-"}</div>
+      <div className={styles.rowBody}>
+        <div className={styles.rowName}>{r.name}</div>
+        <div className={styles.rowSub}>{[r.team?.abbr, `${r.gp}경기`].filter(Boolean).join(" · ")}</div>
+      </div>
+      <div className={styles.rowValue}>{r.perW.toFixed(1)}</div>
+    </Link>
+  );
+}
+
+function AllStarCard({ team }: { team: AllStarTeam }) {
+  return (
+    <section className={styles.card}>
+      <header className={styles.cardHead}>
+        <h3 className={styles.cardTitle}>{team.label}</h3>
+        <span className={styles.cardPool}>PER</span>
+      </header>
+      {team.players.length === 0 ? (
+        <div className={styles.note}>이 라운드엔 자격을 통과한 선수가 모자라 팀을 채우지 못했습니다.</div>
+      ) : (
+        <div className={styles.rows}>
+          {team.players.map((r) => (
+            <AllStarRow key={r.pcode} r={r} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function MomentRow({ c, rank }: { c: Comeback; rank: number }) {
+  const winnerBadge = { name: c.winner.name, abbr: c.winner.abbr, color: c.winner.color ?? "#888888", logoUrl: c.winner.logoUrl };
+  return (
+    <Link href={`/games/${c.gmkey}`} className={styles.row}>
+      <div className={styles.rank}>{rank}</div>
+      <div className={styles.rowBody}>
+        <div className={styles.rowName}>
+          <TeamBadge team={winnerBadge} size={16} /> {c.winner.name} {c.finalWinner}-{c.finalLoser} {c.loser.name}
+        </div>
+        <div className={styles.rowSub}>
+          {c.period} {c.clock} 승률 {(c.minProb * 100).toFixed(1)}%까지 떨어졌다가 역전승
+        </div>
+      </div>
+      <div className={styles.rowValue}>{(c.minProb * 100).toFixed(0)}%</div>
+    </Link>
+  );
+}
+
+function ImpactRow({ p, rank }: { p: BigPlay; rank: number }) {
+  const badge = { name: p.team.name, abbr: p.team.abbr, color: p.team.color ?? "#888888", logoUrl: p.team.logoUrl };
+  return (
+    <Link href={`/players/${p.pcode}`} className={styles.row}>
+      <div className={styles.rank}>{rank}</div>
+      <div className={styles.rowBody}>
+        <div className={styles.rowName}>
+          <TeamBadge team={badge} size={16} /> {p.playerName}
+        </div>
+        <div className={styles.rowSub}>
+          {p.team.abbr} {p.period} {p.clock} {p.shot} vs {p.opp.abbr} · {p.teamScore}-{p.oppScore}
+        </div>
+      </div>
+      <div className={styles.rowValue}>+{(p.wpa * 100).toFixed(1)}%p</div>
+    </Link>
   );
 }
 
@@ -189,6 +264,44 @@ export default async function RoundAwardsPage({
               <BoardCard key={b.pos} board={b} titleSuffix="베스트" />
             ))}
           </div>
+
+          <div className={styles.groupHead}>
+            <h2 className={styles.groupName}>코트사이드 올스타팀</h2>
+            <span className={styles.groupMeta}>퍼스트 · 세컨드 · 써드, 가드 2 · 포워드 2 · 센터 1</span>
+          </div>
+          <div className={styles.grid}>
+            {result.allStarTeams.map((t) => (
+              <AllStarCard key={t.tier} team={t} />
+            ))}
+          </div>
+
+          <div className={styles.groupHead}>
+            <h2 className={styles.groupName}>코트사이드 최고의 순간</h2>
+            <span className={styles.groupMeta}>이 라운드 가장 극적인 역전승 top{Math.min(5, result.bestMoments.length)}</span>
+          </div>
+          {result.bestMoments.length === 0 ? (
+            <div className="empty-note">이 라운드엔 역전승 기록이 없습니다(한쪽이 쭉 앞선 경기들뿐).</div>
+          ) : (
+            <div className={styles.rows}>
+              {result.bestMoments.map((c, i) => (
+                <MomentRow key={c.gmkey} c={c} rank={i + 1} />
+              ))}
+            </div>
+          )}
+
+          <div className={styles.groupHead}>
+            <h2 className={styles.groupName}>코트사이드 가장 임팩트있는 장면</h2>
+            <span className={styles.groupMeta}>경기당 승률을 가장 크게 끌어올린 플레이 top{Math.min(10, result.impactPlays.length)}</span>
+          </div>
+          {result.impactPlays.length === 0 ? (
+            <div className="empty-note">이 라운드엔 집계된 장면이 없습니다.</div>
+          ) : (
+            <div className={styles.rows}>
+              {result.impactPlays.map((p, i) => (
+                <ImpactRow key={`${p.gmkey}-${p.pcode}-${p.elapsed}`} p={p} rank={i + 1} />
+              ))}
+            </div>
+          )}
         </>
       )}
 
@@ -211,5 +324,5 @@ export default async function RoundAwardsPage({
 
 export const metadata: Metadata = {
   title: "라운드 어워드",
-  description: "라운드별 MVP(국내/용병/아시아쿼터) + 포지션별 베스트 - 출전시간 가중 PER 평균 기준",
+  description: "라운드별 MVP·포지션별 베스트·코트사이드 올스타팀(퍼스트/세컨드/써드)·최고의 순간·가장 임팩트있는 장면",
 };

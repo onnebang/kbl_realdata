@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPositionBestBoards, buildRoundMvpBoards, ROUND_QUALIFY, type PlayerDirectoryInfo } from "./roundAwards";
+import { buildAllStarTeams, buildPositionBestBoards, buildRoundMvpBoards, ROUND_QUALIFY, type PlayerDirectoryInfo } from "./roundAwards";
 import type { SeasonPlayerAgg } from "./seasonLeaders";
 import type { TeamInfo } from "./preseason";
 
@@ -154,5 +154,31 @@ describe("buildPositionBestBoards", () => {
     const g = boards.find((b) => b.pos === "G")!;
     expect(g.rows.map((r) => r.pcode)).toEqual(["g4", "g3", "g2"]);
     expect(g.poolN).toBe(5);
+  });
+});
+
+describe("buildAllStarTeams", () => {
+  it("가드·포워드 2명 + 센터 1명씩 퍼스트/세컨드/써드팀에 PER 순으로 나눠 담는다", () => {
+    const aggs = [
+      ...Array.from({ length: 6 }, (_, i) => agg(`g${i}`, "A", { pos: "G", perW: 10 - i })),
+      ...Array.from({ length: 6 }, (_, i) => agg(`f${i}`, "A", { pos: "F", perW: 10 - i })),
+      ...Array.from({ length: 3 }, (_, i) => agg(`c${i}`, "A", { pos: "C", perW: 10 - i })),
+    ];
+    const infos = info(aggs.map((a) => [a.pcode, { role: null, name: a.pcode, photoUrl: null } as PlayerDirectoryInfo]));
+    const teamsOut = buildAllStarTeams(aggs, infos, TEAMS);
+
+    expect(teamsOut.map((t) => t.tier)).toEqual([1, 2, 3]);
+    expect(teamsOut[0].players.map((r) => r.pcode)).toEqual(["g0", "g1", "f0", "f1", "c0"]);
+    expect(teamsOut[1].players.map((r) => r.pcode)).toEqual(["g2", "g3", "f2", "f3", "c1"]);
+    expect(teamsOut[2].players.map((r) => r.pcode)).toEqual(["g4", "g5", "f4", "f5", "c2"]);
+  });
+
+  it("포지션 자격자가 모자라면 그 자리는 비운다(억지로 채우지 않음)", () => {
+    const aggs = [agg("g0", "A", { pos: "G", perW: 10 }), agg("c0", "A", { pos: "C", perW: 5 })];
+    const infos = info(aggs.map((a) => [a.pcode, { role: null, name: a.pcode, photoUrl: null } as PlayerDirectoryInfo]));
+    const teamsOut = buildAllStarTeams(aggs, infos, TEAMS);
+    expect(teamsOut[0].players.map((r) => r.pcode)).toEqual(["g0", "c0"]);
+    expect(teamsOut[1].players).toEqual([]);
+    expect(teamsOut[2].players).toEqual([]);
   });
 });

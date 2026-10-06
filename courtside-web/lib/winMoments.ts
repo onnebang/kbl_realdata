@@ -136,6 +136,56 @@ function pearson(xs: number[], ys: number[]): number {
  * season_scoring_weight는 team 인자가 없어 결과를 받은 뒤 걸러낸다 - 200점 문턱을 넘는 선수가
  * 원래도 시즌당 90명 안팎이라 필터링 비용은 무시할 만하다.
  */
+/** PlayRow -> BigPlay. 시즌 전체(computeWinMoments)와 라운드 범위(computeRoundWinMoments)가 공유. */
+function toBigPlay(r: PlayRow, season: string, teams: Map<string, TeamMeta>, seriesOf: (gmkey: string) => CurvePoint[], photos: Map<string, string>): BigPlay {
+  const isHome = r.tcode === r.home_tcode;
+  const oppCode = isHome ? r.away_tcode : r.home_tcode;
+  const finalTeam = isHome ? r.final_home : r.final_away;
+  const finalOpp = isHome ? r.final_away : r.final_home;
+  const won = finalTeam > finalOpp;
+  return {
+    gmkey: r.gmkey,
+    gameDate: r.game_date,
+    period: periodLabel(r.quarter),
+    clock: clockLabel(r.clock_min, r.clock_sec),
+    shot: SHOT_LABEL[r.action_code] ?? "플레이",
+    pcode: r.pcode,
+    playerName: r.player_name ?? r.pcode,
+    photoUrl: photos.get(r.pcode) ?? null,
+    team: teamLite(teams, r.tcode, season),
+    opp: teamLite(teams, oppCode, season),
+    teamScore: isHome ? r.home_score : r.away_score,
+    oppScore: isHome ? r.away_score : r.home_score,
+    finalTeam,
+    finalOpp,
+    won,
+    wpa: r.wpa,
+    probBefore: Math.min(1, Math.max(0, r.prob_after - r.wpa)),
+    elapsed: cumulativeElapsed(r.quarter, r.clock_min, r.clock_sec),
+    curve: sideCurve(seriesOf(r.gmkey), isHome, won),
+  };
+}
+
+/** ComebackRow -> Comeback. 시즌 전체와 라운드 범위가 공유. */
+function toComeback(r: ComebackRow, season: string, teams: Map<string, TeamMeta>, seriesOf: (gmkey: string) => CurvePoint[]): Comeback {
+  const winnerHome = r.winner_tcode === r.home_tcode;
+  return {
+    gmkey: r.gmkey,
+    gameDate: r.game_date,
+    winner: teamLite(teams, r.winner_tcode, season),
+    loser: teamLite(teams, winnerHome ? r.away_tcode : r.home_tcode, season),
+    finalWinner: winnerHome ? r.final_home : r.final_away,
+    finalLoser: winnerHome ? r.final_away : r.final_home,
+    minProb: r.min_prob,
+    period: periodLabel(r.min_quarter),
+    clock: clockLabel(r.min_clock_min, r.min_clock_sec),
+    winnerScoreAtMin: winnerHome ? r.min_home_score : r.min_away_score,
+    loserScoreAtMin: winnerHome ? r.min_away_score : r.min_home_score,
+    elapsed: cumulativeElapsed(r.min_quarter, r.min_clock_min, r.min_clock_sec),
+    curve: sideCurve(seriesOf(r.gmkey), winnerHome, true),
+  };
+}
+
 async function computeWinMoments(season: string, tcode?: string): Promise<WinMoments> {
   const [playRows, comebackRows, weightRowsAll, teams] = await Promise.all([
     rpc<PlayRow>("season_big_plays", { p_season: season, p_limit: 12, p_tcode: tcode ?? null }),
@@ -151,53 +201,8 @@ async function computeWinMoments(season: string, tcode?: string): Promise<WinMom
   ]);
   const seriesOf = (gmkey: string) => seriesRows.find((r) => r.gmkey === gmkey)?.points ?? [];
 
-  const plays: BigPlay[] = playRows.map((r) => {
-    const isHome = r.tcode === r.home_tcode;
-    const oppCode = isHome ? r.away_tcode : r.home_tcode;
-    const finalTeam = isHome ? r.final_home : r.final_away;
-    const finalOpp = isHome ? r.final_away : r.final_home;
-    const won = finalTeam > finalOpp;
-    return {
-      gmkey: r.gmkey,
-      gameDate: r.game_date,
-      period: periodLabel(r.quarter),
-      clock: clockLabel(r.clock_min, r.clock_sec),
-      shot: SHOT_LABEL[r.action_code] ?? "플레이",
-      pcode: r.pcode,
-      playerName: r.player_name ?? r.pcode,
-      photoUrl: photos.get(r.pcode) ?? null,
-      team: teamLite(teams, r.tcode, season),
-      opp: teamLite(teams, oppCode, season),
-      teamScore: isHome ? r.home_score : r.away_score,
-      oppScore: isHome ? r.away_score : r.home_score,
-      finalTeam,
-      finalOpp,
-      won,
-      wpa: r.wpa,
-      probBefore: Math.min(1, Math.max(0, r.prob_after - r.wpa)),
-      elapsed: cumulativeElapsed(r.quarter, r.clock_min, r.clock_sec),
-      curve: sideCurve(seriesOf(r.gmkey), isHome, won),
-    };
-  });
-
-  const comebacks: Comeback[] = comebackRows.map((r) => {
-    const winnerHome = r.winner_tcode === r.home_tcode;
-    return {
-      gmkey: r.gmkey,
-      gameDate: r.game_date,
-      winner: teamLite(teams, r.winner_tcode, season),
-      loser: teamLite(teams, winnerHome ? r.away_tcode : r.home_tcode, season),
-      finalWinner: winnerHome ? r.final_home : r.final_away,
-      finalLoser: winnerHome ? r.final_away : r.final_home,
-      minProb: r.min_prob,
-      period: periodLabel(r.min_quarter),
-      clock: clockLabel(r.min_clock_min, r.min_clock_sec),
-      winnerScoreAtMin: winnerHome ? r.min_home_score : r.min_away_score,
-      loserScoreAtMin: winnerHome ? r.min_away_score : r.min_home_score,
-      elapsed: cumulativeElapsed(r.min_quarter, r.min_clock_min, r.min_clock_sec),
-      curve: sideCurve(seriesOf(r.gmkey), winnerHome, true),
-    };
-  });
+  const plays: BigPlay[] = playRows.map((r) => toBigPlay(r, season, teams, seriesOf, photos));
+  const comebacks: Comeback[] = comebackRows.map((r) => toComeback(r, season, teams, seriesOf));
 
   const players: WeightPoint[] = weightRows.map((r) => ({
     pcode: r.pcode,
@@ -227,6 +232,38 @@ export const getWinMoments = cachedFn(computeWinMoments, {
   ttl: TTL.batchDaily,
   tags: (season, tcode) => [TAG.batch, TAG.season(String(season)), ...(tcode ? [`team:${tcode}`] : [])],
 });
+
+// 라운드 어워드(/awards/round)용 - 사용자 요청("라운드별 최고의 순간 top5 / 가장 임팩트있는
+// 장면 top10"). season_big_plays/season_comebacks는 "경기당 1개"만 돌려주므로(distinct on
+// gmkey) 시즌 전체를 넉넉한 limit으로 받아 그 라운드 gmkey만 걸러낸다 - 이미 wpa desc/minProb
+// asc로 정렬돼 있어 필터링만 하면 순서가 그대로 유지된다. 라운드 전용 RPC를 새로 만들지 않음.
+// "최고의 순간" = 팀 단위 역전 드라마(Comeback, 한 경기의 가장 극적인 저점), "가장 임팩트있는
+// 장면" = 개별 선수의 한 방(BigPlay, 경기당 최대 wpa 플레이) - 이 둘은 season_comebacks/
+// season_big_plays가 원래 담당하던 두 축과 그대로 대응된다.
+const SEASON_GAMES_LIMIT = 300; // 정규시즌 270경기(2026-27 기준)보다 넉넉하게
+
+export async function getRoundWinMoments(season: string, gmkeys: string[]): Promise<{ bestMoments: Comeback[]; impactPlays: BigPlay[] }> {
+  if (!gmkeys.length) return { bestMoments: [], impactPlays: [] };
+  const gmkeySet = new Set(gmkeys);
+  const [playRowsAll, comebackRowsAll, teams] = await Promise.all([
+    rpc<PlayRow>("season_big_plays", { p_season: season, p_limit: SEASON_GAMES_LIMIT }),
+    rpc<ComebackRow>("season_comebacks", { p_season: season, p_limit: SEASON_GAMES_LIMIT }),
+    getAllTeams(),
+  ]);
+  const playRows = playRowsAll.filter((r) => gmkeySet.has(r.gmkey)).slice(0, 10);
+  const comebackRows = comebackRowsAll.filter((r) => gmkeySet.has(r.gmkey)).slice(0, 5);
+  const seriesGmkeys = [...new Set([...playRows.map((r) => r.gmkey), ...comebackRows.map((r) => r.gmkey)])];
+  const [seriesRows, photos] = await Promise.all([
+    seriesGmkeys.length ? rpc<SeriesRow>("game_winprob_series", { p_gmkeys: seriesGmkeys }) : Promise.resolve<SeriesRow[]>([]),
+    fetchPlayerPhotos(playRows.map((r) => r.pcode)),
+  ]);
+  const seriesOf = (gmkey: string) => seriesRows.find((r) => r.gmkey === gmkey)?.points ?? [];
+
+  return {
+    bestMoments: comebackRows.map((r) => toComeback(r, season, teams, seriesOf)),
+    impactPlays: playRows.map((r) => toBigPlay(r, season, teams, seriesOf, photos)),
+  };
+}
 
 /** WinContributionPage용 아주 짧은 요약(팀 필터 없을 때는 계산 자체를 안 한다). */
 export type TeamHighlight = { play: BigPlay | null; comeback: Comeback | null };

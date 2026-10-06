@@ -4,6 +4,7 @@ import { getRoundGames } from "./homeGames";
 import { getSeasonDirectory, getTeams, type TeamInfo } from "./preseason";
 import { aggregateSeasonPlayers, PLAYER_SELECT, type PlayerGameRow, type SeasonPlayerAgg } from "./seasonLeaders";
 import { normalizePos, posLabel } from "./teamSeasonStats";
+import { getRoundWinMoments, type BigPlay, type Comeback } from "./winMoments";
 
 // 라운드 어워드(/awards/round) - 라운드 MVP(국내/용병/아시아쿼터) + 포지션별 베스트(G/F/C
 // 1~3위). 둘 다 같은 라운드 선수 집계(aggs) 하나에서 그룹 기준만 바꿔 뽑는다 - 쿼리도
@@ -73,6 +74,17 @@ export type PositionBestBoard = {
   rows: RoundAwardRow[];
 };
 
+export type AllStarTier = 1 | 2 | 3;
+
+export const ALL_STAR_TIER_LABEL: Record<AllStarTier, string> = { 1: "퍼스트팀", 2: "세컨드팀", 3: "써드팀" };
+
+export type AllStarTeam = {
+  tier: AllStarTier;
+  label: string;
+  /** 2가드 + 2포워드 + 1센터. 해당 포지션 자격자가 모자라면 그만큼 빈다(채워 넣지 않음). */
+  players: RoundAwardRow[];
+};
+
 export type RoundAwardsResult = {
   seasonName: string;
   round: number;
@@ -82,6 +94,11 @@ export type RoundAwardsResult = {
   qualify: typeof ROUND_QUALIFY;
   mvpBoards: RoundMvpBoard[];
   positionBoards: PositionBestBoard[];
+  allStarTeams: AllStarTeam[];
+  /** "최고의 순간" top5 - 한 경기의 가장 극적인 역전 드라마(팀 단위). */
+  bestMoments: Comeback[];
+  /** "가장 임팩트있는 장면" top10 - 경기당 승률을 가장 크게 끌어올린 개인 플레이 하나씩. */
+  impactPlays: BigPlay[];
 };
 
 export type PlayerDirectoryInfo = { role: string | null; name: string; photoUrl: string | null };
@@ -167,6 +184,30 @@ export function buildPositionBestBoards(
   });
 }
 
+/** 올스타팀 퍼스트/세컨드/써드(사용자 요청) - NBA 올-리그 팀과 같은 2가드+2포워드+1센터
+ * 구성. 새 순위를 만들지 않고 buildPositionBestBoards를 포지션당 6명(가드·포워드는 팀당 2명
+ * × 3팀, 센터는 팀당 1명 × 3팀 = 3명이면 충분하지만 가드·포워드 커트라인에 맞춰 6명 통일)으로
+ * 넉넉히 뽑은 뒤 2/2/1씩 세 팀에 나눠 담는다. */
+export function buildAllStarTeams(
+  aggs: SeasonPlayerAgg[],
+  infoByPcode: Map<string, PlayerDirectoryInfo>,
+  teams: Map<string, TeamInfo>
+): AllStarTeam[] {
+  const posBoards = buildPositionBestBoards(aggs, infoByPcode, teams, 6);
+  const guards = posBoards.find((b) => b.pos === "G")?.rows ?? [];
+  const forwards = posBoards.find((b) => b.pos === "F")?.rows ?? [];
+  const centers = posBoards.find((b) => b.pos === "C")?.rows ?? [];
+  return ([1, 2, 3] as const).map((tier) => ({
+    tier,
+    label: ALL_STAR_TIER_LABEL[tier],
+    players: [
+      ...guards.slice((tier - 1) * 2, tier * 2),
+      ...forwards.slice((tier - 1) * 2, tier * 2),
+      ...centers.slice(tier - 1, tier),
+    ],
+  }));
+}
+
 export async function getRoundAwards(seasonName: string, round?: number): Promise<RoundAwardsResult> {
   const { games, round: r, roundCount } = await getRoundGames(seasonName, undefined, round);
   const ended = games.filter((g) => g.is_ended);
@@ -180,13 +221,19 @@ export async function getRoundAwards(seasonName: string, round?: number): Promis
       qualify: ROUND_QUALIFY,
       mvpBoards: [],
       positionBoards: [],
+      allStarTeams: [],
+      bestMoments: [],
+      impactPlays: [],
     };
   }
 
   const gmkeys = ended.map((g) => g.gmkey);
-  const rows = await fetchAllPagesBounded<PlayerGameRow>((from, to) =>
-    supabase.from("game_player_stats").select(PLAYER_SELECT, { count: "exact" }).in("gmkey", gmkeys).range(from, to)
-  );
+  const [rows, winMoments] = await Promise.all([
+    fetchAllPagesBounded<PlayerGameRow>((from, to) =>
+      supabase.from("game_player_stats").select(PLAYER_SELECT, { count: "exact" }).in("gmkey", gmkeys).range(from, to)
+    ),
+    getRoundWinMoments(seasonName, gmkeys),
+  ]);
   const aggs = aggregateSeasonPlayers(rows).filter((a) => a.gp > 0);
 
   const [directory, teams] = await Promise.all([getSeasonDirectory(seasonName), getTeams(seasonName)]);
@@ -206,5 +253,8 @@ export async function getRoundAwards(seasonName: string, round?: number): Promis
     qualify: ROUND_QUALIFY,
     mvpBoards: buildRoundMvpBoards(aggs, infoByPcode, teams, 5),
     positionBoards: buildPositionBestBoards(aggs, infoByPcode, teams, 3),
+    allStarTeams: buildAllStarTeams(aggs, infoByPcode, teams),
+    bestMoments: winMoments.bestMoments,
+    impactPlays: winMoments.impactPlays,
   };
 }
