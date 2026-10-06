@@ -739,7 +739,11 @@ export const getTeamQuarterSplits = cachedFn(computeTeamQuarterSplits, {
   tags: (seasonName) => [TAG.batch, TAG.season(seasonName)],
 });
 
-async function computeTeamQuarterSplits(seasonName: string): Promise<Map<string, TeamQuarterSplit> | null> {
+// 반환 타입은 Map이 아니라 Record - cachedFn(unstable_cache)이 결과를 JSON으로 직렬화한다.
+// Map은 JSON.stringify에서 "{}"로 죽어서, 캐시 적중(두 번째 요청부터)마다 .get()이 함수가
+// 아니라는 TypeError로 터졌다(2026-10-06, 프로덕션에서 실제로 터진 뒤 발견 - byTcode 패턴을
+// 쓰는 다른 함수들(getTeamSeasonStats 등)과 똑같이 맞춤).
+async function computeTeamQuarterSplits(seasonName: string): Promise<Record<string, TeamQuarterSplit> | null> {
   const games = await getSeasonGames(seasonName, { category: SEASON_CATEGORY_REGULAR });
   if (!games.length) return null;
 
@@ -780,7 +784,7 @@ async function computeTeamQuarterSplits(seasonName: string): Promise<Map<string,
     }
   }
 
-  const out = new Map<string, TeamQuarterSplit>();
+  const out: Record<string, TeamQuarterSplit> = {};
   for (const [tcode, a] of accs) {
     if (!a.gp) continue;
     const quarters = zeroSums();
@@ -788,7 +792,7 @@ async function computeTeamQuarterSplits(seasonName: string): Promise<Map<string,
       quarters[q] = a.counts[q] ? a.sums[q] / a.counts[q] : 0;
     }
     const ranked = [...REGULATION_QUARTERS].sort((x, y) => quarters[y] - quarters[x]);
-    out.set(tcode, { tcode, gp: a.gp, quarters, bestQuarter: ranked[0], worstQuarter: ranked[ranked.length - 1] });
+    out[tcode] = { tcode, gp: a.gp, quarters, bestQuarter: ranked[0], worstQuarter: ranked[ranked.length - 1] };
   }
   return out;
 }

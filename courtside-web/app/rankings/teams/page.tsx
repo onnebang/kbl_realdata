@@ -180,7 +180,7 @@ export default async function TeamStandingsPage({
                   if (!stat) return null;
                   const tm = teams.get(r.tcode);
                   const badge = tm ? { name: tm.name, abbr: tm.abbr, color: tm.color, logoUrl: tm.logoUrl } : null;
-                  const qs = quarterSplits?.get(r.tcode);
+                  const qs = quarterSplits?.[r.tcode];
                   return (
                     <Link key={r.tcode} href={`/teams/${r.tcode}`} className={overview.card}>
                       <div className={overview.cardHead}>
