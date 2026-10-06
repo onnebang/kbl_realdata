@@ -93,12 +93,7 @@ export default async function TeamStandingsPage({
         등)는 반영하지 않고 승률 → 득실마진 순으로만 정렬했습니다.
       </p>
 
-      {fellBack && (
-        <div className={styles.fallback}>
-          {fellBack} 시즌은 아직 종료된 정규시즌 경기가 없어 순위표를 만들 수 없습니다. 대신
-          가장 최근 시즌인 <strong>{activeSeason}</strong> 기록을 보여줍니다.
-        </div>
-      )}
+
 
       {!rows.length ? (
         <div className="empty-note">{activeSeason} 시즌 정규시즌 기록을 찾지 못했습니다.</div>
@@ -177,7 +172,7 @@ export default async function TeamStandingsPage({
                 요청("SK까지 10팀 전부") - 팀 목록은 teams(시즌 로스터 10개 전체)를 기준으로
                 돌고, 기록이 없으면 "아직 기록 없음"으로 빈 카드를 보여준다. */}
             {[...teams.values()]
-              .filter((tm) => !["30", "35", "73"].includes(tm.tcode))
+              .filter((tm) => !["30", "65", "73"].includes(tm.tcode))
               .sort((a, b) => {
                 const ai = rows.findIndex((row) => row.tcode === a.tcode);
                 const bi = rows.findIndex((row) => row.tcode === b.tcode);
