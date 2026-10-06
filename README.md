@@ -254,10 +254,10 @@ Disable-ScheduledTask  -TaskName "KBL_LiveCollector"  # 끄기
 
 **`KBL_WeeklyTrain` 참고** - OVR·경기전 모델은 전부 로컬 SQLite(`raw/kbl_realdata.db`, git에 안 올라감)만
 읽는다. 이 태스크가 매주 `raw/games`의 최신 경기를 SQLite에 다시 적재해야 OVR/모델이 갱신된다 - PC가
-꺼져 있으면 그 주는 건너뛰고 다음 주에 누적 반영됨. `tools/save_pregame_model.py`의
-`CURRENT_SEASON_EXCLUDE`(2026-27, 새 Q2/Q3 용병 2인 규정 첫 시즌)는 표본이 충분히 쌓이기 전까지
-의도적으로 이번 시즌 경기를 재학습에서 뺀다 - `weekly_retrain.py`는 이 시즌 표본 수를 로그에만 찍고
-자동으로 플래그를 바꾸지는 않는다(사람 판단 필요).
+꺼져 있으면 그 주는 건너뛰고 다음 주에 누적 반영됨. `tools/save_pregame_model.py`는 2026-27 시즌(새
+Q2/Q3 용병 2인 규정 첫 시즌) 학습테이블 표본이 `SAMPLE_THRESHOLD`(150행, 사용자 지정 2026-10-06)
+미달이면 그 시즌 경기를 재학습에서 빼고, 넘으면 자동으로 포함한다 - 기준을 넘는 주부터 사람 개입
+없이 전환됨(로그에 포함/제외 여부가 매주 찍힘).
 
 **감시**: Supabase pg_cron(`watch_live_collector`, 1분마다)이 수집기 심박(`live_collector_status`)을
 보고 있다가 멈추면 Discord로 알림(🔴 응답 없음 / 🟠 문자중계 멈춤 / 🟢 해제). 지금 걸린 문제 보기:

@@ -9,10 +9,11 @@ KBL_DailyBatch(06:00)가 끝난 뒤 실행되도록 Windows 작업 스케줄러 
    compute_ovr()이 그 선수의 진짜 스탯 기반 OVR로 자연히 대체함(코드 변경 불필요,
    SQLite에 최신 경기만 들어가면 됨).
 2. 이번 시즌(seasonCode 49)부터 2쿼터/3쿼터 외국선수 2인 동시출전이 과거 15시즌에
-   전례가 없는 새 규정이라, save_pregame_model.py가 2026-09-24에 CURRENT_SEASON_EXCLUDE=49로
-   "표본이 쌓이기 전까진 재학습에서 제외"해뒀다. 이 스크립트는 그 제외를 자동으로 풀지
-   않는다(과소표본 과적합 위험 - 저자가 의도적으로 사람 판단에 맡긴 지점) - 매주 season 49
-   표본 수만 로그에 찍어서 "이제 포함할 때인지" 판단할 근거를 쌓아준다.
+   전례가 없는 새 규정이라, save_pregame_model.py가 표본이 SAMPLE_THRESHOLD(150행, 사용자
+   지정 2026-10-06)를 넘기 전까진 이 시즌 경기를 재학습에서 제외한다. 이 판단과 전환은
+   save_pregame_model.py 안에서 매번 자동으로 이뤄진다(기준을 넘는 주부터 자동 포함) -
+   이 오케스트레이터는 그 스크립트를 그대로 호출만 하고, 결과(포함/제외 여부)는 그 스크립트의
+   stdout이 로그에 그대로 남는다.
 
 파이프라인: load_sqlite(SQLite 재적재) -> build_courtside_ovr(OVR 재계산) ->
 export_training_table(학습 테이블 재생성) -> save_pregame_model(배포용 모델 재학습) ->
@@ -23,7 +24,6 @@ git commit+push(courtside_ovr_history.json / play_styles.json / pregame_model.jo
 학습이라 이번 시즌 누적과 무관함. 필요해지면 별도 주기(월 1회 등)로 분리할 것.
 """
 import datetime
-import json
 import os
 import subprocess
 import sys
@@ -31,10 +31,6 @@ import sys
 BASE = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.join(BASE, "..")
 LOG_PATH = os.path.join(BASE, "..", "raw", "weekly_retrain.log")
-TRAINING_TABLE_PATH = os.path.join(BASE, "..", "raw", "analysis", "pregame_training_table.json")
-
-CURRENT_SEASON_CODE = 49  # 2026-2027
-SEASON49_SAMPLE_WATCH_THRESHOLD = 150  # 임의 기준값 - 이 근처부터 "이제 포함해도 되나" 검토 권장
 
 # git에 커밋할 생성물만 명시 - git add -A 금지(의도치 않은 작업중 파일 섞임 방지)
 TRACKED_OUTPUTS = [
@@ -69,18 +65,6 @@ def run_step(f, script, desc):
         return False
     log(f, f"[OK] {script}")
     return True
-
-
-def report_season49_sample_size(f):
-    if not os.path.exists(TRAINING_TABLE_PATH):
-        return
-    with open(TRAINING_TABLE_PATH, encoding="utf-8") as fp:
-        rows = json.load(fp)
-    n = sum(1 for r in rows if r["seasonCode"] == CURRENT_SEASON_CODE)
-    log(f, f"시즌 {CURRENT_SEASON_CODE}(2026-27, 신규 Q2/Q3 용병 2인 규정) 학습테이블 표본: {n}행")
-    if n >= SEASON49_SAMPLE_WATCH_THRESHOLD:
-        log(f, f"[참고] 표본이 기준치({SEASON49_SAMPLE_WATCH_THRESHOLD}행)를 넘었음 - "
-               f"save_pregame_model.py의 CURRENT_SEASON_EXCLUDE 제거 검토 시점일 수 있음(사람 판단 필요, 자동 변경 안 함)")
 
 
 def git(args):
@@ -119,7 +103,6 @@ def main():
             if not run_step(f, script, desc):
                 log(f, "[ABORT] 파이프라인 중단 - 이후 단계 건너뜀")
                 return
-        report_season49_sample_size(f)
         commit_and_push(f)
         log(f, "===== 주간 재학습 종료 =====\n")
 
