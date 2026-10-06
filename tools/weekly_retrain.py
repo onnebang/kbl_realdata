@@ -17,7 +17,9 @@ KBL_DailyBatch(06:00)가 끝난 뒤 실행되도록 Windows 작업 스케줄러 
 
 파이프라인: load_sqlite(SQLite 재적재) -> build_courtside_ovr(OVR 재계산) ->
 export_training_table(학습 테이블 재생성) -> save_pregame_model(배포용 모델 재학습) ->
-git commit+push(courtside_ovr_history.json / play_styles.json / pregame_model.joblib).
+build_alltime_leaders(올타임 리더스 "현역" 배지 재계산) ->
+git commit+push(courtside_ovr_history.json / play_styles.json / alltime_leaders.json /
+pregame_model.joblib).
 
 라이브(경기중) 승률 모델(train_live_winprob_model.py)은 포함하지 않음 - 그 모델은 15시즌
 전체 스틴트 스냅샷(676MB)을 다시 뽑아야 해서 매주 돌리기엔 너무 무겁고, 과거 규정 기반
@@ -36,6 +38,7 @@ LOG_PATH = os.path.join(BASE, "..", "raw", "weekly_retrain.log")
 TRACKED_OUTPUTS = [
     "courtside-web/lib/courtside_ovr_history.json",
     "courtside-web/lib/play_styles.json",
+    "courtside-web/lib/alltime_leaders.json",
     "raw/analysis/pregame_model.joblib",
 ]
 
@@ -44,6 +47,9 @@ STEPS = [
     ("build_courtside_ovr.py", "OVR 재계산 (courtside_ovr_history.json)"),
     ("export_training_table.py", "학습 테이블 재생성 (pregame_training_table.json)"),
     ("save_pregame_model.py", "배포용 경기전 승률 모델 재학습 (pregame_model.joblib)"),
+    # 올타임 리더스(/rankings/legends)의 "현역" 배지가 이 주의 최신 로스터를 반영하도록
+    # (2026-10-06, 사용자 요청) - SQLite가 방금 최신화됐으니 같은 묶음에서 재생성.
+    ("build_alltime_leaders.py", "올타임 리더스 재계산 (alltime_leaders.json)"),
 ]
 
 

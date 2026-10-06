@@ -208,6 +208,10 @@ a {
 .nav-analysis .nav-link:hover {
   color: var(--ink);
 }
+/* 좁은 화면엔 summary가 이미 그룹 이름을 보여주므로 중복 - ≥900px에서만 드러낸다. */
+.nav-group-label {
+  display: none;
+}
 
 @media (min-width: 900px) {
   .nav-bar-inner {
@@ -249,6 +253,24 @@ a {
   }
   .nav-analysis .nav-link:hover {
     border-bottom-color: var(--home);
+  }
+  /* 그룹별 <details>가 여러 개라 summary가 안 보이면 어디까지가 한 그룹인지 알 수 없다 -
+     구분선 + 이름표로 대신한다(2026-10-06, nba.com Stats 드롭다운 소분류 참고). */
+  .nav-group-label {
+    display: inline-flex;
+    align-items: center;
+    padding: 12px 8px 12px 14px;
+    margin-left: 4px;
+    border-left: 1px solid rgba(var(--line-rgb), 0.15);
+    font-size: var(--fs-200);
+    font-weight: 700;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  .nav-more:first-of-type .nav-group-label {
+    border-left: none;
+    margin-left: 0;
+    padding-left: 0;
   }
 }
 

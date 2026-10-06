@@ -64,7 +64,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 8884,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 10,
@@ -105,7 +105,7 @@
           "rank": 15,
           "pcode": "290776",
           "pname": "허웅",
-          "value": 6731,
+          "value": 6742,
           "is_active": true
         },
         {
@@ -133,7 +133,7 @@
           "rank": 19,
           "pcode": "290765",
           "pname": "이재도",
-          "value": 6244,
+          "value": 6255,
           "is_active": true
         },
         {
@@ -141,7 +141,7 @@
           "pcode": "290750",
           "pname": "김종규",
           "value": 6221,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 21,
@@ -154,7 +154,7 @@
           "rank": 22,
           "pcode": "290440",
           "pname": "이관희",
-          "value": 5962,
+          "value": 5968,
           "is_active": true
         },
         {
@@ -189,7 +189,7 @@
           "rank": 27,
           "pcode": "290787",
           "pname": "이승현",
-          "value": 5639,
+          "value": 5650,
           "is_active": true
         },
         {
@@ -243,37 +243,37 @@
         },
         {
           "rank": 35,
+          "pcode": "291091",
+          "pname": "양홍석",
+          "value": 4787,
+          "is_active": true
+        },
+        {
+          "rank": 36,
           "pcode": "290248",
           "pname": "하승진",
           "value": 4785,
           "is_active": false
         },
         {
-          "rank": 36,
+          "rank": 37,
           "pcode": "290417",
           "pname": "최진수",
           "value": 4785,
-          "is_active": true
-        },
-        {
-          "rank": 37,
-          "pcode": "291091",
-          "pname": "양홍석",
-          "value": 4765,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 38,
           "pcode": "291085",
           "pname": "허훈",
-          "value": 4697,
+          "value": 4718,
           "is_active": true
         },
         {
           "rank": 39,
           "pcode": "290763",
           "pname": "전성현",
-          "value": 4683,
+          "value": 4686,
           "is_active": true
         },
         {
@@ -281,14 +281,14 @@
           "pcode": "290742",
           "pname": "이대성",
           "value": 4681,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 41,
           "pcode": "290897",
           "pname": "송교창",
           "value": 4389,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 42,
@@ -320,17 +320,17 @@
         },
         {
           "rank": 46,
+          "pcode": "291488",
+          "pname": "이정현",
+          "value": 4225,
+          "is_active": true
+        },
+        {
+          "rank": 47,
           "pcode": "215012",
           "pname": "주희정",
           "value": 4219,
           "is_active": false
-        },
-        {
-          "rank": 47,
-          "pcode": "291488",
-          "pname": "이정현",
-          "value": 4207,
-          "is_active": true
         },
         {
           "rank": 48,
@@ -358,20 +358,20 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 4132,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 52,
           "pcode": "291084",
           "pname": "안영준",
           "value": 4116,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 53,
           "pcode": "291001",
           "pname": "강상재",
-          "value": 4097,
+          "value": 4116,
           "is_active": true
         },
         {
@@ -379,7 +379,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 4097,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 55,
@@ -420,14 +420,14 @@
           "rank": 60,
           "pcode": "291432",
           "pname": "아셈 마레이",
-          "value": 3980,
+          "value": 3994,
           "is_active": true
         },
         {
           "rank": 61,
           "pcode": "290781",
           "pname": "김준일",
-          "value": 3931,
+          "value": 3938,
           "is_active": true
         },
         {
@@ -435,13 +435,13 @@
           "pcode": "291068",
           "pname": "김낙현",
           "value": 3904,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 63,
           "pcode": "290539",
           "pname": "장재석",
-          "value": 3881,
+          "value": 3900,
           "is_active": true
         },
         {
@@ -449,7 +449,7 @@
           "pcode": "291430",
           "pname": "앤드류 니콜슨",
           "value": 3822,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 65,
@@ -474,17 +474,17 @@
         },
         {
           "rank": 68,
+          "pcode": "291008",
+          "pname": "박지훈",
+          "value": 3655,
+          "is_active": true
+        },
+        {
+          "rank": 69,
           "pcode": "290238",
           "pname": "크리스 다니엘스",
           "value": 3655,
           "is_active": false
-        },
-        {
-          "rank": 69,
-          "pcode": "291008",
-          "pname": "박지훈",
-          "value": 3646,
-          "is_active": true
         },
         {
           "rank": 70,
@@ -497,7 +497,7 @@
           "rank": 71,
           "pcode": "291511",
           "pname": "이선 알바노",
-          "value": 3548,
+          "value": 3563,
           "is_active": true
         },
         {
@@ -511,7 +511,7 @@
           "rank": 73,
           "pcode": "290542",
           "pname": "임동섭",
-          "value": 3522,
+          "value": 3544,
           "is_active": true
         },
         {
@@ -539,28 +539,28 @@
           "rank": 77,
           "pcode": "291342",
           "pname": "숀 롱",
-          "value": 3400,
+          "value": 3438,
           "is_active": true
         },
         {
           "rank": 78,
+          "pcode": "291579",
+          "pname": "게이지 프림",
+          "value": 3369,
+          "is_active": true
+        },
+        {
+          "rank": 79,
           "pcode": "291316",
           "pname": "디드릭 로슨",
           "value": 3367,
           "is_active": false
         },
         {
-          "rank": 79,
+          "rank": 80,
           "pcode": "291242",
           "pname": "캐디 라렌",
           "value": 3331,
-          "is_active": false
-        },
-        {
-          "rank": 80,
-          "pcode": "291579",
-          "pname": "게이지 프림",
-          "value": 3304,
           "is_active": false
         },
         {
@@ -572,23 +572,23 @@
         },
         {
           "rank": 82,
+          "pcode": "291220",
+          "pname": "변준형",
+          "value": 3153,
+          "is_active": true
+        },
+        {
+          "rank": 83,
           "pcode": "250038",
           "pname": "송영진",
           "value": 3148,
           "is_active": false
         },
         {
-          "rank": 83,
-          "pcode": "291220",
-          "pname": "변준형",
-          "value": 3139,
-          "is_active": true
-        },
-        {
           "rank": 84,
           "pcode": "290603",
           "pname": "이대헌",
-          "value": 3128,
+          "value": 3136,
           "is_active": true
         },
         {
@@ -603,7 +603,7 @@
           "pcode": "290488",
           "pname": "차바위",
           "value": 3070,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 87,
@@ -644,7 +644,7 @@
           "rank": 92,
           "pcode": "291189",
           "pname": "서명진",
-          "value": 2914,
+          "value": 2925,
           "is_active": true
         },
         {
@@ -656,23 +656,23 @@
         },
         {
           "rank": 94,
+          "pcode": "290754",
+          "pname": "한호빈",
+          "value": 2890,
+          "is_active": true
+        },
+        {
+          "rank": 95,
           "pcode": "290115",
           "pname": "정병국",
           "value": 2887,
           "is_active": false
         },
         {
-          "rank": 95,
-          "pcode": "290754",
-          "pname": "한호빈",
-          "value": 2883,
-          "is_active": true
-        },
-        {
           "rank": 96,
           "pcode": "290901",
           "pname": "정성우",
-          "value": 2835,
+          "value": 2840,
           "is_active": true
         },
         {
@@ -712,7 +712,7 @@
           "rank": 1,
           "pcode": "290524",
           "pname": "라건아",
-          "value": 7662,
+          "value": 7674,
           "is_active": true
         },
         {
@@ -803,7 +803,7 @@
           "rank": 14,
           "pcode": "291432",
           "pname": "아셈 마레이",
-          "value": 3384,
+          "value": 3398,
           "is_active": true
         },
         {
@@ -811,7 +811,7 @@
           "pcode": "290750",
           "pname": "김종규",
           "value": 3352,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 16,
@@ -824,7 +824,7 @@
           "rank": 17,
           "pcode": "290787",
           "pname": "이승현",
-          "value": 2965,
+          "value": 2972,
           "is_active": true
         },
         {
@@ -866,14 +866,14 @@
           "rank": 23,
           "pcode": "291001",
           "pname": "강상재",
-          "value": 2356,
+          "value": 2363,
           "is_active": true
         },
         {
           "rank": 24,
           "pcode": "291091",
           "pname": "양홍석",
-          "value": 2306,
+          "value": 2312,
           "is_active": true
         },
         {
@@ -887,7 +887,7 @@
           "rank": 26,
           "pcode": "290539",
           "pname": "장재석",
-          "value": 2200,
+          "value": 2208,
           "is_active": true
         },
         {
@@ -902,7 +902,7 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 2143,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 29,
@@ -923,7 +923,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 2082,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 32,
@@ -944,7 +944,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 1982,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 35,
@@ -965,7 +965,7 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 1905,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 38,
@@ -983,31 +983,31 @@
         },
         {
           "rank": 40,
-          "pcode": "290897",
-          "pname": "송교창",
-          "value": 1854,
+          "pcode": "291342",
+          "pname": "숀 롱",
+          "value": 1884,
           "is_active": true
         },
         {
           "rank": 41,
-          "pcode": "291342",
-          "pname": "숀 롱",
-          "value": 1852,
-          "is_active": true
+          "pcode": "290897",
+          "pname": "송교창",
+          "value": 1854,
+          "is_active": false
         },
         {
           "rank": 42,
           "pcode": "290488",
           "pname": "차바위",
           "value": 1849,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 43,
           "pcode": "290661",
           "pname": "문성곤",
           "value": 1840,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 44,
@@ -1021,7 +1021,7 @@
           "pcode": "291144",
           "pname": "대릴 먼로",
           "value": 1817,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 46,
@@ -1041,7 +1041,7 @@
           "rank": 48,
           "pcode": "290781",
           "pname": "김준일",
-          "value": 1796,
+          "value": 1801,
           "is_active": true
         },
         {
@@ -1055,7 +1055,7 @@
           "rank": 50,
           "pcode": "290765",
           "pname": "이재도",
-          "value": 1772,
+          "value": 1780,
           "is_active": true
         },
         {
@@ -1084,7 +1084,7 @@
           "pcode": "291084",
           "pname": "안영준",
           "value": 1680,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 55,
@@ -1097,7 +1097,7 @@
           "rank": 56,
           "pcode": "290440",
           "pname": "이관희",
-          "value": 1603,
+          "value": 1604,
           "is_active": true
         },
         {
@@ -1118,8 +1118,8 @@
           "rank": 59,
           "pcode": "291579",
           "pname": "게이지 프림",
-          "value": 1494,
-          "is_active": false
+          "value": 1510,
+          "is_active": true
         },
         {
           "rank": 60,
@@ -1140,7 +1140,7 @@
           "pcode": "291430",
           "pname": "앤드류 니콜슨",
           "value": 1400,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 63,
@@ -1160,7 +1160,7 @@
           "rank": 65,
           "pcode": "290501",
           "pname": "최현민",
-          "value": 1362,
+          "value": 1363,
           "is_active": true
         },
         {
@@ -1174,7 +1174,7 @@
           "rank": 67,
           "pcode": "290542",
           "pname": "임동섭",
-          "value": 1353,
+          "value": 1358,
           "is_active": true
         },
         {
@@ -1230,7 +1230,7 @@
           "rank": 75,
           "pcode": "290529",
           "pname": "정희재",
-          "value": 1308,
+          "value": 1309,
           "is_active": true
         },
         {
@@ -1244,14 +1244,14 @@
           "rank": 77,
           "pcode": "291492",
           "pname": "하윤기",
-          "value": 1299,
+          "value": 1302,
           "is_active": true
         },
         {
           "rank": 78,
           "pcode": "290603",
           "pname": "이대헌",
-          "value": 1252,
+          "value": 1254,
           "is_active": true
         },
         {
@@ -1265,21 +1265,21 @@
           "rank": 80,
           "pcode": "290454",
           "pname": "정창영",
-          "value": 1218,
+          "value": 1219,
           "is_active": true
         },
         {
           "rank": 81,
           "pcode": "291008",
           "pname": "박지훈",
-          "value": 1208,
+          "value": 1209,
           "is_active": true
         },
         {
           "rank": 82,
           "pcode": "290776",
           "pname": "허웅",
-          "value": 1169,
+          "value": 1171,
           "is_active": true
         },
         {
@@ -1294,7 +1294,7 @@
           "pcode": "291478",
           "pname": "이원석",
           "value": 1143,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 85,
@@ -1319,16 +1319,16 @@
         },
         {
           "rank": 88,
-          "pcode": "290231",
-          "pname": "기승호",
-          "value": 1113,
-          "is_active": false
+          "pcode": "291375",
+          "pname": "이우석",
+          "value": 1122,
+          "is_active": true
         },
         {
           "rank": 89,
-          "pcode": "291375",
-          "pname": "이우석",
-          "value": 1111,
+          "pcode": "290231",
+          "pname": "기승호",
+          "value": 1113,
           "is_active": false
         },
         {
@@ -1350,7 +1350,7 @@
           "pcode": "290742",
           "pname": "이대성",
           "value": 1062,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 93,
@@ -1377,7 +1377,7 @@
           "rank": 96,
           "pcode": "291698",
           "pname": "레이션 해먼즈",
-          "value": 1035,
+          "value": 1042,
           "is_active": true
         },
         {
@@ -1460,7 +1460,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 3178,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 8,
@@ -1480,7 +1480,7 @@
           "rank": 10,
           "pcode": "290765",
           "pname": "이재도",
-          "value": 2460,
+          "value": 2471,
           "is_active": true
         },
         {
@@ -1508,7 +1508,7 @@
           "rank": 14,
           "pcode": "291085",
           "pname": "허훈",
-          "value": 1963,
+          "value": 1983,
           "is_active": true
         },
         {
@@ -1550,7 +1550,7 @@
           "rank": 20,
           "pcode": "290776",
           "pname": "허웅",
-          "value": 1646,
+          "value": 1650,
           "is_active": true
         },
         {
@@ -1578,36 +1578,36 @@
           "rank": 24,
           "pcode": "290901",
           "pname": "정성우",
-          "value": 1411,
+          "value": 1418,
           "is_active": true
         },
         {
           "rank": 25,
           "pcode": "290524",
           "pname": "라건아",
-          "value": 1406,
+          "value": 1408,
           "is_active": true
         },
         {
           "rank": 26,
+          "pcode": "290754",
+          "pname": "한호빈",
+          "value": 1376,
+          "is_active": true
+        },
+        {
+          "rank": 27,
           "pcode": "220194",
           "pname": "조성민",
           "value": 1371,
           "is_active": false
         },
         {
-          "rank": 27,
+          "rank": 28,
           "pcode": "290119",
           "pname": "김영환",
           "value": 1369,
           "is_active": false
-        },
-        {
-          "rank": 28,
-          "pcode": "290754",
-          "pname": "한호빈",
-          "value": 1368,
-          "is_active": true
         },
         {
           "rank": 29,
@@ -1618,17 +1618,17 @@
         },
         {
           "rank": 30,
-          "pcode": "291068",
-          "pname": "김낙현",
-          "value": 1348,
+          "pcode": "291511",
+          "pname": "이선 알바노",
+          "value": 1353,
           "is_active": true
         },
         {
           "rank": 31,
-          "pcode": "291511",
-          "pname": "이선 알바노",
-          "value": 1344,
-          "is_active": true
+          "pcode": "291068",
+          "pname": "김낙현",
+          "value": 1348,
+          "is_active": false
         },
         {
           "rank": 32,
@@ -1649,7 +1649,7 @@
           "pcode": "290742",
           "pname": "이대성",
           "value": 1306,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 35,
@@ -1676,7 +1676,7 @@
           "rank": 38,
           "pcode": "290787",
           "pname": "이승현",
-          "value": 1250,
+          "value": 1254,
           "is_active": true
         },
         {
@@ -1690,14 +1690,14 @@
           "rank": 40,
           "pcode": "291220",
           "pname": "변준형",
-          "value": 1197,
+          "value": 1207,
           "is_active": true
         },
         {
           "rank": 41,
           "pcode": "291189",
           "pname": "서명진",
-          "value": 1167,
+          "value": 1171,
           "is_active": true
         },
         {
@@ -1719,13 +1719,13 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 1146,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 45,
           "pcode": "291488",
           "pname": "이정현",
-          "value": 1130,
+          "value": 1143,
           "is_active": true
         },
         {
@@ -1781,7 +1781,7 @@
           "rank": 53,
           "pcode": "291432",
           "pname": "아셈 마레이",
-          "value": 914,
+          "value": 922,
           "is_active": true
         },
         {
@@ -1789,28 +1789,28 @@
           "pcode": "290488",
           "pname": "차바위",
           "value": 877,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 55,
+          "pcode": "291091",
+          "pname": "양홍석",
+          "value": 864,
+          "is_active": true
+        },
+        {
+          "rank": 56,
           "pcode": "290118",
           "pname": "박상오",
           "value": 859,
           "is_active": false
         },
         {
-          "rank": 56,
-          "pcode": "291091",
-          "pname": "양홍석",
-          "value": 858,
-          "is_active": true
-        },
-        {
           "rank": 57,
           "pcode": "291144",
           "pname": "대릴 먼로",
           "value": 850,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 58,
@@ -1823,7 +1823,7 @@
           "rank": 59,
           "pcode": "291556",
           "pname": "샘조세프 벨란겔",
-          "value": 826,
+          "value": 832,
           "is_active": true
         },
         {
@@ -1837,7 +1837,7 @@
           "rank": 61,
           "pcode": "291001",
           "pname": "강상재",
-          "value": 812,
+          "value": 814,
           "is_active": true
         },
         {
@@ -1845,21 +1845,21 @@
           "pcode": "290750",
           "pname": "김종규",
           "value": 799,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 63,
           "pcode": "290897",
           "pname": "송교창",
           "value": 793,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 64,
           "pcode": "290790",
           "pname": "정효근",
           "value": 784,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 65,
@@ -1877,17 +1877,17 @@
         },
         {
           "rank": 67,
+          "pcode": "291576",
+          "pname": "양준석",
+          "value": 761,
+          "is_active": true
+        },
+        {
+          "rank": 68,
           "pcode": "255038",
           "pname": "황성인",
           "value": 760,
           "is_active": false
-        },
-        {
-          "rank": 68,
-          "pcode": "291576",
-          "pname": "양준석",
-          "value": 757,
-          "is_active": true
         },
         {
           "rank": 69,
@@ -1901,7 +1901,7 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 729,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 71,
@@ -1912,44 +1912,44 @@
         },
         {
           "rank": 72,
+          "pcode": "290539",
+          "pname": "장재석",
+          "value": 716,
+          "is_active": true
+        },
+        {
+          "rank": 73,
           "pcode": "290367",
           "pname": "로드 벤슨",
           "value": 715,
           "is_active": false
         },
         {
-          "rank": 73,
-          "pcode": "290539",
-          "pname": "장재석",
-          "value": 714,
+          "rank": 74,
+          "pcode": "291375",
+          "pname": "이우석",
+          "value": 706,
           "is_active": true
         },
         {
-          "rank": 74,
+          "rank": 75,
           "pcode": "290552",
           "pname": "유병훈",
           "value": 703,
           "is_active": false
         },
         {
-          "rank": 75,
+          "rank": 76,
           "pcode": "290788",
           "pname": "이호현",
           "value": 701,
           "is_active": true
         },
         {
-          "rank": 76,
+          "rank": 77,
           "pcode": "290335",
           "pname": "제스퍼 존슨",
           "value": 700,
-          "is_active": false
-        },
-        {
-          "rank": 77,
-          "pcode": "291375",
-          "pname": "이우석",
-          "value": 697,
           "is_active": false
         },
         {
@@ -1985,14 +1985,14 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 657,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 83,
           "pcode": "291084",
           "pname": "안영준",
           "value": 652,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 84,
@@ -2031,44 +2031,44 @@
         },
         {
           "rank": 89,
+          "pcode": "291649",
+          "pname": "박무빈",
+          "value": 614,
+          "is_active": true
+        },
+        {
+          "rank": 90,
           "pcode": "230061",
           "pname": "오용준",
           "value": 612,
           "is_active": false
         },
         {
-          "rank": 90,
+          "rank": 91,
           "pcode": "290234",
           "pname": "정재홍",
           "value": 612,
           "is_active": false
         },
         {
-          "rank": 91,
+          "rank": 92,
           "pcode": "290147",
           "pname": "테렌스 레더",
           "value": 608,
           "is_active": false
         },
         {
-          "rank": 92,
+          "rank": 93,
           "pcode": "230068",
           "pname": "김현중",
           "value": 603,
           "is_active": false
         },
         {
-          "rank": 93,
-          "pcode": "291649",
-          "pname": "박무빈",
-          "value": 601,
-          "is_active": true
-        },
-        {
           "rank": 94,
           "pcode": "291512",
           "pname": "저스틴 구탕",
-          "value": 596,
+          "value": 598,
           "is_active": true
         },
         {
@@ -2130,7 +2130,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 978,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 3,
@@ -2235,7 +2235,7 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 596,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 18,
@@ -2290,7 +2290,7 @@
           "rank": 25,
           "pcode": "291008",
           "pname": "박지훈",
-          "value": 504,
+          "value": 506,
           "is_active": true
         },
         {
@@ -2302,17 +2302,17 @@
         },
         {
           "rank": 27,
+          "pcode": "290787",
+          "pname": "이승현",
+          "value": 472,
+          "is_active": true
+        },
+        {
+          "rank": 28,
           "pcode": "215053",
           "pname": "김주성",
           "value": 472,
           "is_active": false
-        },
-        {
-          "rank": 28,
-          "pcode": "290787",
-          "pname": "이승현",
-          "value": 471,
-          "is_active": true
         },
         {
           "rank": 29,
@@ -2353,22 +2353,22 @@
           "rank": 34,
           "pcode": "290776",
           "pname": "허웅",
-          "value": 446,
+          "value": 447,
           "is_active": true
         },
         {
           "rank": 35,
-          "pcode": "290377",
-          "pname": "문태종",
-          "value": 442,
-          "is_active": false
-        },
-        {
-          "rank": 36,
           "pcode": "291248",
           "pname": "자밀 워니",
           "value": 442,
           "is_active": true
+        },
+        {
+          "rank": 36,
+          "pcode": "290377",
+          "pname": "문태종",
+          "value": 442,
+          "is_active": false
         },
         {
           "rank": 37,
@@ -2382,56 +2382,56 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 424,
-          "is_active": true
-        },
-        {
-          "rank": 39,
-          "pcode": "290118",
-          "pname": "박상오",
-          "value": 422,
           "is_active": false
         },
         {
-          "rank": 40,
+          "rank": 39,
           "pcode": "290454",
           "pname": "정창영",
           "value": 422,
           "is_active": true
         },
         {
+          "rank": 40,
+          "pcode": "290118",
+          "pname": "박상오",
+          "value": 422,
+          "is_active": false
+        },
+        {
           "rank": 41,
           "pcode": "290742",
           "pname": "이대성",
           "value": 421,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 42,
           "pcode": "291084",
           "pname": "안영준",
           "value": 419,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 43,
+          "pcode": "290539",
+          "pname": "장재석",
+          "value": 415,
+          "is_active": true
+        },
+        {
+          "rank": 44,
           "pcode": "290524",
           "pname": "라건아",
           "value": 414,
           "is_active": true
         },
         {
-          "rank": 44,
+          "rank": 45,
           "pcode": "290335",
           "pname": "제스퍼 존슨",
           "value": 414,
           "is_active": false
-        },
-        {
-          "rank": 45,
-          "pcode": "290539",
-          "pname": "장재석",
-          "value": 413,
-          "is_active": true
         },
         {
           "rank": 46,
@@ -2442,29 +2442,29 @@
         },
         {
           "rank": 47,
+          "pcode": "291488",
+          "pname": "이정현",
+          "value": 406,
+          "is_active": true
+        },
+        {
+          "rank": 48,
           "pcode": "290147",
           "pname": "테렌스 레더",
           "value": 404,
           "is_active": false
         },
         {
-          "rank": 48,
-          "pcode": "291488",
-          "pname": "이정현",
-          "value": 402,
-          "is_active": true
-        },
-        {
           "rank": 49,
-          "pcode": "290488",
-          "pname": "차바위",
+          "pcode": "290114",
+          "pname": "정영삼",
           "value": 401,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 50,
-          "pcode": "290114",
-          "pname": "정영삼",
+          "pcode": "290488",
+          "pname": "차바위",
           "value": 401,
           "is_active": false
         },
@@ -2484,24 +2484,24 @@
         },
         {
           "rank": 53,
+          "pcode": "291511",
+          "pname": "이선 알바노",
+          "value": 369,
+          "is_active": true
+        },
+        {
+          "rank": 54,
           "pcode": "235075",
           "pname": "이시준",
           "value": 367,
           "is_active": false
         },
         {
-          "rank": 54,
+          "rank": 55,
           "pcode": "235058",
           "pname": "이현호",
           "value": 367,
           "is_active": false
-        },
-        {
-          "rank": 55,
-          "pcode": "291511",
-          "pname": "이선 알바노",
-          "value": 367,
-          "is_active": true
         },
         {
           "rank": 56,
@@ -2568,38 +2568,38 @@
         },
         {
           "rank": 65,
-          "pcode": "290372",
-          "pname": "송창용",
-          "value": 322,
-          "is_active": false
-        },
-        {
-          "rank": 66,
           "pcode": "290371",
           "pname": "찰스 로드",
           "value": 322,
           "is_active": false
         },
         {
+          "rank": 66,
+          "pcode": "290372",
+          "pname": "송창용",
+          "value": 322,
+          "is_active": false
+        },
+        {
           "rank": 67,
-          "pcode": "290351",
-          "pname": "변기훈",
+          "pcode": "290529",
+          "pname": "정희재",
+          "value": 322,
+          "is_active": true
+        },
+        {
+          "rank": 68,
+          "pcode": "291068",
+          "pname": "김낙현",
           "value": 321,
           "is_active": false
         },
         {
-          "rank": 68,
-          "pcode": "290529",
-          "pname": "정희재",
-          "value": 321,
-          "is_active": true
-        },
-        {
           "rank": 69,
-          "pcode": "291068",
-          "pname": "김낙현",
+          "pcode": "290351",
+          "pname": "변기훈",
           "value": 321,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 70,
@@ -2620,28 +2620,28 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 310,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 73,
+          "pcode": "291001",
+          "pname": "강상재",
+          "value": 301,
+          "is_active": true
+        },
+        {
+          "rank": 74,
           "pcode": "250039",
           "pname": "황진원",
           "value": 301,
           "is_active": false
         },
         {
-          "rank": 74,
-          "pcode": "291001",
-          "pname": "강상재",
-          "value": 300,
-          "is_active": true
-        },
-        {
           "rank": 75,
           "pcode": "290790",
           "pname": "정효근",
           "value": 297,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 76,
@@ -2673,29 +2673,29 @@
         },
         {
           "rank": 80,
-          "pcode": "290115",
-          "pname": "정병국",
-          "value": 280,
-          "is_active": false
-        },
-        {
-          "rank": 81,
           "pcode": "290241",
           "pname": "리카르도 포웰",
           "value": 280,
           "is_active": false
         },
         {
+          "rank": 81,
+          "pcode": "290115",
+          "pname": "정병국",
+          "value": 280,
+          "is_active": false
+        },
+        {
           "rank": 82,
-          "pcode": "290750",
-          "pname": "김종규",
+          "pcode": "230051",
+          "pname": "김승현",
           "value": 279,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 83,
-          "pcode": "230051",
-          "pname": "김승현",
+          "pcode": "290750",
+          "pname": "김종규",
           "value": 279,
           "is_active": false
         },
@@ -2767,7 +2767,7 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 258,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 94,
@@ -2780,7 +2780,7 @@
           "rank": 95,
           "pcode": "291556",
           "pname": "샘조세프 벨란겔",
-          "value": 250,
+          "value": 252,
           "is_active": true
         },
         {
@@ -2856,7 +2856,7 @@
           "pcode": "290750",
           "pname": "김종규",
           "value": 512,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 6,
@@ -2898,7 +2898,7 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 384,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 12,
@@ -2925,7 +2925,7 @@
           "rank": 15,
           "pcode": "290539",
           "pname": "장재석",
-          "value": 360,
+          "value": 362,
           "is_active": true
         },
         {
@@ -2947,7 +2947,7 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 322,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 19,
@@ -2961,7 +2961,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 275,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 21,
@@ -3052,14 +3052,14 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 196,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 34,
           "pcode": "290897",
           "pname": "송교창",
           "value": 192,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 35,
@@ -3086,20 +3086,20 @@
           "rank": 38,
           "pcode": "291001",
           "pname": "강상재",
-          "value": 179,
+          "value": 180,
           "is_active": true
         },
         {
           "rank": 39,
-          "pcode": "290332",
-          "pname": "크리스 알렉산더",
+          "pcode": "290558",
+          "pname": "코트니 심스",
           "value": 174,
           "is_active": false
         },
         {
           "rank": 40,
-          "pcode": "290558",
-          "pname": "코트니 심스",
+          "pcode": "290332",
+          "pname": "크리스 알렉산더",
           "value": 174,
           "is_active": false
         },
@@ -3122,7 +3122,7 @@
           "pcode": "291084",
           "pname": "안영준",
           "value": 166,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 44,
@@ -3150,13 +3150,13 @@
           "pcode": "291478",
           "pname": "이원석",
           "value": 154,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 48,
           "pcode": "291342",
           "pname": "숀 롱",
-          "value": 148,
+          "value": 149,
           "is_active": true
         },
         {
@@ -3175,24 +3175,24 @@
         },
         {
           "rank": 51,
-          "pcode": "291261",
-          "pname": "치나누 오누아쿠",
-          "value": 139,
-          "is_active": false
-        },
-        {
-          "rank": 52,
           "pcode": "291475",
           "pname": "오마리 스펠맨",
           "value": 139,
           "is_active": false
         },
         {
-          "rank": 53,
+          "rank": 52,
           "pcode": "290661",
           "pname": "문성곤",
           "value": 139,
-          "is_active": true
+          "is_active": false
+        },
+        {
+          "rank": 53,
+          "pcode": "291261",
+          "pname": "치나누 오누아쿠",
+          "value": 139,
+          "is_active": false
         },
         {
           "rank": 54,
@@ -3217,17 +3217,17 @@
         },
         {
           "rank": 57,
-          "pcode": "215063",
-          "pname": "자밀 왓킨스",
-          "value": 131,
-          "is_active": false
-        },
-        {
-          "rank": 58,
           "pcode": "291091",
           "pname": "양홍석",
           "value": 131,
           "is_active": true
+        },
+        {
+          "rank": 58,
+          "pcode": "215063",
+          "pname": "자밀 왓킨스",
+          "value": 131,
+          "is_active": false
         },
         {
           "rank": 59,
@@ -3245,15 +3245,15 @@
         },
         {
           "rank": 61,
-          "pcode": "290440",
-          "pname": "이관희",
-          "value": 125,
+          "pcode": "291432",
+          "pname": "아셈 마레이",
+          "value": 126,
           "is_active": true
         },
         {
           "rank": 62,
-          "pcode": "291432",
-          "pname": "아셈 마레이",
+          "pcode": "290440",
+          "pname": "이관희",
           "value": 125,
           "is_active": true
         },
@@ -3273,22 +3273,22 @@
         },
         {
           "rank": 65,
+          "pcode": "230061",
+          "pname": "오용준",
+          "value": 123,
+          "is_active": false
+        },
+        {
+          "rank": 66,
           "pcode": "290861",
           "pname": "마커스 블레이클리",
           "value": 123,
           "is_active": false
         },
         {
-          "rank": 66,
+          "rank": 67,
           "pcode": "210083",
           "pname": "크리스 윌리엄스",
-          "value": 123,
-          "is_active": false
-        },
-        {
-          "rank": 67,
-          "pcode": "230061",
-          "pname": "오용준",
           "value": 123,
           "is_active": false
         },
@@ -3329,10 +3329,10 @@
         },
         {
           "rank": 73,
-          "pcode": "290731",
-          "pname": "데이본 제퍼슨",
-          "value": 105,
-          "is_active": false
+          "pcode": "291579",
+          "pname": "게이지 프림",
+          "value": 106,
+          "is_active": true
         },
         {
           "rank": 74,
@@ -3350,9 +3350,9 @@
         },
         {
           "rank": 76,
-          "pcode": "291579",
-          "pname": "게이지 프림",
-          "value": 104,
+          "pcode": "290731",
+          "pname": "데이본 제퍼슨",
+          "value": 105,
           "is_active": false
         },
         {
@@ -3430,7 +3430,7 @@
           "pcode": "291430",
           "pname": "앤드류 니콜슨",
           "value": 89,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 88,
@@ -3441,15 +3441,15 @@
         },
         {
           "rank": 89,
-          "pcode": "220196",
-          "pname": "필립 리치",
+          "pcode": "245072",
+          "pname": "퍼비스 파스코",
           "value": 87,
           "is_active": false
         },
         {
           "rank": 90,
-          "pcode": "245072",
-          "pname": "퍼비스 파스코",
+          "pcode": "220196",
+          "pname": "필립 리치",
           "value": 87,
           "is_active": false
         },
@@ -3504,17 +3504,17 @@
         },
         {
           "rank": 98,
-          "pcode": "290150",
-          "pname": "로버트 커밍스",
-          "value": 78,
-          "is_active": false
-        },
-        {
-          "rank": 99,
           "pcode": "290542",
           "pname": "임동섭",
           "value": 78,
           "is_active": true
+        },
+        {
+          "rank": 99,
+          "pcode": "290150",
+          "pname": "로버트 커밍스",
+          "value": 78,
+          "is_active": false
         },
         {
           "rank": 100,
@@ -3560,7 +3560,7 @@
           "rank": 5,
           "pcode": "290763",
           "pname": "전성현",
-          "value": 1025,
+          "value": 1026,
           "is_active": true
         },
         {
@@ -3616,7 +3616,7 @@
           "rank": 13,
           "pcode": "290440",
           "pname": "이관희",
-          "value": 801,
+          "value": 803,
           "is_active": true
         },
         {
@@ -3624,7 +3624,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 760,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 15,
@@ -3644,7 +3644,7 @@
           "rank": 17,
           "pcode": "290765",
           "pname": "이재도",
-          "value": 702,
+          "value": 705,
           "is_active": true
         },
         {
@@ -3652,7 +3652,7 @@
           "pcode": "291068",
           "pname": "김낙현",
           "value": 684,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 19,
@@ -3665,14 +3665,14 @@
           "rank": 20,
           "pcode": "290542",
           "pname": "임동섭",
-          "value": 642,
+          "value": 648,
           "is_active": true
         },
         {
           "rank": 21,
           "pcode": "291085",
           "pname": "허훈",
-          "value": 627,
+          "value": 628,
           "is_active": true
         },
         {
@@ -3715,7 +3715,7 @@
           "pcode": "290742",
           "pname": "이대성",
           "value": 576,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 28,
@@ -3756,7 +3756,7 @@
           "rank": 33,
           "pcode": "291488",
           "pname": "이정현",
-          "value": 558,
+          "value": 561,
           "is_active": true
         },
         {
@@ -3764,13 +3764,13 @@
           "pcode": "290488",
           "pname": "차바위",
           "value": 555,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 35,
           "pcode": "291091",
           "pname": "양홍석",
-          "value": 548,
+          "value": 549,
           "is_active": true
         },
         {
@@ -3806,7 +3806,7 @@
           "pcode": "291084",
           "pname": "안영준",
           "value": 522,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 41,
@@ -3819,7 +3819,7 @@
           "rank": 42,
           "pcode": "290754",
           "pname": "한호빈",
-          "value": 508,
+          "value": 509,
           "is_active": true
         },
         {
@@ -3827,13 +3827,13 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 494,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 44,
           "pcode": "291189",
           "pname": "서명진",
-          "value": 480,
+          "value": 482,
           "is_active": true
         },
         {
@@ -3855,7 +3855,7 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 459,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 48,
@@ -3869,26 +3869,26 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 443,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 50,
           "pcode": "290901",
           "pname": "정성우",
-          "value": 428,
+          "value": 429,
           "is_active": true
         },
         {
           "rank": 51,
-          "pcode": "290544",
-          "pname": "김지완",
+          "pcode": "290283",
+          "pname": "김강선",
           "value": 426,
           "is_active": false
         },
         {
           "rank": 52,
-          "pcode": "290283",
-          "pname": "김강선",
+          "pcode": "290544",
+          "pname": "김지완",
           "value": 426,
           "is_active": false
         },
@@ -3897,7 +3897,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 417,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 54,
@@ -3925,7 +3925,7 @@
           "pcode": "291430",
           "pname": "앤드류 니콜슨",
           "value": 396,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 58,
@@ -3943,16 +3943,16 @@
         },
         {
           "rank": 60,
-          "pcode": "291220",
-          "pname": "변준형",
-          "value": 383,
+          "pcode": "291001",
+          "pname": "강상재",
+          "value": 386,
           "is_active": true
         },
         {
           "rank": 61,
-          "pcode": "291001",
-          "pname": "강상재",
-          "value": 381,
+          "pcode": "291220",
+          "pname": "변준형",
+          "value": 385,
           "is_active": true
         },
         {
@@ -4016,7 +4016,7 @@
           "pcode": "291640",
           "pname": "유기상",
           "value": 353,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 71,
@@ -4029,27 +4029,27 @@
           "rank": 72,
           "pcode": "291194",
           "pname": "전현우",
-          "value": 350,
+          "value": 351,
           "is_active": true
         },
         {
           "rank": 73,
           "pcode": "290787",
           "pname": "이승현",
-          "value": 349,
+          "value": 350,
           "is_active": true
         },
         {
           "rank": 74,
-          "pcode": "210068",
-          "pname": "김동우",
+          "pcode": "290528",
+          "pname": "박경상",
           "value": 347,
           "is_active": false
         },
         {
           "rank": 75,
-          "pcode": "290528",
-          "pname": "박경상",
+          "pcode": "210068",
+          "pname": "김동우",
           "value": 347,
           "is_active": false
         },
@@ -4092,7 +4092,7 @@
           "rank": 81,
           "pcode": "291008",
           "pname": "박지훈",
-          "value": 334,
+          "value": 335,
           "is_active": true
         },
         {
@@ -4128,7 +4128,7 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 313,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 87,
@@ -4146,22 +4146,22 @@
         },
         {
           "rank": 89,
+          "pcode": "291375",
+          "pname": "이우석",
+          "value": 303,
+          "is_active": true
+        },
+        {
+          "rank": 90,
           "pcode": "235057",
           "pname": "박종천",
           "value": 303,
           "is_active": false
         },
         {
-          "rank": 90,
+          "rank": 91,
           "pcode": "291475",
           "pname": "오마리 스펠맨",
-          "value": 299,
-          "is_active": false
-        },
-        {
-          "rank": 91,
-          "pcode": "291375",
-          "pname": "이우석",
           "value": 299,
           "is_active": false
         },
@@ -4188,17 +4188,17 @@
         },
         {
           "rank": 95,
-          "pcode": "210044",
-          "pname": "이병석",
-          "value": 291,
-          "is_active": false
-        },
-        {
-          "rank": 96,
           "pcode": "290553",
           "pname": "배병준",
           "value": 291,
           "is_active": true
+        },
+        {
+          "rank": 96,
+          "pcode": "210044",
+          "pname": "이병석",
+          "value": 291,
+          "is_active": false
         },
         {
           "rank": 97,
@@ -4244,7 +4244,7 @@
           "rank": 2,
           "pcode": "290381",
           "pname": "이정현",
-          "value": 793,
+          "value": 794,
           "is_active": true
         },
         {
@@ -4265,7 +4265,7 @@
           "rank": 5,
           "pcode": "290284",
           "pname": "허일영",
-          "value": 759,
+          "value": 760,
           "is_active": true
         },
         {
@@ -4293,7 +4293,7 @@
           "rank": 9,
           "pcode": "290524",
           "pname": "라건아",
-          "value": 710,
+          "value": 711,
           "is_active": true
         },
         {
@@ -4308,13 +4308,13 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 685,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 12,
           "pcode": "290440",
           "pname": "이관희",
-          "value": 678,
+          "value": 679,
           "is_active": true
         },
         {
@@ -4326,15 +4326,15 @@
         },
         {
           "rank": 14,
-          "pcode": "290114",
-          "pname": "정영삼",
+          "pcode": "290283",
+          "pname": "김강선",
           "value": 664,
           "is_active": false
         },
         {
           "rank": 15,
-          "pcode": "290283",
-          "pname": "김강선",
+          "pcode": "290114",
+          "pname": "정영삼",
           "value": 664,
           "is_active": false
         },
@@ -4363,7 +4363,7 @@
           "rank": 19,
           "pcode": "290539",
           "pname": "장재석",
-          "value": 630,
+          "value": 632,
           "is_active": true
         },
         {
@@ -4377,7 +4377,7 @@
           "rank": 21,
           "pcode": "290454",
           "pname": "정창영",
-          "value": 620,
+          "value": 621,
           "is_active": true
         },
         {
@@ -4410,52 +4410,52 @@
         },
         {
           "rank": 26,
+          "pcode": "290529",
+          "pname": "정희재",
+          "value": 607,
+          "is_active": true
+        },
+        {
+          "rank": 27,
           "pcode": "290261",
           "pname": "애런 헤인즈",
           "value": 606,
           "is_active": false
         },
         {
-          "rank": 27,
-          "pcode": "290529",
-          "pname": "정희재",
-          "value": 605,
-          "is_active": true
-        },
-        {
           "rank": 28,
-          "pcode": "290501",
-          "pname": "최현민",
-          "value": 603,
+          "pcode": "290765",
+          "pname": "이재도",
+          "value": 604,
           "is_active": true
         },
         {
           "rank": 29,
-          "pcode": "290417",
-          "pname": "최진수",
-          "value": 602,
+          "pcode": "290501",
+          "pname": "최현민",
+          "value": 604,
           "is_active": true
         },
         {
           "rank": 30,
-          "pcode": "290765",
-          "pname": "이재도",
+          "pcode": "290417",
+          "pname": "최진수",
           "value": 602,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 31,
           "pcode": "290488",
           "pname": "차바위",
           "value": 598,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 32,
           "pcode": "290750",
           "pname": "김종규",
           "value": 592,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 33,
@@ -4536,15 +4536,15 @@
         },
         {
           "rank": 44,
-          "pcode": "290108",
-          "pname": "김태술",
+          "pcode": "290227",
+          "pname": "김민수",
           "value": 559,
           "is_active": false
         },
         {
           "rank": 45,
-          "pcode": "290227",
-          "pname": "김민수",
+          "pcode": "290108",
+          "pname": "김태술",
           "value": 559,
           "is_active": false
         },
@@ -4552,22 +4552,22 @@
           "rank": 46,
           "pcode": "290787",
           "pname": "이승현",
-          "value": 546,
+          "value": 548,
           "is_active": true
         },
         {
           "rank": 47,
+          "pcode": "290785",
+          "pname": "최승욱",
+          "value": 545,
+          "is_active": true
+        },
+        {
+          "rank": 48,
           "pcode": "650023",
           "pname": "전정규",
           "value": 545,
           "is_active": false
-        },
-        {
-          "rank": 48,
-          "pcode": "290785",
-          "pname": "최승욱",
-          "value": 543,
-          "is_active": true
         },
         {
           "rank": 49,
@@ -4581,7 +4581,7 @@
           "pcode": "290503",
           "pname": "박지훈",
           "value": 537,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 51,
@@ -4594,36 +4594,36 @@
           "rank": 52,
           "pcode": "290763",
           "pname": "전성현",
-          "value": 524,
+          "value": 525,
           "is_active": true
         },
         {
           "rank": 53,
           "pcode": "290542",
           "pname": "임동섭",
-          "value": 522,
+          "value": 524,
           "is_active": true
         },
         {
           "rank": 54,
           "pcode": "290754",
           "pname": "한호빈",
-          "value": 518,
+          "value": 519,
           "is_active": true
         },
         {
           "rank": 55,
+          "pcode": "290776",
+          "pname": "허웅",
+          "value": 515,
+          "is_active": true
+        },
+        {
+          "rank": 56,
           "pcode": "290287",
           "pname": "전태풍",
           "value": 515,
           "is_active": false
-        },
-        {
-          "rank": 56,
-          "pcode": "290776",
-          "pname": "허웅",
-          "value": 513,
-          "is_active": true
         },
         {
           "rank": 57,
@@ -4665,7 +4665,7 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 495,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 63,
@@ -4679,7 +4679,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 488,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 65,
@@ -4720,14 +4720,14 @@
           "rank": 70,
           "pcode": "290478",
           "pname": "장민국",
-          "value": 464,
+          "value": 465,
           "is_active": true
         },
         {
           "rank": 71,
           "pcode": "290901",
           "pname": "정성우",
-          "value": 463,
+          "value": 464,
           "is_active": true
         },
         {
@@ -4741,7 +4741,7 @@
           "rank": 73,
           "pcode": "291008",
           "pname": "박지훈",
-          "value": 458,
+          "value": 459,
           "is_active": true
         },
         {
@@ -4769,7 +4769,7 @@
           "rank": 77,
           "pcode": "290781",
           "pname": "김준일",
-          "value": 454,
+          "value": 455,
           "is_active": true
         },
         {
@@ -4783,7 +4783,7 @@
           "rank": 79,
           "pcode": "290583",
           "pname": "한희원",
-          "value": 449,
+          "value": 450,
           "is_active": true
         },
         {
@@ -4804,7 +4804,7 @@
           "rank": 82,
           "pcode": "290788",
           "pname": "이호현",
-          "value": 442,
+          "value": 444,
           "is_active": true
         },
         {
@@ -4846,7 +4846,7 @@
           "rank": 88,
           "pcode": "291001",
           "pname": "강상재",
-          "value": 416,
+          "value": 417,
           "is_active": true
         },
         {
@@ -4854,7 +4854,7 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 414,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 90,
@@ -4888,7 +4888,7 @@
           "rank": 94,
           "pcode": "290599",
           "pname": "서민수",
-          "value": 408,
+          "value": 409,
           "is_active": true
         },
         {
@@ -4900,17 +4900,17 @@
         },
         {
           "rank": 96,
+          "pcode": "291091",
+          "pname": "양홍석",
+          "value": 404,
+          "is_active": true
+        },
+        {
+          "rank": 97,
           "pcode": "290285",
           "pname": "박성진",
           "value": 403,
           "is_active": false
-        },
-        {
-          "rank": 97,
-          "pcode": "291091",
-          "pname": "양홍석",
-          "value": 403,
-          "is_active": true
         },
         {
           "rank": 98,
@@ -5001,7 +5001,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 8403,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 10,
@@ -5042,7 +5042,7 @@
           "rank": 15,
           "pcode": "290776",
           "pname": "허웅",
-          "value": 6310,
+          "value": 6321,
           "is_active": true
         },
         {
@@ -5056,7 +5056,7 @@
           "rank": 17,
           "pcode": "290765",
           "pname": "이재도",
-          "value": 5931,
+          "value": 5942,
           "is_active": true
         },
         {
@@ -5070,7 +5070,7 @@
           "rank": 19,
           "pcode": "290440",
           "pname": "이관희",
-          "value": 5880,
+          "value": 5886,
           "is_active": true
         },
         {
@@ -5085,7 +5085,7 @@
           "pcode": "290750",
           "pname": "김종규",
           "value": 5847,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 22,
@@ -5126,7 +5126,7 @@
           "rank": 27,
           "pcode": "290787",
           "pname": "이승현",
-          "value": 5315,
+          "value": 5326,
           "is_active": true
         },
         {
@@ -5175,7 +5175,7 @@
           "rank": 34,
           "pcode": "291091",
           "pname": "양홍석",
-          "value": 4569,
+          "value": 4591,
           "is_active": true
         },
         {
@@ -5190,14 +5190,14 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 4540,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 37,
           "pcode": "290742",
           "pname": "이대성",
           "value": 4336,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 38,
@@ -5210,7 +5210,7 @@
           "rank": 39,
           "pcode": "290763",
           "pname": "전성현",
-          "value": 4248,
+          "value": 4251,
           "is_active": true
         },
         {
@@ -5231,7 +5231,7 @@
           "rank": 42,
           "pcode": "291085",
           "pname": "허훈",
-          "value": 4089,
+          "value": 4110,
           "is_active": true
         },
         {
@@ -5246,7 +5246,7 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 4011,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 45,
@@ -5271,17 +5271,17 @@
         },
         {
           "rank": 48,
-          "pcode": "291084",
-          "pname": "안영준",
-          "value": 3950,
+          "pcode": "291001",
+          "pname": "강상재",
+          "value": 3952,
           "is_active": true
         },
         {
           "rank": 49,
-          "pcode": "291001",
-          "pname": "강상재",
-          "value": 3933,
-          "is_active": true
+          "pcode": "291084",
+          "pname": "안영준",
+          "value": 3950,
+          "is_active": false
         },
         {
           "rank": 50,
@@ -5295,7 +5295,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 3878,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 52,
@@ -5313,16 +5313,16 @@
         },
         {
           "rank": 54,
-          "pcode": "290781",
-          "pname": "김준일",
-          "value": 3795,
+          "pcode": "291432",
+          "pname": "아셈 마레이",
+          "value": 3805,
           "is_active": true
         },
         {
           "rank": 55,
-          "pcode": "291432",
-          "pname": "아셈 마레이",
-          "value": 3791,
+          "pcode": "290781",
+          "pname": "김준일",
+          "value": 3802,
           "is_active": true
         },
         {
@@ -5337,28 +5337,28 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 3763,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 58,
+          "pcode": "291488",
+          "pname": "이정현",
+          "value": 3750,
+          "is_active": true
+        },
+        {
+          "rank": 59,
           "pcode": "290149",
           "pname": "마퀸 챈들러",
           "value": 3735,
           "is_active": false
         },
         {
-          "rank": 59,
-          "pcode": "291488",
-          "pname": "이정현",
-          "value": 3732,
-          "is_active": true
-        },
-        {
           "rank": 60,
           "pcode": "291430",
           "pname": "앤드류 니콜슨",
           "value": 3715,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 61,
@@ -5379,13 +5379,13 @@
           "pcode": "291068",
           "pname": "김낙현",
           "value": 3681,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 64,
           "pcode": "290539",
           "pname": "장재석",
-          "value": 3624,
+          "value": 3643,
           "is_active": true
         },
         {
@@ -5397,15 +5397,15 @@
         },
         {
           "rank": 66,
-          "pcode": "290380",
-          "pname": "박찬희",
+          "pcode": "290276",
+          "pname": "이승준",
           "value": 3525,
           "is_active": false
         },
         {
           "rank": 67,
-          "pcode": "290276",
-          "pname": "이승준",
+          "pcode": "290380",
+          "pname": "박찬희",
           "value": 3525,
           "is_active": false
         },
@@ -5413,7 +5413,7 @@
           "rank": 68,
           "pcode": "291008",
           "pname": "박지훈",
-          "value": 3485,
+          "value": 3494,
           "is_active": true
         },
         {
@@ -5425,17 +5425,17 @@
         },
         {
           "rank": 70,
+          "pcode": "291511",
+          "pname": "이선 알바노",
+          "value": 3438,
+          "is_active": true
+        },
+        {
+          "rank": 71,
           "pcode": "230061",
           "pname": "오용준",
           "value": 3425,
           "is_active": false
-        },
-        {
-          "rank": 71,
-          "pcode": "291511",
-          "pname": "이선 알바노",
-          "value": 3423,
-          "is_active": true
         },
         {
           "rank": 72,
@@ -5446,17 +5446,17 @@
         },
         {
           "rank": 73,
+          "pcode": "290542",
+          "pname": "임동섭",
+          "value": 3282,
+          "is_active": true
+        },
+        {
+          "rank": 74,
           "pcode": "291242",
           "pname": "캐디 라렌",
           "value": 3262,
           "is_active": false
-        },
-        {
-          "rank": 74,
-          "pcode": "290542",
-          "pname": "임동섭",
-          "value": 3260,
-          "is_active": true
         },
         {
           "rank": 75,
@@ -5490,14 +5490,14 @@
           "rank": 79,
           "pcode": "291579",
           "pname": "게이지 프림",
-          "value": 3030,
-          "is_active": false
+          "value": 3095,
+          "is_active": true
         },
         {
           "rank": 80,
           "pcode": "291342",
           "pname": "숀 롱",
-          "value": 3001,
+          "value": 3039,
           "is_active": true
         },
         {
@@ -5518,14 +5518,14 @@
           "rank": 83,
           "pcode": "290603",
           "pname": "이대헌",
-          "value": 2953,
+          "value": 2961,
           "is_active": true
         },
         {
           "rank": 84,
           "pcode": "291220",
           "pname": "변준형",
-          "value": 2945,
+          "value": 2959,
           "is_active": true
         },
         {
@@ -5547,7 +5547,7 @@
           "pcode": "290488",
           "pname": "차바위",
           "value": 2811,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 88,
@@ -5588,14 +5588,14 @@
           "rank": 93,
           "pcode": "291189",
           "pname": "서명진",
-          "value": 2709,
+          "value": 2720,
           "is_active": true
         },
         {
           "rank": 94,
           "pcode": "290754",
           "pname": "한호빈",
-          "value": 2701,
+          "value": 2708,
           "is_active": true
         },
         {
@@ -5609,7 +5609,7 @@
           "rank": 96,
           "pcode": "290901",
           "pname": "정성우",
-          "value": 2684,
+          "value": 2689,
           "is_active": true
         },
         {
@@ -5637,7 +5637,7 @@
           "rank": 100,
           "pcode": "290501",
           "pname": "최현민",
-          "value": 2613,
+          "value": 2615,
           "is_active": true
         }
       ]
@@ -5649,7 +5649,7 @@
           "rank": 1,
           "pcode": "290524",
           "pname": "라건아",
-          "value": 7066,
+          "value": 7078,
           "is_active": true
         },
         {
@@ -5710,24 +5710,24 @@
         },
         {
           "rank": 10,
+          "pcode": "291432",
+          "pname": "아셈 마레이",
+          "value": 3226,
+          "is_active": true
+        },
+        {
+          "rank": 11,
           "pcode": "290280",
           "pname": "문태영",
           "value": 3222,
           "is_active": false
         },
         {
-          "rank": 11,
-          "pcode": "291432",
-          "pname": "아셈 마레이",
-          "value": 3212,
-          "is_active": true
-        },
-        {
           "rank": 12,
           "pcode": "290750",
           "pname": "김종규",
           "value": 3190,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 13,
@@ -5761,7 +5761,7 @@
           "rank": 17,
           "pcode": "290787",
           "pname": "이승현",
-          "value": 2810,
+          "value": 2817,
           "is_active": true
         },
         {
@@ -5796,7 +5796,7 @@
           "rank": 22,
           "pcode": "291001",
           "pname": "강상재",
-          "value": 2263,
+          "value": 2270,
           "is_active": true
         },
         {
@@ -5810,7 +5810,7 @@
           "rank": 24,
           "pcode": "291091",
           "pname": "양홍석",
-          "value": 2179,
+          "value": 2185,
           "is_active": true
         },
         {
@@ -5824,7 +5824,7 @@
           "rank": 26,
           "pcode": "290539",
           "pname": "장재석",
-          "value": 2064,
+          "value": 2072,
           "is_active": true
         },
         {
@@ -5832,7 +5832,7 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 2001,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 28,
@@ -5850,15 +5850,15 @@
         },
         {
           "rank": 30,
-          "pcode": "290790",
-          "pname": "정효근",
+          "pcode": "291107",
+          "pname": "브랜든 브라운",
           "value": 1971,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 31,
-          "pcode": "291107",
-          "pname": "브랜든 브라운",
+          "pcode": "290790",
+          "pname": "정효근",
           "value": 1971,
           "is_active": false
         },
@@ -5881,7 +5881,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 1880,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 35,
@@ -5923,13 +5923,13 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 1789,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 41,
           "pcode": "290781",
           "pname": "김준일",
-          "value": 1718,
+          "value": 1723,
           "is_active": true
         },
         {
@@ -5941,52 +5941,52 @@
         },
         {
           "rank": 43,
-          "pcode": "290488",
-          "pname": "차바위",
-          "value": 1693,
+          "pcode": "290765",
+          "pname": "이재도",
+          "value": 1699,
           "is_active": true
         },
         {
           "rank": 44,
-          "pcode": "290765",
-          "pname": "이재도",
-          "value": 1691,
-          "is_active": true
+          "pcode": "290488",
+          "pname": "차바위",
+          "value": 1693,
+          "is_active": false
         },
         {
           "rank": 45,
+          "pcode": "291342",
+          "pname": "숀 롱",
+          "value": 1676,
+          "is_active": true
+        },
+        {
+          "rank": 46,
           "pcode": "291138",
           "pname": "머피 할로웨이",
           "value": 1670,
           "is_active": false
         },
         {
-          "rank": 46,
-          "pcode": "291144",
-          "pname": "대릴 먼로",
-          "value": 1666,
-          "is_active": true
-        },
-        {
           "rank": 47,
           "pcode": "290897",
           "pname": "송교창",
           "value": 1666,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 48,
-          "pcode": "290661",
-          "pname": "문성곤",
-          "value": 1651,
-          "is_active": true
+          "pcode": "291144",
+          "pname": "대릴 먼로",
+          "value": 1666,
+          "is_active": false
         },
         {
           "rank": 49,
-          "pcode": "291342",
-          "pname": "숀 롱",
-          "value": 1644,
-          "is_active": true
+          "pcode": "290661",
+          "pname": "문성곤",
+          "value": 1651,
+          "is_active": false
         },
         {
           "rank": 50,
@@ -6007,7 +6007,7 @@
           "pcode": "291084",
           "pname": "안영준",
           "value": 1612,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 53,
@@ -6020,7 +6020,7 @@
           "rank": 54,
           "pcode": "290440",
           "pname": "이관희",
-          "value": 1572,
+          "value": 1573,
           "is_active": true
         },
         {
@@ -6076,15 +6076,15 @@
           "rank": 62,
           "pcode": "291579",
           "pname": "게이지 프림",
-          "value": 1358,
-          "is_active": false
+          "value": 1374,
+          "is_active": true
         },
         {
           "rank": 63,
           "pcode": "291430",
           "pname": "앤드류 니콜슨",
           "value": 1350,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 64,
@@ -6104,7 +6104,7 @@
           "rank": 66,
           "pcode": "290501",
           "pname": "최현민",
-          "value": 1285,
+          "value": 1286,
           "is_active": true
         },
         {
@@ -6118,7 +6118,7 @@
           "rank": 68,
           "pcode": "290542",
           "pname": "임동섭",
-          "value": 1271,
+          "value": 1276,
           "is_active": true
         },
         {
@@ -6132,7 +6132,7 @@
           "rank": 70,
           "pcode": "290529",
           "pname": "정희재",
-          "value": 1263,
+          "value": 1264,
           "is_active": true
         },
         {
@@ -6181,21 +6181,21 @@
           "rank": 77,
           "pcode": "291492",
           "pname": "하윤기",
-          "value": 1200,
+          "value": 1203,
           "is_active": true
         },
         {
           "rank": 78,
           "pcode": "290454",
           "pname": "정창영",
-          "value": 1168,
+          "value": 1169,
           "is_active": true
         },
         {
           "rank": 79,
           "pcode": "290603",
           "pname": "이대헌",
-          "value": 1162,
+          "value": 1164,
           "is_active": true
         },
         {
@@ -6209,7 +6209,7 @@
           "rank": 81,
           "pcode": "291008",
           "pname": "박지훈",
-          "value": 1146,
+          "value": 1147,
           "is_active": true
         },
         {
@@ -6217,7 +6217,7 @@
           "pcode": "291478",
           "pname": "이원석",
           "value": 1143,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 83,
@@ -6230,7 +6230,7 @@
           "rank": 84,
           "pcode": "290776",
           "pname": "허웅",
-          "value": 1090,
+          "value": 1092,
           "is_active": true
         },
         {
@@ -6242,16 +6242,16 @@
         },
         {
           "rank": 86,
-          "pcode": "250038",
-          "pname": "송영진",
-          "value": 1030,
-          "is_active": false
+          "pcode": "291375",
+          "pname": "이우석",
+          "value": 1033,
+          "is_active": true
         },
         {
           "rank": 87,
-          "pcode": "291375",
-          "pname": "이우석",
-          "value": 1022,
+          "pcode": "250038",
+          "pname": "송영진",
+          "value": 1030,
           "is_active": false
         },
         {
@@ -6280,7 +6280,7 @@
           "pcode": "290742",
           "pname": "이대성",
           "value": 1000,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 92,
@@ -6326,17 +6326,17 @@
         },
         {
           "rank": 98,
+          "pcode": "291698",
+          "pname": "레이션 해먼즈",
+          "value": 958,
+          "is_active": true
+        },
+        {
+          "rank": 99,
           "pcode": "290412",
           "pname": "김현민",
           "value": 951,
           "is_active": false
-        },
-        {
-          "rank": 99,
-          "pcode": "291698",
-          "pname": "레이션 해먼즈",
-          "value": 951,
-          "is_active": true
         },
         {
           "rank": 100,
@@ -6390,7 +6390,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 3013,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 7,
@@ -6415,17 +6415,17 @@
         },
         {
           "rank": 10,
+          "pcode": "290765",
+          "pname": "이재도",
+          "value": 2341,
+          "is_active": true
+        },
+        {
+          "rank": 11,
           "pcode": "290108",
           "pname": "김태술",
           "value": 2335,
           "is_active": false
-        },
-        {
-          "rank": 11,
-          "pcode": "290765",
-          "pname": "이재도",
-          "value": 2330,
-          "is_active": true
         },
         {
           "rank": 12,
@@ -6450,17 +6450,17 @@
         },
         {
           "rank": 15,
+          "pcode": "291085",
+          "pname": "허훈",
+          "value": 1751,
+          "is_active": true
+        },
+        {
+          "rank": 16,
           "pcode": "230056",
           "pname": "박지현",
           "value": 1743,
           "is_active": false
-        },
-        {
-          "rank": 16,
-          "pcode": "291085",
-          "pname": "허훈",
-          "value": 1731,
-          "is_active": true
         },
         {
           "rank": 17,
@@ -6487,7 +6487,7 @@
           "rank": 20,
           "pcode": "290776",
           "pname": "허웅",
-          "value": 1553,
+          "value": 1557,
           "is_active": true
         },
         {
@@ -6515,21 +6515,21 @@
           "rank": 24,
           "pcode": "290901",
           "pname": "정성우",
-          "value": 1362,
+          "value": 1369,
           "is_active": true
         },
         {
           "rank": 25,
           "pcode": "290524",
           "pname": "라건아",
-          "value": 1328,
+          "value": 1330,
           "is_active": true
         },
         {
           "rank": 26,
           "pcode": "290754",
           "pname": "한호빈",
-          "value": 1316,
+          "value": 1324,
           "is_active": true
         },
         {
@@ -6543,7 +6543,7 @@
           "rank": 28,
           "pcode": "291511",
           "pname": "이선 알바노",
-          "value": 1303,
+          "value": 1312,
           "is_active": true
         },
         {
@@ -6572,7 +6572,7 @@
           "pcode": "291068",
           "pname": "김낙현",
           "value": 1252,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 33,
@@ -6586,7 +6586,7 @@
           "pcode": "290742",
           "pname": "이대성",
           "value": 1222,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 35,
@@ -6606,7 +6606,7 @@
           "rank": 37,
           "pcode": "290787",
           "pname": "이승현",
-          "value": 1189,
+          "value": 1193,
           "is_active": true
         },
         {
@@ -6625,23 +6625,23 @@
         },
         {
           "rank": 40,
+          "pcode": "291220",
+          "pname": "변준형",
+          "value": 1131,
+          "is_active": true
+        },
+        {
+          "rank": 41,
           "pcode": "290738",
           "pname": "두경민",
           "value": 1128,
           "is_active": false
         },
         {
-          "rank": 41,
-          "pcode": "291220",
-          "pname": "변준형",
-          "value": 1121,
-          "is_active": true
-        },
-        {
           "rank": 42,
           "pcode": "291189",
           "pname": "서명진",
-          "value": 1111,
+          "value": 1115,
           "is_active": true
         },
         {
@@ -6656,7 +6656,7 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 1075,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 45,
@@ -6669,7 +6669,7 @@
           "rank": 46,
           "pcode": "291488",
           "pname": "이정현",
-          "value": 1043,
+          "value": 1056,
           "is_active": true
         },
         {
@@ -6709,51 +6709,51 @@
         },
         {
           "rank": 52,
+          "pcode": "291432",
+          "pname": "아셈 마레이",
+          "value": 878,
+          "is_active": true
+        },
+        {
+          "rank": 53,
           "pcode": "290239",
           "pname": "강병현",
           "value": 874,
           "is_active": false
         },
         {
-          "rank": 53,
-          "pcode": "291432",
-          "pname": "아셈 마레이",
-          "value": 870,
-          "is_active": true
-        },
-        {
           "rank": 54,
-          "pcode": "290488",
-          "pname": "차바위",
-          "value": 822,
+          "pcode": "291091",
+          "pname": "양홍석",
+          "value": 828,
           "is_active": true
         },
         {
           "rank": 55,
-          "pcode": "291091",
-          "pname": "양홍석",
+          "pcode": "290488",
+          "pname": "차바위",
           "value": 822,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 56,
+          "pcode": "291556",
+          "pname": "샘조세프 벨란겔",
+          "value": 810,
+          "is_active": true
+        },
+        {
+          "rank": 57,
           "pcode": "290118",
           "pname": "박상오",
           "value": 807,
           "is_active": false
         },
         {
-          "rank": 57,
-          "pcode": "291556",
-          "pname": "샘조세프 벨란겔",
-          "value": 804,
-          "is_active": true
-        },
-        {
           "rank": 58,
           "pcode": "291001",
           "pname": "강상재",
-          "value": 788,
+          "value": 790,
           "is_active": true
         },
         {
@@ -6761,7 +6761,7 @@
           "pcode": "291144",
           "pname": "대릴 먼로",
           "value": 768,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 60,
@@ -6775,7 +6775,7 @@
           "pcode": "290750",
           "pname": "김종규",
           "value": 763,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 62,
@@ -6789,7 +6789,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 742,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 64,
@@ -6809,7 +6809,7 @@
           "rank": 66,
           "pcode": "291576",
           "pname": "양준석",
-          "value": 723,
+          "value": 727,
           "is_active": true
         },
         {
@@ -6817,7 +6817,7 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 716,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 68,
@@ -6838,7 +6838,7 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 686,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 71,
@@ -6849,15 +6849,15 @@
         },
         {
           "rank": 72,
-          "pcode": "290552",
-          "pname": "유병훈",
+          "pcode": "290116",
+          "pname": "신명호",
           "value": 679,
           "is_active": false
         },
         {
           "rank": 73,
-          "pcode": "290116",
-          "pname": "신명호",
+          "pcode": "290552",
+          "pname": "유병훈",
           "value": 679,
           "is_active": false
         },
@@ -6872,7 +6872,7 @@
           "rank": 75,
           "pcode": "290539",
           "pname": "장재석",
-          "value": 673,
+          "value": 675,
           "is_active": true
         },
         {
@@ -6884,16 +6884,16 @@
         },
         {
           "rank": 77,
-          "pcode": "220050",
-          "pname": "전형수",
-          "value": 654,
-          "is_active": false
+          "pcode": "291375",
+          "pname": "이우석",
+          "value": 659,
+          "is_active": true
         },
         {
           "rank": 78,
-          "pcode": "291375",
-          "pname": "이우석",
-          "value": 650,
+          "pcode": "220050",
+          "pname": "전형수",
+          "value": 654,
           "is_active": false
         },
         {
@@ -6915,7 +6915,7 @@
           "pcode": "291084",
           "pname": "안영준",
           "value": 628,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 82,
@@ -6957,7 +6957,7 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 603,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 88,
@@ -6982,30 +6982,30 @@
         },
         {
           "rank": 91,
+          "pcode": "291649",
+          "pname": "박무빈",
+          "value": 584,
+          "is_active": true
+        },
+        {
+          "rank": 92,
           "pcode": "290991",
           "pname": "천기범",
           "value": 582,
           "is_active": false
         },
         {
-          "rank": 92,
+          "rank": 93,
           "pcode": "290234",
           "pname": "정재홍",
           "value": 580,
           "is_active": false
         },
         {
-          "rank": 93,
+          "rank": 94,
           "pcode": "291512",
           "pname": "저스틴 구탕",
-          "value": 573,
-          "is_active": true
-        },
-        {
-          "rank": 94,
-          "pcode": "291649",
-          "pname": "박무빈",
-          "value": 571,
+          "value": 575,
           "is_active": true
         },
         {
@@ -7067,7 +7067,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 931,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 3,
@@ -7172,7 +7172,7 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 553,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 18,
@@ -7213,7 +7213,7 @@
           "rank": 23,
           "pcode": "291008",
           "pname": "박지훈",
-          "value": 480,
+          "value": 482,
           "is_active": true
         },
         {
@@ -7241,7 +7241,7 @@
           "rank": 27,
           "pcode": "290787",
           "pname": "이승현",
-          "value": 447,
+          "value": 448,
           "is_active": true
         },
         {
@@ -7253,15 +7253,15 @@
         },
         {
           "rank": 29,
-          "pcode": "290284",
-          "pname": "허일영",
+          "pcode": "290901",
+          "pname": "정성우",
           "value": 440,
           "is_active": true
         },
         {
           "rank": 30,
-          "pcode": "290901",
-          "pname": "정성우",
+          "pcode": "290284",
+          "pname": "허일영",
           "value": 440,
           "is_active": true
         },
@@ -7290,7 +7290,7 @@
           "rank": 34,
           "pcode": "290776",
           "pname": "허웅",
-          "value": 420,
+          "value": 421,
           "is_active": true
         },
         {
@@ -7309,15 +7309,15 @@
         },
         {
           "rank": 37,
-          "pcode": "290335",
-          "pname": "제스퍼 존슨",
+          "pcode": "235038",
+          "pname": "강혁",
           "value": 407,
           "is_active": false
         },
         {
           "rank": 38,
-          "pcode": "235038",
-          "pname": "강혁",
+          "pcode": "290335",
+          "pname": "제스퍼 존슨",
           "value": 407,
           "is_active": false
         },
@@ -7326,7 +7326,7 @@
           "pcode": "291084",
           "pname": "안영준",
           "value": 403,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 40,
@@ -7347,14 +7347,14 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 396,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 43,
           "pcode": "290742",
           "pname": "이대성",
           "value": 392,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 44,
@@ -7374,7 +7374,7 @@
           "rank": 46,
           "pcode": "290539",
           "pname": "장재석",
-          "value": 380,
+          "value": 382,
           "is_active": true
         },
         {
@@ -7389,7 +7389,7 @@
           "pcode": "290488",
           "pname": "차바위",
           "value": 371,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 49,
@@ -7402,7 +7402,7 @@
           "rank": 50,
           "pcode": "291488",
           "pname": "이정현",
-          "value": 358,
+          "value": 362,
           "is_active": true
         },
         {
@@ -7421,15 +7421,15 @@
         },
         {
           "rank": 53,
-          "pcode": "290485",
-          "pname": "최부경",
-          "value": 349,
+          "pcode": "291511",
+          "pname": "이선 알바노",
+          "value": 351,
           "is_active": true
         },
         {
           "rank": 54,
-          "pcode": "291511",
-          "pname": "이선 알바노",
+          "pcode": "290485",
+          "pname": "최부경",
           "value": 349,
           "is_active": true
         },
@@ -7449,15 +7449,15 @@
         },
         {
           "rank": 57,
-          "pcode": "235058",
-          "pname": "이현호",
+          "pcode": "291107",
+          "pname": "브랜든 브라운",
           "value": 340,
           "is_active": false
         },
         {
           "rank": 58,
-          "pcode": "291107",
-          "pname": "브랜든 브라운",
+          "pcode": "235058",
+          "pname": "이현호",
           "value": 340,
           "is_active": false
         },
@@ -7507,20 +7507,20 @@
           "rank": 65,
           "pcode": "290529",
           "pname": "정희재",
-          "value": 311,
+          "value": 312,
           "is_active": true
         },
         {
           "rank": 66,
-          "pcode": "290351",
-          "pname": "변기훈",
+          "pcode": "290372",
+          "pname": "송창용",
           "value": 310,
           "is_active": false
         },
         {
           "rank": 67,
-          "pcode": "290372",
-          "pname": "송창용",
+          "pcode": "290351",
+          "pname": "변기훈",
           "value": 310,
           "is_active": false
         },
@@ -7533,17 +7533,17 @@
         },
         {
           "rank": 69,
-          "pcode": "291068",
-          "pname": "김낙현",
+          "pcode": "291220",
+          "pname": "변준형",
           "value": 293,
           "is_active": true
         },
         {
           "rank": 70,
-          "pcode": "291220",
-          "pname": "변준형",
+          "pcode": "291068",
+          "pname": "김낙현",
           "value": 293,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 71,
@@ -7554,24 +7554,24 @@
         },
         {
           "rank": 72,
-          "pcode": "290897",
-          "pname": "송교창",
+          "pcode": "291001",
+          "pname": "강상재",
           "value": 287,
           "is_active": true
         },
         {
           "rank": 73,
-          "pcode": "291001",
-          "pname": "강상재",
-          "value": 286,
-          "is_active": true
+          "pcode": "290897",
+          "pname": "송교창",
+          "value": 287,
+          "is_active": false
         },
         {
           "rank": 74,
           "pcode": "290790",
           "pname": "정효근",
           "value": 286,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 75,
@@ -7624,17 +7624,17 @@
         },
         {
           "rank": 82,
-          "pcode": "290115",
-          "pname": "정병국",
-          "value": 261,
-          "is_active": false
-        },
-        {
-          "rank": 83,
           "pcode": "290542",
           "pname": "임동섭",
           "value": 261,
           "is_active": true
+        },
+        {
+          "rank": 83,
+          "pcode": "290115",
+          "pname": "정병국",
+          "value": 261,
+          "is_active": false
         },
         {
           "rank": 84,
@@ -7648,7 +7648,7 @@
           "pcode": "290750",
           "pname": "김종규",
           "value": 259,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 86,
@@ -7687,9 +7687,9 @@
         },
         {
           "rank": 91,
-          "pcode": "290501",
-          "pname": "최현민",
-          "value": 244,
+          "pcode": "291556",
+          "pname": "샘조세프 벨란겔",
+          "value": 245,
           "is_active": true
         },
         {
@@ -7701,9 +7701,9 @@
         },
         {
           "rank": 93,
-          "pcode": "291556",
-          "pname": "샘조세프 벨란겔",
-          "value": 243,
+          "pcode": "290501",
+          "pname": "최현민",
+          "value": 244,
           "is_active": true
         },
         {
@@ -7739,7 +7739,7 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 238,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 99,
@@ -7786,7 +7786,7 @@
           "pcode": "290750",
           "pname": "김종규",
           "value": 496,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 5,
@@ -7835,7 +7835,7 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 368,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 12,
@@ -7862,7 +7862,7 @@
           "rank": 15,
           "pcode": "290539",
           "pname": "장재석",
-          "value": 335,
+          "value": 337,
           "is_active": true
         },
         {
@@ -7877,7 +7877,7 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 298,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 18,
@@ -7898,7 +7898,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 268,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 21,
@@ -7975,7 +7975,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 188,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 32,
@@ -8003,21 +8003,21 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 177,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 36,
+          "pcode": "291001",
+          "pname": "강상재",
+          "value": 176,
+          "is_active": true
+        },
+        {
+          "rank": 37,
           "pcode": "291316",
           "pname": "디드릭 로슨",
           "value": 175,
           "is_active": false
-        },
-        {
-          "rank": 37,
-          "pcode": "291001",
-          "pname": "강상재",
-          "value": 175,
-          "is_active": true
         },
         {
           "rank": 38,
@@ -8049,15 +8049,15 @@
         },
         {
           "rank": 42,
-          "pcode": "291084",
-          "pname": "안영준",
+          "pcode": "290118",
+          "pname": "박상오",
           "value": 158,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 43,
-          "pcode": "290118",
-          "pname": "박상오",
+          "pcode": "291084",
+          "pname": "안영준",
           "value": 158,
           "is_active": false
         },
@@ -8080,7 +8080,7 @@
           "pcode": "291478",
           "pname": "이원석",
           "value": 154,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 47,
@@ -8129,13 +8129,13 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 132,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 54,
           "pcode": "291342",
           "pname": "숀 롱",
-          "value": 131,
+          "value": 132,
           "is_active": true
         },
         {
@@ -8147,15 +8147,15 @@
         },
         {
           "rank": 56,
-          "pcode": "250038",
-          "pname": "송영진",
+          "pcode": "215063",
+          "pname": "자밀 왓킨스",
           "value": 125,
           "is_active": false
         },
         {
           "rank": 57,
-          "pcode": "215063",
-          "pname": "자밀 왓킨스",
+          "pcode": "250038",
+          "pname": "송영진",
           "value": 125,
           "is_active": false
         },
@@ -8168,22 +8168,22 @@
         },
         {
           "rank": 59,
+          "pcode": "290478",
+          "pname": "장민국",
+          "value": 121,
+          "is_active": true
+        },
+        {
+          "rank": 60,
           "pcode": "230061",
           "pname": "오용준",
           "value": 121,
           "is_active": false
         },
         {
-          "rank": 60,
-          "pcode": "290440",
-          "pname": "이관희",
-          "value": 121,
-          "is_active": true
-        },
-        {
           "rank": 61,
-          "pcode": "290478",
-          "pname": "장민국",
+          "pcode": "291432",
+          "pname": "아셈 마레이",
           "value": 121,
           "is_active": true
         },
@@ -8196,9 +8196,9 @@
         },
         {
           "rank": 63,
-          "pcode": "291432",
-          "pname": "아셈 마레이",
-          "value": 120,
+          "pcode": "290440",
+          "pname": "이관희",
+          "value": 121,
           "is_active": true
         },
         {
@@ -8252,17 +8252,17 @@
         },
         {
           "rank": 71,
-          "pcode": "290381",
-          "pname": "이정현",
-          "value": 106,
-          "is_active": true
-        },
-        {
-          "rank": 72,
           "pcode": "255032",
           "pname": "서장훈",
           "value": 106,
           "is_active": false
+        },
+        {
+          "rank": 72,
+          "pcode": "290381",
+          "pname": "이정현",
+          "value": 106,
+          "is_active": true
         },
         {
           "rank": 73,
@@ -8296,8 +8296,8 @@
           "rank": 77,
           "pcode": "291579",
           "pname": "게이지 프림",
-          "value": 94,
-          "is_active": false
+          "value": 96,
+          "is_active": true
         },
         {
           "rank": 78,
@@ -8315,15 +8315,15 @@
         },
         {
           "rank": 80,
-          "pcode": "290139",
-          "pname": "레지 오코사",
+          "pcode": "290774",
+          "pname": "웬델 맥키네스",
           "value": 90,
           "is_active": false
         },
         {
           "rank": 81,
-          "pcode": "290774",
-          "pname": "웬델 맥키네스",
+          "pcode": "290139",
+          "pname": "레지 오코사",
           "value": 90,
           "is_active": false
         },
@@ -8374,7 +8374,7 @@
           "pcode": "291430",
           "pname": "앤드류 니콜슨",
           "value": 83,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 89,
@@ -8385,15 +8385,15 @@
         },
         {
           "rank": 90,
-          "pcode": "245072",
-          "pname": "퍼비스 파스코",
+          "pcode": "290733",
+          "pname": "타일러 윌커슨",
           "value": 81,
           "is_active": false
         },
         {
           "rank": 91,
-          "pcode": "290733",
-          "pname": "타일러 윌커슨",
+          "pcode": "245072",
+          "pname": "퍼비스 파스코",
           "value": 81,
           "is_active": false
         },
@@ -8441,22 +8441,22 @@
         },
         {
           "rank": 98,
-          "pcode": "290491",
-          "pname": "김승원",
-          "value": 73,
-          "is_active": false
-        },
-        {
-          "rank": 99,
           "pcode": "210090",
           "pname": "크리스 버지스",
           "value": 73,
           "is_active": false
         },
         {
+          "rank": 99,
+          "pcode": "290491",
+          "pname": "김승원",
+          "value": 73,
+          "is_active": false
+        },
+        {
           "rank": 100,
-          "pcode": "290542",
-          "pname": "임동섭",
+          "pcode": "290583",
+          "pname": "한희원",
           "value": 71,
           "is_active": true
         }
@@ -8497,7 +8497,7 @@
           "rank": 5,
           "pcode": "290763",
           "pname": "전성현",
-          "value": 928,
+          "value": 929,
           "is_active": true
         },
         {
@@ -8546,7 +8546,7 @@
           "rank": 12,
           "pcode": "290440",
           "pname": "이관희",
-          "value": 793,
+          "value": 795,
           "is_active": true
         },
         {
@@ -8561,7 +8561,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 718,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 15,
@@ -8581,7 +8581,7 @@
           "rank": 17,
           "pcode": "290765",
           "pname": "이재도",
-          "value": 672,
+          "value": 675,
           "is_active": true
         },
         {
@@ -8589,7 +8589,7 @@
           "pcode": "291068",
           "pname": "김낙현",
           "value": 645,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 19,
@@ -8602,7 +8602,7 @@
           "rank": 20,
           "pcode": "290542",
           "pname": "임동섭",
-          "value": 590,
+          "value": 596,
           "is_active": true
         },
         {
@@ -8637,7 +8637,7 @@
           "rank": 25,
           "pcode": "291085",
           "pname": "허훈",
-          "value": 552,
+          "value": 553,
           "is_active": true
         },
         {
@@ -8680,21 +8680,21 @@
           "pcode": "290742",
           "pname": "이대성",
           "value": 528,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 32,
+          "pcode": "291091",
+          "pname": "양홍석",
+          "value": 522,
+          "is_active": true
+        },
+        {
+          "rank": 33,
           "pcode": "230061",
           "pname": "오용준",
           "value": 522,
           "is_active": false
-        },
-        {
-          "rank": 33,
-          "pcode": "291091",
-          "pname": "양홍석",
-          "value": 521,
-          "is_active": true
         },
         {
           "rank": 34,
@@ -8715,7 +8715,7 @@
           "pcode": "290488",
           "pname": "차바위",
           "value": 503,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 37,
@@ -8729,13 +8729,13 @@
           "pcode": "291084",
           "pname": "안영준",
           "value": 496,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 39,
           "pcode": "291488",
           "pname": "이정현",
-          "value": 492,
+          "value": 495,
           "is_active": true
         },
         {
@@ -8756,7 +8756,7 @@
           "rank": 42,
           "pcode": "290754",
           "pname": "한호빈",
-          "value": 468,
+          "value": 469,
           "is_active": true
         },
         {
@@ -8764,7 +8764,7 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 467,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 44,
@@ -8777,7 +8777,7 @@
           "rank": 45,
           "pcode": "291189",
           "pname": "서명진",
-          "value": 450,
+          "value": 452,
           "is_active": true
         },
         {
@@ -8785,7 +8785,7 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 433,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 47,
@@ -8805,7 +8805,7 @@
           "rank": 49,
           "pcode": "290901",
           "pname": "정성우",
-          "value": 404,
+          "value": 405,
           "is_active": true
         },
         {
@@ -8813,7 +8813,7 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 403,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 51,
@@ -8834,7 +8834,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 392,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 54,
@@ -8852,15 +8852,15 @@
         },
         {
           "rank": 56,
-          "pcode": "290501",
-          "pname": "최현민",
+          "pcode": "291430",
+          "pname": "앤드류 니콜슨",
           "value": 388,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 57,
-          "pcode": "291430",
-          "pname": "앤드류 니콜슨",
+          "pcode": "290501",
+          "pname": "최현민",
           "value": 388,
           "is_active": true
         },
@@ -8889,14 +8889,14 @@
           "rank": 61,
           "pcode": "291001",
           "pname": "강상재",
-          "value": 368,
+          "value": 373,
           "is_active": true
         },
         {
           "rank": 62,
           "pcode": "291220",
           "pname": "변준형",
-          "value": 357,
+          "value": 359,
           "is_active": true
         },
         {
@@ -8915,29 +8915,29 @@
         },
         {
           "rank": 65,
-          "pcode": "290454",
-          "pname": "정창영",
-          "value": 348,
-          "is_active": true
-        },
-        {
-          "rank": 66,
           "pcode": "220172",
           "pname": "방성윤",
           "value": 348,
           "is_active": false
         },
         {
+          "rank": 66,
+          "pcode": "290454",
+          "pname": "정창영",
+          "value": 348,
+          "is_active": true
+        },
+        {
           "rank": 67,
-          "pcode": "290528",
-          "pname": "박경상",
+          "pcode": "290231",
+          "pname": "기승호",
           "value": 338,
           "is_active": false
         },
         {
           "rank": 68,
-          "pcode": "290231",
-          "pname": "기승호",
+          "pcode": "290528",
+          "pname": "박경상",
           "value": 338,
           "is_active": false
         },
@@ -8964,50 +8964,50 @@
         },
         {
           "rank": 72,
+          "pcode": "291194",
+          "pname": "전현우",
+          "value": 329,
+          "is_active": true
+        },
+        {
+          "rank": 73,
           "pcode": "291374",
           "pname": "이근휘",
           "value": 329,
           "is_active": true
         },
         {
-          "rank": 73,
+          "rank": 74,
           "pcode": "291640",
           "pname": "유기상",
           "value": 328,
-          "is_active": true
-        },
-        {
-          "rank": 74,
-          "pcode": "291194",
-          "pname": "전현우",
-          "value": 328,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 75,
           "pcode": "291008",
           "pname": "박지훈",
-          "value": 319,
+          "value": 320,
           "is_active": true
         },
         {
           "rank": 76,
           "pcode": "290787",
           "pname": "이승현",
-          "value": 318,
+          "value": 319,
           "is_active": true
         },
         {
           "rank": 77,
-          "pcode": "290115",
-          "pname": "정병국",
+          "pcode": "290122",
+          "pname": "이광재",
           "value": 317,
           "is_active": false
         },
         {
           "rank": 78,
-          "pcode": "290122",
-          "pname": "이광재",
+          "pcode": "290115",
+          "pname": "정병국",
           "value": 317,
           "is_active": false
         },
@@ -9093,7 +9093,7 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 283,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 91,
@@ -9111,15 +9111,15 @@
         },
         {
           "rank": 93,
-          "pcode": "290280",
-          "pname": "문태영",
+          "pcode": "210044",
+          "pname": "이병석",
           "value": 274,
           "is_active": false
         },
         {
           "rank": 94,
-          "pcode": "210044",
-          "pname": "이병석",
+          "pcode": "290280",
+          "pname": "문태영",
           "value": 274,
           "is_active": false
         },
@@ -9134,20 +9134,20 @@
           "rank": 96,
           "pcode": "291375",
           "pname": "이우석",
-          "value": 268,
-          "is_active": false
+          "value": 272,
+          "is_active": true
         },
         {
           "rank": 97,
-          "pcode": "290380",
-          "pname": "박찬희",
+          "pcode": "225037",
+          "pname": "조동현",
           "value": 266,
           "is_active": false
         },
         {
           "rank": 98,
-          "pcode": "225037",
-          "pname": "조동현",
+          "pcode": "290380",
+          "pname": "박찬희",
           "value": 266,
           "is_active": false
         },
@@ -9181,7 +9181,7 @@
           "rank": 2,
           "pcode": "290381",
           "pname": "이정현",
-          "value": 744,
+          "value": 745,
           "is_active": true
         },
         {
@@ -9202,7 +9202,7 @@
           "rank": 5,
           "pcode": "290284",
           "pname": "허일영",
-          "value": 708,
+          "value": 709,
           "is_active": true
         },
         {
@@ -9230,14 +9230,14 @@
           "rank": 9,
           "pcode": "290524",
           "pname": "라건아",
-          "value": 665,
+          "value": 666,
           "is_active": true
         },
         {
           "rank": 10,
           "pcode": "290440",
           "pname": "이관희",
-          "value": 654,
+          "value": 655,
           "is_active": true
         },
         {
@@ -9245,7 +9245,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 650,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 12,
@@ -9270,17 +9270,17 @@
         },
         {
           "rank": 15,
-          "pcode": "290450",
-          "pname": "오세근",
-          "value": 621,
-          "is_active": true
-        },
-        {
-          "rank": 16,
           "pcode": "290118",
           "pname": "박상오",
           "value": 621,
           "is_active": false
+        },
+        {
+          "rank": 16,
+          "pcode": "290450",
+          "pname": "오세근",
+          "value": 621,
+          "is_active": true
         },
         {
           "rank": 17,
@@ -9293,7 +9293,7 @@
           "rank": 18,
           "pcode": "290454",
           "pname": "정창영",
-          "value": 595,
+          "value": 596,
           "is_active": true
         },
         {
@@ -9314,7 +9314,7 @@
           "rank": 21,
           "pcode": "290539",
           "pname": "장재석",
-          "value": 578,
+          "value": 580,
           "is_active": true
         },
         {
@@ -9328,43 +9328,43 @@
           "rank": 23,
           "pcode": "290765",
           "pname": "이재도",
-          "value": 570,
+          "value": 572,
           "is_active": true
         },
         {
           "rank": 24,
+          "pcode": "290501",
+          "pname": "최현민",
+          "value": 569,
+          "is_active": true
+        },
+        {
+          "rank": 25,
           "pcode": "220194",
           "pname": "조성민",
           "value": 568,
           "is_active": false
         },
         {
-          "rank": 25,
-          "pcode": "290501",
-          "pname": "최현민",
-          "value": 568,
-          "is_active": true
-        },
-        {
           "rank": 26,
-          "pcode": "290417",
-          "pname": "최진수",
-          "value": 566,
+          "pcode": "290529",
+          "pname": "정희재",
+          "value": 567,
           "is_active": true
         },
         {
           "rank": 27,
-          "pcode": "290529",
-          "pname": "정희재",
-          "value": 565,
-          "is_active": true
+          "pcode": "290417",
+          "pname": "최진수",
+          "value": 566,
+          "is_active": false
         },
         {
           "rank": 28,
           "pcode": "290750",
           "pname": "김종규",
           "value": 562,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 29,
@@ -9382,15 +9382,15 @@
         },
         {
           "rank": 31,
-          "pcode": "290280",
-          "pname": "문태영",
+          "pcode": "290116",
+          "pname": "신명호",
           "value": 557,
           "is_active": false
         },
         {
           "rank": 32,
-          "pcode": "290116",
-          "pname": "신명호",
+          "pcode": "290280",
+          "pname": "문태영",
           "value": 557,
           "is_active": false
         },
@@ -9399,7 +9399,7 @@
           "pcode": "290488",
           "pname": "차바위",
           "value": 551,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 34,
@@ -9459,22 +9459,22 @@
         },
         {
           "rank": 42,
-          "pcode": "290218",
-          "pname": "윤호영",
-          "value": 530,
-          "is_active": false
-        },
-        {
-          "rank": 43,
           "pcode": "290380",
           "pname": "박찬희",
           "value": 530,
           "is_active": false
         },
         {
-          "rank": 44,
+          "rank": 43,
           "pcode": "290108",
           "pname": "김태술",
+          "value": 530,
+          "is_active": false
+        },
+        {
+          "rank": 44,
+          "pcode": "290218",
+          "pname": "윤호영",
           "value": 530,
           "is_active": false
         },
@@ -9490,7 +9490,7 @@
           "pcode": "290503",
           "pname": "박지훈",
           "value": 524,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 47,
@@ -9510,14 +9510,14 @@
           "rank": 49,
           "pcode": "290785",
           "pname": "최승욱",
-          "value": 519,
+          "value": 521,
           "is_active": true
         },
         {
           "rank": 50,
           "pcode": "290787",
           "pname": "이승현",
-          "value": 511,
+          "value": 513,
           "is_active": true
         },
         {
@@ -9531,21 +9531,21 @@
           "rank": 52,
           "pcode": "290542",
           "pname": "임동섭",
-          "value": 491,
+          "value": 493,
           "is_active": true
         },
         {
           "rank": 53,
-          "pcode": "290740",
-          "pname": "전준범",
+          "pcode": "290763",
+          "pname": "전성현",
           "value": 484,
           "is_active": true
         },
         {
           "rank": 54,
-          "pcode": "290763",
-          "pname": "전성현",
-          "value": 483,
+          "pcode": "290740",
+          "pname": "전준범",
+          "value": 484,
           "is_active": true
         },
         {
@@ -9559,14 +9559,14 @@
           "rank": 56,
           "pcode": "290776",
           "pname": "허웅",
-          "value": 481,
+          "value": 483,
           "is_active": true
         },
         {
           "rank": 57,
           "pcode": "290754",
           "pname": "한호빈",
-          "value": 479,
+          "value": 480,
           "is_active": true
         },
         {
@@ -9588,7 +9588,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 461,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 61,
@@ -9615,28 +9615,28 @@
           "rank": 64,
           "pcode": "290478",
           "pname": "장민국",
-          "value": 454,
+          "value": 455,
           "is_active": true
         },
         {
           "rank": 65,
+          "pcode": "290661",
+          "pname": "문성곤",
+          "value": 449,
+          "is_active": false
+        },
+        {
+          "rank": 66,
           "pcode": "290412",
           "pname": "김현민",
           "value": 449,
           "is_active": false
         },
         {
-          "rank": 66,
-          "pcode": "290661",
-          "pname": "문성곤",
-          "value": 449,
-          "is_active": true
-        },
-        {
           "rank": 67,
           "pcode": "290901",
           "pname": "정성우",
-          "value": 445,
+          "value": 446,
           "is_active": true
         },
         {
@@ -9648,17 +9648,17 @@
         },
         {
           "rank": 69,
+          "pcode": "291008",
+          "pname": "박지훈",
+          "value": 441,
+          "is_active": true
+        },
+        {
+          "rank": 70,
           "pcode": "290544",
           "pname": "김지완",
           "value": 441,
           "is_active": false
-        },
-        {
-          "rank": 70,
-          "pcode": "291008",
-          "pname": "박지훈",
-          "value": 440,
-          "is_active": true
         },
         {
           "rank": 71,
@@ -9685,7 +9685,7 @@
           "rank": 74,
           "pcode": "290781",
           "pname": "김준일",
-          "value": 431,
+          "value": 432,
           "is_active": true
         },
         {
@@ -9727,7 +9727,7 @@
           "rank": 80,
           "pcode": "290583",
           "pname": "한희원",
-          "value": 420,
+          "value": 421,
           "is_active": true
         },
         {
@@ -9739,17 +9739,17 @@
         },
         {
           "rank": 82,
+          "pcode": "290788",
+          "pname": "이호현",
+          "value": 418,
+          "is_active": true
+        },
+        {
+          "rank": 83,
           "pcode": "260005",
           "pname": "주태수",
           "value": 417,
           "is_active": false
-        },
-        {
-          "rank": 83,
-          "pcode": "290788",
-          "pname": "이호현",
-          "value": 416,
-          "is_active": true
         },
         {
           "rank": 84,
@@ -9767,10 +9767,10 @@
         },
         {
           "rank": 86,
-          "pcode": "290295",
-          "pname": "김우겸",
+          "pcode": "291001",
+          "pname": "강상재",
           "value": 400,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 87,
@@ -9781,10 +9781,10 @@
         },
         {
           "rank": 88,
-          "pcode": "291001",
-          "pname": "강상재",
-          "value": 399,
-          "is_active": true
+          "pcode": "290295",
+          "pname": "김우겸",
+          "value": 400,
+          "is_active": false
         },
         {
           "rank": 89,
@@ -9804,36 +9804,36 @@
           "rank": 91,
           "pcode": "290599",
           "pname": "서민수",
-          "value": 392,
+          "value": 393,
           "is_active": true
         },
         {
           "rank": 92,
-          "pcode": "290553",
-          "pname": "배병준",
-          "value": 385,
-          "is_active": true
-        },
-        {
-          "rank": 93,
           "pcode": "290549",
           "pname": "김민욱",
           "value": 385,
           "is_active": false
         },
         {
+          "rank": 93,
+          "pcode": "290553",
+          "pname": "배병준",
+          "value": 385,
+          "is_active": true
+        },
+        {
           "rank": 94,
+          "pcode": "291091",
+          "pname": "양홍석",
+          "value": 384,
+          "is_active": true
+        },
+        {
+          "rank": 95,
           "pcode": "255053",
           "pname": "이한권",
           "value": 383,
           "is_active": false
-        },
-        {
-          "rank": 95,
-          "pcode": "291091",
-          "pname": "양홍석",
-          "value": 383,
-          "is_active": true
         },
         {
           "rank": 96,
@@ -9861,7 +9861,7 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 372,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 100,
@@ -9980,7 +9980,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 481,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 16,
@@ -10064,7 +10064,7 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 378,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 28,
@@ -10078,7 +10078,7 @@
           "pcode": "290750",
           "pname": "김종규",
           "value": 374,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 30,
@@ -10099,7 +10099,7 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 369,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 33,
@@ -10127,7 +10127,7 @@
           "pcode": "290742",
           "pname": "이대성",
           "value": 345,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 37,
@@ -10253,7 +10253,7 @@
           "pcode": "291579",
           "pname": "게이지 프림",
           "value": 274,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 55,
@@ -10288,7 +10288,7 @@
           "pcode": "290488",
           "pname": "차바위",
           "value": 259,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 60,
@@ -10316,21 +10316,21 @@
           "pcode": "291144",
           "pname": "대릴 먼로",
           "value": 253,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 64,
           "pcode": "291671",
           "pname": "패리스 배스",
           "value": 248,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 65,
           "pcode": "290417",
           "pname": "최진수",
           "value": 245,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 66,
@@ -10400,7 +10400,7 @@
           "pcode": "291068",
           "pname": "김낙현",
           "value": 223,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 76,
@@ -10421,7 +10421,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 219,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 79,
@@ -10519,7 +10519,7 @@
           "pcode": "291375",
           "pname": "이우석",
           "value": 184,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 93,
@@ -10540,7 +10540,7 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 180,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 96,
@@ -10692,14 +10692,14 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 189,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 17,
           "pcode": "290897",
           "pname": "송교창",
           "value": 188,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 18,
@@ -10755,7 +10755,7 @@
           "pcode": "290750",
           "pname": "김종규",
           "value": 162,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 26,
@@ -10783,7 +10783,7 @@
           "pcode": "290488",
           "pname": "차바위",
           "value": 156,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 30,
@@ -10797,7 +10797,7 @@
           "pcode": "291144",
           "pname": "대릴 먼로",
           "value": 151,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 32,
@@ -10818,7 +10818,7 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 142,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 35,
@@ -10853,7 +10853,7 @@
           "pcode": "291579",
           "pname": "게이지 프림",
           "value": 136,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 40,
@@ -10902,7 +10902,7 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 116,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 47,
@@ -10916,7 +10916,7 @@
           "pcode": "291671",
           "pname": "패리스 배스",
           "value": 113,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 49,
@@ -10930,7 +10930,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 111,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 51,
@@ -10979,7 +10979,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 102,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 58,
@@ -11098,14 +11098,14 @@
           "pcode": "291375",
           "pname": "이우석",
           "value": 89,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 75,
           "pcode": "291788",
           "pname": "네이던 나이트",
           "value": 89,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 76,
@@ -11327,7 +11327,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 165,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 7,
@@ -11460,7 +11460,7 @@
           "pcode": "291068",
           "pname": "김낙현",
           "value": 96,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 26,
@@ -11523,14 +11523,14 @@
           "pcode": "290742",
           "pname": "이대성",
           "value": 84,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 35,
           "pcode": "291144",
           "pname": "대릴 먼로",
           "value": 82,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 36,
@@ -11551,7 +11551,7 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 77,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 39,
@@ -11586,7 +11586,7 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 71,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 44,
@@ -11656,7 +11656,7 @@
           "pcode": "290488",
           "pname": "차바위",
           "value": 55,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 54,
@@ -11677,7 +11677,7 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 54,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 57,
@@ -11719,7 +11719,7 @@
           "pcode": "291375",
           "pname": "이우석",
           "value": 47,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 63,
@@ -11782,7 +11782,7 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 43,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 72,
@@ -11803,7 +11803,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 42,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 75,
@@ -11908,7 +11908,7 @@
           "pcode": "290750",
           "pname": "김종규",
           "value": 36,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 90,
@@ -11985,7 +11985,7 @@
           "pcode": "291788",
           "pname": "네이던 나이트",
           "value": 33,
-          "is_active": true
+          "is_active": false
         }
       ]
     },
@@ -12095,7 +12095,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 47,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 16,
@@ -12123,7 +12123,7 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 43,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 20,
@@ -12186,7 +12186,7 @@
           "pcode": "290488",
           "pname": "차바위",
           "value": 30,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 29,
@@ -12214,7 +12214,7 @@
           "pcode": "290742",
           "pname": "이대성",
           "value": 29,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 33,
@@ -12242,14 +12242,14 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 28,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 37,
           "pcode": "291068",
           "pname": "김낙현",
           "value": 28,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 38,
@@ -12396,7 +12396,7 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 23,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 59,
@@ -12431,7 +12431,7 @@
           "pcode": "291671",
           "pname": "패리스 배스",
           "value": 22,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 64,
@@ -12480,21 +12480,21 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 20,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 71,
           "pcode": "290750",
           "pname": "김종규",
           "value": 20,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 72,
           "pcode": "291579",
           "pname": "게이지 프림",
           "value": 19,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 73,
@@ -12508,7 +12508,7 @@
           "pcode": "291144",
           "pname": "대릴 먼로",
           "value": 18,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 75,
@@ -12550,7 +12550,7 @@
           "pcode": "291777",
           "pname": "조엘 카굴랑안",
           "value": 17,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 81,
@@ -12578,7 +12578,7 @@
           "pcode": "291084",
           "pname": "안영준",
           "value": 16,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 85,
@@ -12669,7 +12669,7 @@
           "pcode": "291640",
           "pname": "유기상",
           "value": 14,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 98,
@@ -12807,7 +12807,7 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 24,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 17,
@@ -12863,14 +12863,14 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 16,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 25,
           "pcode": "290750",
           "pname": "김종규",
           "value": 16,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 26,
@@ -12884,7 +12884,7 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 15,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 28,
@@ -12961,14 +12961,14 @@
           "pcode": "291579",
           "pname": "게이지 프림",
           "value": 10,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 39,
           "pcode": "291671",
           "pname": "패리스 배스",
           "value": 10,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 40,
@@ -13066,7 +13066,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 8,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 54,
@@ -13080,7 +13080,7 @@
           "pcode": "291084",
           "pname": "안영준",
           "value": 8,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 56,
@@ -13101,7 +13101,7 @@
           "pcode": "291788",
           "pname": "네이던 나이트",
           "value": 8,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 59,
@@ -13122,7 +13122,7 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 7,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 62,
@@ -13157,14 +13157,14 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 7,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 67,
           "pcode": "290742",
           "pname": "이대성",
           "value": 7,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 68,
@@ -13234,14 +13234,14 @@
           "pcode": "291783",
           "pname": "망콕 마티앙",
           "value": 6,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 78,
           "pcode": "291430",
           "pname": "앤드류 니콜슨",
           "value": 6,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 79,
@@ -13491,7 +13491,7 @@
           "pcode": "290488",
           "pname": "차바위",
           "value": 52,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 14,
@@ -13519,7 +13519,7 @@
           "pcode": "290742",
           "pname": "이대성",
           "value": 48,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 18,
@@ -13561,7 +13561,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 42,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 24,
@@ -13596,7 +13596,7 @@
           "pcode": "290993",
           "pname": "최준용",
           "value": 40,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 29,
@@ -13624,7 +13624,7 @@
           "pcode": "291068",
           "pname": "김낙현",
           "value": 39,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 33,
@@ -13694,7 +13694,7 @@
           "pcode": "291375",
           "pname": "이우석",
           "value": 31,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 43,
@@ -13715,7 +13715,7 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 30,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 46,
@@ -13785,14 +13785,14 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 27,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 56,
           "pcode": "290661",
           "pname": "문성곤",
           "value": 26,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 57,
@@ -13820,7 +13820,7 @@
           "pcode": "291084",
           "pname": "안영준",
           "value": 26,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 61,
@@ -13841,7 +13841,7 @@
           "pcode": "291640",
           "pname": "유기상",
           "value": 25,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 64,
@@ -13855,7 +13855,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 25,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 66,
@@ -13946,7 +13946,7 @@
           "pcode": "291144",
           "pname": "대릴 먼로",
           "value": 21,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 79,
@@ -14058,7 +14058,7 @@
           "pcode": "291671",
           "pname": "패리스 배스",
           "value": 16,
-          "is_active": false
+          "is_active": true
         },
         {
           "rank": 95,
@@ -14245,7 +14245,7 @@
           "pcode": "290488",
           "pname": "차바위",
           "value": 47,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 21,
@@ -14280,7 +14280,7 @@
           "pcode": "290661",
           "pname": "문성곤",
           "value": 46,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 26,
@@ -14336,7 +14336,7 @@
           "pcode": "290897",
           "pname": "송교창",
           "value": 42,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 34,
@@ -14448,7 +14448,7 @@
           "pcode": "290417",
           "pname": "최진수",
           "value": 36,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 50,
@@ -14476,7 +14476,7 @@
           "pcode": "290407",
           "pname": "김선형",
           "value": 35,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 54,
@@ -14630,7 +14630,7 @@
           "pcode": "290750",
           "pname": "김종규",
           "value": 30,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 76,
@@ -14651,7 +14651,7 @@
           "pcode": "290742",
           "pname": "이대성",
           "value": 29,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 79,
@@ -14707,7 +14707,7 @@
           "pcode": "291068",
           "pname": "김낙현",
           "value": 28,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 87,
@@ -14728,7 +14728,7 @@
           "pcode": "290790",
           "pname": "정효근",
           "value": 27,
-          "is_active": true
+          "is_active": false
         },
         {
           "rank": 90,

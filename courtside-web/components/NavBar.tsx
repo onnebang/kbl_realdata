@@ -6,7 +6,14 @@ import Link from "next/link";
 //
 // 실측: 12개를 한 줄 overflow-x에 늘어놓으니 375px에서 3.5개만 화면에 닿았고, 잘렸다는
 // 단서조차 없었다. 순서와 이름은 그대로 두고 두 무리로만 나눈다 - 주요(경기/리포트/팀/선수/
-// 감독)는 어느 폭에서도 탭으로 보이고, 분석(리더보드류)은 좁은 화면에서 접힌다.
+// 감독)는 어느 폭에서도 탭으로 보이고, 나머지는 좁은 화면에서 접힌다.
+//
+// 2026-10-06(사용자 요청, nba.com/stats 네비바 참고) - "분석 더보기" 하나에 9개를 뭉쳐두니
+// 서로 무관한 항목들(라운드 어워드 옆에 커스텀 지표)이 한 묶음으로 보였다. nba.com도 Stats
+// 드롭다운 안을 Players/Teams/Leaders 등 성격별로 다시 쪼갠다 - 같은 패턴으로 "리더보드·시상"
+// (순위·수상 성격) / "플레이 분석"(경기 장면 리포트) / "조합·커스텀"(선수 조합·커스텀 지표)
+// 세 그룹으로 나눈다. MAIN_LINKS는 이미 자리 잡은 구성이라 손대지 않는다(폭이 좁을 때도 항상
+// 보여야 하는 항목들이라 더 추가하면 전에 겪은 overflow 문제가 재발함).
 const MAIN_LINKS = [
   { href: "/", label: "경기 목록" },
   { href: "/rankings/teams", label: "팀 순위" },
@@ -16,20 +23,41 @@ const MAIN_LINKS = [
   { href: "/coaches", label: "감독" },
 ];
 
-// 선수별 조합(WOWY)은 선수 도구라 선수 항목 옆에, 시즌 리더보드는 나머지 리더보드 묶음
-// 맨 앞에 둔다(요청: "시즌별 리더보드 추가 / 선수별 조합").
-const ANALYSIS_LINKS = [
-  // { href: "/rankings/ovr", label: "OVR 랭킹 (2K)" },
-  // { href: "/rankings/legends", label: "명예의 전당 (리빙 레전드)" },
-  { href: "/season", label: "시즌 허브" },
-  { href: "/lineups", label: "선수별 조합" },
-  { href: "/awards/round", label: "라운드 어워드" },
-  { href: "/season-browser", label: "시즌 브라우저" },
-  { href: "/leaderboards/season", label: "시즌 리더보드" },
-  { href: "/leaderboards/win-contribution", label: "승부를 가른 순간" },
-  { href: "/leaderboards/scoring-explorer", label: "슈팅 리포트" },
-  { href: "/leaderboards/form-index", label: "슛 결정력" },
-  { href: "/leaderboards/custom-metric", label: "커스텀 지표" },
+const DROPDOWN_GROUPS = [
+  {
+    key: "season",
+    label: "시즌 개관",
+    links: [
+      { href: "/season", label: "시즌 허브" },
+      { href: "/season-browser", label: "시즌 브라우저" },
+    ],
+  },
+  {
+    key: "leaders",
+    label: "리더보드·시상",
+    links: [
+      { href: "/leaderboards/season", label: "시즌 리더보드" },
+      { href: "/awards/round", label: "라운드 어워드" },
+      { href: "/rankings/legends", label: "올타임 리더스" },
+    ],
+  },
+  {
+    key: "plays",
+    label: "플레이 분석",
+    links: [
+      { href: "/leaderboards/win-contribution", label: "승부를 가른 순간" },
+      { href: "/leaderboards/scoring-explorer", label: "슈팅 리포트" },
+      { href: "/leaderboards/form-index", label: "슛 결정력" },
+    ],
+  },
+  {
+    key: "tools",
+    label: "조합·커스텀",
+    links: [
+      { href: "/lineups", label: "선수별 조합" },
+      { href: "/leaderboards/custom-metric", label: "커스텀 지표" },
+    ],
+  },
 ];
 
 export function NavBar() {
@@ -44,18 +72,22 @@ export function NavBar() {
           ))}
         </div>
         {/* 순수 <details>/<summary> 접이식 - 클라이언트 JS 0(이 프로젝트의 프리뷰
-            인사이트 접이식과 같은 컨벤션). ≥900px에서는 globals.css가 summary를 숨기고
-            내용을 강제로 펼쳐서 그냥 오른쪽에 흘려 놓는다. */}
-        <details className="nav-more">
-          <summary className="nav-more-summary">분석 더보기</summary>
-          <div className="nav-analysis">
-            {ANALYSIS_LINKS.map((l) => (
-              <Link key={l.href} href={l.href} className="nav-link">
-                {l.label}
-              </Link>
-            ))}
-          </div>
-        </details>
+            인사이트 접이식과 같은 컨벤션). 그룹마다 별도 <details>라 좁은 화면에서는
+            각자 펼쳐지는 카테고리로 보이고, ≥900px에서는 globals.css가 summary를 숨기고
+            .nav-group-label이 대신 그룹 이름표 역할을 한다(오른쪽에 구분선과 함께 흘러감). */}
+        {DROPDOWN_GROUPS.map((g) => (
+          <details key={g.key} className="nav-more">
+            <summary className="nav-more-summary">{g.label}</summary>
+            <div className="nav-analysis">
+              <span className="nav-group-label">{g.label}</span>
+              {g.links.map((l) => (
+                <Link key={l.href} href={l.href} className="nav-link">
+                  {l.label}
+                </Link>
+              ))}
+            </div>
+          </details>
+        ))}
       </div>
     </nav>
   );
