@@ -236,18 +236,28 @@ python live_collector.py --max-runtime 21600 --stall-timeout 5400
                                              # 무인 운용 안전장치(기본 12시간 / 2시간)
 ```
 
-**무인 실행 - 작업 스케줄러 태스크 2개 등록돼 있음:**
+**무인 실행 - 작업 스케줄러 태스크 등록돼 있음:**
 
 | 태스크 | 실행 주기 | 하는 일 |
 |---|---|---|
 | `KBL_LiveCollector` | 매일 13:00부터 12시간, 10분마다 | 그날 예정/진행중 경기를 실시간 추적·정산까지 자동 처리 |
 | `KBL_DailyBatch` | 매일 06:00 | 전날 놓친/실패한 경기를 정본으로 재수집·재계산(라이브가 못 돌았을 때의 복구 경로) |
+| `KBL_LineupRecalc` | 매일 13:00부터 8분마다 | 라인업 승률 재계산(`recalc_lineup_winprob.py --today`) |
+| `KBL_WeeklyTrain` | 매주 월요일 06:20 (2026-10-06 등록) | `weekly_retrain.py` - SQLite 재적재 → OVR 재계산 → 학습테이블 재생성 → 경기전 승률모델 재학습 → (변경 파일이 예상과 일치할 때만) git commit+push. 로그: `raw/weekly_retrain.log` |
 
 ```powershell
 Get-ScheduledTaskInfo -TaskName "KBL_LiveCollector"   # 다음/마지막 실행, 결과코드
 Get-ScheduledTaskInfo -TaskName "KBL_DailyBatch"
+Get-ScheduledTaskInfo -TaskName "KBL_WeeklyTrain"
 Disable-ScheduledTask  -TaskName "KBL_LiveCollector"  # 끄기
 ```
+
+**`KBL_WeeklyTrain` 참고** - OVR·경기전 모델은 전부 로컬 SQLite(`raw/kbl_realdata.db`, git에 안 올라감)만
+읽는다. 이 태스크가 매주 `raw/games`의 최신 경기를 SQLite에 다시 적재해야 OVR/모델이 갱신된다 - PC가
+꺼져 있으면 그 주는 건너뛰고 다음 주에 누적 반영됨. `tools/save_pregame_model.py`의
+`CURRENT_SEASON_EXCLUDE`(2026-27, 새 Q2/Q3 용병 2인 규정 첫 시즌)는 표본이 충분히 쌓이기 전까지
+의도적으로 이번 시즌 경기를 재학습에서 뺀다 - `weekly_retrain.py`는 이 시즌 표본 수를 로그에만 찍고
+자동으로 플래그를 바꾸지는 않는다(사람 판단 필요).
 
 **감시**: Supabase pg_cron(`watch_live_collector`, 1분마다)이 수집기 심박(`live_collector_status`)을
 보고 있다가 멈추면 Discord로 알림(🔴 응답 없음 / 🟠 문자중계 멈춤 / 🟢 해제). 지금 걸린 문제 보기:

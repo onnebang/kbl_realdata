@@ -1,7 +1,8 @@
 """
 주간 모델 재학습 오케스트레이션 (2026-10-06, 사용자 요청) - 매주 월요일 새벽 06:20 KST,
-KBL_DailyBatch(06:00)가 끝난 뒤 실행되도록 Windows 작업 스케줄러에 등록해서 쓴다
-(register_weekly_retrain_task.ps1 참고).
+KBL_DailyBatch(06:00)가 끝난 뒤 실행되도록 Windows 작업 스케줄러 "KBL_WeeklyTrain"에
+등록해서 쓴다(다른 KBL_* 태스크와 같은 패턴 - Register-ScheduledTask로 직접 등록, 별도
+스크립트 파일 없음. README.md 운영 런북 참고).
 
 왜 필요한가:
 1. 신규 용병/신인 OVR이 지금 추정치(프로젝션)로만 잡혀있음 - 실제 경기가 쌓이면
