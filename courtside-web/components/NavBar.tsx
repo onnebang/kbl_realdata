@@ -76,18 +76,20 @@ export function NavBar() {
             커지고 본문을 눌렀다). name="nav-group"은 같은 이름끼리 한 번에 하나만 열리게
             하는 네이티브 아코디언 묶음(미지원 브라우저는 그냥 평범한 각자 토글로 동작 -
             깨지지 않음). */}
-        {DROPDOWN_GROUPS.map((g) => (
-          <details key={g.key} name="nav-group" className="nav-more">
-            <summary className="nav-more-summary">{g.label}</summary>
-            <div className="nav-analysis">
-              {g.links.map((l) => (
-                <Link key={l.href} href={l.href} className="nav-link">
-                  {l.label}
-                </Link>
-              ))}
-            </div>
-          </details>
-        ))}
+        <div className="nav-secondary">
+          {DROPDOWN_GROUPS.map((g) => (
+            <details key={g.key} name="nav-group" className="nav-more">
+              <summary className="nav-more-summary">{g.label}</summary>
+              <div className="nav-analysis">
+                {g.links.map((l) => (
+                  <Link key={l.href} href={l.href} className="nav-link">
+                    {l.label}
+                  </Link>
+                ))}
+              </div>
+            </details>
+          ))}
+        </div>
       </div>
     </nav>
   );
