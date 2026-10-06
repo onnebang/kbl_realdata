@@ -32,6 +32,17 @@ FULL_SEASON_SQL = (
     f" GROUP BY season_name HAVING COUNT(*) >= {MIN_SEASON_GAMES})"
 )
 
+# 진행 중 시즌(최신 시즌, 정규시즌 팀당 경기 < REGULAR_SEASON_GAMES, 플레이오프 전) 처리.
+# 2026-10-06 개막 직후 선수당 1~2경기(총 40~70분)뿐인데 아래 가비지 패널티(총 200분 미만 -8)와 루키
+# 바닥값 블렌딩(총 400분 기준)이 "시즌 총 출전분" 절대값이라 주전 전원의 올 시즌 행이 53~58로 눌렸고,
+# 그 행이 3시즌 스무딩에서 ~33%를 먹어 전원 폭락했다(엘런슨·배스 포함). 그래서 진행 중 시즌 행은
+# (1) 기준 분을 시즌 진행률로 비례 축소해 신호만 뽑고 (2) 백분위 풀·모델 이력·출력에서 빼 과거 시즌
+# 값이 그대로 유지되게 하고 (3) 다음 시즌 예상치(project_forward = 개막 전 값)에 출전분 비례로 최대
+# ±MAX_LIVE_DRIFT만 얹는다. 시즌이 끝나면(팀당 54경기/플레이오프) 자동으로 일반 행이 된다.
+REGULAR_SEASON_GAMES = 54
+MAX_LIVE_DRIFT = 1.0
+LIVE_FULL_WEIGHT_MIN = 1000.0  # 이 출전분이면 올 시즌 성적 증거를 100% 인정(그래도 상한은 MAX_LIVE_DRIFT)
+
 # shot_log(raw/kbl_realdata.db)의 x,y로 미드레인지 슈팅을 뽑아내는 좌표 보정값 - shot_log의
 # 자체 zone 컬럼('1'/'2')은 골밑/3점 같은 슛 종류가 아니라 그냥 "어느 쪽 골대에서 쐈나"였다
 # (두 zone FG%가 46.5%/46.4%로 동일 - 2026-09-24 발견). 대신 골대 좌표를 양쪽 밀집구역
@@ -145,6 +156,10 @@ MANUAL_OVR_OVERRIDES = {
     '291787': {'delta': 2, 'from_season': '2025-2026',
                'reason': '케렘 칸터 - KBL 데뷔 시즌인데 25-26 PIE 리그 1위(35.3), 나이(30세)만으로 '
                          '첫 시즌부터 하락기+약한 등급 보호를 받아 저평가. 83->85, 81->83(예상)'},
+    '290440': {'delta': 4, 'from_season': '2024-2025',
+               'reason': '이관희 - 현재 퍼포먼스 대비 나이 곡선이 과함(2026-09-27 b03fdc4에서 JSON을 직접 '
+                         '고쳤으나 스크립트에 없어 재생성 때 사라짐 - 10-06 복구). 직접 수정값은 24-25 +4, '
+                         '25-26 +5, 26-27 +5(속성별 +2~+4 제각각)였고, 균일 delta로는 +4가 가장 가까움(오차 1 이내).'},
 }
 
 
@@ -544,6 +559,16 @@ def compute_ovr(target_season='2024-2025'):
             " WHERE g.season_category IN ('정규시즌', '플레이오프', '챔피언결정전')",
             conn,
         )
+        team_games_df = pd.read_sql_query(
+            "SELECT season_name, tcode, COUNT(*) AS n FROM ("
+            " SELECT season_name, home_tcode AS tcode FROM games WHERE season_category = '정규시즌'"
+            " UNION ALL SELECT season_name, away_tcode FROM games WHERE season_category = '정규시즌')"
+            " GROUP BY season_name, tcode",
+            conn,
+        )
+        playoff_seasons = set(pd.read_sql_query(
+            "SELECT DISTINCT season_name FROM games WHERE season_category IN ('플레이오프', '챔피언결정전')",
+            conn)['season_name'])
     except Exception as e:
         print(f"DB Query failed: {e}")
         conn.close()
@@ -561,6 +586,18 @@ def compute_ovr(target_season='2024-2025'):
         name_df.sort_values('start_year').groupby('pcode')['pname'].last().to_dict()
     )
     global_df['name'] = global_df['pcode'].map(canonical_name)
+
+    # 진행 중 시즌 판정 - 최신 시즌만 후보(과거 시즌은 항상 완결 취급이라 기존 값 그대로).
+    latest_season = global_df['season_name'].max()
+    latest_team_games = team_games_df.loc[team_games_df['season_name'] == latest_season, 'n'].max()
+    live_season = None
+    live_progress = 1.0
+    if latest_team_games < REGULAR_SEASON_GAMES and latest_season not in playoff_seasons:
+        live_season = latest_season
+        live_progress = max(latest_team_games, 1) / REGULAR_SEASON_GAMES
+        print(f"진행 중 시즌: {live_season} (팀당 최대 {int(latest_team_games)}경기, 진행률 {live_progress:.1%})"
+              f" - 예상치에 ±{MAX_LIVE_DRIFT} 상한으로만 반영")
+    global_df['season_scale'] = np.where(global_df['season_name'] == live_season, live_progress, 1.0)
 
     # TS% Calculation
     global_df['ts_pct'] = np.where((global_df['fga'] + 0.44 * global_df['fta']) > 0,
@@ -712,13 +749,23 @@ def compute_ovr(target_season='2024-2025'):
                 return v0 + ((p - p0) / (p1 - p0)) * (v1 - v0)
         return anchors[-1][1]
 
+    # rank(method='average', pct=True)와 같은 값인데, 진행 중 시즌 행은 기준 풀에서 뺀다(그 행 때문에
+    # 과거 시즌 백분위가 밀리면 "과거 값 그대로 유지"가 깨진다) - 풀 밖 행은 풀 안 삽입 위치로 매긴다.
+    in_pool = global_df['season_name'] != live_season
+
+    def pool_pct(col):
+        ref = np.sort(global_df.loc[in_pool, col].dropna().to_numpy())
+        v = global_df[col].to_numpy()
+        pct = (np.searchsorted(ref, v, 'left') + np.searchsorted(ref, v, 'right') + 1) / 2 / len(ref)
+        return pd.Series(np.where(np.isnan(v), np.nan, pct), index=global_df.index)
+
     # 각 속성 독립적으로 매핑
-    global_df['attr_outside_mapped'] = global_df['attr_outside'].rank(method='average', pct=True).apply(map_percentile)
-    global_df['attr_inside_mapped'] = global_df['attr_inside'].rank(method='average', pct=True).apply(map_percentile)
-    global_df['attr_playmaking_mapped'] = global_df['attr_playmaking'].rank(method='average', pct=True).apply(map_percentile)
-    global_df['attr_athletic_mapped'] = global_df['attr_athletic'].rank(method='average', pct=True).apply(map_percentile).fillna(45.0)
-    global_df['attr_defense_mapped'] = global_df['attr_defense'].rank(method='average', pct=True).apply(map_percentile).fillna(45.0)
-    global_df['attr_rebounding_mapped'] = global_df['attr_rebounding'].rank(method='average', pct=True).apply(map_percentile).fillna(45.0)
+    global_df['attr_outside_mapped'] = pool_pct('attr_outside').apply(map_percentile)
+    global_df['attr_inside_mapped'] = pool_pct('attr_inside').apply(map_percentile)
+    global_df['attr_playmaking_mapped'] = pool_pct('attr_playmaking').apply(map_percentile)
+    global_df['attr_athletic_mapped'] = pool_pct('attr_athletic').apply(map_percentile).fillna(45.0)
+    global_df['attr_defense_mapped'] = pool_pct('attr_defense').apply(map_percentile).fillna(45.0)
+    global_df['attr_rebounding_mapped'] = pool_pct('attr_rebounding').apply(map_percentile).fillna(45.0)
 
     # 가비지 플레이어(0~5분) 스탯 왜곡(NaN 또는 0값으로 인한 99 OVR 버그) 원천 차단
     garbage_mask = global_df['total_min'] < 5
@@ -883,8 +930,10 @@ def compute_ovr(target_season='2024-2025'):
     global_df['raw_ovr_mapped'] += (wpa_boost + win_bonus + margin_bonus + pie_bonus + global_df['rep_boost'])
 
     # ── 4. 가비지 타임 패널티 ──
+    # season_scale: 진행 중 시즌 행만 시즌 진행률(그 외 1.0) - 임계 분을 비례 축소해야 개막 직후 주전이
+    # 벤치 취급을 안 받는다(위 REGULAR_SEASON_GAMES 주석 참고).
     def apply_garbage_penalty(row):
-        total_m = row['total_min']
+        total_m = row['total_min'] / row['season_scale']
         val = row['raw_ovr_mapped']
         if total_m < 200:
             val -= 8.0
@@ -898,7 +947,7 @@ def compute_ovr(target_season='2024-2025'):
     draft_ranks = load_draft_ranks()
     global_df['draft_rank_val'] = global_df['pcode'].map(draft_ranks)
     global_df['rookie_floor'] = global_df['draft_rank_val'].apply(rookie_floor_for)
-    minutes_factor = np.clip(global_df['total_min'] / 400.0, 0.0, 1.0)
+    minutes_factor = np.clip(global_df['total_min'] / (400.0 * global_df['season_scale']), 0.0, 1.0)
     global_df['raw_ovr_mapped'] = global_df['raw_ovr_mapped'] * minutes_factor + global_df['rookie_floor'] * (1.0 - minutes_factor)
 
     # 프로 몇 년차인지는 "DB에 처음 나온 시즌"으로 센다. 단 DB 자체가 2006-07에 시작(그 전은 1경기짜리 고아
@@ -913,7 +962,7 @@ def compute_ovr(target_season='2024-2025'):
     LEGEND_COUNT = 10
     LEGEND_TOP = 99
     LEGEND_BOTTOM = 91
-    top_indices = global_df['raw_ovr_mapped'].nlargest(LEGEND_COUNT).index
+    top_indices = global_df.loc[in_pool, 'raw_ovr_mapped'].nlargest(LEGEND_COUNT).index
     for rank, idx in enumerate(top_indices):
         t = rank / (LEGEND_COUNT - 1) if LEGEND_COUNT > 1 else 0
         global_df.loc[idx, 'raw_ovr_mapped'] = round(LEGEND_TOP - t * (LEGEND_TOP - LEGEND_BOTTOM))
@@ -969,6 +1018,11 @@ def compute_ovr(target_season='2024-2025'):
         np.nan,
     )
     global_df['age_for_model'] = global_df['age'].fillna(NEUTRAL_AGE)
+
+    # 진행 중 시즌 행은 여기서 분리 - 이후 모델 이력/출력/보간/스타일에는 안 들어가고, 아래 예상치 블록에서
+    # live_nudge()로 ±MAX_LIVE_DRIFT만 반영된다(raw_*_mapped / attr_*_mapped / total_min만 쓴다).
+    live_df = global_df[~in_pool].copy()
+    global_df = global_df[in_pool].copy()
 
     model = OvrCurveModel()
     corrected_ovr = pd.Series(index=global_df.index, dtype=float)
@@ -1252,7 +1306,18 @@ def compute_ovr(target_season='2024-2025'):
     # 이건 데이터 부족이 아니라 사실이 그렇다).
     next_season_roster = load_next_season_roster(PROJECTION_SEASON)
     already_covered = set(global_df.loc[global_df['season_name'] == PROJECTION_SEASON, 'pcode'])
-    to_project = set(next_season_roster) - already_covered
+    # 진행 중 시즌이 예상 시즌이면 그 시즌에 뛴 선수도 전부 예상치 행으로 만든다(로스터에 없어도 행이 안 사라지게).
+    live_by_pcode = ({r['pcode']: r for _, r in live_df.iterrows()}
+                     if live_season == PROJECTION_SEASON else {})
+    to_project = (set(next_season_roster) | set(live_by_pcode)) - already_covered
+
+    def live_nudge(pcode, last, col):
+        """올 시즌 진행 중 경기에서 나온 신호 - 직전 확정 시즌 대비 차이를 출전분 비례로 줄여서 ±MAX_LIVE_DRIFT 안에서만."""
+        lv = live_by_pcode.get(pcode)
+        if lv is None:
+            return 0.0
+        w = min(1.0, lv['total_min'] / LIVE_FULL_WEIGHT_MIN)
+        return max(-MAX_LIVE_DRIFT, min(MAX_LIVE_DRIFT, w * (lv[col] - last[col])))
 
     # 커리어 기록이 전혀 없는 완전 신인용 최저치 - 실측 데이터에서 실제로 몇 경기 못 뛴
     # 선수들의 바닥권(하위 5명 53~58)을 참고해 잡았다. 처음엔 전원 55로 고정했는데(제보:
@@ -1300,7 +1365,7 @@ def compute_ovr(target_season='2024-2025'):
                  "games": int(r['g'])}
                 for _, r in hist.iterrows()
             ]
-            return model.project_forward(seasons, extra_years=1)
+            return model.project_forward(seasons, extra_years=1) + live_nudge(pcode, last, mapped_col)
 
         # 마지막 확정 시즌 이후~예상 시즌 개막 전에 새로 쌓인 평판(예: 2026 아시안게임 발탁)만 얹는다.
         rep_delta = (reputation_boost(pcode, parse_start_year(PROJECTION_SEASON))
