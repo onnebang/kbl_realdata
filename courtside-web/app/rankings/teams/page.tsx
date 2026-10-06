@@ -177,6 +177,7 @@ export default async function TeamStandingsPage({
                 요청("SK까지 10팀 전부") - 팀 목록은 teams(시즌 로스터 10개 전체)를 기준으로
                 돌고, 기록이 없으면 "아직 기록 없음"으로 빈 카드를 보여준다. */}
             {[...teams.values()]
+              .filter((tm) => !["30", "35", "73"].includes(tm.tcode))
               .sort((a, b) => {
                 const ai = rows.findIndex((row) => row.tcode === a.tcode);
                 const bi = rows.findIndex((row) => row.tcode === b.tcode);
