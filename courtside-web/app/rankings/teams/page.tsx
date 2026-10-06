@@ -166,74 +166,83 @@ export default async function TeamStandingsPage({
             <p>{shortSeason(activeSeason)} 정규시즌 기준 · 플레이오프 제외</p>
           </div>
 
-          {teamStats && (
-            <>
-              <div className={overview.sectionHead}>
-                <h2 className="title" style={{ fontSize: "1.1rem" }}>
-                  팀 전체 개요
-                </h2>
-                <span className="empty-note">종합·슈팅·리바운드·소유 6개 지표 + 쿼터별 분위기 · 전체 지표는 팀 상세에서</span>
-              </div>
-              <div className={overview.grid}>
-                {rows.map((r) => {
-                  const stat = teamStats.byTcode[r.tcode];
-                  if (!stat) return null;
-                  const tm = teams.get(r.tcode);
-                  const badge = tm ? { name: tm.name, abbr: tm.abbr, color: tm.color, logoUrl: tm.logoUrl } : null;
-                  const qs = quarterSplits?.[r.tcode];
-                  return (
-                    <Link key={r.tcode} href={`/teams/${r.tcode}`} className={overview.card}>
-                      <div className={overview.cardHead}>
-                        <TeamBadge team={badge} size={28} />
-                        <div>
-                          <div className={overview.cardName}>{tm?.name ?? r.tcode}</div>
-                          <div className={overview.cardRecord}>
-                            {r.wins}승 {r.losses}패 · {(r.pct * 100).toFixed(1)}%
-                          </div>
-                        </div>
+          <div className={overview.sectionHead}>
+            <h2 className="title" style={{ fontSize: "1.1rem" }}>
+              팀 전체 개요
+            </h2>
+            <span className="empty-note">종합·슈팅·리바운드·소유 6개 지표 + 쿼터별 분위기 · 전체 지표는 팀 상세에서</span>
+          </div>
+          <div className={overview.grid}>
+            {/* rows(승-패 기록)만 돌면 아직 치른 경기가 0인 팀(예: 개막 전 SK)이 빠진다 -
+                요청("SK까지 10팀 전부") - 팀 목록은 teams(시즌 로스터 10개 전체)를 기준으로
+                돌고, 기록이 없으면 "아직 기록 없음"으로 빈 카드를 보여준다. */}
+            {[...teams.values()]
+              .sort((a, b) => {
+                const ai = rows.findIndex((row) => row.tcode === a.tcode);
+                const bi = rows.findIndex((row) => row.tcode === b.tcode);
+                // 기록 있는 팀은 순위표 순서 그대로, 0경기 팀(순위표에 없음)은 맨 뒤로.
+                return (ai === -1 ? rows.length : ai) - (bi === -1 ? rows.length : bi);
+              })
+              .map((tm) => {
+              const r = rows.find((row) => row.tcode === tm.tcode);
+              const stat = teamStats?.byTcode[tm.tcode];
+              const badge = { name: tm.name, abbr: tm.abbr, color: tm.color, logoUrl: tm.logoUrl };
+              const qs = quarterSplits?.[tm.tcode];
+              return (
+                <Link key={tm.tcode} href={`/teams/${tm.tcode}`} className={overview.card}>
+                  <div className={overview.cardHead}>
+                    <TeamBadge team={badge} size={28} />
+                    <div>
+                      <div className={overview.cardName}>{tm.name}</div>
+                      <div className={overview.cardRecord}>
+                        {r ? `${r.wins}승 ${r.losses}패 · ${(r.pct * 100).toFixed(1)}%` : "아직 치른 경기 없음"}
                       </div>
+                    </div>
+                  </div>
 
-                      <div className={overview.statGrid}>
-                        {OVERVIEW_STAT_KEYS.map((key) => {
-                          const cell = stat.cellByKey[key];
-                          if (!cell) return null;
+                  {stat ? (
+                    <div className={overview.statGrid}>
+                      {OVERVIEW_STAT_KEYS.map((key) => {
+                        const cell = stat.cellByKey[key];
+                        if (!cell) return null;
+                        return (
+                          <div key={key} className={overview.statCell}>
+                            <span className={overview.statLabel}>{cell.label}</span>
+                            <span className={cell.better === null ? undefined : cell.better ? overview.pos : overview.neg}>
+                              {cell.display}
+                            </span>
+                            <span className={overview.statRank}>{cell.rankLabel}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="empty-note">경기 기록이 쌓이면 여기에 지표가 표시됩니다.</div>
+                  )}
+
+                  {qs && (
+                    <div className={overview.quarters}>
+                      <span className={overview.quarterCaption}>쿼터별 분위기(그 쿼터 평균 득실차)</span>
+                      <div className={overview.quarterBars}>
+                        {REGULATION_QUARTERS.map((q) => {
+                          const v = qs.quarters[q];
+                          const tone = v > 0.1 ? overview.pos : v < -0.1 ? overview.neg : undefined;
                           return (
-                            <div key={key} className={overview.statCell}>
-                              <span className={overview.statLabel}>{cell.label}</span>
-                              <span className={cell.better === null ? undefined : cell.better ? overview.pos : overview.neg}>
-                                {cell.display}
-                              </span>
-                              <span className={overview.statRank}>{cell.rankLabel}</span>
+                            <div key={q} className={overview.quarterBar}>
+                              <span className={overview.quarterLabel}>{q}</span>
+                              <span className={tone}>{signed(v, 1)}</span>
                             </div>
                           );
                         })}
                       </div>
+                    </div>
+                  )}
 
-                      {qs && (
-                        <div className={overview.quarters}>
-                          <span className={overview.quarterCaption}>쿼터별 분위기(그 쿼터 평균 득실차)</span>
-                          <div className={overview.quarterBars}>
-                            {REGULATION_QUARTERS.map((q) => {
-                              const v = qs.quarters[q];
-                              const tone = v > 0.1 ? overview.pos : v < -0.1 ? overview.neg : undefined;
-                              return (
-                                <div key={q} className={overview.quarterBar}>
-                                  <span className={overview.quarterLabel}>{q}</span>
-                                  <span className={tone}>{signed(v, 1)}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      <span className={overview.cta}>팀 자세히 보기 →</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </>
-          )}
+                  <span className={overview.cta}>팀 자세히 보기 →</span>
+                </Link>
+              );
+            })}
+          </div>
         </>
       )}
     </div>
