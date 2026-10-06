@@ -208,16 +208,12 @@ a {
 .nav-analysis .nav-link:hover {
   color: var(--ink);
 }
-/* 좁은 화면엔 summary가 이미 그룹 이름을 보여주므로 중복 - ≥900px에서만 드러낸다. */
-.nav-group-label {
-  display: none;
-}
 
 @media (min-width: 900px) {
   .nav-bar-inner {
     flex-direction: row;
-    align-items: flex-start;
-    gap: 4px 20px;
+    align-items: center;
+    gap: 4px 4px;
   }
   .nav-main {
     flex: none;
@@ -225,52 +221,33 @@ a {
     -webkit-mask-image: none;
     mask-image: none;
   }
+  /* 2026-10-06(사용자 요청) - 전엔 이 너비부터 접이식을 풀어 그룹 4개를 전부 펼친 채
+     오른쪽에 흘려놓았는데, 세로 줄바꿈이 생겨 네비바가 너무 커지고 본문이 눌렸다.
+     이제 모든 너비에서 <details>가 진짜 토글이다 - summary(그룹 이름)만 한 줄로 작게
+     보이고, 클릭해야 그 그룹만 아래로 뜬다(position:absolute 드롭다운 패널). */
   .nav-more {
-    flex: 1;
-    min-width: 0;
+    position: relative;
     border-top: none;
   }
   .nav-more-summary {
-    display: none;
-  }
-  /* 넓은 화면에선 접이식이 아니라 그냥 오른쪽에 흘려 놓는다(넘치면 둘째 줄). */
-  .nav-more::details-content {
-    content-visibility: visible;
-    block-size: auto;
-  }
-  .nav-more:not([open]) > .nav-analysis,
-  .nav-analysis {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 0 2px;
-    padding-bottom: 0;
-  }
-  .nav-analysis .nav-link {
-    padding: 12px 8px;
-    color: var(--ink-faint);
+    padding: 10px 10px;
     border-bottom: 2px solid transparent;
   }
-  .nav-analysis .nav-link:hover {
+  .nav-more[open] > .nav-more-summary {
     border-bottom-color: var(--home);
   }
-  /* 그룹별 <details>가 여러 개라 summary가 안 보이면 어디까지가 한 그룹인지 알 수 없다 -
-     구분선 + 이름표로 대신한다(2026-10-06, nba.com Stats 드롭다운 소분류 참고). */
-  .nav-group-label {
-    display: inline-flex;
-    align-items: center;
-    padding: 12px 8px 12px 14px;
-    margin-left: 4px;
-    border-left: 1px solid rgba(var(--line-rgb), 0.15);
-    font-size: var(--fs-200);
-    font-weight: 700;
-    color: var(--ink-faint);
-    white-space: nowrap;
-  }
-  .nav-more:first-of-type .nav-group-label {
-    border-left: none;
-    margin-left: 0;
-    padding-left: 0;
+  .nav-more[open] > .nav-analysis {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 20;
+    margin-top: 2px;
+    padding: 6px;
+    min-width: 200px;
+    background: var(--surface);
+    border: 1px solid rgba(var(--line-rgb), 0.15);
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
   }
 }
 

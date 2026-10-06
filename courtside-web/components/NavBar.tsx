@@ -71,15 +71,15 @@ export function NavBar() {
             </Link>
           ))}
         </div>
-        {/* 순수 <details>/<summary> 접이식 - 클라이언트 JS 0(이 프로젝트의 프리뷰
-            인사이트 접이식과 같은 컨벤션). 그룹마다 별도 <details>라 좁은 화면에서는
-            각자 펼쳐지는 카테고리로 보이고, ≥900px에서는 globals.css가 summary를 숨기고
-            .nav-group-label이 대신 그룹 이름표 역할을 한다(오른쪽에 구분선과 함께 흘러감). */}
+        {/* 순수 <details>/<summary> 접이식 - 클라이언트 JS 0. 모든 너비에서 진짜 토글이다
+            (2026-10-06, 사용자 요청 - 전엔 ≥900px에서 4그룹을 강제로 펼쳐놔서 네비바가
+            커지고 본문을 눌렀다). name="nav-group"은 같은 이름끼리 한 번에 하나만 열리게
+            하는 네이티브 아코디언 묶음(미지원 브라우저는 그냥 평범한 각자 토글로 동작 -
+            깨지지 않음). */}
         {DROPDOWN_GROUPS.map((g) => (
-          <details key={g.key} className="nav-more">
+          <details key={g.key} name="nav-group" className="nav-more">
             <summary className="nav-more-summary">{g.label}</summary>
             <div className="nav-analysis">
-              <span className="nav-group-label">{g.label}</span>
               {g.links.map((l) => (
                 <Link key={l.href} href={l.href} className="nav-link">
                   {l.label}
