@@ -43,6 +43,9 @@ import { iGa } from "@/lib/josa";
 import { currentOnCourt, comboKey, computeFinalPlusMinus, computeSecondsUpTo } from "@/lib/gameLineups";
 import type { LineupRating, PlayerOnOff } from "@/lib/lineupNetRating";
 import { OnCourtCards } from "./OnCourtCards";
+import { applyBoxEvent, emptyBoxLine, type BoxLine } from "@/lib/boxEvents";
+import { MilestoneWatch } from "./MilestoneWatch";
+import { buildMilestoneTimeline, type MilestoneContext, type MilestoneMoment } from "@/lib/milestones";
 import { buildOnCourtTeam } from "@/lib/onCourtCards";
 import type { CourtCardInfo } from "@/lib/courtCardInfo"; // 타입만 - 값을 가져오면 OVR JSON이 브라우저 번들에 들어간다
 
@@ -51,7 +54,6 @@ import type { CourtCardInfo } from "@/lib/courtCardInfo"; // 타입만 - 값을 
 // 경험만 먼저(사용자 확인 - "핵심 스크럽 MVP 먼저"). AI 내러티브 8종/핫스트릭 애니메이션/
 // 클러치샷 지수 등은 다음 단계로 미룸(이미 이 경기 페이지 하단에 있는 정적
 // postgameReport/pregameInsights 패널이 "경기 끝난 뒤 요약"은 커버하고 있음).
-const MAKE_CODES = new Set(["201", "205", "207"]);
 const MISS_CODES = new Set(["202", "206", "208"]);
 // 215(파울자유투)가 빠져 있으면 개인 파울이 실제보다 적게 세어진다 - PF 칸을 추가하면서
 // 실측(25-26 최근 40경기 845 선수-경기)으로 확인: 215+216+224면 845/845 전부 game_player_stats.fouls와
@@ -104,16 +106,10 @@ function getSurgeMvp(
 // serverEvents/events useMemo가 매 렌더 재계산된다(600~800행 × attachDerivedFields).
 const EMPTY_MAP: Record<string, string> = {};
 
-function emptyBoxLine() {
-  // oreb/dreb - Game Leaders 카드(REBOUNDS 항목의 "N DREB, M OREB" 서브라인)용으로 209/210을
-  // 나눠 셈. reb는 그대로 둘의 합(기존 박스스코어 테이블 REB 컬럼이 이미 이 값을 씀).
-  return { pts: 0, fgm: 0, fga: 0, threePM: 0, threePA: 0, ftm: 0, fta: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, to: 0, foul: 0 };
-}
-type BoxLine = ReturnType<typeof emptyBoxLine>;
-
 // game_events는 shot_id 단위가 아니라 액션코드 로그라서, courtside_template.html의
 // computeBoxScore(uptoIdx)와 동일하게 매 스크럽마다 0..idx를 재훑어 박스스코어를 만듦
-// (경기당 500~800개뿐이라 클라이언트에서도 비용 무시 가능).
+// (경기당 500~800개뿐이라 클라이언트에서도 비용 무시 가능). 이벤트 하나를 박스에 반영하는 규칙은
+// lib/boxEvents.ts(기록 워치 타임라인과 공유).
 function computeBoxScore(events: GameEvent[], uptoIdx: number, players: PlayerMeta[]): Map<string, BoxLine> {
   const box = new Map<string, BoxLine>();
   for (const p of players) box.set(p.pcode, emptyBoxLine());
@@ -124,38 +120,7 @@ function computeBoxScore(events: GameEvent[], uptoIdx: number, players: PlayerMe
     if (!b) continue;
     const code = row.action_code;
     if (!code) continue;
-    if (MAKE_CODES.has(code)) {
-      b.pts += code === "205" ? 3 : 2;
-      b.fgm++;
-      b.fga++;
-      if (code === "205") {
-        b.threePM++;
-        b.threePA++;
-      }
-    } else if (MISS_CODES.has(code)) {
-      if (code === "206") b.threePA++;
-      b.fga++;
-    } else if (code === "203") {
-      b.pts += 1;
-      b.ftm++;
-      b.fta++;
-    } else if (code === "204") {
-      b.fta++;
-    } else if (code === "209" || code === "210") {
-      b.reb++;
-      if (code === "209") b.oreb++;
-      else b.dreb++;
-    } else if (code === "211") {
-      b.ast++;
-    } else if (code === "212") {
-      b.stl++;
-    } else if (code === "213") {
-      b.blk++;
-    } else if (code === "214") {
-      b.to++;
-    } else if (FOUL_CODES.has(code)) {
-      b.foul++;
-    }
+    applyBoxEvent(b, code);
   }
   return box;
 }
@@ -206,7 +171,9 @@ function computePushNotifications(
   prevIdx: number,
   newIdx: number,
   homeTeam: { tcode: string; name: string },
-  awayTeam: { tcode: string; name: string }
+  awayTeam: { tcode: string; name: string },
+  /** 기록 워치(lib/milestones.ts) 타임라인을 이벤트 인덱스로 묶은 것 - 이 이벤트에서 달성/임박한 기록이 있으면 토스트로 알린다. */
+  milestones?: ReadonlyMap<number, MilestoneMoment[]>
 ): PushToastSpec[] {
   const row = events[newIdx];
   const out: PushToastSpec[] = [];
@@ -260,6 +227,15 @@ function computePushNotifications(
   }
   if (droughtsNow.awaySec >= PUSH_DROUGHT_SEC && droughtsPrev.awaySec < PUSH_DROUGHT_SEC) {
     out.push({ icon: "🧊", title: `${awayTeam.name} 침묵`, msg: "3분 넘게 득점이 없습니다." });
+  }
+
+  // 기록 달성/임박 - 맨 뒤에 붙인다: 라이브 버스트는 마지막 3개만 띄우는데(TOAST_STACK_MAX), 승부처보다 기록이 밀려나지 않게.
+  for (const m of milestones?.get(newIdx) ?? []) {
+    out.push(
+      m.phase === "done"
+        ? { icon: "🏅", title: "기록 달성!", msg: `${m.name} ${m.text}` }
+        : { icon: "👀", title: "기록 임박", msg: `${m.name} ${m.text}` }
+    );
   }
 
   return out;
@@ -603,6 +579,7 @@ export default function GameReplay({
   actionLabels = EMPTY_MAP,
   liveNames,
   cardInfo,
+  milestones,
   boxOnly = false,
 }: {
   // 파생 필드(elapsed/runHome/runAway/surge = 실측 34,382B)와 action_label/player_name까지
@@ -639,6 +616,9 @@ export default function GameReplay({
   // "코트 위" 선수 카드(OnCourtCards)의 OVR·플레이 스타일 - page.tsx가 서버에서 lib/courtCardInfo.ts로 뽑아 내려준다
   // (OVR JSON이 커서 클라이언트에서 직접 읽지 않는다). 없으면 카드는 OVR 없이 그려진다.
   cardInfo?: Record<string, CourtCardInfo>;
+  // 라이브 "기록 워치"(올타임/현역 순위 돌파·100개 단위 통산·커리어 하이) 재료 - page.tsx가 서버에서 lib/careerMarks.ts로 이 경기 직전
+  // 기준으로 선수별 "달성 가능 목표"를 뽑아 내려준다. 없으면(전시경기·오래된 경기·목표 없음) 패널·알림 모두 없다.
+  milestones?: MilestoneContext | null;
   // true면 "코트 위" 박스스코어 패널만 그린다(경기 후 AI 분석 탭의 최종 스탯창). 이벤트로 최종 기록을 다시 계산하므로 live=false(종료 경기)에서만 쓴다.
   boxOnly?: boolean;
 }) {
@@ -680,6 +660,15 @@ export default function GameReplay({
     const merged = mergeEventRows(serverEvents, incoming);
     return merged === serverEvents ? serverEvents : attachDerivedFields(merged);
   }, [live, liveRows, serverEvents, actionLabels, nameByPcode, liveNames, liveCtx.lateNames]);
+
+  // 기록 워치 타임라인 - 이벤트를 처음부터 한 번 훑어 "언제 무엇을 달성/임박했는지"를 뽑는다(경기당 600~800개라 가볍다).
+  // 패널은 스크럽 위치까지의 달성만 보여주고, 토스트는 순방향 전진 때 그 이벤트 인덱스의 것만 띄운다.
+  const milestoneMoments = useMemo(() => (milestones ? buildMilestoneTimeline(milestones, events) : []), [milestones, events]);
+  const momentsByIdx = useMemo(() => {
+    const byIdx = new Map<number, MilestoneMoment[]>();
+    for (const m of milestoneMoments) byIdx.set(m.idx, [...(byIdx.get(m.idx) ?? []), m]);
+    return byIdx;
+  }, [milestoneMoments]);
 
   // ---- B-2. 팔로우 라이브 / 이탈 ------------------------------------------------
   // pinnedIdx === null 이 곧 "최신 이벤트에 붙어 있음(팔로우 중)". 사용자가 뒤로 스크럽하면
@@ -744,14 +733,14 @@ export default function GameReplay({
     const next = Math.min(events.length - 1, cur + 1);
     if (next === cur) return;
     idxRef.current = next;
-    for (const spec of computePushNotifications(events, cur, next, homeTeam, awayTeam)) pushToast(spec);
+    for (const spec of computePushNotifications(events, cur, next, homeTeam, awayTeam, momentsByIdx)) pushToast(spec);
     setIdx(next);
     // 재생 타이머가 마지막 이벤트에 도달하면 여기서 바로 멈춤(끝에 다다른 idx로의 setIdx와
     // 같은 tick) - 아래 useEffect 본문에서 동기적으로 setPlaying을 부르면
     // react-hooks/set-state-in-effect 린트 에러가 나서, 그 대신 idx를 실제로 옮기는 이
     // 지점(setTimeout 콜백/버튼 클릭 - 둘 다 effect 본문 밖)에서 처리.
     if (next >= events.length - 1) setPlaying(false);
-  }, [events, homeTeam, awayTeam, pushToast, setIdx]);
+  }, [events, homeTeam, awayTeam, momentsByIdx, pushToast, setIdx]);
 
   useEffect(() => {
     if (!playing || idx >= events.length - 1) return;
@@ -794,10 +783,10 @@ export default function GameReplay({
   // 새로" 바뀌기 때문. 그래서 타이머는 언마운트 때만 정리한다.
   const burstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 타이머 콜백이 걸릴 때의 렌더에 갇히지 않도록 최신 스냅샷을 따로 들고 간다.
-  const latestRef = useRef({ events, homeTeam, awayTeam });
+  const latestRef = useRef({ events, homeTeam, awayTeam, momentsByIdx });
   useEffect(() => {
-    latestRef.current = { events, homeTeam, awayTeam };
-  }, [events, homeTeam, awayTeam]);
+    latestRef.current = { events, homeTeam, awayTeam, momentsByIdx };
+  }, [events, homeTeam, awayTeam, momentsByIdx]);
   useEffect(() => () => { if (burstTimerRef.current) clearTimeout(burstTimerRef.current); }, []);
 
   useEffect(() => {
@@ -835,7 +824,7 @@ export default function GameReplay({
         return;
       }
       const specs: PushToastSpec[] = [];
-      for (let i = burstFrom; i < to; i++) specs.push(...computePushNotifications(cur.events, i, i + 1, cur.homeTeam, cur.awayTeam));
+      for (let i = burstFrom; i < to; i++) specs.push(...computePushNotifications(cur.events, i, i + 1, cur.homeTeam, cur.awayTeam, cur.momentsByIdx));
       for (const spec of specs.slice(-TOAST_STACK_MAX)) pushToast(spec);
     }, LIVE_TOAST_DEBOUNCE_MS);
   }, [events, live, pushToast]);
@@ -1418,6 +1407,14 @@ export default function GameReplay({
   // "두경민 3점 실패 - 공격리바운드 - 유기상 3점" 같은 실제 흐름을 훨씬 잘 보여줌.
   const recentFeed = useMemo(() => buildRecentFeed(events, idx), [events, idx]);
   const playerByPcode = useMemo(() => new Map(players.map((p) => [p.pcode, p])), [players]);
+  // 기록 워치 줄의 팀 점 색 - 박스에 있는 선수는 그 팀, 아직 안 나온 벤치 선수는 서버가 로스터로 붙여 준 tcode.
+  const milestoneTeamOf = useCallback(
+    (pcode: string, tcode?: string) => {
+      const t = playerByPcode.get(pcode)?.tcode ?? tcode;
+      return t === homeTeam.tcode ? homeTeam : t === awayTeam.tcode ? awayTeam : null;
+    },
+    [playerByPcode, homeTeam, awayTeam]
+  );
 
   // 박스스코어 +/- 컬럼 - game_player_stats엔 plus_minus 컬럼이 없어서 game_events 전체를
   // 훑어 직접 계산(lib/gameLineups.ts의 computeFinalPlusMinus, currentOnCourt와 같은 IN=101/
@@ -1483,6 +1480,8 @@ export default function GameReplay({
     () => computeSecondsUpTo(events, idx, players, homeTeam.tcode, awayTeam.tcode),
     [events, idx, players, homeTeam.tcode, awayTeam.tcode]
   );
+  // 기록 워치 "임박" 필터 - 지금까지 코트에 나온(출전 시간 > 0) 선수만. liveSec는 스크럽 위치까지의 출전 초라 되감기에도 맞는다.
+  const milestoneAppeared = useCallback((pcode: string) => (liveSec.get(pcode) ?? 0) > 0, [liveSec]);
   // "코트 위" 선수 카드 재료 - 아래 표와 같은 homeOnCourt/awayOnCourt·box·liveSec를 그대로 재사용한다(새 이벤트 스캔 없음).
   const courtCardTeams = useMemo(
     () => [
@@ -2202,6 +2201,8 @@ export default function GameReplay({
           );
         })}
       </div>
+
+      {milestones && <MilestoneWatch ctx={milestones} moments={milestoneMoments} idx={idx} box={box} teamOf={milestoneTeamOf} hideNear={!live && idx >= events.length - 1} appeared={milestoneAppeared} />}
 
       {/* "코트 위" 패널을 M7 라인업 넷레이팅 바로 위에 붙여서 "지금 누가 뛰고 있고, 이 조합이
           통산 얼마나 잘했는지"를 한 섹션처럼 읽히게 배치(요청). */}

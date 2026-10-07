@@ -24,6 +24,7 @@ import { TeamBadge } from "@/components/TeamBadge";
 import { getTeamPowerByName } from "@/lib/teamPower";
 import GameReplay from "@/components/GameReplay";
 import { buildCourtCardInfo } from "@/lib/courtCardInfo";
+import { getMilestoneContext } from "@/lib/careerMarks";
 import { InsightCard } from "@/components/InsightCard";
 import { deriveGameStatus } from "@/lib/gameStatus";
 import { initialGameTab } from "@/lib/gameTabs";
@@ -716,6 +717,12 @@ export default async function GamePage({
         }));
 
   // "코트 위" 선수 카드의 OVR·플레이 스타일(lib/courtCardInfo.ts, 서버 전용 - OVR JSON이 커서 클라이언트로는 이 로스터분만 내려간다).
+  // 라이브 "기록 워치"(올타임/현역 순위 돌파·100개 단위 통산·커리어 하이) 재료 - 이 경기 직전 기준 선수별 달성 가능 목표.
+  // 다른 조회와 나란히 돌도록 먼저 시작만 하고 아래에서 기다린다. 예정 경기는 실시간 탭이 없어 건너뛰고, 실패해도 패널만 빈다(soft).
+  const milestonesPromise =
+    status === "scheduled"
+      ? Promise.resolve(null)
+      : soft("milestones", getMilestoneContext(game, replayPlayers.map((p) => ({ pcode: p.pcode, name: p.name, tcode: p.tcode }))), null);
   const cardInfo = await soft("courtCardInfo", Promise.resolve().then(() => buildCourtCardInfo(replayPlayers, game.season_name)), {});
 
   // 요청: "라인업 조합별(1~5인) 넷레이팅 표시" - tools/build_synergy_matchup.py가 이미
@@ -843,6 +850,8 @@ export default async function GamePage({
   // live=false(예정/종료)면 훅이 구독도 타이머도 만들지 않는다(검증 5). 서버 컴포넌트가
   // 클라이언트 프로바이더로 children을 감싸는 형태 - 본문은 그대로 서버에서 렌더된다.
   const lastEventOrder = events.length > 0 ? events[events.length - 1].event_order : 0;
+
+  const milestones = await milestonesPromise;
 
   return (
     <LiveGameProvider gmkey={gmkey} live={status === "live"} initialLastOrder={lastEventOrder}>
@@ -1199,6 +1208,7 @@ export default async function GamePage({
             lineupRatings={lineupRatings}
             playerOnOff={playerOnOff}
             cardInfo={cardInfo}
+            milestones={milestones}
             live={status === "live"}
             /* action_codes 33행 맵(약 800B). 예전엔 라이브 경기에만 보냈지만, 행마다 라벨
                문자열을 박는 것(14,060B)보다 압도적으로 싸서 이제 항상 보낸다. 복원 규칙은

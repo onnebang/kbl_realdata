@@ -1,0 +1,82 @@
+/* 라이브 "기록 워치" 패널 - GAME LEADERS(.replay-leaders)와 같은 폭·여백. 색 토큰은 globals.css 것을 소비만 한다. */
+.wrap {
+  max-width: 480px;
+  margin: 0 auto 16px;
+  border-top: 1px solid rgba(var(--line-rgb), 0.1);
+  padding-top: 12px;
+}
+.sub {
+  margin: -4px 0 10px;
+  color: var(--ink-faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.group + .group {
+  margin-top: 14px;
+}
+.groupTitle {
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+.list {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+.headline {
+  color: var(--ink);
+  font-size: 13.5px;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+.name {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: none;
+}
+a.name:hover {
+  text-decoration: underline;
+}
+.detail {
+  margin-top: 2px;
+  color: var(--ink-faint);
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+.clock {
+  margin-right: 6px;
+  font-variant-numeric: tabular-nums;
+}
+/* 남은 수 - 임박 줄 오른쪽 배지. 1~2개 남았을 때(.hot)만 눈에 띄게. */
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(var(--line-rgb), 0.08);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hot {
+  background: rgba(var(--line-rgb), 0.14);
+  color: var(--positive);
+}
