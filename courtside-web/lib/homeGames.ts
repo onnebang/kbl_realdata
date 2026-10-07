@@ -559,7 +559,20 @@ function renameTeams<T extends GameRow>(rows: T[]): T[] {
   }
   return rows;
 }
-const gameNo = (g: GameRow) => Number(/N(\d+)$/.exec(g.gmkey)?.[1] ?? 0);
+const gameNo = (g: { gmkey: string }) => Number(/N(\d+)$/.exec(g.gmkey)?.[1] ?? 0);
+/** 라운드 크기·개수의 단일 출처(getRoundGames와 선수별 라운드 기록 lib/roundSplits.ts가 같이 쓴다). 팀 수는 경기의 원본
+ * tcode 컬럼에서 직접 센다 - 팀 목록이나 teams 조인에 의존하면 그 조회가 비었을 때 라운드가 경기 수만큼 쪼개진다. */
+export function roundInfoFromGames(games: { home_tcode: string | null; away_tcode: string | null }[]): { perRound: number; roundCount: number } {
+  const teams = new Set<string>();
+  for (const g of games) {
+    if (g.home_tcode) teams.add(g.home_tcode);
+    if (g.away_tcode) teams.add(g.away_tcode);
+  }
+  const perRound = Math.max(1, (teams.size * (teams.size - 1)) / 2);
+  return { perRound, roundCount: Math.max(1, Math.ceil(games.length / perRound)) };
+}
+/** 정규시즌 경기(gmkey S{시즌}G01N{순번})가 속한 라운드 - getRoundGames와 같은 정의. */
+export const roundOfGmkey = (gmkey: string, perRound: number) => Math.ceil(gameNo({ gmkey }) / perRound);
 const byDateTime = (a: GameRow, b: GameRow) =>
   a.game_date.localeCompare(b.game_date) || (a.game_start ?? "").localeCompare(b.game_start ?? "") || a.gmkey.localeCompare(b.gmkey);
 // 스코어가 바뀌는 중일 수 있어 캐시하지 않는다(라이브 구간과 같은 이유). 정규시즌 최대 ~270행 한 번.
@@ -574,15 +587,8 @@ export async function getRoundGames(
     .eq("season_name", seasonName)
     .eq("season_category", "정규시즌");
   const raw = (data ?? []) as unknown as (GameRow & { home_tcode: string | null; away_tcode: string | null })[];
-  // 팀 수는 이 시즌 경기의 원본 tcode 컬럼에서 직접 센다(팀 목록이나 teams 조인에 의존하면 그 조회가 비었을 때 라운드가 경기 수만큼 쪼개진다).
-  const teams = new Set<string>();
-  for (const g of raw) {
-    if (g.home_tcode) teams.add(g.home_tcode);
-    if (g.away_tcode) teams.add(g.away_tcode);
-  }
+  const { perRound, roundCount } = roundInfoFromGames(raw);
   const all = renameTeams(raw).sort((a, b) => gameNo(a) - gameNo(b)) as typeof raw;
-  const perRound = Math.max(1, (teams.size * (teams.size - 1)) / 2);
-  const roundCount = Math.max(1, Math.ceil(all.length / perRound));
   const today = kstToday();
   const upcoming = all.find((g) => g.game_date >= today);
   const wanted = round ?? (upcoming ? Math.ceil(gameNo(upcoming) / perRound) : roundCount);

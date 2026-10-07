@@ -56,6 +56,8 @@ import { TeamBadge } from "@/components/TeamBadge";
 import { PlayerGlanceCard } from "@/components/PlayerGlance";
 import { PlayerFormPanel, resolveFormUnit } from "@/components/PlayerForm";
 import { RecentWindow } from "@/components/RecentWindow";
+import { RoundSplitsTable } from "@/components/RoundSplits";
+import { getPlayerRoundSplits, type RoundSplits } from "@/lib/roundSplits";
 import { RECENT_RATE_PARAM, resolveRecentRate } from "@/lib/recentWindow";
 import { SynergyCombos } from "@/components/SynergyCombos";
 import { WinImpactPanel } from "@/components/WinImpact";
@@ -75,7 +77,7 @@ import {
   buildZoneSvg,
 } from "@/lib/scoringBreakdown";
 import { aggregateByOpponent, buildKoreaMapSvg } from "@/lib/koreaMap";
-import { getPlayerOvrHistory } from "@/lib/ovr";
+import { getPlayerOvrHistory, OFF_ROSTER_LABEL } from "@/lib/ovr";
 import CourtsidePlayerCard from "@/components/CourtsidePlayerCard";
 import OvrTrendChart from "@/components/OvrTrendChart";
 import AchievementTrophyRoom from "@/components/AchievementTrophyRoom";
@@ -469,10 +471,12 @@ export default async function PlayerPage({
   // 명단 상태는 본체(팀·등번호·포지션·시즌 목록 = 히어로 정체성과 focus의 입력) - throw.
   // 결 띠와 폼은 패널이라 soft(null). null이면 아래에서 그 패널만 "불러오지 못함"으로 그리고,
   // 한눈 카드에는 undefined로 넘겨 카드가 스스로 재조회하게 둔다(그것도 실패하면 카드가 soft).
-  const [status, grain, form] = await Promise.all([
+  // 이번 시즌 라운드별 기록(요청 2026-10-07) - 이 시즌 종료 경기가 없으면 일정 조회 없이 null이라 비용 0, 있으면 일정 1회(캐시).
+  const [status, grain, form, roundSplits] = await Promise.all([
     getPlayerRosterStatus(pcode, careerRows),
     soft<CareerGrain | null>("careerGrain", getCareerGrain(pcode, careerRows), null),
     soft<PlayerForm | null>("playerForm", getPlayerForm(pcode, { careerRows, recentN: windowN }), null),
+    soft<RoundSplits | null>("roundSplits", getPlayerRoundSplits(careerRows, PRESEASON_SEASON), null),
   ]);
   // "이번 시즌"의 정의는 lib/seasonFocus.ts 한 곳에서만 - 추정 패널(평균·퍼센타일·슛)은 statSeason을
   // 받아 개막일 밤에 1경기 평균이 시즌 수치로 승격되는 일이 없게 한다(선수 임계 10GP).
@@ -774,6 +778,9 @@ export default async function PlayerPage({
                         <span style={{ color: ovrDiff > 0 ? 'var(--positive)' : 'var(--negative)', marginLeft: '6px', fontSize: '1em', fontWeight: 'bold' }}>
                           {ovrDiff > 0 ? '▲' : '▼'}{Math.abs(ovrDiff)}
                         </span>
+                      )}
+                      {latestOvr.offRoster && (
+                        <span style={{ marginLeft: '8px', fontSize: '0.8em', opacity: 0.75 }}>{OFF_ROSTER_LABEL[latestOvr.offRoster]}</span>
                       )}
                     </>
                   );
@@ -1279,6 +1286,13 @@ export default async function PlayerPage({
         <div className={styles.panel} id="form">
           <div className={styles.panelTitle}>시즌별 폼</div>
           <div className="empty-note">시즌별 폼을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>
+        </div>
+      )}
+
+      {roundSplits && (
+        <div className={styles.panel} id="rounds">
+          <div className={styles.panelTitle}>{shortSeason(roundSplits.season)} 라운드별 기록</div>
+          <RoundSplitsTable splits={roundSplits} />
         </div>
       )}
 

@@ -1,0 +1,63 @@
+/* 선수 프로필 "라운드별 기록" 표. 색 토큰(--ink*, --positive/--negative, --line-rgb)은 globals.css 것을 소비만 한다.
+   표 뼈대는 전역 .data-table과 같은 모양이지만 그쪽은 1·2번째 칸을 왼쪽 정렬로 고정(날짜·팀 표용)해서 여기선 따로 둔다. */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.table th {
+  font-family: "Pretendard", sans-serif;
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-weight: 600;
+  text-align: right;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.14);
+}
+.table td {
+  padding: 6px 8px;
+  text-align: right;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.07);
+  font-variant-numeric: tabular-nums;
+}
+.table th:first-child,
+.table td:first-child {
+  text-align: left;
+}
+.round {
+  font-weight: 700;
+  color: var(--ink);
+}
+.v {
+  display: block;
+}
+/* 직전에 뛴 라운드 대비 변화 - 값 바로 밑의 작은 줄. 색 규칙은 lib/roundSplits.ts roundDelta(노이즈 안이면 회색). */
+.d {
+  display: block;
+  font-size: 11px;
+  line-height: 1.25;
+}
+.up {
+  color: var(--positive);
+}
+.down {
+  color: var(--negative);
+}
+.flat {
+  color: var(--ink-faint);
+}
+.role {
+  color: var(--ink-soft);
+}
+.table td.empty {
+  text-align: left;
+  color: var(--ink-faint);
+}
+.note {
+  margin: 8px 0 0;
+  color: var(--ink-faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
