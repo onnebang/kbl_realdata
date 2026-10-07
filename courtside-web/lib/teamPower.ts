@@ -41,7 +41,8 @@ export function getAllTeamPowers(season?: string): TeamPower[] {
   const targetSeason = season ?? seasons[seasons.length - 1];
   if (!targetSeason) return [];
 
-  const players = history.filter((r) => r.season === targetSeason && r.team && r.team !== "Unknown");
+  // offRoster(군 복무/해외 진출 추정 행)는 로스터가 아니라서 뺀다 - 안 빼면 뛰지도 않는 선수가 옛 소속팀 전력을 올린다.
+  const players = history.filter((r) => r.season === targetSeason && r.team && r.team !== "Unknown" && !r.offRoster);
   const byTeam = new Map<string, OvrSeasonRecord[]>();
   for (const p of players) {
     if (!byTeam.has(p.team!)) byTeam.set(p.team!, []);

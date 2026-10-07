@@ -48,7 +48,17 @@ export interface OvrSeasonRecord {
    *  군 복무·부상 등 공백 시즌의 앞뒤 실측 보간. 화면(OvrTrendChart)은 마지막 레코드를 선수 카드와 같이 확정값처럼
    *  그리고 보간만 점선·"보간"으로 표시한다(2026-09-19 결정). */
   projected?: boolean;
+  /** 로스터에는 없지만 예상 OVR을 이어가는 선수의 사유 - 군 복무/해외 진출/미확인(2026-10-07 결정: "로스터 없는
+   *  대부분이 군 입대일텐데 추정치로 오버롤"). 이 행은 프로필·그래프에서만 쓰고, 팀 전력·OVR 랭킹처럼 "지금 로스터"를
+   *  세는 곳에서는 반드시 빼야 한다(안 그러면 뛰지도 않는 선수가 옛 소속팀 전력을 올린다). */
+  offRoster?: "military" | "overseas" | "unconfirmed";
 }
+
+export const OFF_ROSTER_LABEL: Record<NonNullable<OvrSeasonRecord["offRoster"]>, string> = {
+  military: "추정 · 군 복무",
+  overseas: "추정 · 해외 진출",
+  unconfirmed: "추정",
+};
 
 export function getOvrHistoryCache(): OvrSeasonRecord[] {
   // 웹팩(Next.js)에서 import한 JSON은 자동으로 캐싱되고 번들에 포함됩니다.

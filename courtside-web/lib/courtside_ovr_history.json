@@ -63696,8 +63696,8 @@
       "outside": 67,
       "inside": 82,
       "playmaking": 68,
-      "athletic": 77,
-      "defense": 77,
+      "athletic": 78,
+      "defense": 78,
       "rebounding": 83
     },
     "role": "Paint Beast",
@@ -65923,13 +65923,13 @@
     "team": "전주 KCC",
     "position": "C",
     "OVR": 81,
-    "OFF": 72,
+    "OFF": 73,
     "DEF": 85,
     "attributes": {
       "outside": 64,
       "inside": 69,
-      "playmaking": 73,
-      "athletic": 83,
+      "playmaking": 74,
+      "athletic": 82,
       "defense": 85,
       "rebounding": 80
     },
@@ -66474,14 +66474,14 @@
     "team": "고양 소노",
     "position": "FD",
     "OVR": 76,
-    "OFF": 79,
+    "OFF": 78,
     "DEF": 70,
     "attributes": {
       "outside": 81,
       "inside": 74,
       "playmaking": 68,
       "athletic": 74,
-      "defense": 76,
+      "defense": 77,
       "rebounding": 70
     },
     "role": "3&D Wing",
@@ -78019,8 +78019,8 @@
     "OFF": 80,
     "DEF": 62,
     "attributes": {
-      "outside": 87,
-      "inside": 79,
+      "outside": 88,
+      "inside": 80,
       "playmaking": 67,
       "athletic": 65,
       "defense": 66,
@@ -78484,11 +78484,11 @@
     "DEF": 74,
     "attributes": {
       "outside": 72,
-      "inside": 70,
+      "inside": 71,
       "playmaking": 85,
       "athletic": 76,
       "defense": 78,
-      "rebounding": 70
+      "rebounding": 69
     },
     "role": "Playmaker",
     "archetype": "플레이메이커",
@@ -79350,14 +79350,14 @@
     "team": "전주 KCC",
     "position": "GD",
     "OVR": 83,
-    "OFF": 85,
+    "OFF": 86,
     "DEF": 76,
     "attributes": {
-      "outside": 79,
+      "outside": 80,
       "inside": 81,
       "playmaking": 82,
       "athletic": 73,
-      "defense": 72,
+      "defense": 71,
       "rebounding": 66
     },
     "role": "Scoring Threat",
@@ -80542,7 +80542,7 @@
     "OFF": 73,
     "DEF": 78,
     "attributes": {
-      "outside": 68,
+      "outside": 67,
       "inside": 72,
       "playmaking": 74,
       "athletic": 78,
@@ -81901,7 +81901,7 @@
     "season": "2026-2027",
     "team": "고양 소노",
     "position": "FD",
-    "OVR": 75,
+    "OVR": 76,
     "OFF": 78,
     "DEF": 74,
     "attributes": {
@@ -81909,7 +81909,7 @@
       "inside": 73,
       "playmaking": 75,
       "athletic": 74,
-      "defense": 75,
+      "defense": 76,
       "rebounding": 72
     },
     "role": "Sharpshooter",
@@ -82453,15 +82453,15 @@
     "team": "울산 현대모비스",
     "position": "FD",
     "OVR": 83,
-    "OFF": 83,
-    "DEF": 82,
+    "OFF": 84,
+    "DEF": 81,
     "attributes": {
       "outside": 74,
-      "inside": 77,
+      "inside": 78,
       "playmaking": 76,
       "athletic": 80,
       "defense": 73,
-      "rebounding": 75
+      "rebounding": 74
     },
     "role": "Midrange Master",
     "archetype": "미드레인지 마스터",
@@ -82834,7 +82834,7 @@
     "DEF": 62,
     "attributes": {
       "outside": 71,
-      "inside": 73,
+      "inside": 72,
       "playmaking": 80,
       "athletic": 69,
       "defense": 68,
@@ -85606,6 +85606,36 @@
       "defense": 0
     },
     "projected": false
+  },
+  {
+    "pcode": "290897",
+    "name": "송교창",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "FD",
+    "OVR": 78,
+    "OFF": 82,
+    "DEF": 76,
+    "attributes": {
+      "outside": 79,
+      "inside": 77,
+      "playmaking": 82,
+      "athletic": 79,
+      "defense": 75,
+      "rebounding": 80
+    },
+    "role": "Scoring Threat",
+    "archetype": "스코어링 스렛",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "overseas"
   },
   {
     "pcode": "290898",
@@ -88972,6 +89002,36 @@
     "projected": false
   },
   {
+    "pcode": "290993",
+    "name": "최준용",
+    "season": "2026-2027",
+    "team": "전주 KCC",
+    "position": "FD",
+    "OVR": 85,
+    "OFF": 84,
+    "DEF": 86,
+    "attributes": {
+      "outside": 72,
+      "inside": 72,
+      "playmaking": 81,
+      "athletic": 84,
+      "defense": 77,
+      "rebounding": 77
+    },
+    "role": "All-Around",
+    "archetype": "올어라운드",
+    "role2": "Rim Protector",
+    "archetype2": "림 프로텍터",
+    "badges": {
+      "finishing": 1,
+      "shooting": 1,
+      "playmaking": 0,
+      "defense": 1
+    },
+    "projected": true,
+    "offRoster": "overseas"
+  },
+  {
     "pcode": "290994",
     "name": "김준성",
     "season": "2016-2017",
@@ -89534,7 +89594,7 @@
     "attributes": {
       "outside": 86,
       "inside": 74,
-      "playmaking": 77,
+      "playmaking": 78,
       "athletic": 86,
       "defense": 87,
       "rebounding": 72
@@ -89853,8 +89913,8 @@
     "attributes": {
       "outside": 81,
       "inside": 80,
-      "playmaking": 79,
-      "athletic": 82,
+      "playmaking": 78,
+      "athletic": 83,
       "defense": 86,
       "rebounding": 83
     },
@@ -90486,11 +90546,11 @@
     "team": "원주 DB",
     "position": "FD",
     "OVR": 82,
-    "OFF": 82,
+    "OFF": 81,
     "DEF": 83,
     "attributes": {
       "outside": 75,
-      "inside": 73,
+      "inside": 74,
       "playmaking": 76,
       "athletic": 77,
       "defense": 78,
@@ -91152,8 +91212,8 @@
     "season": "2026-2027",
     "team": "대구 한국가스공사",
     "position": "FD",
-    "OVR": 73,
-    "OFF": 69,
+    "OVR": 74,
+    "OFF": 70,
     "DEF": 76,
     "attributes": {
       "outside": 75,
@@ -91161,7 +91221,7 @@
       "playmaking": 74,
       "athletic": 78,
       "defense": 80,
-      "rebounding": 77
+      "rebounding": 78
     },
     "role": "Lockdown Defender",
     "archetype": "락다운 디펜더",
@@ -91941,10 +92001,10 @@
     "attributes": {
       "outside": 76,
       "inside": 79,
-      "playmaking": 90,
+      "playmaking": 91,
       "athletic": 83,
       "defense": 83,
-      "rebounding": 75
+      "rebounding": 76
     },
     "role": "Combo Guard",
     "archetype": "콤보 가드",
@@ -93800,7 +93860,7 @@
       "playmaking": 82,
       "athletic": 74,
       "defense": 73,
-      "rebounding": 67
+      "rebounding": 68
     },
     "role": "Sharpshooter",
     "archetype": "샤프슈터",
@@ -95272,14 +95332,14 @@
     "position": "GD",
     "OVR": 86,
     "OFF": 89,
-    "DEF": 83,
+    "DEF": 84,
     "attributes": {
       "outside": 76,
       "inside": 76,
       "playmaking": 93,
-      "athletic": 79,
-      "defense": 79,
-      "rebounding": 72
+      "athletic": 80,
+      "defense": 78,
+      "rebounding": 73
     },
     "role": "Playmaker",
     "archetype": "플레이메이커",
@@ -95705,12 +95765,12 @@
     "season": "2026-2027",
     "team": "대구 한국가스공사",
     "position": "FD",
-    "OVR": 80,
+    "OVR": 81,
     "OFF": 82,
     "DEF": 80,
     "attributes": {
       "outside": 85,
-      "inside": 83,
+      "inside": 82,
       "playmaking": 77,
       "athletic": 79,
       "defense": 83,
@@ -96315,14 +96375,14 @@
     "team": "창원 LG",
     "position": "FD",
     "OVR": 84,
-    "OFF": 84,
+    "OFF": 83,
     "DEF": 83,
     "attributes": {
       "outside": 79,
-      "inside": 83,
-      "playmaking": 82,
+      "inside": 82,
+      "playmaking": 81,
       "athletic": 79,
-      "defense": 78,
+      "defense": 79,
       "rebounding": 82
     },
     "role": "Bench Scorer",
@@ -98844,8 +98904,8 @@
       "outside": 84,
       "inside": 78,
       "playmaking": 91,
-      "athletic": 79,
-      "defense": 79,
+      "athletic": 80,
+      "defense": 78,
       "rebounding": 74
     },
     "role": "Playmaker",
@@ -99243,11 +99303,11 @@
     "season": "2026-2027",
     "team": "대구 한국가스공사",
     "position": "FD",
-    "OVR": 75,
+    "OVR": 76,
     "OFF": 84,
     "DEF": 68,
     "attributes": {
-      "outside": 91,
+      "outside": 90,
       "inside": 83,
       "playmaking": 74,
       "athletic": 73,
@@ -99882,14 +99942,14 @@
     "team": "울산 현대모비스",
     "position": "FD",
     "OVR": 79,
-    "OFF": 79,
+    "OFF": 80,
     "DEF": 77,
     "attributes": {
-      "outside": 87,
+      "outside": 88,
       "inside": 76,
       "playmaking": 76,
       "athletic": 80,
-      "defense": 83,
+      "defense": 82,
       "rebounding": 77
     },
     "role": "3&D Wing",
@@ -100926,10 +100986,10 @@
     "team": "안양 정관장",
     "position": "GD",
     "OVR": 84,
-    "OFF": 87,
+    "OFF": 86,
     "DEF": 84,
     "attributes": {
-      "outside": 75,
+      "outside": 74,
       "inside": 76,
       "playmaking": 89,
       "athletic": 82,
@@ -101186,11 +101246,11 @@
     "season": "2026-2027",
     "team": "대구 한국가스공사",
     "position": "FD",
-    "OVR": 77,
+    "OVR": 78,
     "OFF": 78,
     "DEF": 75,
     "attributes": {
-      "outside": 79,
+      "outside": 80,
       "inside": 80,
       "playmaking": 79,
       "athletic": 78,
@@ -101708,15 +101768,15 @@
     "season": "2026-2027",
     "team": "서울 삼성",
     "position": "FD",
-    "OVR": 87,
-    "OFF": 81,
+    "OVR": 86,
+    "OFF": 80,
     "DEF": 91,
     "attributes": {
-      "outside": 78,
+      "outside": 77,
       "inside": 85,
       "playmaking": 72,
       "athletic": 90,
-      "defense": 91,
+      "defense": 90,
       "rebounding": 85
     },
     "role": "Stretch Big",
@@ -103361,7 +103421,7 @@
     "season": "2026-2027",
     "team": "울산 현대모비스",
     "position": "C",
-    "OVR": 80,
+    "OVR": 81,
     "OFF": 77,
     "DEF": 83,
     "attributes": {
@@ -104409,7 +104469,7 @@
     "OFF": 74,
     "DEF": 60,
     "attributes": {
-      "outside": 88,
+      "outside": 89,
       "inside": 81,
       "playmaking": 73,
       "athletic": 74,
@@ -105139,7 +105199,7 @@
       "playmaking": 83,
       "athletic": 78,
       "defense": 83,
-      "rebounding": 71
+      "rebounding": 72
     },
     "role": "Playmaker",
     "archetype": "플레이메이커",
@@ -107392,15 +107452,15 @@
     "season": "2026-2027",
     "team": "전주 KCC",
     "position": "C",
-    "OVR": 87,
+    "OVR": 86,
     "OFF": 87,
     "DEF": 90,
     "attributes": {
       "outside": 65,
       "inside": 79,
-      "playmaking": 71,
-      "athletic": 82,
-      "defense": 76,
+      "playmaking": 72,
+      "athletic": 81,
+      "defense": 75,
       "rebounding": 87
     },
     "role": "Double-Double Machine",
@@ -108039,7 +108099,7 @@
       "playmaking": 73,
       "athletic": 76,
       "defense": 82,
-      "rebounding": 73
+      "rebounding": 74
     },
     "role": "3&D Wing",
     "archetype": "3&D 윙",
@@ -108241,7 +108301,7 @@
       "inside": 77,
       "playmaking": 89,
       "athletic": 83,
-      "defense": 89,
+      "defense": 90,
       "rebounding": 84
     },
     "role": "Lockdown Defender",
@@ -108445,7 +108505,7 @@
       "playmaking": 79,
       "athletic": 78,
       "defense": 85,
-      "rebounding": 75
+      "rebounding": 76
     },
     "role": "Sharpshooter",
     "archetype": "샤프슈터",
@@ -108785,13 +108845,13 @@
     "team": "창원 LG",
     "position": "GD",
     "OVR": 80,
-    "OFF": 83,
+    "OFF": 82,
     "DEF": 76,
     "attributes": {
-      "outside": 86,
+      "outside": 85,
       "inside": 78,
       "playmaking": 80,
-      "athletic": 76,
+      "athletic": 75,
       "defense": 77,
       "rebounding": 76
     },
@@ -109452,7 +109512,7 @@
     "team": "안양 정관장",
     "position": "FD",
     "OVR": 82,
-    "OFF": 81,
+    "OFF": 82,
     "DEF": 81,
     "attributes": {
       "outside": 81,
@@ -109626,11 +109686,11 @@
     "team": "서울 삼성",
     "position": "FD",
     "OVR": 82,
-    "OFF": 90,
+    "OFF": 91,
     "DEF": 69,
     "attributes": {
       "outside": 97,
-      "inside": 87,
+      "inside": 88,
       "playmaking": 76,
       "athletic": 73,
       "defense": 71,
@@ -109800,15 +109860,15 @@
     "team": "울산 현대모비스",
     "position": "GD",
     "OVR": 84,
-    "OFF": 86,
+    "OFF": 87,
     "DEF": 80,
     "attributes": {
       "outside": 82,
       "inside": 77,
       "playmaking": 86,
       "athletic": 79,
-      "defense": 76,
-      "rebounding": 79
+      "defense": 75,
+      "rebounding": 78
     },
     "role": "Scoring Threat",
     "archetype": "스코어링 스렛",
@@ -111540,8 +111600,8 @@
     "team": "창원 LG",
     "position": "C",
     "OVR": 88,
-    "OFF": 85,
-    "DEF": 93,
+    "OFF": 84,
+    "DEF": 94,
     "attributes": {
       "outside": 61,
       "inside": 65,
@@ -111717,10 +111777,10 @@
     "OFF": 88,
     "DEF": 95,
     "attributes": {
-      "outside": 73,
+      "outside": 72,
       "inside": 82,
       "playmaking": 77,
-      "athletic": 93,
+      "athletic": 94,
       "defense": 93,
       "rebounding": 90
     },
@@ -112288,6 +112348,36 @@
     "projected": false
   },
   {
+    "pcode": "291478",
+    "name": "이원석",
+    "season": "2026-2027",
+    "team": "서울 삼성",
+    "position": "FD",
+    "OVR": 79,
+    "OFF": 78,
+    "DEF": 82,
+    "attributes": {
+      "outside": 77,
+      "inside": 80,
+      "playmaking": 74,
+      "athletic": 85,
+      "defense": 84,
+      "rebounding": 85
+    },
+    "role": "Slasher",
+    "archetype": "슬래셔",
+    "role2": "Rim Protector",
+    "archetype2": "림 프로텍터",
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "military"
+  },
+  {
     "pcode": "291479",
     "name": "신승민",
     "season": "2021-2022",
@@ -112431,6 +112521,36 @@
       "defense": 0
     },
     "projected": false
+  },
+  {
+    "pcode": "291479",
+    "name": "신승민",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "FD",
+    "OVR": 80,
+    "OFF": 81,
+    "DEF": 78,
+    "attributes": {
+      "outside": 80,
+      "inside": 81,
+      "playmaking": 78,
+      "athletic": 80,
+      "defense": 79,
+      "rebounding": 78
+    },
+    "role": "3&D Wing",
+    "archetype": "3&D 윙",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "military"
   },
   {
     "pcode": "291480",
@@ -113042,6 +113162,36 @@
     "projected": false
   },
   {
+    "pcode": "291485",
+    "name": "이승우",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "FD",
+    "OVR": 63,
+    "OFF": 56,
+    "DEF": 64,
+    "attributes": {
+      "outside": 78,
+      "inside": 80,
+      "playmaking": 77,
+      "athletic": 78,
+      "defense": 86,
+      "rebounding": 83
+    },
+    "role": "3&D Wing",
+    "archetype": "3&D 윙",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "military"
+  },
+  {
     "pcode": "291486",
     "name": "김종호",
     "season": "2021-2022",
@@ -113339,7 +113489,7 @@
     "position": "GD",
     "OVR": 89,
     "OFF": 90,
-    "DEF": 87,
+    "DEF": 88,
     "attributes": {
       "outside": 84,
       "inside": 88,
@@ -113685,14 +113835,14 @@
     "season": "2026-2027",
     "team": "전주 KCC",
     "position": "GD",
-    "OVR": 80,
+    "OVR": 79,
     "OFF": 81,
-    "DEF": 77,
+    "DEF": 76,
     "attributes": {
-      "outside": 87,
-      "inside": 89,
+      "outside": 86,
+      "inside": 88,
       "playmaking": 88,
-      "athletic": 80,
+      "athletic": 79,
       "defense": 81,
       "rebounding": 76
     },
@@ -113976,14 +114126,14 @@
     "team": "수원 KT",
     "position": "C",
     "OVR": 82,
-    "OFF": 83,
-    "DEF": 77,
+    "OFF": 84,
+    "DEF": 78,
     "attributes": {
-      "outside": 73,
-      "inside": 84,
-      "playmaking": 72,
-      "athletic": 74,
-      "defense": 73,
+      "outside": 74,
+      "inside": 85,
+      "playmaking": 73,
+      "athletic": 75,
+      "defense": 74,
       "rebounding": 76
     },
     "role": "Slasher",
@@ -114967,7 +115117,7 @@
     "attributes": {
       "outside": 72,
       "inside": 74,
-      "playmaking": 75,
+      "playmaking": 76,
       "athletic": 79,
       "defense": 84,
       "rebounding": 84
@@ -115255,10 +115405,10 @@
     "OFF": 92,
     "DEF": 89,
     "attributes": {
-      "outside": 79,
+      "outside": 80,
       "inside": 80,
       "playmaking": 96,
-      "athletic": 88,
+      "athletic": 87,
       "defense": 86,
       "rebounding": 77
     },
@@ -115396,7 +115546,7 @@
     "season": "2026-2027",
     "team": "서울 삼성",
     "position": "FD",
-    "OVR": 82,
+    "OVR": 81,
     "OFF": 82,
     "DEF": 82,
     "attributes": {
@@ -115404,7 +115554,7 @@
       "inside": 78,
       "playmaking": 86,
       "athletic": 83,
-      "defense": 83,
+      "defense": 82,
       "rebounding": 79
     },
     "role": "Playmaker",
@@ -115575,7 +115725,7 @@
     "DEF": 81,
     "attributes": {
       "outside": 84,
-      "inside": 85,
+      "inside": 86,
       "playmaking": 91,
       "athletic": 81,
       "defense": 81,
@@ -115778,11 +115928,11 @@
     "DEF": 81,
     "attributes": {
       "outside": 79,
-      "inside": 78,
+      "inside": 77,
       "playmaking": 95,
       "athletic": 77,
       "defense": 77,
-      "rebounding": 74
+      "rebounding": 75
     },
     "role": "Playmaker",
     "archetype": "플레이메이커",
@@ -116011,10 +116161,10 @@
     "attributes": {
       "outside": 77,
       "inside": 90,
-      "playmaking": 78,
+      "playmaking": 79,
       "athletic": 86,
-      "defense": 85,
-      "rebounding": 91
+      "defense": 84,
+      "rebounding": 90
     },
     "role": "Slasher",
     "archetype": "슬래셔",
@@ -116355,11 +116505,11 @@
     "position": "GD",
     "OVR": 84,
     "OFF": 84,
-    "DEF": 88,
+    "DEF": 89,
     "attributes": {
       "outside": 77,
       "inside": 85,
-      "playmaking": 75,
+      "playmaking": 76,
       "athletic": 87,
       "defense": 89,
       "rebounding": 81
@@ -116696,6 +116846,36 @@
     "projected": false
   },
   {
+    "pcode": "291587",
+    "name": "박선웅",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "GD",
+    "OVR": 54,
+    "OFF": 56,
+    "DEF": 55,
+    "attributes": {
+      "outside": 68,
+      "inside": 66,
+      "playmaking": 65,
+      "athletic": 65,
+      "defense": 67,
+      "rebounding": 66
+    },
+    "role": "3&D Wing",
+    "archetype": "3&D 윙",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "unconfirmed"
+  },
+  {
     "pcode": "291588",
     "name": "박인웅",
     "season": "2022-2023",
@@ -116810,6 +116990,36 @@
       "defense": 0
     },
     "projected": false
+  },
+  {
+    "pcode": "291588",
+    "name": "박인웅",
+    "season": "2026-2027",
+    "team": "원주 DB",
+    "position": "FD",
+    "OVR": 80,
+    "OFF": 85,
+    "DEF": 77,
+    "attributes": {
+      "outside": 87,
+      "inside": 84,
+      "playmaking": 74,
+      "athletic": 76,
+      "defense": 76,
+      "rebounding": 78
+    },
+    "role": "Sharpshooter",
+    "archetype": "샤프슈터",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "military"
   },
   {
     "pcode": "291589",
@@ -117368,7 +117578,7 @@
     "season": "2026-2027",
     "team": "울산 현대모비스",
     "position": "GD",
-    "OVR": 67,
+    "OVR": 68,
     "OFF": 70,
     "DEF": 67,
     "attributes": {
@@ -117513,11 +117723,11 @@
     "season": "2026-2027",
     "team": "서울 삼성",
     "position": "FD",
-    "OVR": 74,
+    "OVR": 73,
     "OFF": 79,
-    "DEF": 72,
+    "DEF": 71,
     "attributes": {
-      "outside": 85,
+      "outside": 86,
       "inside": 77,
       "playmaking": 77,
       "athletic": 76,
@@ -117827,6 +118037,36 @@
     "projected": false
   },
   {
+    "pcode": "291601",
+    "name": "고찬혁",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "GD",
+    "OVR": 56,
+    "OFF": 55,
+    "DEF": 56,
+    "attributes": {
+      "outside": 76,
+      "inside": 82,
+      "playmaking": 59,
+      "athletic": 64,
+      "defense": 64,
+      "rebounding": 66
+    },
+    "role": "All-Around",
+    "archetype": "올어라운드",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "military"
+  },
+  {
     "pcode": "291602",
     "name": "유진",
     "season": "2022-2023",
@@ -118001,6 +118241,36 @@
     "projected": false
   },
   {
+    "pcode": "291603",
+    "name": "문가온",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "GD",
+    "OVR": 55,
+    "OFF": 57,
+    "DEF": 51,
+    "attributes": {
+      "outside": 79,
+      "inside": 88,
+      "playmaking": 68,
+      "athletic": 69,
+      "defense": 81,
+      "rebounding": 68
+    },
+    "role": "Sharpshooter",
+    "archetype": "샤프슈터",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "military"
+  },
+  {
     "pcode": "291604",
     "name": "백지웅",
     "season": "2023-2024",
@@ -118057,6 +118327,36 @@
       "defense": 0
     },
     "projected": false
+  },
+  {
+    "pcode": "291604",
+    "name": "백지웅",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "GD",
+    "OVR": 59,
+    "OFF": 64,
+    "DEF": 56,
+    "attributes": {
+      "outside": 88,
+      "inside": 71,
+      "playmaking": 73,
+      "athletic": 70,
+      "defense": 69,
+      "rebounding": 77
+    },
+    "role": "All-Around",
+    "archetype": "올어라운드",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "unconfirmed"
   },
   {
     "pcode": "291605",
@@ -119399,7 +119699,7 @@
     "team": "안양 정관장",
     "position": "FD",
     "OVR": 67,
-    "OFF": 65,
+    "OFF": 66,
     "DEF": 67,
     "attributes": {
       "outside": 83,
@@ -119407,7 +119707,7 @@
       "playmaking": 75,
       "athletic": 89,
       "defense": 92,
-      "rebounding": 85
+      "rebounding": 86
     },
     "role": "3&D Wing",
     "archetype": "3&D 윙",
@@ -119516,11 +119816,11 @@
     "position": "GD",
     "OVR": 80,
     "OFF": 83,
-    "DEF": 78,
+    "DEF": 77,
     "attributes": {
       "outside": 76,
       "inside": 75,
-      "playmaking": 92,
+      "playmaking": 91,
       "athletic": 79,
       "defense": 78,
       "rebounding": 78
@@ -119944,6 +120244,36 @@
     "projected": false
   },
   {
+    "pcode": "291659",
+    "name": "민기남",
+    "season": "2026-2027",
+    "team": "고양 소노",
+    "position": "GD",
+    "OVR": 66,
+    "OFF": 70,
+    "DEF": 59,
+    "attributes": {
+      "outside": 86,
+      "inside": 76,
+      "playmaking": 85,
+      "athletic": 76,
+      "defense": 77,
+      "rebounding": 76
+    },
+    "role": "Sharpshooter",
+    "archetype": "샤프슈터",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "unconfirmed"
+  },
+  {
     "pcode": "291660",
     "name": "박승재",
     "season": "2023-2024",
@@ -120029,6 +120359,36 @@
       "defense": 0
     },
     "projected": false
+  },
+  {
+    "pcode": "291660",
+    "name": "박승재",
+    "season": "2026-2027",
+    "team": "서울 삼성",
+    "position": "GD",
+    "OVR": 68,
+    "OFF": 70,
+    "DEF": 65,
+    "attributes": {
+      "outside": 75,
+      "inside": 74,
+      "playmaking": 83,
+      "athletic": 73,
+      "defense": 73,
+      "rebounding": 75
+    },
+    "role": "Playmaker",
+    "archetype": "플레이메이커",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "military"
   },
   {
     "pcode": "291662",
@@ -120147,6 +120507,36 @@
     "projected": false
   },
   {
+    "pcode": "291664",
+    "name": "김태호",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 45,
+      "inside": 45,
+      "playmaking": 45,
+      "athletic": 45,
+      "defense": 45,
+      "rebounding": 45
+    },
+    "role": "All-Around",
+    "archetype": "올어라운드",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "unconfirmed"
+  },
+  {
     "pcode": "291667",
     "name": "문정현",
     "season": "2023-2024",
@@ -120240,15 +120630,15 @@
     "team": "수원 KT",
     "position": "FD",
     "OVR": 82,
-    "OFF": 83,
-    "DEF": 79,
+    "OFF": 84,
+    "DEF": 80,
     "attributes": {
-      "outside": 78,
-      "inside": 84,
-      "playmaking": 79,
-      "athletic": 77,
-      "defense": 76,
-      "rebounding": 80
+      "outside": 80,
+      "inside": 85,
+      "playmaking": 80,
+      "athletic": 78,
+      "defense": 77,
+      "rebounding": 81
     },
     "role": "Slasher",
     "archetype": "슬래셔",
@@ -120348,6 +120738,36 @@
       "defense": 0
     },
     "projected": false
+  },
+  {
+    "pcode": "291668",
+    "name": "신주영",
+    "season": "2026-2027",
+    "team": "대구 한국가스공사",
+    "position": "FD",
+    "OVR": 72,
+    "OFF": 72,
+    "DEF": 68,
+    "attributes": {
+      "outside": 80,
+      "inside": 80,
+      "playmaking": 79,
+      "athletic": 76,
+      "defense": 76,
+      "rebounding": 80
+    },
+    "role": "Hustle Big",
+    "archetype": "허슬 빅",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "military"
   },
   {
     "pcode": "291670",
@@ -120472,7 +120892,7 @@
     "team": "수원 KT",
     "position": "FD",
     "OVR": 90,
-    "OFF": 89,
+    "OFF": 90,
     "DEF": 93,
     "attributes": {
       "outside": 76,
@@ -120762,7 +121182,7 @@
     "team": "대구 한국가스공사",
     "position": "FD",
     "OVR": 85,
-    "OFF": 85,
+    "OFF": 84,
     "DEF": 86,
     "attributes": {
       "outside": 77,
@@ -120770,7 +121190,7 @@
       "playmaking": 76,
       "athletic": 82,
       "defense": 83,
-      "rebounding": 87
+      "rebounding": 88
     },
     "role": "Slasher",
     "archetype": "슬래셔",
@@ -121113,11 +121533,11 @@
     "OFF": 76,
     "DEF": 70,
     "attributes": {
-      "outside": 85,
-      "inside": 75,
-      "playmaking": 86,
+      "outside": 84,
+      "inside": 76,
+      "playmaking": 87,
       "athletic": 78,
-      "defense": 80,
+      "defense": 81,
       "rebounding": 74
     },
     "role": "Sharpshooter",
@@ -121346,7 +121766,7 @@
     "DEF": 89,
     "attributes": {
       "outside": 80,
-      "inside": 91,
+      "inside": 90,
       "playmaking": 83,
       "athletic": 86,
       "defense": 87,
@@ -121432,10 +121852,10 @@
     "OFF": 85,
     "DEF": 85,
     "attributes": {
-      "outside": 79,
+      "outside": 78,
       "inside": 80,
       "playmaking": 83,
-      "athletic": 82,
+      "athletic": 83,
       "defense": 81,
       "rebounding": 84
     },
@@ -121581,7 +122001,7 @@
       "inside": 73,
       "playmaking": 83,
       "athletic": 87,
-      "defense": 91,
+      "defense": 92,
       "rebounding": 78
     },
     "role": "Lockdown Defender",
@@ -122038,15 +122458,15 @@
     "team": "원주 DB",
     "position": "FD",
     "OVR": 82,
-    "OFF": 74,
-    "DEF": 87,
+    "OFF": 75,
+    "DEF": 88,
     "attributes": {
-      "outside": 73,
-      "inside": 77,
-      "playmaking": 82,
-      "athletic": 88,
-      "defense": 93,
-      "rebounding": 88
+      "outside": 74,
+      "inside": 78,
+      "playmaking": 83,
+      "athletic": 89,
+      "defense": 94,
+      "rebounding": 89
     },
     "role": "Rim Protector",
     "archetype": "림 프로텍터",
@@ -122380,6 +122800,36 @@
     "projected": true
   },
   {
+    "pcode": "291757",
+    "name": "박준형",
+    "season": "2026-2027",
+    "team": "울산 현대모비스",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "role": "Role Player",
+    "archetype": "롤 플레이어",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "unconfirmed"
+  },
+  {
     "pcode": "291758",
     "name": "강현수",
     "season": "2026-2027",
@@ -122465,6 +122915,36 @@
       "defense": 0
     },
     "projected": false
+  },
+  {
+    "pcode": "291759",
+    "name": "김태훈",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "GD",
+    "OVR": 72,
+    "OFF": 77,
+    "DEF": 67,
+    "attributes": {
+      "outside": 88,
+      "inside": 90,
+      "playmaking": 75,
+      "athletic": 75,
+      "defense": 83,
+      "rebounding": 78
+    },
+    "role": "Slasher",
+    "archetype": "슬래셔",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "military"
   },
   {
     "pcode": "291760",
@@ -122554,6 +123034,66 @@
     "projected": false
   },
   {
+    "pcode": "291761",
+    "name": "강재민",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "Unknown",
+    "OVR": 54,
+    "OFF": 59,
+    "DEF": 46,
+    "attributes": {
+      "outside": 83,
+      "inside": 88,
+      "playmaking": 73,
+      "athletic": 71,
+      "defense": 71,
+      "rebounding": 72
+    },
+    "role": "Slasher",
+    "archetype": "슬래셔",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "unconfirmed"
+  },
+  {
+    "pcode": "291762",
+    "name": "양준",
+    "season": "2026-2027",
+    "team": "서울 SK",
+    "position": "Unknown",
+    "OVR": 53,
+    "OFF": 53,
+    "DEF": 53,
+    "attributes": {
+      "outside": 53,
+      "inside": 53,
+      "playmaking": 53,
+      "athletic": 53,
+      "defense": 53,
+      "rebounding": 53
+    },
+    "role": "Role Player",
+    "archetype": "롤 플레이어",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "unconfirmed"
+  },
+  {
     "pcode": "291763",
     "name": "임동언",
     "season": "2024-2025",
@@ -122621,10 +123161,10 @@
     "OFF": 60,
     "DEF": 48,
     "attributes": {
-      "outside": 89,
+      "outside": 90,
       "inside": 88,
       "playmaking": 75,
-      "athletic": 73,
+      "athletic": 74,
       "defense": 77,
       "rebounding": 76
     },
@@ -122844,6 +123384,36 @@
     "projected": false
   },
   {
+    "pcode": "291766",
+    "name": "박성재",
+    "season": "2026-2027",
+    "team": "수원 KT",
+    "position": "GD",
+    "OVR": 72,
+    "OFF": 80,
+    "DEF": 63,
+    "attributes": {
+      "outside": 86,
+      "inside": 79,
+      "playmaking": 70,
+      "athletic": 72,
+      "defense": 72,
+      "rebounding": 71
+    },
+    "role": "Sharpshooter",
+    "archetype": "샤프슈터",
+    "role2": null,
+    "archetype2": null,
+    "badges": {
+      "finishing": 0,
+      "shooting": 0,
+      "playmaking": 0,
+      "defense": 0
+    },
+    "projected": true,
+    "offRoster": "military"
+  },
+  {
     "pcode": "291768",
     "name": "조혁재",
     "season": "2026-2027",
@@ -122936,7 +123506,7 @@
     "season": "2026-2027",
     "team": "전주 KCC",
     "position": "Unknown",
-    "OVR": 53,
+    "OVR": 54,
     "OFF": 52,
     "DEF": 54,
     "attributes": {
@@ -123082,15 +123652,15 @@
     "team": "창원 LG",
     "position": "GD",
     "OVR": 82,
-    "OFF": 84,
-    "DEF": 80,
+    "OFF": 85,
+    "DEF": 81,
     "attributes": {
-      "outside": 89,
-      "inside": 75,
-      "playmaking": 75,
-      "athletic": 77,
-      "defense": 84,
-      "rebounding": 76
+      "outside": 90,
+      "inside": 76,
+      "playmaking": 76,
+      "athletic": 78,
+      "defense": 85,
+      "rebounding": 77
     },
     "role": "3&D Wing",
     "archetype": "3&D 윙",
@@ -123373,14 +123943,14 @@
     "position": "FD",
     "OVR": 85,
     "OFF": 86,
-    "DEF": 81,
+    "DEF": 82,
     "attributes": {
-      "outside": 79,
+      "outside": 80,
       "inside": 85,
-      "playmaking": 83,
+      "playmaking": 84,
       "athletic": 81,
       "defense": 76,
-      "rebounding": 77
+      "rebounding": 78
     },
     "role": "Stretch Big",
     "archetype": "스트레치 빅",
@@ -123749,12 +124319,12 @@
     "team": "서울 삼성",
     "position": "C",
     "OVR": 83,
-    "OFF": 89,
+    "OFF": 88,
     "DEF": 81,
     "attributes": {
       "outside": 75,
       "inside": 88,
-      "playmaking": 81,
+      "playmaking": 82,
       "athletic": 75,
       "defense": 75,
       "rebounding": 83
@@ -124009,16 +124579,16 @@
     "season": "2026-2027",
     "team": "수원 KT",
     "position": "GD",
-    "OVR": 82,
+    "OVR": 83,
     "OFF": 79,
-    "DEF": 85,
+    "DEF": 86,
     "attributes": {
-      "outside": 75,
-      "inside": 75,
+      "outside": 76,
+      "inside": 76,
       "playmaking": 86,
-      "athletic": 81,
+      "athletic": 82,
       "defense": 85,
-      "rebounding": 71
+      "rebounding": 72
     },
     "role": "Combo Guard",
     "archetype": "콤보 가드",
@@ -124242,15 +124812,15 @@
     "team": "서울 SK",
     "position": "FD",
     "OVR": 82,
-    "OFF": 77,
-    "DEF": 84,
+    "OFF": 78,
+    "DEF": 85,
     "attributes": {
-      "outside": 76,
-      "inside": 77,
-      "playmaking": 74,
-      "athletic": 81,
-      "defense": 82,
-      "rebounding": 80
+      "outside": 77,
+      "inside": 78,
+      "playmaking": 75,
+      "athletic": 82,
+      "defense": 83,
+      "rebounding": 81
     },
     "role": "Hustle Big",
     "archetype": "허슬 빅",
@@ -124474,14 +125044,14 @@
     "team": "원주 DB",
     "position": "FD",
     "OVR": 79,
-    "OFF": 79,
+    "OFF": 80,
     "DEF": 78,
     "attributes": {
-      "outside": 87,
-      "inside": 84,
-      "playmaking": 80,
-      "athletic": 81,
-      "defense": 83,
+      "outside": 88,
+      "inside": 85,
+      "playmaking": 81,
+      "athletic": 82,
+      "defense": 84,
       "rebounding": 86
     },
     "role": "Sharpshooter",
@@ -124626,7 +125196,7 @@
       "inside": 81,
       "playmaking": 76,
       "athletic": 76,
-      "defense": 76,
+      "defense": 75,
       "rebounding": 78
     },
     "role": "Sharpshooter",
@@ -124938,15 +125508,15 @@
     "team": "전주 KCC",
     "position": "FD",
     "OVR": 82,
-    "OFF": 85,
+    "OFF": 86,
     "DEF": 75,
     "attributes": {
-      "outside": 87,
-      "inside": 84,
-      "playmaking": 75,
+      "outside": 88,
+      "inside": 85,
+      "playmaking": 76,
       "athletic": 73,
       "defense": 74,
-      "rebounding": 71
+      "rebounding": 72
     },
     "role": "Sharpshooter",
     "archetype": "샤프슈터",
@@ -125120,7 +125690,7 @@
       "playmaking": 88,
       "athletic": 79,
       "defense": 82,
-      "rebounding": 80
+      "rebounding": 81
     },
     "role": "Playmaker",
     "archetype": "플레이메이커",
@@ -125374,7 +125944,7 @@
     "position": "Unknown",
     "OVR": 54,
     "OFF": 53,
-    "DEF": 49,
+    "DEF": 48,
     "attributes": {
       "outside": 81,
       "inside": 69,
@@ -125633,16 +126203,16 @@
     "season": "2026-2027",
     "team": "고양 소노",
     "position": "Unknown",
-    "OVR": 91,
+    "OVR": 90,
     "OFF": 91,
     "DEF": 87,
     "attributes": {
-      "outside": 85,
+      "outside": 84,
       "inside": 88,
       "playmaking": 76,
       "athletic": 84,
       "defense": 86,
-      "rebounding": 90
+      "rebounding": 89
     },
     "role": "Stretch Big",
     "archetype": "스트레치 빅",
@@ -125667,9 +126237,9 @@
     "DEF": 76,
     "attributes": {
       "outside": 76,
-      "inside": 85,
+      "inside": 84,
       "playmaking": 76,
-      "athletic": 90,
+      "athletic": 89,
       "defense": 74,
       "rebounding": 70
     },
@@ -125699,8 +126269,8 @@
       "inside": 88,
       "playmaking": 70,
       "athletic": 78,
-      "defense": 82,
-      "rebounding": 90
+      "defense": 81,
+      "rebounding": 89
     },
     "role": "Paint Beast",
     "archetype": "페인트존 장인",
@@ -125778,14 +126348,14 @@
     "season": "2026-2027",
     "team": "울산 현대모비스",
     "position": "Unknown",
-    "OVR": 90,
-    "OFF": 90,
+    "OVR": 89,
+    "OFF": 89,
     "DEF": 88,
     "attributes": {
       "outside": 84,
       "inside": 82,
       "playmaking": 74,
-      "athletic": 93,
+      "athletic": 92,
       "defense": 86,
       "rebounding": 85
     },

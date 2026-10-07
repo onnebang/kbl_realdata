@@ -26,7 +26,8 @@ export default async function PlayerRankingsPage({
   const latestSeason = seasons[seasons.length - 1];
   
   // Filter by latest season and position
-  let players = history.filter(r => r.season === latestSeason);
+  // offRoster(군 복무/해외 진출 추정 행)는 올 시즌 안 뛰므로 랭킹에서 뺀다(프로필에서만 추정치로 보인다).
+  let players = history.filter(r => r.season === latestSeason && !r.offRoster);
   if (pos && pos !== "ALL") {
     players = players.filter(r => r.position === pos);
   }

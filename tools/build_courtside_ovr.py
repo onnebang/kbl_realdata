@@ -12,7 +12,8 @@ from play_styles import STYLE_LABEL, assign_play_styles, styles_json
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'raw', 'kbl_realdata.db')
 KBL540_PLAYERS_PATH = '../../kbl540/kbl540_players_public.json'
-OUT_PATH = '../data/courtside_ovr.json'
+# 결과 JSON 위치(+ 옆의 play_styles.json) - 시즌 초반 리플레이 검증(replay_ovr_season_start.py)이 바꿔 끼울 수 있게 모듈 상수로 둔다.
+HISTORY_OUT_PATH = os.path.join(os.path.dirname(__file__), '..', 'courtside-web', 'lib', 'courtside_ovr_history.json')
 
 # 나이를 모르는 선수(kbl540 카드 풀에 없는 최근 신인 등)에게 줄 중립 나이 - 전성기
 # 한복판이라 OvrCurveModel의 나이 보정 배율이 정확히 1.0(보너스도 페널티도 없음)이라서,
@@ -36,32 +37,37 @@ FULL_SEASON_SQL = (
 # 2026-10-06 개막 직후 선수당 1~2경기(총 40~70분)뿐인데 아래 가비지 패널티(총 200분 미만 -8)와 루키
 # 바닥값 블렌딩(총 400분 기준)이 "시즌 총 출전분" 절대값이라 주전 전원의 올 시즌 행이 53~58로 눌렸고,
 # 그 행이 3시즌 스무딩에서 ~33%를 먹어 전원 폭락했다(엘런슨·배스 포함). 그래서 진행 중 시즌 행은
-# (1) 기준 분을 시즌 진행률로 비례 축소해 신호만 뽑고 (2) 백분위 풀·모델 이력·출력에서 빼 과거 시즌
-# 값이 그대로 유지되게 하고 (3) 다음 시즌 예상치(project_forward = 개막 전 값)에 출전분 비례로
-# live_cap() 상한 안에서만 얹는다. 시즌이 끝나면(팀당 54경기/플레이오프) 자동으로 일반 행이 된다.
+# (1) 기준 분을 시즌 진행률로 비례 축소해 신호만 뽑고 (2) 백분위 풀·확정 행·출력에서 빼 과거 시즌 값이
+# 그대로 유지되게 하고 (3) 일반 행과 똑같이 계산한 "지금 시즌이 끝난다면 나올 값" 쪽으로 다음 시즌 예상치
+# (project_forward = 개막 전 값)를 live_reveal() 상한 안에서만 움직인다. 시즌이 끝나면(팀당 54경기/플레이오프)
+# 자동으로 일반 행이 된다.
 REGULAR_SEASON_GAMES = 54
-# 상한 점진 완화(사용자 결정 2026-10-07 "경기 수에 따라 상한을 서서히 푸는 쪽"): 허용 변동폭이 개막 직후
-# ±LIVE_CAP_START에서 시작해 시즌 진행률(팀당 경기/54)에 비례해 정규시즌 종료 시 ±LIVE_CAP_END까지
-# 풀린다(1라운드=9경기마다 약 ±0.83). 고정 상한이면 54경기가 끝나 일반 행으로 편입되는 순간 한꺼번에
-# 튄다. 신호 반영 비율도 일반 행의 올 시즌 가중치(OvrCurveModel.weights[0]=0.5)까지만 쓴다
-# (LIVE_SETTLED_WEIGHT) - 그 이상 반영하면 편입 시점에 과대 반영분이 되돌아오는 단차가 생긴다.
+# 상한 점진 완화(사용자 결정 2026-10-07 "경기 수에 따라 상한을 서서히 푸는 쪽"): 허용 변동폭이 개막 직후 ±LIVE_CAP_START에서
+# 시작해 시즌 진행률 p(팀당 경기/54)의 LIVE_CAP_POWER제곱으로 풀려 정규시즌 종료 시 사실상 해제(±LIVE_CAP_END)된다 - 1라운드
+# 끝 ±1.1, 2라운드 ±2.1, 3라운드 ±4.6, 4라운드 ±9.6, 5라운드 ±17.8. 시즌 초반에 촘촘하게 묶고 후반에 빨리 푸는 모양인 이유:
+# 고정 상한이면 54경기가 끝나 일반 행으로 편입되는 순간 한꺼번에 튀고(실측: 2025-26 리플레이에서 막판에도 일반 값과
+# 평균 4.8점 차), 선형으로 풀면 초반 변동이 너무 크다. 상한 안에서의 반영 비율은 live_reveal() 참고.
 LIVE_CAP_START = 1.0
-LIVE_CAP_END = 6.0
-LIVE_SETTLED_WEIGHT = 0.5
-LIVE_FULL_WEIGHT_MIN = 1000.0  # 이 출전분이면 올 시즌 성적 증거를 100% 인정(그래도 상한은 live_cap)
+LIVE_CAP_END = 30.0
+LIVE_CAP_POWER = 3
+LIVE_FULL_WEIGHT_MIN = 1000.0  # 이 출전분이면 올 시즌 성적 증거를 100% 인정
 
 
 def live_cap(progress):
-    """진행 중 시즌 신호가 예상치에 줄 수 있는 최대 변동폭 - 개막 LIVE_CAP_START에서 시즌 종료 LIVE_CAP_END까지 선형."""
+    """진행 중 시즌 값이 예상치에서 움직일 수 있는 최대 폭 - 개막 LIVE_CAP_START, 시즌 종료 LIVE_CAP_END, 사이는 p^LIVE_CAP_POWER."""
     p = min(1.0, max(0.0, progress))
-    return LIVE_CAP_START + (LIVE_CAP_END - LIVE_CAP_START) * p
+    return LIVE_CAP_START + (LIVE_CAP_END - LIVE_CAP_START) * p ** LIVE_CAP_POWER
 
 
-def live_nudge_value(live_val, last_val, total_min, progress):
-    """올 시즌 진행 중 경기 신호(live_val - 직전 확정 시즌 last_val)를 출전분·일반 행 가중치로 줄여 live_cap 안에 가둔 값."""
-    cap = live_cap(progress)
+def live_reveal(proj, live_val, total_min, progress):
+    """예상치 proj를 live_val(지금 시즌이 끝난다면 나올 값) 쪽으로 움직인 값. 이동 폭 = 반영 비율 x (live_val - proj)를
+    live_cap 안에 가둔 것이고, 반영 비율은 출전분이 적으면 낮다가(표본 노이즈 방지) 시즌이 끝나갈수록 출전분과 무관하게 1로
+    수렴한다(1 - (1-출전분비율) x (1-p^2)) - 그래야 편입 직전엔 live_val과 같아져 단차가 없다."""
+    p = min(1.0, max(0.0, progress))
     w = min(1.0, total_min / LIVE_FULL_WEIGHT_MIN)
-    return max(-cap, min(cap, LIVE_SETTLED_WEIGHT * w * (live_val - last_val)))
+    reveal = 1.0 - (1.0 - w) * (1.0 - p * p)
+    cap = live_cap(p)
+    return proj + max(-cap, min(cap, reveal * (live_val - proj)))
 
 # shot_log(raw/kbl_realdata.db)의 x,y로 미드레인지 슈팅을 뽑아내는 좌표 보정값 - shot_log의
 # 자체 zone 컬럼('1'/'2')은 골밑/3점 같은 슛 종류가 아니라 그냥 "어느 쪽 골대에서 쐈나"였다
@@ -1082,11 +1088,10 @@ def compute_ovr(target_season='2024-2025'):
     )
     global_df['age_for_model'] = global_df['age'].fillna(NEUTRAL_AGE)
 
-    # 진행 중 시즌 행은 여기서 분리 - 이후 모델 이력/출력/보간/스타일에는 안 들어가고, 아래 예상치 블록에서
-    # live_nudge()로 live_cap() 상한 안에서만 반영된다(raw_*_mapped / attr_*_mapped / total_min만 쓴다).
-    live_df = global_df[~in_pool].copy()
-    global_df = global_df[in_pool].copy()
-
+    # 진행 중 시즌 행도 일부러 여기서 안 뺀다 - 일반 행과 똑같이 모델·캡·수동 보정까지 태워야 "지금 시즌이 끝난다면 나올 값"
+    # (live_df의 OVR/OFF/DEF/ATTR_*)이 나오고, 아래 예상치 블록이 그 값 쪽으로 live_reveal() 상한 안에서만 움직인다. 그래야
+    # 시즌 종료 편입 시 단차가 안 생긴다(예전엔 raw 차이를 예상치에 얹기만 해서 막판에도 일반 값과 평균 4.8점 벌어졌다).
+    # 확정 시즌 행은 영향 없음 - 모델은 시즌 순서대로 앞 시즌만 보고, 백분위 풀·커리어 스타일 판정은 확정 행만 쓴다.
     model = OvrCurveModel()
     corrected_ovr = pd.Series(index=global_df.index, dtype=float)
     corrected_off = pd.Series(index=global_df.index, dtype=float)
@@ -1103,13 +1108,16 @@ def compute_ovr(target_season='2024-2025'):
         group = group.sort_values('season_name')
         idxs = group.index.tolist()
 
-        # Determine career play_style
-        career_tpm = group['tpm'].sum() / max(1, group['g'].sum())
-        career_pts = group['pts'].mean()
-        career_ast = group['ast'].mean()
-        career_reb = group['reb'].mean()
-        career_blk = group['blk'].mean()
-        
+        # Determine career play_style - 진행 중 시즌 행은 빼고 센다(포함하면 하락 가속도가 바뀌어 확정 시즌 값이 흔들린다).
+        career = group[in_pool.loc[group.index]]
+        if career.empty:
+            career = group
+        career_tpm = career['tpm'].sum() / max(1, career['g'].sum())
+        career_pts = career['pts'].mean()
+        career_ast = career['ast'].mean()
+        career_reb = career['reb'].mean()
+        career_blk = career['blk'].mean()
+
         play_style = "balanced"
         if career_tpm >= 2.0 or (career_tpm >= 1.5 and career_ast >= 4.0):
             play_style = "shooter"
@@ -1175,7 +1183,7 @@ def compute_ovr(target_season='2024-2025'):
         else:
             return val
             
-        minutes_bonus = min(2.0, row['total_min'] / 1000.0)
+        minutes_bonus = min(2.0, row['total_min'] / row['season_scale'] / 1000.0)  # 진행 중 시즌은 진행률로 환산
         final_cap = cap + minutes_bonus
         if val <= final_cap:
             return int(val)
@@ -1200,7 +1208,7 @@ def compute_ovr(target_season='2024-2025'):
         # 수비형/3점 스페셜리스트 역할군이 점유율 18% 이하일 경우 하드캡 적용
         # 오재현(17.4%) 같은 롤 플레이어를 현실적인 81점 만점으로 제한
         cap = 81.0
-        minutes_bonus = min(1.0, row['total_min'] / 1000.0)
+        minutes_bonus = min(1.0, row['total_min'] / row['season_scale'] / 1000.0)  # 진행 중 시즌은 진행률로 환산
         return int(min(val, cap + minutes_bonus))
 
 
@@ -1226,6 +1234,11 @@ def compute_ovr(target_season='2024-2025'):
     global_df['ATTR_ATHLETIC'] = (global_df['ATTR_ATHLETIC'] + diff).clip(40, 99)
     global_df['ATTR_DEFENSE'] = (global_df['ATTR_DEFENSE'] + diff).clip(40, 99)
     global_df['ATTR_REBOUNDING'] = (global_df['ATTR_REBOUNDING'] + diff).clip(40, 99)
+
+    # 진행 중 시즌 행 분리 - 여기까지 일반 행과 똑같이 계산됐으니 live_df의 OVR/OFF/DEF/ATTR_*는 "지금 시즌이 끝난다면
+    # 나올 값"이다. 이후 스타일/배지/출력/보간에는 안 들어가고, 예상치 블록에서 live_reveal() 상한 안에서만 반영된다.
+    live_df = global_df[~in_pool].copy()
+    global_df = global_df[in_pool].copy()
 
     # ── 3차: 배지 및 빌드(Archetype) 산출 ────────────────────────────────
     # 화면용 플레이 스타일(메인 + 서브) - 엔진 `role`(위에서 OFF/DEF 분할·롤 플레이어 캡에 쓴 11개)은 그대로 두고,
@@ -1380,11 +1393,12 @@ def compute_ovr(target_season='2024-2025'):
     next_season_roster.update(off_roster)  # 아래 행 생성이 팀/이름을 next_season_roster에서 읽는다
     to_project = (set(next_season_roster) | set(live_by_pcode)) - already_covered
 
-    def live_nudge(pcode, last, col):
+    def reveal_live(pcode, proj, live_col):
+        """예상치 proj를 이 선수의 진행 중 시즌 값(live_df의 live_col) 쪽으로 상한 안에서 움직인다 - 올 시즌 안 뛴 선수는 그대로."""
         lv = live_by_pcode.get(pcode)
         if lv is None:
-            return 0.0
-        return live_nudge_value(lv[col], last[col], lv['total_min'], live_progress)
+            return proj
+        return live_reveal(proj, lv[live_col], lv['total_min'], live_progress)
 
     # 커리어 기록이 전혀 없는 완전 신인용 최저치 - 실측 데이터에서 실제로 몇 경기 못 뛴
     # 선수들의 바닥권(하위 5명 53~58)을 참고해 잡았다. 처음엔 전원 55로 고정했는데(제보:
@@ -1397,18 +1411,22 @@ def compute_ovr(target_season='2024-2025'):
         if hist.empty:
             scouted = SCOUTED_ROOKIE_PROFILES.get(pcode)
             floor = rookie_floor_for(draft_ranks.get(pcode))
+            # 올 시즌 이미 뛴 신인/신규 영입은 바닥값·스카우팅 값에서 출발해 진행 중 시즌 값 쪽으로 같은 상한 안에서 움직인다
+            # (안 그러면 시즌 내내 바닥값에 머물다 종료 편입 때 한 번에 튄다).
+            rv = lambda proj, col: round(reveal_live(pcode, proj, col))
             out_data.append({
                 "pcode": pcode,
                 "name": next_season_roster.get(pcode, {}).get("name", "Unknown"),
                 "season": PROJECTION_SEASON,
                 "team": next_season_roster.get(pcode, {}).get("team", "Unknown"),
                 "position": positions.get(pcode, "Unknown"),
-                "OVR": scouted["OVR"] if scouted else floor,
-                "OFF": scouted["OFF"] if scouted else floor,
-                "DEF": scouted["DEF"] if scouted else floor,
-                "attributes": dict(scouted["attributes"]) if scouted else {
-                    "outside": floor, "inside": floor, "playmaking": floor,
-                    "athletic": floor, "defense": floor, "rebounding": floor
+                "OVR": rv(scouted["OVR"] if scouted else floor, 'OVR'),
+                "OFF": rv(scouted["OFF"] if scouted else floor, 'OFF'),
+                "DEF": rv(scouted["DEF"] if scouted else floor, 'DEF'),
+                "attributes": {
+                    key: rv((scouted["attributes"] if scouted else {}).get(key, floor), col)
+                    for key, col in (("outside", 'ATTR_OUTSIDE'), ("inside", 'ATTR_INSIDE'), ("playmaking", 'ATTR_PLAYMAKING'),
+                                     ("athletic", 'ATTR_ATHLETIC'), ("defense", 'ATTR_DEFENSE'), ("rebounding", 'ATTR_REBOUNDING'))
                 },
                 # 스카우팅 프로필은 role/role2를 손으로 정해뒀다(근거는 각 항목 주석). 기록도 스카우팅도 없는 신인은 롤 플레이어.
                 **(style_fields(scouted["role"], scouted.get("role2")) if scouted else style_fields("Role Player", None)),
@@ -1433,7 +1451,7 @@ def compute_ovr(target_season='2024-2025'):
                  "games": int(r['g'])}
                 for _, r in hist.iterrows()
             ]
-            return model.project_forward(seasons, extra_years=1) + live_nudge(pcode, last, mapped_col)
+            return model.project_forward(seasons, extra_years=1)
 
         # 마지막 확정 시즌 이후~예상 시즌 개막 전에 새로 쌓인 평판(예: 2026 아시안게임 발탁)만 얹는다.
         rep_delta = (reputation_boost(pcode, parse_start_year(PROJECTION_SEASON))
@@ -1478,7 +1496,7 @@ def compute_ovr(target_season='2024-2025'):
                 
                 minutes_bonus = min(2.0, last['total_min'] / 1000.0)
                 final_cap = cap + minutes_bonus
-                
+
                 if proj_ovr > final_cap:
                     excess = proj_ovr - final_cap
                     soft_capped_ovr = int(round(final_cap + excess * 0.3))
@@ -1511,6 +1529,18 @@ def compute_ovr(target_season='2024-2025'):
                 proj_defense -= diff
                 proj_rebounding -= diff
 
+        # 올 시즌 진행 중 경기가 있으면, 캡·수동 보정까지 거친 예상치를 "지금 시즌이 끝난다면 나올 값"(live_df - 같은 캡·수동 보정을
+        # 이미 거침) 쪽으로 live_cap() 상한 안에서 움직인다.
+        proj_ovr = round(reveal_live(pcode, proj_ovr, 'OVR'))
+        proj_off = round(reveal_live(pcode, proj_off, 'OFF'))
+        proj_def = round(reveal_live(pcode, proj_def, 'DEF'))
+        proj_outside = round(reveal_live(pcode, proj_outside, 'ATTR_OUTSIDE'))
+        proj_inside = round(reveal_live(pcode, proj_inside, 'ATTR_INSIDE'))
+        proj_playmaking = round(reveal_live(pcode, proj_playmaking, 'ATTR_PLAYMAKING'))
+        proj_athletic = round(reveal_live(pcode, proj_athletic, 'ATTR_ATHLETIC'))
+        proj_defense = round(reveal_live(pcode, proj_defense, 'ATTR_DEFENSE'))
+        proj_rebounding = round(reveal_live(pcode, proj_rebounding, 'ATTR_REBOUNDING'))
+
         out_data.append({
             "pcode": pcode,
             "name": last['name'],
@@ -1540,7 +1570,7 @@ def compute_ovr(target_season='2024-2025'):
     # 여기서 최종적으로 한 번 더 정렬해 그 가정을 보장한다.
     out_data.sort(key=lambda r: (r['pcode'], r['season']))
 
-    OUT_PATH = os.path.join(os.path.dirname(__file__), '..', 'courtside-web', 'lib', 'courtside_ovr_history.json')
+    OUT_PATH = HISTORY_OUT_PATH
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     with open(OUT_PATH, 'w', encoding='utf-8') as f:
         json.dump(out_data, f, ensure_ascii=False, indent=2)
