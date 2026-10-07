@@ -115,7 +115,6 @@ export default function LegendsClient({ leaders }: Props) {
         {shownData.length === 0 ? (
           <p style={{ color: "#8b949e" }}>현역 선수 중 이 부문에 기록이 있는 선수가 없습니다.</p>
         ) : (
-        ) : (
           shownData.map((player, index) => (
           <Link
             key={`${splitType}-${activeTab}-${player.pcode}`}
