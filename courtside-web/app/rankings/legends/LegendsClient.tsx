@@ -47,8 +47,7 @@ export default function LegendsClient({ leaders }: Props) {
 
   const currentCategory = currentSplitData[activeTab];
   const allData = currentCategory?.data ?? [];
-  // 요청(2026-10-06, nba.com "Only Active Players" 참고) - 현역만 볼 때도 원래 통산 순위
-  // 번호(player.rank)는 그대로 둔다. 1,2,3으로 다시 매기면 "역대 몇 위인지"가 사라진다.
+  // 요청(2026-10-07) - 현역만 볼 때는 1위부터 새로 매긴다.
   const shownData = activeOnly ? allData.filter((p) => p.is_active) : allData;
   // "얼마나 차이가 나는지"(사용자 요청) - 역대 1위(allData[0], 필터와 무관하게 전체 1위) 대비
   // 지금 가장 앞서 있는 현역 선수의 격차. 카테고리가 전부 누적 합계(득점/리바운드 등)라 단순
@@ -116,14 +115,15 @@ export default function LegendsClient({ leaders }: Props) {
         {shownData.length === 0 ? (
           <p style={{ color: "#8b949e" }}>현역 선수 중 이 부문에 기록이 있는 선수가 없습니다.</p>
         ) : (
-          shownData.map((player) => (
+        ) : (
+          shownData.map((player, index) => (
           <Link
             key={`${splitType}-${activeTab}-${player.pcode}`}
             href={`/players/${player.pcode}`}
             style={{ textDecoration: "none", color: "inherit" }}
           >
             <div className={styles.card}>
-              <div className={styles.rank}>{player.rank}</div>
+              <div className={styles.rank}>{activeOnly ? index + 1 : player.rank}</div>
 
               <div style={{ position: "relative", width: 60, height: 60, borderRadius: "50%", overflow: "hidden", marginRight: 16, backgroundColor: "#30363d" }}>
                 <Image

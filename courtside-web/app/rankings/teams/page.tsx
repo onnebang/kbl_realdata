@@ -58,7 +58,6 @@ export default async function TeamStandingsPage({
   }
   const requested = (season ?? "").trim();
   const activeSeason = seasons.includes(requested) ? requested : seasons[0];
-  const fellBack = requested && requested !== activeSeason ? requested : null;
 
   const [dbRows, teams, teamStats, quarterSplits] = await Promise.all([
     getStandingsAsOfCached(activeSeason, "9999-12-31"),

@@ -37,11 +37,31 @@ FULL_SEASON_SQL = (
 # 바닥값 블렌딩(총 400분 기준)이 "시즌 총 출전분" 절대값이라 주전 전원의 올 시즌 행이 53~58로 눌렸고,
 # 그 행이 3시즌 스무딩에서 ~33%를 먹어 전원 폭락했다(엘런슨·배스 포함). 그래서 진행 중 시즌 행은
 # (1) 기준 분을 시즌 진행률로 비례 축소해 신호만 뽑고 (2) 백분위 풀·모델 이력·출력에서 빼 과거 시즌
-# 값이 그대로 유지되게 하고 (3) 다음 시즌 예상치(project_forward = 개막 전 값)에 출전분 비례로 최대
-# ±MAX_LIVE_DRIFT만 얹는다. 시즌이 끝나면(팀당 54경기/플레이오프) 자동으로 일반 행이 된다.
+# 값이 그대로 유지되게 하고 (3) 다음 시즌 예상치(project_forward = 개막 전 값)에 출전분 비례로
+# live_cap() 상한 안에서만 얹는다. 시즌이 끝나면(팀당 54경기/플레이오프) 자동으로 일반 행이 된다.
 REGULAR_SEASON_GAMES = 54
-MAX_LIVE_DRIFT = 1.0
-LIVE_FULL_WEIGHT_MIN = 1000.0  # 이 출전분이면 올 시즌 성적 증거를 100% 인정(그래도 상한은 MAX_LIVE_DRIFT)
+# 상한 점진 완화(사용자 결정 2026-10-07 "경기 수에 따라 상한을 서서히 푸는 쪽"): 허용 변동폭이 개막 직후
+# ±LIVE_CAP_START에서 시작해 시즌 진행률(팀당 경기/54)에 비례해 정규시즌 종료 시 ±LIVE_CAP_END까지
+# 풀린다(1라운드=9경기마다 약 ±0.83). 고정 상한이면 54경기가 끝나 일반 행으로 편입되는 순간 한꺼번에
+# 튄다. 신호 반영 비율도 일반 행의 올 시즌 가중치(OvrCurveModel.weights[0]=0.5)까지만 쓴다
+# (LIVE_SETTLED_WEIGHT) - 그 이상 반영하면 편입 시점에 과대 반영분이 되돌아오는 단차가 생긴다.
+LIVE_CAP_START = 1.0
+LIVE_CAP_END = 6.0
+LIVE_SETTLED_WEIGHT = 0.5
+LIVE_FULL_WEIGHT_MIN = 1000.0  # 이 출전분이면 올 시즌 성적 증거를 100% 인정(그래도 상한은 live_cap)
+
+
+def live_cap(progress):
+    """진행 중 시즌 신호가 예상치에 줄 수 있는 최대 변동폭 - 개막 LIVE_CAP_START에서 시즌 종료 LIVE_CAP_END까지 선형."""
+    p = min(1.0, max(0.0, progress))
+    return LIVE_CAP_START + (LIVE_CAP_END - LIVE_CAP_START) * p
+
+
+def live_nudge_value(live_val, last_val, total_min, progress):
+    """올 시즌 진행 중 경기 신호(live_val - 직전 확정 시즌 last_val)를 출전분·일반 행 가중치로 줄여 live_cap 안에 가둔 값."""
+    cap = live_cap(progress)
+    w = min(1.0, total_min / LIVE_FULL_WEIGHT_MIN)
+    return max(-cap, min(cap, LIVE_SETTLED_WEIGHT * w * (live_val - last_val)))
 
 # shot_log(raw/kbl_realdata.db)의 x,y로 미드레인지 슈팅을 뽑아내는 좌표 보정값 - shot_log의
 # 자체 zone 컬럼('1'/'2')은 골밑/3점 같은 슛 종류가 아니라 그냥 "어느 쪽 골대에서 쐈나"였다
@@ -452,6 +472,49 @@ def load_next_season_roster(season):
         return {}
 
 
+# 로스터(season_roster)에는 없지만 예상 OVR은 계속 보여주기로 한 선수 - 사용자 결정 2026-10-07("로스터 없는
+# 대부분이 군 입대일텐데 이 사람들은 추정치로 오버롤"). 2026-09-25 로스터 정리(KBL 등록상태 C '군복무·육성
+# 추정, 미확인' 일괄 삭제 + 해외 진출 2명 삭제) 때 season_roster에서 지워졌고, 예상치 대상을 season_roster
+# 에서만 뽑던 탓에 그 뒤 재생성부터 이들의 2026-27 행 19개가 소리 없이 사라졌다(09-27 JSON엔 있었음).
+# roster_departure에 사유(군 복무·해외 진출)가 기록된 12명은 DB에서 읽고(load_departed_projection_targets),
+# 사유 기록이 없는 7명(로스터 정리 때 같이 빠진 '군복무 추정' 선수)은 아래 표로 유지한다 - 확인되면
+# roster_departure로 옮기면 이 표에서 지워도 된다. 시즌 키라서 다음 시즌엔 자동으로 안 쓰인다.
+# 이 행들은 JSON에 offRoster 표식이 붙어, 팀 전력/OVR 랭킹처럼 "지금 로스터"를 세는 곳에서 걸러진다.
+OFF_ROSTER_ESTIMATE_TARGETS = {
+    '2026-2027': {
+        '291587': {'name': '박선웅', 'team': '수원 KT'},
+        '291604': {'name': '백지웅', 'team': '고양 소노'},
+        '291659': {'name': '민기남', 'team': '고양 소노'},
+        '291664': {'name': '김태호', 'team': '대구 한국가스공사'},
+        '291761': {'name': '강재민', 'team': '서울 SK'},
+        '291757': {'name': '박준형', 'team': '울산 현대모비스'},
+        '291762': {'name': '양준', 'team': '서울 SK'},
+    },
+}
+
+
+def load_departed_projection_targets(season):
+    """roster_departure(사용자 확인 이탈)에서 군 복무/해외 진출 선수 -> {pcode: {team, name, reason}}.
+    은퇴(retired)·FA 미계약(unsigned)은 뺀다 - 돌아올 가능성이 확인된 이탈만 예상치를 이어간다.
+    DB 접속이 안 되면 빈 dict(예상 OVR은 부가 기능 - load_next_season_roster와 같은 원칙)."""
+    try:
+        import psycopg2
+        from import_roster import load_database_url
+        conn = psycopg2.connect(load_database_url())
+        cur = conn.cursor()
+        cur.execute(
+            "select d.pcode, t.name, d.player_name, d.reason from roster_departure d join teams t using (tcode)"
+            " where d.season_name = %s and d.reason in ('military', 'overseas') and d.pcode is not null",
+            (season,),
+        )
+        result = {pcode: {"team": team, "name": name, "reason": reason} for pcode, team, name, reason in cur.fetchall()}
+        conn.close()
+        return result
+    except Exception as e:
+        print(f"경고: roster_departure 조회 실패({e}) - 군 복무/해외 선수 예상 OVR을 건너뜀")
+        return {}
+
+
 def load_awards():
     path = os.path.join(os.path.dirname(__file__), '..', 'courtside-web', 'lib', 'courtside_awards.json')
     if not os.path.exists(path):
@@ -596,7 +659,7 @@ def compute_ovr(target_season='2024-2025'):
         live_season = latest_season
         live_progress = max(latest_team_games, 1) / REGULAR_SEASON_GAMES
         print(f"진행 중 시즌: {live_season} (팀당 최대 {int(latest_team_games)}경기, 진행률 {live_progress:.1%})"
-              f" - 예상치에 ±{MAX_LIVE_DRIFT} 상한으로만 반영")
+              f" - 예상치에 ±{live_cap(live_progress):.2f} 상한으로만 반영")
     global_df['season_scale'] = np.where(global_df['season_name'] == live_season, live_progress, 1.0)
 
     # TS% Calculation
@@ -1020,7 +1083,7 @@ def compute_ovr(target_season='2024-2025'):
     global_df['age_for_model'] = global_df['age'].fillna(NEUTRAL_AGE)
 
     # 진행 중 시즌 행은 여기서 분리 - 이후 모델 이력/출력/보간/스타일에는 안 들어가고, 아래 예상치 블록에서
-    # live_nudge()로 ±MAX_LIVE_DRIFT만 반영된다(raw_*_mapped / attr_*_mapped / total_min만 쓴다).
+    # live_nudge()로 live_cap() 상한 안에서만 반영된다(raw_*_mapped / attr_*_mapped / total_min만 쓴다).
     live_df = global_df[~in_pool].copy()
     global_df = global_df[in_pool].copy()
 
@@ -1309,15 +1372,19 @@ def compute_ovr(target_season='2024-2025'):
     # 진행 중 시즌이 예상 시즌이면 그 시즌에 뛴 선수도 전부 예상치 행으로 만든다(로스터에 없어도 행이 안 사라지게).
     live_by_pcode = ({r['pcode']: r for _, r in live_df.iterrows()}
                      if live_season == PROJECTION_SEASON else {})
+    # 로스터 밖이지만 추정치를 이어갈 선수(군 복무·해외 진출 등 - OFF_ROSTER_ESTIMATE_TARGETS 주석 참고).
+    # 로스터에 있거나 올 시즌 이미 뛴 선수는 정상 경로가 이기므로 표식을 안 단다.
+    off_roster = {**{p: {**v, "reason": "unconfirmed"} for p, v in OFF_ROSTER_ESTIMATE_TARGETS.get(PROJECTION_SEASON, {}).items()},
+                  **load_departed_projection_targets(PROJECTION_SEASON)}
+    off_roster = {p: v for p, v in off_roster.items() if p not in next_season_roster and p not in live_by_pcode}
+    next_season_roster.update(off_roster)  # 아래 행 생성이 팀/이름을 next_season_roster에서 읽는다
     to_project = (set(next_season_roster) | set(live_by_pcode)) - already_covered
 
     def live_nudge(pcode, last, col):
-        """올 시즌 진행 중 경기에서 나온 신호 - 직전 확정 시즌 대비 차이를 출전분 비례로 줄여서 ±MAX_LIVE_DRIFT 안에서만."""
         lv = live_by_pcode.get(pcode)
         if lv is None:
             return 0.0
-        w = min(1.0, lv['total_min'] / LIVE_FULL_WEIGHT_MIN)
-        return max(-MAX_LIVE_DRIFT, min(MAX_LIVE_DRIFT, w * (lv[col] - last[col])))
+        return live_nudge_value(lv[col], last[col], lv['total_min'], live_progress)
 
     # 커리어 기록이 전혀 없는 완전 신인용 최저치 - 실측 데이터에서 실제로 몇 경기 못 뛴
     # 선수들의 바닥권(하위 5명 53~58)을 참고해 잡았다. 처음엔 전원 55로 고정했는데(제보:
@@ -1347,6 +1414,7 @@ def compute_ovr(target_season='2024-2025'):
                 **(style_fields(scouted["role"], scouted.get("role2")) if scouted else style_fields("Role Player", None)),
                 "badges": {"finishing": 0, "shooting": 0, "playmaking": 0, "defense": 0},
                 "projected": True,
+                **({"offRoster": off_roster[pcode]["reason"]} if pcode in off_roster else {}),
             })
             continue
         last = hist.iloc[-1]
@@ -1463,6 +1531,7 @@ def compute_ovr(target_season='2024-2025'):
             **style_fields(last['style_main'], last['style_sub']),  # 마지막 실제 시즌의 스타일을 그대로 잇는다
             "badges": last['badges'],
             "projected": True,
+            **({"offRoster": off_roster[pcode]["reason"]} if pcode in off_roster else {}),
         })
 
     # 공백 시즌 보간/다음 시즌 예상 행이 뒤에 통째로 덧붙는 구조라, 그대로 두면 한 선수의
