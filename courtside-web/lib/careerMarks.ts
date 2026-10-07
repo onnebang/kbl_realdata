@@ -138,6 +138,9 @@ export function buildMilestoneContext(args: {
     { all: ReturnType<typeof board>; active: ReturnType<typeof board> }
   >;
 
+  // ponytail: 아래 순위 목표는 (경기 선수 × 부문 × 범위)마다 board 전체를 훑고 후보마다 rankOf로 또 훑는다 - 역대 선수 수 N에 거의 N².
+  // 실측(2026-10-07, N=1,049·선수 34명): 요청당 중앙 14ms, N 2배 ≈ 3배, 4배 ≈ 10배. N은 리그 역사(연 +50명 안팎)라 지금은 둔다.
+  // 느려지면 board가 값 오름차순이니 이분 탐색으로 시작 위치와 순위를 구한다.
   const out: Record<string, MilestonePlayer> = {};
   for (const p of players) {
     const a = adj.get(p.pcode)!;
@@ -186,13 +189,16 @@ export function buildMilestoneContext(args: {
 /** 스냅샷 보정에 필요한 경기들(스냅샷 최근 구간 + 이 경기 날짜 이후) - 10분 캐시(이 경기 이전 날짜 경기만 쓰므로 당일엔 안 바뀐다). */
 const fetchDeltaGames = cachedFn(
   async (from: string): Promise<DeltaGame[]> => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("games")
       .select("gmkey, game_date, season_category, game_player_stats(pcode, pts, reb, ast, stl, blk, tpm)")
       .eq("is_ended", true)
       .in("season_category", ["정규시즌", "플레이오프", "챔피언결정전"])
       .gte("game_date", from)
       .order("game_date", { ascending: true });
+    // 실패를 []로 삼키면 unstable_cache가 그 "보정할 경기 없음"을 10분간 굳혀 합계가 틀린 채 알림이 나간다(DB가 에러를 내는 건 대개
+    // 트래픽이 몰릴 때다). 던지면 캐시에 안 들어가고, 호출부 soft()가 패널만 비운다.
+    if (error) throw new Error(`careerMarksDelta: ${error.message}`);
     return (data ?? []).map((g) => ({
       gmkey: g.gmkey as string,
       game_date: g.game_date as string,
@@ -212,7 +218,16 @@ const fetchDeltaGames = cachedFn(
 );
 
 /** 팀 로스터는 하루 단위로 안 바뀐다 - 경기 페이지를 열 때마다 두 번씩 치지 않게 1시간 캐시. */
-const cachedRoster = cachedFn(async (tcode: string, season: string) => getTeamRoster(tcode, season), { name: "milestoneRoster", ttl: TTL.batchDaily });
+const cachedRoster = cachedFn(
+  async (tcode: string, season: string) => {
+    const roster = await getTeamRoster(tcode, season);
+    // getTeamRoster는 조회 실패를 []로 삼킨다 - 그대로 1시간 캐시하면 그동안 이 팀 선수가 통째로 빠진다. 빈 로스터는 캐시에 안 넣는다
+    // (호출부 .catch가 박스 선수만으로 이어 간다).
+    if (!roster.length) throw new Error(`milestoneRoster: empty ${tcode}/${season}`);
+    return roster;
+  },
+  { name: "milestoneRoster", ttl: TTL.batchDaily }
+);
 
 /**
  * 경기 페이지용 - 이 경기에 뛸 선수들의 "달성 가능 기록" 재료. 전시경기(OPEN MATCH DAY)는 통산에 안 들어가므로 null,
