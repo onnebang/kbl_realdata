@@ -16,6 +16,7 @@
 """
 import json
 import os
+import sys
 
 import joblib
 import numpy as np
@@ -29,6 +30,14 @@ BEST_PARAMS_PATH = os.path.join(BASE, "..", "raw", "analysis", "tuned_model_resu
 CURRENT_SEASON_CODE = 49  # 2026-2027 - 새 Q2/Q3 용병 2인 규정 첫 시즌
 SAMPLE_THRESHOLD = 150  # 사용자 지정(2026-10-06) - 이 시즌 학습테이블 표본이 이 행 수를 넘으면 포함
 
+# 승격 게이트(2026-10-07): 새 모델이 현재 배포 모델과 최근 경기 예측이 이만큼 이상 달라지면 덮어쓰지 않는다. 매주 데이터가
+# 몇 행~몇십 행 늘 뿐이라 정상 재학습은 거의 안 달라진다 - 실측(drop 10~80행): 평균 |Δp| 0.009~0.022, 상위 5% 0.024~0.067.
+# 학습 테이블이 깨지면(라벨 섞임 재현) 평균 0.110, 상위 5% 0.239. 임계는 정상 최대의 2배 남짓, 깨진 값 아래로 잡았다.
+# 의도적으로 피처/하이퍼파라미터를 바꾼 재학습은 --force로 건너뛴다.
+DRIFT_MEAN_MAX = 0.05
+DRIFT_P95_MAX = 0.15
+DRIFT_REF_ROWS = 400
+
 
 def build_xy(rows):
     X, y = [], []
@@ -38,6 +47,18 @@ def build_xy(rows):
         X.append([np.nan if v is None else v for v in feats])
         y.append(r["homeWon"])
     return np.array(X, dtype=float), np.array(y, dtype=int)
+
+
+def drift_vs_deployed(new_model, rows):
+    """현재 배포 모델과 새 모델의 최근 경기 예측 확률 차이(평균, 상위 5%). 배포 모델이 없거나 피처 구성이 다르면 None."""
+    if not os.path.exists(MODEL_OUT):
+        return None
+    deployed = joblib.load(MODEL_OUT)
+    if deployed.get("featureKeys") != FEATURE_KEYS or deployed.get("gameLevelKeys") != GAME_LEVEL_KEYS:
+        return None
+    X, _ = build_xy(rows[-DRIFT_REF_ROWS:])
+    d = np.abs(new_model.predict_proba(X)[:, 1] - deployed["model"].predict_proba(X)[:, 1])
+    return float(d.mean()), float(np.percentile(d, 95))
 
 
 def main():
@@ -61,6 +82,17 @@ def main():
 
     model = RandomForestClassifier(random_state=0, **params)
     model.fit(X, y)
+
+    drift = drift_vs_deployed(model, rows)
+    if drift is None:
+        print("승격 게이트: 비교할 배포 모델이 없거나 피처 구성이 달라 건너뜀", flush=True)
+    else:
+        print(f"승격 게이트: 배포 모델 대비 최근 {DRIFT_REF_ROWS}경기 예측 차이 평균 {drift[0]:.4f} / 상위5% {drift[1]:.4f} "
+              f"(기준 {DRIFT_MEAN_MAX} / {DRIFT_P95_MAX})", flush=True)
+        if (drift[0] > DRIFT_MEAN_MAX or drift[1] > DRIFT_P95_MAX) and "--force" not in sys.argv:
+            print("[GATE] 새 모델이 배포 모델과 너무 다름 - 학습 테이블/피처 이상 의심, 덮어쓰지 않고 중단 "
+                  "(의도한 변경이면 --force)", flush=True)
+            sys.exit(1)
 
     os.makedirs(os.path.dirname(MODEL_OUT), exist_ok=True)
     joblib.dump({"model": model, "featureKeys": FEATURE_KEYS, "gameLevelKeys": GAME_LEVEL_KEYS}, MODEL_OUT)

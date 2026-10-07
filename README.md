@@ -243,7 +243,7 @@ python live_collector.py --max-runtime 21600 --stall-timeout 5400
 | `KBL_LiveCollector` | 매일 13:00부터 12시간, 10분마다 | 그날 예정/진행중 경기를 실시간 추적·정산까지 자동 처리 |
 | `KBL_DailyBatch` | 매일 06:00 | 전날 놓친/실패한 경기를 정본으로 재수집·재계산(라이브가 못 돌았을 때의 복구 경로) |
 | `KBL_LineupRecalc` | 매일 13:00부터 8분마다 | 라인업 승률 재계산(`recalc_lineup_winprob.py --today`) |
-| `KBL_WeeklyTrain` | 매주 월요일 06:20 (2026-10-06 등록) | `weekly_retrain.py` - SQLite 재적재 → OVR 재계산 → 학습테이블 재생성 → 경기전 승률모델 재학습 → (변경 파일이 예상과 일치할 때만) git commit+push. 로그: `raw/weekly_retrain.log` |
+| `KBL_WeeklyTrain` | 매주 월요일 06:20 (2026-10-06 등록) | `weekly_retrain.py` - SQLite 재적재 → 신선도 확인 → OVR 재계산 → OVR 가드 → 학습테이블 재생성 → 경기전 승률모델 재학습(승격 게이트) → 깨끗한 임시 worktree에서 git commit+push. 로그: `raw/weekly_retrain.log` |
 
 ```powershell
 Get-ScheduledTaskInfo -TaskName "KBL_LiveCollector"   # 다음/마지막 실행, 결과코드
@@ -258,6 +258,22 @@ Disable-ScheduledTask  -TaskName "KBL_LiveCollector"  # 끄기
 Q2/Q3 용병 2인 규정 첫 시즌) 학습테이블 표본이 `SAMPLE_THRESHOLD`(150행, 사용자 지정 2026-10-06)
 미달이면 그 시즌 경기를 재학습에서 빼고, 넘으면 자동으로 포함한다 - 기준을 넘는 주부터 사람 개입
 없이 전환됨(로그에 포함/제외 여부가 매주 찍힘).
+
+**`KBL_WeeklyTrain` 안전장치** (2026-10-07, 개막 직후 전원 OVR 폭락 사고 대응 - 에러 없이 끝난 틀린 결과가 검증 없이
+나간 것) - 걸리면 커밋·푸시 없이 중단하고 로그에 `[GUARD-FAIL]`/`[FAIL]`/`[ABORT]`가 남으며 작업 결과코드가 1이다
+(`Get-ScheduledTaskInfo -TaskName KBL_WeeklyTrain`의 LastTaskResult):
+
+- 시작 시 산출물 4개에 미커밋 변경이 있으면 중단(사람 작업 위에 덮어쓰지 않음).
+- 로컬 SQLite 종료 경기 수가 Supabase보다 적으면 중단(수집 누락 - 낡은 데이터로 발행 안 함).
+- `ovr_guard.py`가 HEAD 대비 이상을 잡으면 OVR 산출물을 되돌리고 중단: 확정 시즌 행 값 변경, 행 소실, 올 시즌 행의
+  과도한 이동/한쪽 쏠림. 시즌 확정 전환(정규시즌 종료 후 예상치 행이 실측으로 바뀜, 1년에 한 번)은 값을 직접 확인하고
+  `OVR_GUARD_ALLOW_SETTLE=1`로 다시 돌려야 통과한다. 단독 실행: `python ovr_guard.py` (HEAD vs 작업트리), `--selftest`.
+- `save_pregame_model.py`가 새 모델의 최근 경기 예측이 배포 모델과 크게 다르면(평균 0.05 / 상위5% 0.15) 덮어쓰지
+  않고 중단. 피처/하이퍼파라미터를 일부러 바꾼 재학습은 `--force`.
+- 첫 실행 전/설정 변경 후 점검: `python weekly_retrain.py --dry-run` (전 단계+가드까지 돌리고 커밋·푸시 없이 산출물을
+  HEAD로 되돌림. 산출물에 미커밋 변경이 없어야 시작됨).
+- 시즌 초반 상태 재현 검증: `python replay_ovr_season_start.py --season 2025-2026` - 과거 시즌을 N경기까지만 잘라
+  OVR 생성기를 돌려 진행 중 시즌 처리(백분위 풀 격리 + 진행률별 변동 상한)를 확인한다. OVR 생성 로직을 고친 뒤 돌릴 것.
 
 **감시**: Supabase pg_cron(`watch_live_collector`, 1분마다)이 수집기 심박(`live_collector_status`)을
 보고 있다가 멈추면 Discord로 알림(🔴 응답 없음 / 🟠 문자중계 멈춤 / 🟢 해제). 지금 걸린 문제 보기:
