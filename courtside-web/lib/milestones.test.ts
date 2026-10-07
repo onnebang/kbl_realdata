@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMilestoneTimeline, evaluateApproaching, gameStatsFromBox, type GameStats, type MilestoneContext, type TimelineEvent } from "./milestones";
+import { basisNote, buildMilestoneTimeline, buildRecordChances, evaluateApproaching, gameStatsFromBox, significance, type GameStats, type MilestoneContext, type MilestoneTarget, type TimelineEvent } from "./milestones";
 
 const zeros: GameStats = { pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, threep: 0 };
 
@@ -125,5 +125,70 @@ describe("gameStatsFromBox", () => {
   it("박스 한 줄을 부문별 값으로(3점슛 = threePM), 없으면 0", () => {
     expect(gameStatsFromBox({ pts: 22, reb: 8, ast: 5, stl: 2, blk: 1, threePM: 3 })).toEqual({ pts: 22, reb: 8, ast: 5, stl: 2, blk: 1, threep: 3 });
     expect(gameStatsFromBox(undefined)).toEqual(zeros);
+  });
+});
+
+describe("buildRecordChances (경기 전 기록 도전)", () => {
+  const rankT = (at: number, rank: number, extra: Partial<Extract<MilestoneTarget, { kind: "rank" }>> = {}): MilestoneTarget => ({
+    kind: "rank", cat: "pts", scope: "all", at, rank, rival: { pcode: `R${rank}`, name: `선수${rank}`, value: at - 1 }, ...extra,
+  });
+  // 김선형: 경기당 14점(8403/600) -> 현실 도달선 24점. 순위 목표는 9점(10위)과 27점(9위), 하이는 22점(경신은 23점).
+  const star = { name: "김선형", tcode: "T1", gp: 600, before: { ...zeros, pts: 8403 }, targets: [rankT(8412, 10, { rival: { pcode: "R", name: "자밀 워니", value: 8411 } }), rankT(8430, 9), { kind: "step", cat: "pts", at: 8500 } as MilestoneTarget, { kind: "high", cat: "pts", high: 22 } as MilestoneTarget] };
+  const ctx = (players: MilestoneContext["players"]): MilestoneContext => ({ split: "regular", asOf: "2026-10-06", players });
+
+  it("한 경기에 닿는 목표만 - 현실 도달선(경기당 평균 x 1.7, 부문별 [floor, cap]) 밖은 뺀다", () => {
+    const got = buildRecordChances(ctx({ A: star }));
+    // 9점(순위 10위) / 23점(하이 경신)만. 27점(9위)·97점(8,500)은 24점 도달선 밖.
+    expect(got.map((c) => `${c.kind}:${c.need}`).sort()).toEqual(["high:23", "rank:9"]);
+  });
+
+  it("알릴 만한 순 - 100개 단위 통산 > 커리어 하이 > 순위(작은 숫자가 앞)", () => {
+    const b = { name: "강상재", tcode: "T1", gp: 500, before: { ...zeros, reb: 5190 }, targets: [{ kind: "step", cat: "reb", at: 5200 } as MilestoneTarget] }; // 경기당 10.4 -> 도달선 14, 필요 10
+    const got = buildRecordChances(ctx({ A: star, B: b }), { perPlayer: 2 });
+    expect(got.map((c) => c.kind)).toEqual(["step", "high", "rank"]);
+    expect(significance({ kind: "step", cat: "pts", at: 100 })).toBeLessThan(significance({ kind: "high", cat: "pts", high: 20 }));
+  });
+
+  it("같은 (부문·종류·범위)에선 닿는 가장 큰 순위 하나만 - 아래 계단은 그 과정에서 함께 넘는다", () => {
+    const ladder = { name: "엑스", tcode: "T1", gp: 600, before: { ...zeros, pts: 8403 }, targets: [rankT(8412, 31), rankT(8416, 30), rankT(8421, 29)] };
+    const got = buildRecordChances(ctx({ X: ladder }));
+    expect(got).toHaveLength(1);
+    expect(got[0]).toMatchObject({ need: 18, text: expect.stringContaining("올타임 득점 29위") });
+  });
+
+  it("선수당 2개, 팀당 5개로 자른다", () => {
+    const mk = (n: number, tcode: string) => ({ name: `선수${n}`, tcode, gp: 100, before: { ...zeros, pts: 98, reb: 98, ast: 98 }, targets: (["pts", "reb", "ast"] as const).map((cat) => ({ kind: "step", cat, at: 100 }) as MilestoneTarget) });
+    const players = Object.fromEntries(Array.from({ length: 6 }, (_, i) => [`P${i}`, mk(i, "T1")]).concat([["Q0", mk(9, "T2")]]));
+    const got = buildRecordChances(ctx(players));
+    expect(got.filter((c) => c.tcode === "T1")).toHaveLength(5); // 6명 x 최대 2개 = 12개 중 팀당 5
+    expect(got.filter((c) => c.pcode === "Q0")).toHaveLength(2);
+    for (const pcode of new Set(got.map((c) => c.pcode))) expect(got.filter((c) => c.pcode === pcode).length).toBeLessThanOrEqual(2);
+  });
+
+  it("gp를 모르면 평균 0 - 부문별 floor까지만 닿는 것으로 본다", () => {
+    const noGp = { name: "신인", tcode: "T1", before: { ...zeros, pts: 94 }, targets: [{ kind: "step", cat: "pts", at: 100 } as MilestoneTarget, rankT(110, 90)] }; // 필요 6점(floor 8 이내) / 16점(밖)
+    expect(buildRecordChances(ctx({ N: noGp })).map((c) => c.need)).toEqual([6]);
+  });
+
+  it("문장 - 필요 수에 따라 '만/이상', 목적격 조사(점+을 / 개+를), 현역 병기, 하이는 경신", () => {
+    const chances = buildRecordChances(
+      ctx({
+        A: { ...star, targets: [rankT(8412, 10, { rival: { pcode: "R", name: "자밀 워니", value: 8411 }, activeRank: 3 }), { kind: "high", cat: "pts", high: 22 }] },
+        B: { name: "강상재", tcode: "T2", gp: 500, before: { ...zeros, reb: 5199 }, targets: [{ kind: "step", cat: "reb", at: 5200 }] },
+        C: { name: "양홍석", tcode: "T2", gp: 600, before: { ...zeros, pts: 4591 }, targets: [{ kind: "step", cat: "pts", at: 4600 }] },
+      })
+    );
+    const byId = (needle: string) => chances.find((c) => c.text.includes(needle))!;
+    expect(byId("올타임 득점 10위").text).toBe("9점 이상 넣으면 올타임 득점 10위(현역 3위)에 오른다");
+    expect(byId("올타임 득점 10위").detail).toBe("기존 10위 자밀 워니(8,411점) 추월 · 현재 통산 8,403점");
+    expect(byId("리바운드").text).toBe("1개만 잡으면 통산 리바운드 5,200개를 달성한다");
+    expect(byId("4,600").text).toBe("9점 이상 넣으면 통산 득점 4,600점을 달성한다");
+    expect(byId("커리어 하이").text).toBe("23점 이상 넣으면 득점 커리어 하이를 경신한다");
+    expect(byId("커리어 하이").detail).toBe("종전 하이 22점");
+  });
+
+  it("기준 안내 문구는 통산표(정규/플레이오프)를 따른다", () => {
+    expect(basisNote("regular")).toContain("정규리그 통산 기준");
+    expect(basisNote("playoffs")).toContain("플레이오프 통산 기준");
   });
 });

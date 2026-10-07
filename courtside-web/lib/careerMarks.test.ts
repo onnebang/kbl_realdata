@@ -33,6 +33,14 @@ describe("buildMilestoneContext - 순위 돌파", () => {
   });
 });
 
+describe("buildMilestoneContext - 경기 수", () => {
+  it("선수별 경기 수(gp)를 내려준다(경기 전 '현실적으로 닿는 기록' 판정의 평균 재료) - 보정 경기도 반영", () => {
+    const g = { gmkey: "G9", game_date: "2026-10-06", season_category: "정규시즌", rows: [row("P", 10)] };
+    expect(buildMilestoneContext({ ...base, games: [], gameDate: "2026-10-07" }).players.P.gp).toBe(600);
+    expect(buildMilestoneContext({ ...base, games: [g], gameDate: "2026-10-07" }).players.P.gp).toBe(601);
+  });
+});
+
 describe("buildMilestoneContext - 100개 단위 이정표 / 커리어 하이", () => {
   it("한 경기 안에 닿을 수 있는 가장 가까운 100의 배수만 목표로 둔다", () => {
     const ctx = buildMilestoneContext({ ...base, games: [], gameDate: "2026-10-07" });

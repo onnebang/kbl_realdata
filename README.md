@@ -273,7 +273,7 @@ Q2/Q3 용병 2인 규정 첫 시즌) 학습테이블 표본이 `SAMPLE_THRESHOLD
 - 첫 실행 전/설정 변경 후 점검: `python weekly_retrain.py --dry-run` (전 단계+가드까지 돌리고 커밋·푸시 없이 산출물을
   HEAD로 되돌림. 산출물에 미커밋 변경이 없어야 시작됨).
 - `career_marks.json`(선수별 통산 합계·한 경기 최고기록 스냅샷, `build_alltime_leaders.py`가 같이 굽는다)은 웹의 라이브 경기 "기록 워치"
-  (`courtside-web/lib/careerMarks.ts`)가 읽는다. 웹이 스냅샷 이후에 끝난 경기를 Supabase에서 더해 쓰므로 주 1회 갱신으로 충분하고,
+  (경기 후 리포트 "기록 달성"·경기 전 "기록 도전"도 같은 재료, `courtside-web/lib/careerMarks.ts`)가 읽는다. 웹이 스냅샷 이후에 끝난 경기를 Supabase에서 더해 쓰므로 주 1회 갱신으로 충분하고,
   이 주간 잡이 못 도는 주엔 스냅샷이 낡을 뿐 틀리진 않는다(보정할 경기가 늘어난다 - 기준일과 60일 넘게 벌어진 경기는 기능이 꺼진다).
 - 시즌 초반 상태 재현 검증: `python replay_ovr_season_start.py --season 2025-2026` - 과거 시즌을 N경기까지만 잘라
   OVR 생성기를 돌려 진행 중 시즌 처리(백분위 풀 격리 + 진행률별 변동 상한)를 확인한다. OVR 생성 로직을 고친 뒤 돌릴 것.

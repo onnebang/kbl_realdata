@@ -181,7 +181,7 @@ export function buildMilestoneContext(args: {
       const hi = a.hi && a.hiOk?.[i] ? a.hi[i] : undefined;
       if (hi != null && hi >= HIGH_MIN[cat] && a.gpAll >= HIGH_MIN_GP) targets.push({ kind: "high", cat, high: hi });
     }
-    if (targets.length) out[p.pcode] = { name: a.name, ...(p.tcode ? { tcode: p.tcode } : {}), before, targets };
+    if (targets.length) out[p.pcode] = { name: a.name, ...(p.tcode ? { tcode: p.tcode } : {}), gp: a.totals[6], before, targets };
   }
   return { split, asOf: snapshot.asOf, players: out };
 }

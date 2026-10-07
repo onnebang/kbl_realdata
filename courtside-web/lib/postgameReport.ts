@@ -15,6 +15,7 @@ import { computePredictionAudit, type PregameExpectation } from "./report/predic
 import { computeEntryUsage, type EntryPlayer } from "./report/entryUsage";
 import { getPlayerOvrHistory } from "./ovr";
 import { pickRecord } from "./courtCardInfo";
+import { basisNote, buildMilestoneTimeline, type MilestoneContext, type RecordChance } from "./milestones";
 
 export { fmtDuration };
 export type { ReportSection, ReportSectionData, ReportTeamMeta };
@@ -905,6 +906,45 @@ function findNotableSubSparks(hits: SubSparkHit[]): SubSparkHit[] {
   return hits.filter((h) => Math.abs(h.spark.delta) >= SUB_SPARK_NOTABLE_THRESHOLD);
 }
 
+/** "기록 달성" 섹션에 올리는 최대 건수 - 넘으면 알릴 만한 순(significance)으로 자르고 나머지는 개수만 말한다. */
+const RECORDS_MAX = 10;
+
+/**
+ * 기록 달성 - 이 경기에서 이룬 올타임/현역 순위 진입·100개 단위 통산·커리어 하이(요청 2026-10-07).
+ * 계산은 라이브 "기록 워치"와 같은 buildMilestoneTimeline이라 화면 알림과 리포트가 어긋나지 않는다. 점프 링크의 인덱스는
+ * 이 events 배열 기준이고 GameReplay가 같은 배열로 재생한다. 달성이 하나도 없으면 null(섹션 자체를 안 만든다).
+ */
+export function recordsSection(ctx: MilestoneContext, events: GameEvent[], tags: ReportTags): ReportSection | null {
+  const done = buildMilestoneTimeline(ctx, events).filter((m) => m.phase === "done");
+  if (done.length === 0) return null;
+  const shown = [...done]
+    .sort((a, b) => a.sig - b.sig || a.idx - b.idx)
+    .slice(0, RECORDS_MAX)
+    .sort((a, b) => a.idx - b.idx);
+  const items = shown
+    .map((m) => {
+      const tcode = ctx.players[m.pcode]?.tcode ?? null;
+      const text = m.text.replace(/!$/, "");
+      return `${tags.liOpen(tcode)}${tags.playerTag(m.name, tcode)}${iGa(m.name)} ${jumpLink(m.idx, escHtml(m.clock))} ${escHtml(text)}${m.detail ? `(${escHtml(m.detail)})` : ""}.</li>`;
+    })
+    .join("");
+  const rest = done.length - shown.length;
+  const more = rest > 0 ? `<p class="report-caveat">그 밖에 ${rest}건의 기록이 더 있었음 - 실시간 중계 탭의 "기록 워치"에서 전부 볼 수 있습니다.</p>` : "";
+  return { title: "기록 달성", html: `<ul class="report-list">${items}</ul>${more}<p class="report-caveat">${escHtml(basisNote(ctx.split))}</p>` };
+}
+
+/** 경기 전 "기록 도전" 목록(경기 전 탭) - 문장은 buildRecordChances가 만들고 여기서는 이름·팀 칩을 붙인다. 점프 링크는 없다(아직 경기 전). */
+export function recordChanceList(chances: RecordChance[], homeTeam: ReportTeamMeta, awayTeam: ReportTeamMeta): string {
+  const { playerTag, liOpen } = createReportTags(homeTeam, awayTeam);
+  const items = chances
+    .map((c) => {
+      const tcode = c.tcode ?? null;
+      return `${liOpen(tcode)}${playerTag(c.name, tcode)}${iGa(c.name)} ${escHtml(c.text)}(${escHtml(c.detail)}).</li>`;
+    })
+    .join("");
+  return `<ul class="report-list">${items}</ul>`;
+}
+
 export type BuildReportInput = {
   events: GameEvent[]; // event_order 오름차순, attachDerivedFields() 이미 적용된 것
   box: PlayerBox[]; // game_player_stats(이 경기 최종 박스스코어)
@@ -941,6 +981,8 @@ export type BuildReportInput = {
   lineupWinProb?: { lineupProb: number; absentHome: string[]; absentAway: string[] } | null;
   /** 선수별 OVR 조회에 필요한 시즌명(games.season_name). 없으면 최신 레코드로 폴백된다. */
   seasonName?: string | null;
+  /** 이 경기 직전 기준 선수별 달성 가능 목표(lib/careerMarks.ts getMilestoneContext) - '기록 달성'. 없으면(전시경기·스냅샷 공백 등) 그 섹션만 빠진다. */
+  milestones?: MilestoneContext | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -1185,6 +1227,12 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
           : `<p class="report-text">최종 마진은 ${margin}점 - 15시즌 ${rarity.marginTotalGames}경기 중 ${marginPct}%가 이 정도로 접전이었음.</p>`;
     }
     sections.push({ title: "경기 결과", html });
+  }
+
+  // 1.1 기록 달성 - "경기 결과" 바로 아래: 이 경기가 선수들의 통산 기록에 남긴 것(새 조회 0회 - page.tsx가 이미 받은 재료).
+  if (input.milestones) {
+    const records = recordsSection(input.milestones, events, tags);
+    if (records) sections.push(records);
   }
 
   // 1.5 네 가지 요인 & 득점 출처 - "무엇이 승부를 갈랐나". 계산은 report/fourFactors.ts,

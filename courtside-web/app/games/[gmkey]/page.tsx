@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { cache, type CSSProperties, type ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
-import { attachDerivedFields, buildPostgameReport, type GameEvent, type PlayerBox, type ReportSection } from "@/lib/postgameReport";
+import { attachDerivedFields, buildPostgameReport, recordChanceList, type GameEvent, type PlayerBox, type ReportSection } from "@/lib/postgameReport";
 import { DataSectionBody } from "@/components/report/DataSectionBody";
 import { HtmlSectionRenderer } from "@/components/report/HtmlSectionRenderer";
 import { HighlightReel } from "@/components/report/HighlightReel";
@@ -25,6 +25,7 @@ import { getTeamPowerByName } from "@/lib/teamPower";
 import GameReplay from "@/components/GameReplay";
 import { buildCourtCardInfo } from "@/lib/courtCardInfo";
 import { getMilestoneContext } from "@/lib/careerMarks";
+import { basisNote, buildRecordChances } from "@/lib/milestones";
 import { InsightCard } from "@/components/InsightCard";
 import { deriveGameStatus } from "@/lib/gameStatus";
 import { initialGameTab } from "@/lib/gameTabs";
@@ -566,6 +567,20 @@ export default async function GamePage({
   const liveNames = new Map([...livePlayerFallback].map(([pcode, v]) => [pcode, v.name]));
   const { box, derivedEvents, players: currentGamePlayers } = buildGameData(playerStats, events, actionLabels, liveNames);
 
+  // "기록" 재료(올타임/현역 순위 돌파·100개 단위 통산·커리어 하이: 라이브 기록 워치 / 경기 후 '기록 달성' / 경기 전 '기록 도전') -
+  // 이 경기 직전 기준 선수별 달성 가능 목표. 아래 매치업 조회들과 나란히 돌도록 여기서 시작만 하고, 쓰는 곳에서 기다린다.
+  // 실패하면 그 패널·섹션만 빈다(soft). 전시경기·스냅샷에서 먼 오래된 경기는 DB를 건드리기 전에 null이다.
+  const milestonesPromise = soft(
+    "milestones",
+    getMilestoneContext(
+      game,
+      playerStats.length > 0
+        ? playerStats.map((p) => ({ pcode: p.pcode, name: p.player?.name ?? p.pcode, tcode: p.tcode }))
+        : [...liveTcodeByPcode].map(([pcode, tcode]) => ({ pcode, name: livePlayerFallback.get(pcode)?.name ?? pcode, tcode }))
+    ),
+    null
+  );
+
 
   // pregameLines는 아래 최근 일정(homeSchedule)이 있어야 "이 폼 수치가 지난 시즌 것인지"를
   // 알 수 있어서, 일정 조회가 끝난 뒤에 계산한다(선언 위치가 내려간 이유).
@@ -611,6 +626,7 @@ export default async function GamePage({
       ),
     ]);
   }
+  const milestones = await milestonesPromise;
   let reportSections: ReportSection[] = [];
   if (status === "final" && game.home_score != null && game.away_score != null && derivedEvents.length > 0 && game.home_team && game.away_team) {
     // 희소성은 games 4,207행을 훑는 부수 지표다 - 없으면 리포트에서 그 문장만 빠진다.
@@ -676,6 +692,7 @@ export default async function GamePage({
       // 위 Promise.all에서 이미 받아 둔 값이라 새 조회 0회.
       lineupWinProb: lineupWinProbs.get(gmkey) ?? null,
       seasonName: game.season_name,
+      milestones,
     });
   }
   // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - allTeams는 teams 전체를 시즌
@@ -717,12 +734,6 @@ export default async function GamePage({
         }));
 
   // "코트 위" 선수 카드의 OVR·플레이 스타일(lib/courtCardInfo.ts, 서버 전용 - OVR JSON이 커서 클라이언트로는 이 로스터분만 내려간다).
-  // 라이브 "기록 워치"(올타임/현역 순위 돌파·100개 단위 통산·커리어 하이) 재료 - 이 경기 직전 기준 선수별 달성 가능 목표.
-  // 다른 조회와 나란히 돌도록 먼저 시작만 하고 아래에서 기다린다. 예정 경기는 실시간 탭이 없어 건너뛰고, 실패해도 패널만 빈다(soft).
-  const milestonesPromise =
-    status === "scheduled"
-      ? Promise.resolve(null)
-      : soft("milestones", getMilestoneContext(game, replayPlayers.map((p) => ({ pcode: p.pcode, name: p.name, tcode: p.tcode }))), null);
   const cardInfo = await soft("courtCardInfo", Promise.resolve().then(() => buildCourtCardInfo(replayPlayers, game.season_name)), {});
 
   // 요청: "라인업 조합별(1~5인) 넷레이팅 표시" - tools/build_synergy_matchup.py가 이미
@@ -851,7 +862,16 @@ export default async function GamePage({
   // 클라이언트 프로바이더로 children을 감싸는 형태 - 본문은 그대로 서버에서 렌더된다.
   const lastEventOrder = events.length > 0 ? events[events.length - 1].event_order : 0;
 
-  const milestones = await milestonesPromise;
+  // 경기 전 "기록 도전" - 아직 안 끝난 경기만(끝난 경기는 경기 후 리포트의 '기록 달성'이 대신한다). 한 경기에 닿을 만한 것만, 알릴 만한 순.
+  const recordChances = status !== "final" && milestones ? buildRecordChances(milestones) : [];
+  const recordChanceHtml =
+    recordChances.length > 0 && game.home_team && game.away_team
+      ? recordChanceList(
+          recordChances,
+          { tcode: game.home_team.tcode, name: game.home_team.name, abbr: game.home_team.abbr, color: game.home_team.color, logo_url: game.home_team.logo_url },
+          { tcode: game.away_team.tcode, name: game.away_team.name, abbr: game.away_team.abbr, color: game.away_team.color, logo_url: game.away_team.logo_url }
+        )
+      : null;
 
   return (
     <LiveGameProvider gmkey={gmkey} live={status === "live"} initialLastOrder={lastEventOrder}>
@@ -952,6 +972,17 @@ export default async function GamePage({
                 <Link href="/preseason">개막 리포트에서 로스터 변화 보기 →</Link>
               </div>
             )}
+          </div>
+        )}
+
+        {/* 경기 전 "기록 도전"(요청 2026-10-07: "누가 몇 득점을 하면 기록을 세운다") - lib/milestones.ts buildRecordChances가
+            올타임/현역 순위 돌파·100개 단위 통산·커리어 하이 중 한 경기에 닿을 만한 것만 알릴 만한 순으로 골라 준 것.
+            끝난 경기는 경기 후 리포트의 '기록 달성'이 대신하므로 안 그린다. */}
+        {recordChanceHtml && milestones && (
+          <div className="panel">
+            <div className="panel-title">기록 도전 (이 경기에서 세울 수 있는 기록)</div>
+            <div dangerouslySetInnerHTML={{ __html: recordChanceHtml }} />
+            <div className="insight-caveat">{basisNote(milestones.split)} · 평소 기록으로 한 경기에 닿을 만한 것만 골랐습니다.</div>
           </div>
         )}
 

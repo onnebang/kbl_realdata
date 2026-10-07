@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import type { BoxLine } from "@/lib/boxEvents";
-import { CAT_TEXT, evaluateApproaching, gameStatsFromBox, type MilestoneContext, type MilestoneItem, type MilestoneMoment } from "@/lib/milestones";
+import { basisNote, CAT_TEXT, evaluateApproaching, gameStatsFromBox, type MilestoneContext, type MilestoneItem, type MilestoneMoment } from "@/lib/milestones";
 import { isLinkablePcode } from "@/lib/onCourtCards";
 import styles from "./MilestoneWatch.module.css";
 
@@ -76,9 +76,7 @@ export function MilestoneWatch({
   return (
     <div className={styles.wrap}>
       <div className="panel-title">기록 워치</div>
-      <p className={styles.sub}>
-        {ctx.split === "regular" ? "정규리그" : "플레이오프"} 통산 기준 · 순위는 올타임 리더스와 같은 기준 · 합계는 이 경기 직전까지
-      </p>
+      <p className={styles.sub}>{basisNote(ctx.split)}</p>
       {done.length > 0 && (
         <div className={styles.group}>
           <div className={styles.groupTitle}>🏅 달성</div>

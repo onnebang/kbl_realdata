@@ -38,7 +38,15 @@ export type MilestoneTarget =
   /** 한 경기 커리어 하이(high). 같으면 타이, 넘으면 경신. */
   | { kind: "high"; cat: MilestoneCat; high: number };
 
-export type MilestonePlayer = { name: string; /** 팀 표시용(점 색) - 모르면 생략 */ tcode?: string; before: Record<MilestoneCat, number>; targets: MilestoneTarget[] };
+export type MilestonePlayer = {
+  name: string;
+  /** 팀 표시용(점 색) - 모르면 생략 */
+  tcode?: string;
+  /** 이 통산표(정규/플레이오프)의 출전 경기 수 - 경기 전 "현실적으로 닿는 기록"을 가르는 경기당 평균에 쓴다. 없으면 평균 0으로 본다. */
+  gp?: number;
+  before: Record<MilestoneCat, number>;
+  targets: MilestoneTarget[];
+};
 
 export type MilestoneContext = {
   /** 이 경기가 속한 통산표 - 정규시즌 경기는 정규리그, 플레이오프/챔프전은 플레이오프 통산. */
@@ -47,6 +55,15 @@ export type MilestoneContext = {
   asOf: string;
   players: Record<string, MilestonePlayer>;
 };
+
+/** 패널·리포트가 같이 쓰는 기준 안내 한 줄. */
+export const basisNote = (split: MilestoneContext["split"]) =>
+  `${split === "regular" ? "정규리그" : "플레이오프"} 통산 기준 · 순위는 올타임 리더스와 같은 기준 · 합계는 이 경기 직전까지`;
+
+/** 알릴 만한 정도(작을수록 크다): 100개 단위 통산 < 커리어 하이 < 순위 돌파(숫자가 작은 순위일수록 앞 - 현역은 풀이 작아 같은 숫자여도 한 단계 약하게 본다). */
+export function significance(t: MilestoneTarget): number {
+  return t.kind === "step" ? 0 : t.kind === "high" ? 1_000 : 2_000 + (t.scope === "all" ? t.rank : t.rank * 2);
+}
 
 export type GameStats = Record<MilestoneCat, number>;
 
@@ -69,6 +86,8 @@ export type MilestoneItem = {
   remaining: number;
   /** near 정렬용(남은 수 / 임박 기준). 작을수록 가깝다. */
   ratio: number;
+  /** 알릴 만한 정도(significance) - 리포트가 많은 달성 중 무엇을 먼저 보여줄지 가른다. */
+  sig: number;
 };
 
 const fmt = (n: number) => n.toLocaleString("ko-KR");
@@ -124,7 +143,7 @@ function describe(c: Check, p: MilestonePlayer, g: GameStats, phase: "done" | "n
 function itemOf(pcode: string, p: MilestonePlayer, c: Check, g: GameStats, phase: "done" | "near"): MilestoneItem {
   const remaining = phase === "done" ? 0 : c.at - valueOf(c, p, g);
   const { text, detail } = describe(c, p, g, phase, remaining);
-  return { id: c.id, pcode, name: p.name, cat: c.cat, kind: c.target.kind, phase, text, detail, remaining, ratio: remaining / nearWindow(c) };
+  return { id: c.id, pcode, name: p.name, cat: c.cat, kind: c.target.kind, phase, text, detail, remaining, ratio: remaining / nearWindow(c), sig: significance(c.target) };
 }
 
 /** 지금 박스 기준으로 "아직 안 이뤘고 곧 이룰 수 있는" 목표들 - 가까운 순, 선수당 최대 perPlayer개. */
@@ -215,4 +234,89 @@ export function buildMilestoneTimeline(ctx: MilestoneContext, events: TimelineEv
     }
   }
   return out;
+}
+
+// ── 경기 전 "이만큼 하면 기록" ────────────────────────────────────────────────────────────────
+// 라이브 임박 알림과 같은 재료(targets)에서, 한 경기에 현실적으로 닿는 것만 골라 "누가 몇 점을 하면 어떤 기록"으로 푼다(요청 2026-10-07).
+
+export type RecordChance = {
+  id: string;
+  pcode: string;
+  name: string;
+  tcode?: string;
+  cat: MilestoneCat;
+  kind: MilestoneTarget["kind"];
+  /** 이 경기에서 채워야 하는 기록 수(득점이면 점수). */
+  need: number;
+  /** 이름 뒤에 이어 붙는 서술 - "9점 이상 넣으면 올타임 득점 10위에 오른다". */
+  text: string;
+  /** 보조 설명 - "기존 10위 자밀 워니(8,411점) 추월 · 현재 통산 8,403점". */
+  detail: string;
+  sig: number;
+};
+
+/** 한 경기 현실 도달선 = 통산 경기당 평균 × REACH_MULT를 부문별 [floor, cap]로 조인 값 - 평균 5점 선수에게 25점짜리 기록을 내놓지 않고, 평균 20점 선수에게도 40점짜리는 내놓지 않는다. */
+const REACH_MULT = 1.7;
+const REACH: Record<MilestoneCat, { floor: number; cap: number }> = {
+  pts: { floor: 8, cap: 30 },
+  reb: { floor: 4, cap: 14 },
+  ast: { floor: 3, cap: 12 },
+  stl: { floor: 2, cap: 4 },
+  blk: { floor: 2, cap: 4 },
+  threep: { floor: 2, cap: 6 },
+};
+const reachOf = (cat: MilestoneCat, p: MilestonePlayer) => {
+  const avg = p.gp ? p.before[cat] / p.gp : 0;
+  return Math.min(REACH[cat].cap, Math.max(REACH[cat].floor, Math.round(avg * REACH_MULT)));
+};
+const objectParticle = (unit: string) => (unit === "점" ? "을" : "를"); // 점 + 을 / 개 + 를
+
+function chanceOf(pcode: string, p: MilestonePlayer, t: MilestoneTarget, need: number, i: number): RecordChance {
+  const cat = CAT_TEXT[t.cat];
+  const ask = need === 1 ? `1${cat.unit}만 ${cat.verb}` : `${need}${cat.unit} 이상 ${cat.verb}`;
+  const base = { id: `${pcode}:${i}`, pcode, name: p.name, ...(p.tcode ? { tcode: p.tcode } : {}), cat: t.cat, kind: t.kind, need, sig: significance(t) };
+  const now = `현재 통산 ${fmt(p.before[t.cat])}${cat.unit}`;
+  if (t.kind === "rank") {
+    const active = t.activeRank != null ? `(현역 ${t.activeRank}위)` : "";
+    return {
+      ...base,
+      text: `${ask} ${t.scope === "all" ? "올타임" : "현역"} ${cat.name} ${t.rank}위${active}에 오른다`,
+      detail: `기존 ${t.rank}위 ${t.rival.name}(${fmt(t.rival.value)}${cat.unit}) 추월 · ${now}`,
+    };
+  }
+  if (t.kind === "step") return { ...base, text: `${ask} 통산 ${cat.name} ${fmt(t.at)}${cat.unit}${objectParticle(cat.unit)} 달성한다`, detail: now };
+  return { ...base, text: `${ask} ${cat.name} 커리어 하이를 경신한다`, detail: `종전 하이 ${t.high}${cat.unit}` };
+}
+
+/**
+ * 경기 전 "기록 도전" 목록 - 한 경기에 닿을 만한(reachOf 이내) 목표만, 알릴 만한 순(significance)으로.
+ * (부문, 종류, 범위)마다 닿는 것 중 가장 큰 기록 하나만 남기고(순위 계단을 줄줄이 늘어놓지 않는다 - 그 밑 계단은 그 과정에서 함께 넘는다),
+ * 선수당 perPlayer개·팀당 perTeam개까지. 커리어 하이는 타이가 아니라 경신(하이 + 1)만 올린다.
+ */
+export function buildRecordChances(ctx: MilestoneContext, opts: { perPlayer?: number; perTeam?: number } = {}): RecordChance[] {
+  const perPlayer = opts.perPlayer ?? 2;
+  const perTeam = opts.perTeam ?? 5;
+  const cand: RecordChance[] = [];
+  for (const [pcode, p] of Object.entries(ctx.players)) {
+    const best = new Map<string, RecordChance>();
+    p.targets.forEach((t, i) => {
+      const need = t.kind === "high" ? t.high + 1 : t.at - p.before[t.cat];
+      if (need < 1 || need > reachOf(t.cat, p)) return;
+      const key = `${t.cat}:${t.kind}:${t.kind === "rank" ? t.scope : ""}`;
+      const sig = significance(t);
+      const prev = best.get(key);
+      if (!prev || sig < prev.sig || (sig === prev.sig && need < prev.need)) best.set(key, chanceOf(pcode, p, t, need, i));
+    });
+    cand.push(...best.values());
+  }
+  cand.sort((a, b) => a.sig - b.sig || a.need - b.need || a.name.localeCompare(b.name, "ko"));
+  const byPlayer = new Map<string, number>();
+  const byTeam = new Map<string, number>();
+  return cand.filter((c) => {
+    const team = c.tcode ?? "";
+    if ((byPlayer.get(c.pcode) ?? 0) >= perPlayer || (byTeam.get(team) ?? 0) >= perTeam) return false;
+    byPlayer.set(c.pcode, (byPlayer.get(c.pcode) ?? 0) + 1);
+    byTeam.set(team, (byTeam.get(team) ?? 0) + 1);
+    return true;
+  });
 }

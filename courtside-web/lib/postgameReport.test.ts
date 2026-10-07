@@ -9,7 +9,11 @@ import {
   dramaticSwingKind,
   estimatePossessions,
   isOvertimeQuarter,
+  recordChanceList,
+  recordsSection,
 } from "./postgameReport";
+import type { MilestoneContext, MilestoneTarget } from "./milestones";
+import { createReportTags } from "./report/renderKit";
 import { shotXPTS } from "./zoneCompare";
 
 /**
@@ -267,5 +271,76 @@ describe("dramaticSwingKind", () => {
     // 1차 버그의 경기(S49G14N4): KCC 8% -> 41%, 한 번도 50%를 넘지 못했다.
     expect(dramaticSwingKind(8, 41)).toBe("chase");
     expect(dramaticSwingKind(1, 49)).toBe("chase");
+  });
+});
+
+describe("기록 달성 섹션 / 기록 도전 목록 (요청 2026-10-07)", () => {
+  const home = { tcode: "H", name: "홈팀", abbr: "홈", color: "#111111" };
+  const away = { tcode: "A", name: "원정팀", abbr: "원정", color: "#222222" };
+  const tags = createReportTags(home, away);
+  const zero = { pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, threep: 0 };
+  const step = (cat: "pts" | "reb", at: number): MilestoneTarget => ({ kind: "step", cat, at });
+  const mkEvents = (rows: { pcode: string; tcode: string; code: string; q?: string; m?: number; s?: number }[]) =>
+    attachDerivedFields([
+      ev({ event_order: 0, quarter: "PRE", home_score: 0, away_score: 0, home_win_prob: 0.5 }),
+      ...rows.map((r, i) => ev({ event_order: i + 1, quarter: r.q ?? "Q1", clock_min: r.m ?? 8, clock_sec: r.s ?? 30, home_score: 2 * (i + 1), away_score: 0, action_code: r.code, pcode: r.pcode, player_name: r.pcode, tcode: r.tcode, home_win_prob: 0.5 })),
+    ]);
+
+  it("달성한 기록을 시각 점프 링크와 함께 쓰고, '!'는 떼고, 이름 뒤 조사를 맞춘다", () => {
+    const ctx: MilestoneContext = { split: "regular", asOf: "2026-10-06", players: { p1: { name: "양홍석", tcode: "H", before: { ...zero, pts: 4598 }, targets: [step("pts", 4600)] } } };
+    const events = mkEvents([{ pcode: "p1", tcode: "H", code: "201", q: "Q3", m: 3, s: 26 }]); // 2점슛 -> 4,600점
+    const sec = recordsSection(ctx, events, tags)!;
+    expect(sec.title).toBe("기록 달성");
+    const html = htmlOf(sec);
+    expect(html).toContain('<a href="#" class="report-jump-link" data-jump-idx="1">Q3 3:26</a>');
+    expect(html).toContain("양홍석</b></span>이 "); // 받침 있는 이름 + 이
+    expect(html).toContain("통산 득점 4,600점 달성(오늘 2점째).");
+    expect(html).not.toContain("!");
+    expect(html).toContain("정규리그 통산 기준"); // 기준 안내
+  });
+
+  it("달성이 없으면 null - 섹션 자체를 만들지 않는다", () => {
+    const ctx: MilestoneContext = { split: "regular", asOf: "2026-10-06", players: { p1: { name: "양홍석", tcode: "H", before: { ...zero, pts: 4000 }, targets: [step("pts", 4600)] } } };
+    expect(recordsSection(ctx, mkEvents([{ pcode: "p1", tcode: "H", code: "201" }]), tags)).toBeNull();
+  });
+
+  it("달성이 많으면 알릴 만한 순 10건만 시간순으로 쓰고 나머지는 개수만 말한다", () => {
+    const players: MilestoneContext["players"] = {};
+    const rows: { pcode: string; tcode: string; code: string }[] = [];
+    for (let i = 0; i < 12; i++) {
+      players[`p${i}`] = { name: `선수${i}`, tcode: "H", before: { ...zero, pts: 98 }, targets: [step("pts", 100)] };
+      rows.push({ pcode: `p${i}`, tcode: "H", code: "201" });
+    }
+    const html = htmlOf(recordsSection({ split: "regular", asOf: "2026-10-06", players }, mkEvents(rows), tags)!);
+    expect(html.match(/<li /g)).toHaveLength(10);
+    expect(html).toContain("그 밖에 2건의 기록이 더 있었음");
+  });
+
+  it("buildPostgameReport - milestones를 주면 '경기 결과' 바로 다음에 들어가고, 안 주면 섹션이 없다", () => {
+    const homeTeam = { ...home };
+    const awayTeam = { ...away };
+    const box = [{ pcode: "p1", tcode: "H", name: "홈선수", is_starter: true, pts: 2, fgm: 1, fga: 1, ftm: 0, fta: 0, reb: 0, ast: 0, stl: 0, blk: 0, fouls: 0, turnovers: 0 }];
+    const events = mkEvents([{ pcode: "p1", tcode: "H", code: "201" }]);
+    const base = { events, box, homeTeam, awayTeam, homeScore: 2, awayScore: 0, rarity: null };
+    const ctx: MilestoneContext = { split: "regular", asOf: "2026-10-06", players: { p1: { name: "홈선수", tcode: "H", before: { ...zero, pts: 99 }, targets: [step("pts", 100)] } } };
+    const titles = buildPostgameReport({ ...base, milestones: ctx }).map((s) => s.title);
+    expect(titles[titles.indexOf("경기 결과") + 1]).toBe("기록 달성");
+    expect(buildPostgameReport(base).map((s) => s.title)).not.toContain("기록 달성");
+    expect(buildPostgameReport({ ...base, milestones: null }).map((s) => s.title)).not.toContain("기록 달성");
+  });
+
+  it("recordChanceList - 팀 칩·조사·문장·보조 설명, 이름의 HTML은 이스케이프", () => {
+    const html = recordChanceList(
+      [
+        { id: "a", pcode: "p1", name: "양홍석", tcode: "H", cat: "pts", kind: "step", need: 9, text: "9점 이상 넣으면 통산 득점 4,600점을 달성한다", detail: "현재 통산 4,591점", sig: 0 },
+        { id: "b", pcode: "p2", name: "마레이<b>", tcode: "A", cat: "blk", kind: "rank", need: 1, text: "1개만 기록하면 올타임 블록 59위에 오른다", detail: "기존 59위 오용준(121개) 추월 · 현재 통산 121개", sig: 2059 },
+      ],
+      home,
+      away
+    );
+    expect(html.startsWith('<ul class="report-list">')).toBe(true);
+    expect(html).toContain("양홍석</b></span>이 9점 이상 넣으면 통산 득점 4,600점을 달성한다(현재 통산 4,591점).</li>");
+    expect(html).toContain("마레이&lt;b&gt;</b></span>가 1개만 기록하면"); // 받침 없는 마지막 글자 '>' 는 '가'
+    expect(html).not.toContain("마레이<b>");
   });
 });
