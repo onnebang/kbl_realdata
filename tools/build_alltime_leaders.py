@@ -150,21 +150,30 @@ def build_alltime_leaders():
         for col, kr_name in categories:
             if col not in sp_df.columns: continue
             
-            top100 = sp_df.sort_values(by=col, ascending=False).head(100)
+            sp_df_sorted = sp_df.sort_values(by=col, ascending=False)
+            
+            # Find top 100 overall
+            overall_pcodes = sp_df_sorted.head(100)['pcode'].tolist()
+            
+            # Find top 100 active
+            active_pcodes = sp_df_sorted[sp_df_sorted['is_active'] == True].head(100)['pcode'].tolist()
+            
+            keep_pcodes = set(overall_pcodes + active_pcodes)
             
             category_list = []
             rank = 1
-            for _, row in top100.iterrows():
+            for _, row in sp_df_sorted.iterrows():
                 # Skip 0s
                 if row[col] == 0: continue
                 
-                category_list.append({
-                    "rank": rank,
-                    "pcode": str(row['pcode']),
-                    "pname": str(row['pname']),
-                    "value": int(row[col]),
-                    "is_active": bool(row['is_active'])
-                })
+                if row['pcode'] in keep_pcodes:
+                    category_list.append({
+                        "rank": rank,
+                        "pcode": str(row['pcode']),
+                        "pname": str(row['pname']),
+                        "value": int(row[col]),
+                        "is_active": bool(row['is_active'])
+                    })
                 rank += 1
                 
             leaders[sp][col] = {

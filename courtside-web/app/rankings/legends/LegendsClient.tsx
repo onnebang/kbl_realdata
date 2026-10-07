@@ -48,7 +48,9 @@ export default function LegendsClient({ leaders }: Props) {
   const currentCategory = currentSplitData[activeTab];
   const allData = currentCategory?.data ?? [];
   // 요청(2026-10-07) - 현역만 볼 때는 1위부터 새로 매긴다.
-  const shownData = activeOnly ? allData.filter((p) => p.is_active) : allData;
+  const shownData = activeOnly 
+    ? allData.filter((p) => p.is_active).slice(0, 100) 
+    : allData.slice(0, 100);
   // "얼마나 차이가 나는지"(사용자 요청) - 역대 1위(allData[0], 필터와 무관하게 전체 1위) 대비
   // 지금 가장 앞서 있는 현역 선수의 격차. 카테고리가 전부 누적 합계(득점/리바운드 등)라 단순
   // 차로 계산해도 된다(비율 지표 없음 - tools/build_alltime_leaders.py 참고).
