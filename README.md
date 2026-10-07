@@ -243,7 +243,7 @@ python live_collector.py --max-runtime 21600 --stall-timeout 5400
 | `KBL_LiveCollector` | 매일 13:00부터 12시간, 10분마다 | 그날 예정/진행중 경기를 실시간 추적·정산까지 자동 처리 |
 | `KBL_DailyBatch` | 매일 06:00 | 전날 놓친/실패한 경기를 정본으로 재수집·재계산(라이브가 못 돌았을 때의 복구 경로) |
 | `KBL_LineupRecalc` | 매일 13:00부터 8분마다 | 라인업 승률 재계산(`recalc_lineup_winprob.py --today`) |
-| `KBL_WeeklyTrain` | 매주 월요일 06:20 (2026-10-06 등록) | `weekly_retrain.py` - SQLite 재적재 → 신선도 확인 → OVR 재계산 → OVR 가드 → 학습테이블 재생성 → 경기전 승률모델 재학습(승격 게이트) → 깨끗한 임시 worktree에서 git commit+push. 로그: `raw/weekly_retrain.log` |
+| `KBL_WeeklyTrain` | 매주 월요일 06:20 (2026-10-06 등록) | `weekly_retrain.py` - SQLite 재적재 → 신선도 확인 → OVR 재계산 → OVR 가드 → 학습테이블 재생성 → 경기전 승률모델 재학습(승격 게이트) → 올타임 리더스·통산 스냅샷(`career_marks.json`) 재계산 → 깨끗한 임시 worktree에서 git commit+push. 로그: `raw/weekly_retrain.log` |
 
 ```powershell
 Get-ScheduledTaskInfo -TaskName "KBL_LiveCollector"   # 다음/마지막 실행, 결과코드
@@ -272,6 +272,9 @@ Q2/Q3 용병 2인 규정 첫 시즌) 학습테이블 표본이 `SAMPLE_THRESHOLD
   않고 중단. 피처/하이퍼파라미터를 일부러 바꾼 재학습은 `--force`.
 - 첫 실행 전/설정 변경 후 점검: `python weekly_retrain.py --dry-run` (전 단계+가드까지 돌리고 커밋·푸시 없이 산출물을
   HEAD로 되돌림. 산출물에 미커밋 변경이 없어야 시작됨).
+- `career_marks.json`(선수별 통산 합계·한 경기 최고기록 스냅샷, `build_alltime_leaders.py`가 같이 굽는다)은 웹의 라이브 경기 "기록 워치"
+  (`courtside-web/lib/careerMarks.ts`)가 읽는다. 웹이 스냅샷 이후에 끝난 경기를 Supabase에서 더해 쓰므로 주 1회 갱신으로 충분하고,
+  이 주간 잡이 못 도는 주엔 스냅샷이 낡을 뿐 틀리진 않는다(보정할 경기가 늘어난다 - 기준일과 60일 넘게 벌어진 경기는 기능이 꺼진다).
 - 시즌 초반 상태 재현 검증: `python replay_ovr_season_start.py --season 2025-2026` - 과거 시즌을 N경기까지만 잘라
   OVR 생성기를 돌려 진행 중 시즌 처리(백분위 풀 격리 + 진행률별 변동 상한)를 확인한다. OVR 생성 로직을 고친 뒤 돌릴 것.
 

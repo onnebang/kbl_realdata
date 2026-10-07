@@ -2,11 +2,67 @@ import sqlite3
 import pandas as pd
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE, "..", "raw", "kbl_realdata.db")
 OUTPUT_PATH = os.path.join(BASE, "..", "courtside-web", "lib", "alltime_leaders.json")
+# 라이브 경기 "기록 워치"(courtside-web/lib/careerMarks.ts) 재료 - 선수별 통산 합계/한 경기 최고기록 스냅샷.
+CAREER_MARKS_PATH = os.path.join(BASE, "..", "courtside-web", "lib", "career_marks.json")
+MARK_STATS = ['pts', 'reb', 'ast', 'stl', 'blk', 'threep']  # 순서가 careerMarks.ts의 MARK_CATS와 같아야 한다
+# 스냅샷 이후에 끝난 경기를 웹이 Supabase에서 더해 주는데, 스냅샷에 이미 들어 있는 경기와 겹치지 않게 가르는 기준 -
+# 이 일수 안의 경기는 gmkey를 따로 적어 둔다(그보다 오래된 경기는 전부 스냅샷에 들어 있다고 본다).
+RECENT_WINDOW_DAYS = 21
+
+
+def build_career_marks(conn, all_agg, merged_stats):
+    """선수별 통산 합계(정규/플레이오프, 올타임 리더스와 같은 값 - 레전드 보정 alltime_overrides.json 포함)와 한 경기
+    최고기록(정규+플레이오프, 전시경기 제외)을 courtside-web/lib/career_marks.json으로 낸다.
+
+    왜 올타임 리더스 JSON(alltime_leaders.json)을 그대로 안 쓰는가: 그건 각 부문 상위 100명(+현역 상위 100명)만 담아서
+    중하위 선수의 100개 단위 이정표나 커리어 하이에는 값이 없다. 이 스냅샷은 전 선수를 담고, 웹이 요청 시점에 스냅샷 이후
+    경기만 Supabase에서 더해 항상 최신 합계로 쓴다(주 1회 갱신이라 몇 경기씩 낡는 걸 그대로 두면 이정표 알림이 틀린다)."""
+    games = pd.read_sql_query(
+        "SELECT gmkey, game_date FROM games WHERE season_category IN ('정규시즌', '플레이오프', '챔피언결정전')", conn)
+    as_of = games['game_date'].max()  # 'YYYYMMDD'
+    window_start = (datetime.strptime(as_of, '%Y%m%d') - timedelta(days=RECENT_WINDOW_DAYS)).strftime('%Y%m%d')
+    iso = lambda d: f"{d[:4]}-{d[4:6]}-{d[6:]}"
+
+    played = merged_stats[merged_stats['split_type'] != 'other']
+    highs = played.groupby('pcode')[MARK_STATS].max()
+    by_split = {sp: df.set_index('pcode') for sp, df in all_agg[all_agg['split_type'].isin(['regular', 'playoffs'])].groupby('split_type')}
+    names = all_agg.dropna(subset=['pname']).drop_duplicates('pcode').set_index('pcode')[['pname', 'is_active']]
+
+    def totals(sp, pcode):
+        df = by_split.get(sp)
+        if df is None or pcode not in df.index:
+            return [0] * 7
+        row = df.loc[pcode]
+        return [int(row.get(c, 0) or 0) for c in MARK_STATS + ['gp']]
+
+    players = {}
+    for pcode in names.index:
+        reg, po = totals('regular', pcode), totals('playoffs', pcode)
+        if not any(reg) and not any(po):
+            continue
+        players[str(pcode)] = {
+            'n': str(names.loc[pcode, 'pname']),
+            'a': int(bool(names.loc[pcode, 'is_active'])),
+            'reg': reg,
+            'po': po,
+            'hi': [int(highs.loc[pcode, c]) for c in MARK_STATS] if pcode in highs.index else None,
+        }
+
+    out = {
+        'asOf': iso(as_of),
+        'recentFrom': iso(window_start),
+        'recentGmkeys': games[games['game_date'] >= window_start]['gmkey'].tolist(),
+        'cats': MARK_STATS + ['gp'],
+        'players': players,
+    }
+    with open(CAREER_MARKS_PATH, 'w', encoding='utf-8') as f:
+        json.dump(out, f, ensure_ascii=False, separators=(',', ':'))
+    print(f"[SUCCESS] career marks ({len(players)} players, as of {out['asOf']}) -> {CAREER_MARKS_PATH}")
 
 def build_alltime_leaders():
     conn = sqlite3.connect(DB_PATH)
@@ -124,6 +180,8 @@ def build_alltime_leaders():
                         all_agg = pd.concat([all_agg, pd.DataFrame([new_reg, new_tot])], ignore_index=True)
                         # Fix NaNs to 0 for other columns in new rows
                         all_agg = all_agg.fillna(0)
+
+    build_career_marks(conn, all_agg, merged_stats)
 
     leaders = {}
     categories = [

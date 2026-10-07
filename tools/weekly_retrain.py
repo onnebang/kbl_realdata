@@ -20,7 +20,7 @@ build_courtside_ovr(OVR 재계산) -> ovr_guard(HEAD 대비 이상 검사) ->
 export_training_table(학습 테이블 재생성) -> save_pregame_model(배포용 모델 재학습, 승격 게이트 포함) ->
 build_alltime_leaders(올타임 리더스 "현역" 배지 재계산) ->
 git commit+push(courtside_ovr_history.json / play_styles.json / alltime_leaders.json /
-pregame_model.joblib).
+career_marks.json / pregame_model.joblib).
 
 안전장치(2026-10-07 - 개막 직후 전원 OVR 폭락 사고 대응, 에러 없이 끝난 틀린 결과가 검증 없이 나간 것):
 - 시작 시 산출물 파일에 미커밋 변경이 있으면 중단(사람의 작업 위에 덮어쓰지 않는다).
@@ -52,6 +52,7 @@ TRACKED_OUTPUTS = [
     "courtside-web/lib/courtside_ovr_history.json",
     "courtside-web/lib/play_styles.json",
     "courtside-web/lib/alltime_leaders.json",
+    "courtside-web/lib/career_marks.json",
     "raw/analysis/pregame_model.joblib",
 ]
 OVR_OUTPUTS = TRACKED_OUTPUTS[:2]
@@ -64,7 +65,7 @@ STEPS = [
     ("save_pregame_model.py", "배포용 경기전 승률 모델 재학습 (pregame_model.joblib)"),
     # 올타임 리더스(/rankings/legends)의 "현역" 배지가 이 주의 최신 로스터를 반영하도록
     # (2026-10-06, 사용자 요청) - SQLite가 방금 최신화됐으니 같은 묶음에서 재생성.
-    ("build_alltime_leaders.py", "올타임 리더스 재계산 (alltime_leaders.json)"),
+    ("build_alltime_leaders.py", "올타임 리더스 + 라이브 기록 워치용 통산 스냅샷 재계산 (alltime_leaders.json, career_marks.json)"),
 ]
 
 
