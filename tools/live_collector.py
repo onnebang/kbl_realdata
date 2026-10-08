@@ -1048,6 +1048,23 @@ def official_box_ready(gmkey):
     return True, f"{h}-{a}"
 
 
+RECORD_BOOK_TIMEOUT = 300
+
+
+def run_record_book(gmkey, exe, env, timeout=RECORD_BOOK_TIMEOUT):
+    """역대 기록 반영(record_book.py --gmkeys) - 설계: docs/superpowers/specs/2026-10-08-record-book-design.md.
+    **실패해도 정산 결과(ok)에 영향을 주지 않는다.** 기록 테이블은 부가 기능이고, 놓친 경기는 다음 날 06:00
+    daily_batch.run_supabase_sync가 같은 호출로 복구한다(멱등). 예외를 밖으로 던지지 않는다 - 이 함수가
+    수집 루프를 죽이면 안 된다. 반환: 종료코드(int) 또는 "error: <예외 종류>"."""
+    try:
+        p = subprocess.run([exe, "record_book.py", "--gmkeys", gmkey], cwd=BASE, env=env, timeout=timeout)
+        log(f"    record_book.py -> exit {p.returncode}")
+        return p.returncode
+    except Exception as e:  # noqa: BLE001
+        log(f"    record_book.py 실패(정산에는 영향 없음): {type(e).__name__}: {e}")
+        return f"error: {type(e).__name__}"
+
+
 def reconcile_finished_game(gmkey, python_exe=None, timeout=1800):
     """경기가 끝나면 기존 배치 경로를 그대로 호출한다(새로 짜지 않음):
       1) fetch_kbl_data.fetch_one_game(force=True) - 공식 5개 엔드포인트 재수집.
@@ -1107,6 +1124,9 @@ def reconcile_finished_game(gmkey, python_exe=None, timeout=1800):
     if failures:
         result["why"] = "; ".join(failures)
         log(f"    정산 실패 - {result['why']}")
+    else:
+        # 5) 역대 기록 - 이벤트 이관까지 성공한 경기만(공식 데이터가 확정된 뒤여야 검증 게이트가 의미 있다).
+        result["record_book"] = run_record_book(gmkey, exe, env)
     return result
 
 

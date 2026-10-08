@@ -192,6 +192,9 @@ def run_supabase_sync(new_gmkeys, failures=None):
         # 못한다. 정산 경로(live_collector.reconcile_finished_game)와 같은 플래그를 쓴다.
         step([exe, "migrate_game_events_to_supabase.py", "--gmkeys", gmkeys_arg, "--replace"],
              "migrate_game_events_to_supabase.py", failures, env)
+        # 역대 기록(record_entries) - 라이브 정산 훅(live_collector.run_record_book)이 놓친 경기를 복구한다. 멱등이고 부가 기능이라
+        # 실패해도 배치 실패로 세지 않는다(별도 리스트에 담아 버린다). 설계: docs/superpowers/specs/2026-10-08-record-book-design.md
+        step([exe, "record_book.py", "--gmkeys", gmkeys_arg], "record_book.py", [], env)
     else:
         print("[daily_batch] 새 완료 경기 없음 - Supabase 이관 건너뜀.", flush=True)
 
