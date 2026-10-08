@@ -46,6 +46,7 @@ import { OnCourtCards } from "./OnCourtCards";
 import { applyBoxEvent, emptyBoxLine, type BoxLine } from "@/lib/boxEvents";
 import { MilestoneWatch } from "./MilestoneWatch";
 import { buildMilestoneTimeline, type MilestoneContext, type MilestoneMoment } from "@/lib/milestones";
+import { buildRecordTimeline, recordToast, type RecordContext, type RecordMoment } from "@/lib/records";
 import { buildOnCourtTeam } from "@/lib/onCourtCards";
 import type { CourtCardInfo } from "@/lib/courtCardInfo"; // 타입만 - 값을 가져오면 OVR JSON이 브라우저 번들에 들어간다
 
@@ -173,7 +174,9 @@ function computePushNotifications(
   homeTeam: { tcode: string; name: string },
   awayTeam: { tcode: string; name: string },
   /** 기록 워치(lib/milestones.ts) 타임라인을 이벤트 인덱스로 묶은 것 - 이 이벤트에서 달성/임박한 기록이 있으면 토스트로 알린다. */
-  milestones?: ReadonlyMap<number, MilestoneMoment[]>
+  milestones?: ReadonlyMap<number, MilestoneMoment[]>,
+  /** 역대 기록(lib/records.ts) 타임라인을 이벤트 인덱스로 묶은 것 - 이 이벤트에서 TOP10에 닿은 기록이 있으면 토스트로 알린다(임박은 패널 전용). */
+  records?: ReadonlyMap<number, RecordMoment[]>
 ): PushToastSpec[] {
   const row = events[newIdx];
   const out: PushToastSpec[] = [];
@@ -236,6 +239,11 @@ function computePushNotifications(
         ? { icon: "🏅", title: "기록 달성!", msg: `${m.name} ${m.text}` }
         : { icon: "👀", title: "기록 임박", msg: `${m.name} ${m.text}` }
     );
+  }
+
+  // 역대 기록 - 맨 뒤(가장 드문 사건이라 라이브 버스트의 마지막 3개 제한에서 밀려나지 않게).
+  for (const m of records?.get(newIdx) ?? []) {
+    if (m.phase === "done") out.push(recordToast(m));
   }
 
   return out;
@@ -580,6 +588,7 @@ export default function GameReplay({
   liveNames,
   cardInfo,
   milestones,
+  records,
   boxOnly = false,
 }: {
   // 파생 필드(elapsed/runHome/runAway/surge = 실측 34,382B)와 action_label/player_name까지
@@ -619,6 +628,9 @@ export default function GameReplay({
   // 라이브 "기록 워치"(올타임/현역 순위 돌파·100개 단위 통산·커리어 하이) 재료 - page.tsx가 서버에서 lib/careerMarks.ts로 이 경기 직전
   // 기준으로 선수별 "달성 가능 목표"를 뽑아 내려준다. 없으면(전시경기·오래된 경기·목표 없음) 패널·알림 모두 없다.
   milestones?: MilestoneContext | null;
+  // 역대 기록(KBL 역대 TOP10 - 쿼터·경기·연장별 최다/최소) - page.tsx가 서버에서 lib/recordBook.ts로 "이 경기 이전" 기준 보드 요약을 만들어 내려준다.
+  // 없으면(전시경기·오래된 경기·기록 테이블 없음) 패널·알림 모두 없다.
+  records?: RecordContext | null;
   // true면 "코트 위" 박스스코어 패널만 그린다(경기 후 AI 분석 탭의 최종 스탯창). 이벤트로 최종 기록을 다시 계산하므로 live=false(종료 경기)에서만 쓴다.
   boxOnly?: boolean;
 }) {
@@ -669,6 +681,26 @@ export default function GameReplay({
     for (const m of milestoneMoments) byIdx.set(m.idx, [...(byIdx.get(m.idx) ?? []), m]);
     return byIdx;
   }, [milestoneMoments]);
+
+  // 역대 기록 타임라인 - 기록 워치와 같은 방식(이벤트를 한 번 훑어 TOP10에 닿은 순간·임박 구간을 뽑는다). 종료 경기는 정산된(validated) 항목만 남는다.
+  const recordMoments = useMemo(
+    () =>
+      records
+        ? buildRecordTimeline(records, events, {
+            names: {
+              player: (pcode) => nameByPcode.get(pcode) ?? liveNames?.[pcode] ?? liveCtx.lateNames[pcode] ?? pcode,
+              team: (tcode) => (tcode === homeTeam.tcode ? homeTeam.name : tcode === awayTeam.tcode ? awayTeam.name : tcode),
+            },
+            final: !live,
+          })
+        : [],
+    [records, events, nameByPcode, liveNames, liveCtx.lateNames, homeTeam, awayTeam, live]
+  );
+  const recordsByIdx = useMemo(() => {
+    const byIdx = new Map<number, RecordMoment[]>();
+    for (const m of recordMoments) if (m.phase === "done") byIdx.set(m.idx, [...(byIdx.get(m.idx) ?? []), m]);
+    return byIdx;
+  }, [recordMoments]);
 
   // ---- B-2. 팔로우 라이브 / 이탈 ------------------------------------------------
   // pinnedIdx === null 이 곧 "최신 이벤트에 붙어 있음(팔로우 중)". 사용자가 뒤로 스크럽하면
@@ -733,14 +765,14 @@ export default function GameReplay({
     const next = Math.min(events.length - 1, cur + 1);
     if (next === cur) return;
     idxRef.current = next;
-    for (const spec of computePushNotifications(events, cur, next, homeTeam, awayTeam, momentsByIdx)) pushToast(spec);
+    for (const spec of computePushNotifications(events, cur, next, homeTeam, awayTeam, momentsByIdx, recordsByIdx)) pushToast(spec);
     setIdx(next);
     // 재생 타이머가 마지막 이벤트에 도달하면 여기서 바로 멈춤(끝에 다다른 idx로의 setIdx와
     // 같은 tick) - 아래 useEffect 본문에서 동기적으로 setPlaying을 부르면
     // react-hooks/set-state-in-effect 린트 에러가 나서, 그 대신 idx를 실제로 옮기는 이
     // 지점(setTimeout 콜백/버튼 클릭 - 둘 다 effect 본문 밖)에서 처리.
     if (next >= events.length - 1) setPlaying(false);
-  }, [events, homeTeam, awayTeam, momentsByIdx, pushToast, setIdx]);
+  }, [events, homeTeam, awayTeam, momentsByIdx, recordsByIdx, pushToast, setIdx]);
 
   useEffect(() => {
     if (!playing || idx >= events.length - 1) return;
@@ -783,10 +815,10 @@ export default function GameReplay({
   // 새로" 바뀌기 때문. 그래서 타이머는 언마운트 때만 정리한다.
   const burstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 타이머 콜백이 걸릴 때의 렌더에 갇히지 않도록 최신 스냅샷을 따로 들고 간다.
-  const latestRef = useRef({ events, homeTeam, awayTeam, momentsByIdx });
+  const latestRef = useRef({ events, homeTeam, awayTeam, momentsByIdx, recordsByIdx });
   useEffect(() => {
-    latestRef.current = { events, homeTeam, awayTeam, momentsByIdx };
-  }, [events, homeTeam, awayTeam, momentsByIdx]);
+    latestRef.current = { events, homeTeam, awayTeam, momentsByIdx, recordsByIdx };
+  }, [events, homeTeam, awayTeam, momentsByIdx, recordsByIdx]);
   useEffect(() => () => { if (burstTimerRef.current) clearTimeout(burstTimerRef.current); }, []);
 
   useEffect(() => {
@@ -824,7 +856,7 @@ export default function GameReplay({
         return;
       }
       const specs: PushToastSpec[] = [];
-      for (let i = burstFrom; i < to; i++) specs.push(...computePushNotifications(cur.events, i, i + 1, cur.homeTeam, cur.awayTeam, cur.momentsByIdx));
+      for (let i = burstFrom; i < to; i++) specs.push(...computePushNotifications(cur.events, i, i + 1, cur.homeTeam, cur.awayTeam, cur.momentsByIdx, cur.recordsByIdx));
       for (const spec of specs.slice(-TOAST_STACK_MAX)) pushToast(spec);
     }, LIVE_TOAST_DEBOUNCE_MS);
   }, [events, live, pushToast]);
@@ -1414,6 +1446,11 @@ export default function GameReplay({
       return t === homeTeam.tcode ? homeTeam : t === awayTeam.tcode ? awayTeam : null;
     },
     [playerByPcode, homeTeam, awayTeam]
+  );
+  // 역대 기록 줄의 팀 점 색 - 기록 이벤트가 소속 팀 코드를 직접 들고 있다.
+  const recordTeamOf = useCallback(
+    (tcode: string | null) => (tcode === homeTeam.tcode ? homeTeam : tcode === awayTeam.tcode ? awayTeam : null),
+    [homeTeam, awayTeam]
   );
 
   // 박스스코어 +/- 컬럼 - game_player_stats엔 plus_minus 컬럼이 없어서 game_events 전체를
@@ -2202,7 +2239,19 @@ export default function GameReplay({
         })}
       </div>
 
-      {milestones && <MilestoneWatch ctx={milestones} moments={milestoneMoments} idx={idx} box={box} teamOf={milestoneTeamOf} hideNear={!live && idx >= events.length - 1} appeared={milestoneAppeared} />}
+      {(milestones || recordMoments.length > 0) && (
+        <MilestoneWatch
+          ctx={milestones ?? null}
+          moments={milestoneMoments}
+          idx={idx}
+          box={box}
+          teamOf={milestoneTeamOf}
+          hideNear={!live && idx >= events.length - 1}
+          appeared={milestoneAppeared}
+          records={recordMoments}
+          recordTeamOf={recordTeamOf}
+        />
+      )}
 
       {/* "코트 위" 패널을 M7 라인업 넷레이팅 바로 위에 붙여서 "지금 누가 뛰고 있고, 이 조합이
           통산 얼마나 잘했는지"를 한 섹션처럼 읽히게 배치(요청). */}
