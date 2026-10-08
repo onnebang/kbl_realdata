@@ -317,4 +317,196 @@ def build_all(raw_dir=RAW_GAMES, keep=KEEP_RANK, only=None):
     return col.result(), stats
 
 
-# (Task 2가 이 아래에 저장소·반영·CLI를 이어 붙인다)
+# ---------------------------------------------------------------------------
+# 저장소 - MemoryStore(테스트) / PgStore(운영)
+# ---------------------------------------------------------------------------
+
+class MemoryStore:
+    def __init__(self, rows=()):
+        self._rows = {pk(r): dict(r) for r in rows}
+
+    def all_rows(self):
+        return [dict(r) for r in self._rows.values()]
+
+    def replace_all(self, rows):
+        self._rows = {pk(r): dict(r) for r in rows}
+
+    def delete_game(self, gmkey):
+        gone = [k for k, r in self._rows.items() if r["gmkey"] == gmkey]
+        boards = {(self._rows[k]["board"], self._rows[k]["bucket"]) for k in gone}
+        for k in gone:
+            del self._rows[k]
+        return boards
+
+    def upsert(self, rows):
+        for r in rows:
+            self._rows[pk(r)] = dict(r)
+
+    def board_rows(self, board, bucket):
+        return [dict(r) for r in self._rows.values() if r["board"] == board and r["bucket"] == bucket]
+
+    def delete_rows(self, rows):
+        for r in rows:
+            self._rows.pop(pk(r), None)
+
+
+class PgStore:
+    """psycopg2 커서 하나로 같은 인터페이스. 트랜잭션은 호출부(commit/rollback)가 관리한다."""
+
+    _COLS = ", ".join(ROW_COLUMNS)
+
+    def __init__(self, cur):
+        self.cur = cur
+
+    def lock(self):
+        self.cur.execute("select pg_advisory_xact_lock(%s)", (LOCK_KEY,))
+
+    def _fetch(self, sql, params=()):
+        self.cur.execute(sql, params)
+        return [dict(zip(ROW_COLUMNS, r)) for r in self.cur.fetchall()]
+
+    def all_rows(self):
+        rows = self._fetch(f"select {self._COLS} from record_entries")
+        for r in rows:
+            r["game_date"] = r["game_date"].isoformat() if hasattr(r["game_date"], "isoformat") else str(r["game_date"])
+        return rows
+
+    def replace_all(self, rows):
+        self.cur.execute("delete from record_entries")
+        self.upsert(rows)
+
+    def delete_game(self, gmkey):
+        self.cur.execute("delete from record_entries where gmkey = %s returning board, bucket", (gmkey,))
+        return {(b, k) for b, k in self.cur.fetchall()}
+
+    def upsert(self, rows):
+        rows = list({pk(r): r for r in rows}.values())     # 같은 키가 한 문장에 두 번 있으면 ON CONFLICT DO UPDATE가 실패한다
+        if not rows:
+            return
+        from psycopg2.extras import execute_values
+        updates = ", ".join(f"{c} = excluded.{c}" for c in ROW_COLUMNS if c not in PK_COLUMNS)
+        execute_values(
+            self.cur,
+            f"insert into record_entries ({self._COLS}) values %s on conflict ({', '.join(PK_COLUMNS)}) do update set {updates}",
+            [tuple(r[c] for c in ROW_COLUMNS) for r in rows],
+            page_size=500,
+        )
+
+    def board_rows(self, board, bucket):
+        rows = self._fetch(f"select {self._COLS} from record_entries where board = %s and bucket = %s", (board, bucket))
+        for r in rows:
+            r["game_date"] = r["game_date"].isoformat() if hasattr(r["game_date"], "isoformat") else str(r["game_date"])
+        return rows
+
+    def delete_rows(self, rows):
+        for r in rows:
+            self.cur.execute("delete from record_entries where board = %s and bucket = %s and gmkey = %s and subject = %s and period = %s", pk(r))
+
+
+def apply_game(store, gmkey, candidates, keep=KEEP_RANK):
+    """한 경기를 반영한다(멱등): 그 경기 기존 행 삭제 -> 후보 삽입 -> 영향받은 보드·구간의 순위 > keep 삭제."""
+    affected = set(store.delete_game(gmkey))
+    store.upsert(candidates)
+    affected |= {(r["board"], r["bucket"]) for r in candidates}
+    pruned = 0
+    for board, bucket in sorted(affected):
+        drop = [r for rank, r in rank_sorted(store.board_rows(board, bucket)) if rank > keep]
+        store.delete_rows(drop)
+        pruned += len(drop)
+    return {"candidates": len(candidates), "pruned": pruned, "boards": len(affected)}
+
+
+def diff_rows(expected, actual):
+    """--verify: 두 행 집합을 PK + value로 비교 -> (없는 것, 남는 것, 값이 다른 것)."""
+    e, a = {pk(r): r["value"] for r in expected}, {pk(r): r["value"] for r in actual}
+    missing = sorted(set(e) - set(a))
+    extra = sorted(set(a) - set(e))
+    changed = sorted(k for k in set(e) & set(a) if e[k] != a[k])
+    return missing, extra, changed
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def _summary(rows):
+    by = collections.Counter((r["board"], r["bucket"]) for r in rows)
+    log(f"보관 행 {len(rows)}개 / 보드·구간 {len(by)}개 (최대 {max(by.values()) if by else 0}행)")
+
+
+def _revalidate():
+    try:
+        from cache_invalidate import revalidate
+        revalidate(["records"])
+    except Exception as e:  # noqa: BLE001 - 캐시 무효화는 best-effort
+        log(f"캐시 무효화 건너뜀: {e}")
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--rebuild", action="store_true", help="raw/games 전체로 record_entries 교체")
+    ap.add_argument("--gmkeys", help="이 경기들만 반영(콤마 구분, 멱등)")
+    ap.add_argument("--verify", action="store_true", help="raw에서 다시 계산한 것과 테이블 비교")
+    ap.add_argument("--dry-run", action="store_true", help="--rebuild: DB를 건드리지 않고 계산만")
+    ap.add_argument("--dump", help="--rebuild --dry-run: 보관 행을 JSON으로 저장할 경로")
+    ap.add_argument("--keep", type=int, default=KEEP_RANK, help=f"보드·구간별 보관 순위 (기본 {KEEP_RANK})")
+    args = ap.parse_args(argv)
+    if not (args.rebuild or args.gmkeys or args.verify):
+        ap.error("--rebuild, --gmkeys, --verify 중 하나가 필요하다")
+
+    if args.rebuild or args.verify:
+        rows, stats = build_all(keep=args.keep)
+        log(f"경기 {stats['games']}개(이벤트 검증 통과 {stats['event_games']}개), 후보 {stats['candidates']}개")
+        _summary(rows)
+        if len(rows) > MAX_ROWS:
+            log(f"!!! 보관 행이 {MAX_ROWS}개를 넘는다 - 정의 오류로 보고 중단")
+            return 1
+        if args.dump:
+            with open(args.dump, "w", encoding="utf-8") as f:
+                json.dump(rows, f, ensure_ascii=False)
+            log(f"저장: {args.dump}")
+        if args.dry_run:
+            return 0
+
+    from sync_upcoming_games import get_conn
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        store = PgStore(cur)
+        if args.rebuild:
+            store.lock()
+            store.replace_all(rows)
+            conn.commit()
+            log(f"교체 완료: {len(rows)}행")
+            _revalidate()
+        elif args.verify:
+            missing, extra, changed = diff_rows(rows, store.all_rows())
+            log(f"검증: 없는 행 {len(missing)} / 남는 행 {len(extra)} / 값이 다른 행 {len(changed)}")
+            for label, ks in (("없음", missing), ("남음", extra), ("다름", changed)):
+                for k in ks[:10]:
+                    log(f"  {label}: {k}")
+            return 0 if not (missing or extra or changed) else 1
+        else:
+            failed = 0
+            for gmkey in [x.strip() for x in args.gmkeys.split(",") if x.strip()]:
+                g = load_game(gmkey)
+                if g is None:
+                    log(f"{gmkey}: raw 파일이 없거나 대상 경기가 아니라 건너뜀")
+                    failed += 1
+                    continue
+                store.lock()
+                res = apply_game(store, gmkey, game_candidates(g))
+                conn.commit()
+                log(f"{gmkey}: {res}")
+            _revalidate()
+            return 1 if failed else 0
+        return 0
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
