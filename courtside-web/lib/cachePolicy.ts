@@ -151,4 +151,6 @@ export const TAG = {
   batch: "batch:daily",
   /** build_*.py 산출물. */
   build: "manual:build",
+  /** 역대 기록(record_entries) - tools/record_book.py가 경기 종료 정산 직후 무효화한다. */
+  records: "records",
 } as const;
