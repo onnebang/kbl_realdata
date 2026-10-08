@@ -278,6 +278,19 @@ Q2/Q3 용병 2인 규정 첫 시즌) 학습테이블 표본이 `SAMPLE_THRESHOLD
 - 시즌 초반 상태 재현 검증: `python replay_ovr_season_start.py --season 2025-2026` - 과거 시즌을 N경기까지만 잘라
   OVR 생성기를 돌려 진행 중 시즌 처리(백분위 풀 격리 + 진행률별 변동 상한)를 확인한다. OVR 생성 로직을 고친 뒤 돌릴 것.
 
+**역대 기록(Record Book)** (2026-10-08, 설계 `docs/superpowers/specs/2026-10-08-record-book-design.md`) - KBL 역대 TOP10(팀·선수의
+쿼터/경기/연장별 최다·최소)를 Supabase `record_entries`에 보관해 라이브 "🏆 역대 기록"과 경기 후 리포트 "역대 기록"이 읽는다.
+
+- 경기가 끝나면 `live_collector.reconcile_finished_game`이 이벤트 이관 뒤 `record_book.py --gmkeys <gmkey>`를 부른다(실패해도 정산 결과는 그대로,
+  로그 `raw/live_collector.log`에 `record_book.py -> exit N`). 놓친 경기는 매일 06:00 `daily_batch.py`가 같은 호출로 복구한다(멱등).
+- 수동: `python record_book.py --gmkeys S49G01N9` (한 경기 반영) / `--rebuild --dry-run` (DB 없이 전체 계산·요약) / `--rebuild` (테이블 교체 - 기록 정의나
+  검증 게이트를 고친 뒤) / `--verify` (raw에서 다시 계산한 것과 테이블 비교, 다르면 종료코드 1 - 월 1회 점검).
+- 기록 정의를 고치면 `tools/test_record_book.py`(`RECORD_BOOK_SLOW=1`이면 실데이터 단언)와 웹 `lib/records.parity.test.ts`가 둘 다 통과해야 한다
+  (파이썬과 웹이 같은 정의를 쓰는지 실제 경기 10개로 고정). 픽스처 재생성: `python dump_record_fixtures.py --parity <폴더> --gmkeys ...`.
+- 테이블 적용/롤백: `schema_record_book.sql` / `rollback_record_book.sql`. RLS 켬 + 정책 없음 + anon 권한 회수라 익명은 못 읽는다(서버만).
+- 이벤트는 옛 경기(2006~09)에서 공식 기록과 어긋난다(김승현 2007-03-23 공식 11어시스트, 이벤트 15개) - 이벤트 기반 보드는 공식 쿼터 점수·박스 합계와 대조를
+  통과한 경기만 쓴다. 이 검증 때문에 "기록을 놓칠 수는 있어도 틀린 기록은 안 만든다".
+
 **감시**: Supabase pg_cron(`watch_live_collector`, 1분마다)이 수집기 심박(`live_collector_status`)을
 보고 있다가 멈추면 Discord로 알림(🔴 응답 없음 / 🟠 문자중계 멈춤 / 🟢 해제). 지금 걸린 문제 보기:
 `select * from live_collector_problems();` (Supabase SQL 편집기).
