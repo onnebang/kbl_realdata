@@ -16,6 +16,7 @@ import { computeEntryUsage, type EntryPlayer } from "./report/entryUsage";
 import { getPlayerOvrHistory } from "./ovr";
 import { pickRecord } from "./courtCardInfo";
 import { basisNote, buildMilestoneTimeline, type MilestoneContext, type RecordChance } from "./milestones";
+import { buildRecordTimeline, type RecordContext, type RecordMoment, type RecordNames } from "./records";
 
 export { fmtDuration };
 export type { ReportSection, ReportSectionData, ReportTeamMeta };
@@ -945,6 +946,31 @@ export function recordChanceList(chances: RecordChance[], homeTeam: ReportTeamMe
   return `<ul class="report-list">${items}</ul>`;
 }
 
+/**
+ * 역대 기록 - 이 경기에서 KBL 역대 TOP10(쿼터·경기·연장별 최다/최소)에 닿은 기록(요청 2026-10-08). 계산은 라이브 "기록 워치"의 역대 기록과 같은
+ * buildRecordTimeline을 **종료 경기의 최종 이벤트**로 돌려 시각(점프 링크)을 얻고, 테이블에 있는(= 공식 기록과 대조를 통과한) 항목만 쓴다.
+ * 같은 (보드·대상·구간)에서 여러 번 알린 것(7개 -> 8개 -> 9개)은 마지막(가장 좋은) 한 줄만. 없으면 null.
+ */
+export function recordBookSection(ctx: RecordContext, events: GameEvent[], tags: ReportTags, names: RecordNames): ReportSection | null {
+  const last = new Map<string, RecordMoment>();
+  for (const m of buildRecordTimeline(ctx, events, { names, final: true })) if (m.phase === "done") last.set(`${m.board}|${m.subject}|${m.period}`, m);
+  const done = [...last.values()];
+  if (done.length === 0) return null;
+  const shown = done
+    .sort((a, b) => a.sig - b.sig || a.idx - b.idx)
+    .slice(0, RECORDS_MAX)
+    .sort((a, b) => a.idx - b.idx);
+  const items = shown
+    .map((m) => {
+      const who = m.scope === "p" ? tags.playerTag(m.name, m.tcode) : tags.teamTag(m.tcode, m.name);
+      return `${tags.liOpen(m.tcode)}${who}${iGa(m.name)} ${jumpLink(m.idx, escHtml(m.clock))} ${escHtml(m.text)}${m.detail ? `(${escHtml(m.detail)})` : ""}.</li>`;
+    })
+    .join("");
+  const rest = done.length - shown.length;
+  const more = rest > 0 ? `<p class="report-caveat">그 밖에 ${rest}건의 기록이 더 있었음 - 실시간 중계 탭의 "기록 워치"에서 전부 볼 수 있습니다.</p>` : "";
+  return { title: "역대 기록", html: `<ul class="report-list">${items}</ul>${more}<p class="report-caveat">KBL 역대 TOP10 기준 · 정규시즌·플레이오프 합산 · 공식 기록과 대조를 통과한 경기만 집계</p>` };
+}
+
 export type BuildReportInput = {
   events: GameEvent[]; // event_order 오름차순, attachDerivedFields() 이미 적용된 것
   box: PlayerBox[]; // game_player_stats(이 경기 최종 박스스코어)
@@ -983,6 +1009,8 @@ export type BuildReportInput = {
   seasonName?: string | null;
   /** 이 경기 직전 기준 선수별 달성 가능 목표(lib/careerMarks.ts getMilestoneContext) - '기록 달성'. 없으면(전시경기·스냅샷 공백 등) 그 섹션만 빠진다. */
   milestones?: MilestoneContext | null;
+  /** 이 경기 이전 기준 KBL 역대 TOP10 요약(lib/recordBook.ts getRecordContext, 종료 경기라 validated 포함) - '역대 기록'. 없으면 그 섹션만 빠진다. */
+  records?: RecordContext | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -1227,6 +1255,15 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
           : `<p class="report-text">최종 마진은 ${margin}점 - 15시즌 ${rarity.marginTotalGames}경기 중 ${marginPct}%가 이 정도로 접전이었음.</p>`;
     }
     sections.push({ title: "경기 결과", html });
+  }
+
+  // 1.05 역대 기록 - "경기 결과" 바로 아래, 선수 통산 기록('기록 달성')보다 위: KBL 역대 TOP10에 닿은 쿼터·경기 기록(새 조회 0회).
+  if (input.records) {
+    const book = recordBookSection(input.records, events, tags, {
+      player: (pcode) => boxByPcode.get(pcode)?.name ?? pcode,
+      team: (tcode) => (tcode === homeTcode ? homeTname : tcode === awayTcode ? awayTname : tcode),
+    });
+    if (book) sections.push(book);
   }
 
   // 1.1 기록 달성 - "경기 결과" 바로 아래: 이 경기가 선수들의 통산 기록에 남긴 것(새 조회 0회 - page.tsx가 이미 받은 재료).

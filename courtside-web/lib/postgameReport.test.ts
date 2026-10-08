@@ -9,9 +9,11 @@ import {
   dramaticSwingKind,
   estimatePossessions,
   isOvertimeQuarter,
+  recordBookSection,
   recordChanceList,
   recordsSection,
 } from "./postgameReport";
+import type { RecordContext } from "./records";
 import type { MilestoneContext, MilestoneTarget } from "./milestones";
 import { createReportTags } from "./report/renderKit";
 import { shotXPTS } from "./zoneCompare";
@@ -342,5 +344,59 @@ describe("기록 달성 섹션 / 기록 도전 목록 (요청 2026-10-07)", () =
     expect(html).toContain("양홍석</b></span>이 9점 이상 넣으면 통산 득점 4,600점을 달성한다(현재 통산 4,591점).</li>");
     expect(html).toContain("마레이&lt;b&gt;</b></span>가 1개만 기록하면"); // 받침 없는 마지막 글자 '>' 는 '가'
     expect(html).not.toContain("마레이<b>");
+  });
+});
+
+describe("역대 기록 섹션 (요청 2026-10-08)", () => {
+  const home = { tcode: "H", name: "홈팀", abbr: "홈", color: "#111111" };
+  const away = { tcode: "A", name: "원정팀", abbr: "원정", color: "#222222" };
+  const tags = createReportTags(home, away);
+  const names = { player: (p: string) => (p === "p1" ? "허훈" : p), team: (t: string) => (t === "H" ? "홈팀" : "원정팀") };
+  const board = (tops: number[]) => ({ tops, holders: [{ v: tops[0], who: "문태종", d: "2010-12-15" }] });
+  const EIGHTS = [8, 8, 8, 8, 8, 8, 7, 7, 7, 7];
+  const ctx = (validated?: string[]): RecordContext => ({
+    asOf: "2026-10-07 19:00",
+    boards: { "pq.ast.max|Q1": board(EIGHTS), "pq.ast.max|ALL": board(EIGHTS) },
+    ...(validated ? { validated } : {}),
+  });
+  // PRE 행 + 1쿼터 어시스트 9개(허훈 = p1). 어시스트 k번째 이벤트의 인덱스 = k, 9번째의 남은 시간 = 1:00.
+  const events = attachDerivedFields([
+    ev({ event_order: 0, quarter: "PRE", home_score: 0, away_score: 0, home_win_prob: 0.5 }),
+    ...Array.from({ length: 9 }, (_, i) =>
+      ev({ event_order: i + 1, quarter: "Q1", clock_min: 9 - i, clock_sec: 0, home_score: 0, away_score: 0, action_code: "211", pcode: "p1", player_name: "허훈", tcode: "H", home_win_prob: 0.5 })
+    ),
+  ]);
+
+  it("같은 선수·보드의 7개 -> 8개 -> 9개는 마지막(신기록) 한 줄만, 점프 링크와 팀 칩과 조사를 붙인다", () => {
+    const sec = recordBookSection(ctx(["pq.ast.max|Q1|p1|Q1"]), events, tags, names)!;
+    expect(sec.title).toBe("역대 기록");
+    const html = htmlOf(sec);
+    expect(html.match(/<li /g)).toHaveLength(1);
+    expect(html).toContain('<a href="#" class="report-jump-link" data-jump-idx="9">Q1 1:00</a>');
+    expect(html).toContain("허훈</b></span>이 "); // 받침 있는 이름 + 이
+    expect(html).toContain("1쿼터 어시스트 9개 KBL 신기록(종전 8개)");
+    expect(html).toContain("1쿼터 기준 신기록 · 종전 최고 8개: 문태종");
+    expect(html).toContain("KBL 역대 TOP10 기준");
+  });
+
+  it("종료 경기에서 테이블에 없는 항목(validated 밖)은 쓰지 않고, 아무것도 없으면 null", () => {
+    expect(recordBookSection(ctx([]), events, tags, names)).toBeNull();
+    expect(recordBookSection(ctx(["pq.ast.max|Q2|p1|Q2"]), events, tags, names)).toBeNull();
+    expect(recordBookSection({ asOf: "x", boards: {}, validated: [] }, events, tags, names)).toBeNull();
+  });
+
+  it("buildPostgameReport - records를 주면 '경기 결과'와 '기록 달성' 사이에 들어가고, 안 주면 섹션이 없다", () => {
+    const box = [{ pcode: "p1", tcode: "H", name: "허훈", is_starter: true, pts: 0, fgm: 0, fga: 0, ftm: 0, fta: 0, reb: 0, ast: 9, stl: 0, blk: 0, fouls: 0, turnovers: 0 }];
+    const base = { events, box, homeTeam: home, awayTeam: away, homeScore: 2, awayScore: 0, rarity: null };
+    const milestones = {
+      split: "regular" as const,
+      asOf: "2026-10-06",
+      players: { p1: { name: "허훈", tcode: "H", before: { pts: 0, reb: 0, ast: 98, stl: 0, blk: 0, threep: 0 }, targets: [{ kind: "step" as const, cat: "ast" as const, at: 100 }] } },
+    };
+    const titles = buildPostgameReport({ ...base, milestones, records: ctx(["pq.ast.max|Q1|p1|Q1"]) }).map((s) => s.title);
+    expect(titles.indexOf("역대 기록")).toBe(titles.indexOf("경기 결과") + 1);
+    expect(titles.indexOf("기록 달성")).toBe(titles.indexOf("역대 기록") + 1);
+    expect(buildPostgameReport(base).map((s) => s.title)).not.toContain("역대 기록");
+    expect(buildPostgameReport({ ...base, records: null }).map((s) => s.title)).not.toContain("역대 기록");
   });
 });
