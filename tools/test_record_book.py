@@ -329,6 +329,18 @@ def test_pgstore_sql_shape():
     assert "delete from record_entries where gmkey = %s returning board, bucket" in cur2.statements[-1][0]
 
 
+def test_schema_sql_matches_row_columns():
+    """schema_record_book.sql과 record_book.ROW_COLUMNS가 어긋나면(열 추가/이름 변경 한쪽만) 여기서 잡는다."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema_record_book.sql")
+    with open(path, encoding="utf-8") as f:
+        body = f.read()
+    cols = re.findall(r"^\s{2}(\w+)\s+(?:text|integer|date|boolean)", body, flags=re.M)
+    assert tuple(cols) == rb.ROW_COLUMNS, cols
+    assert "primary key (" + ", ".join(rb.PK_COLUMNS) + ")" in body
+    assert "enable row level security" in body and "revoke all on record_entries from anon, authenticated" in body
+    assert "create policy" not in body, "정책을 만들면 익명 접근이 열릴 수 있다"
+
+
 # ---------------------------------------------------------------------------
 # 실데이터 - RECORD_BOOK_SLOW=1
 # ---------------------------------------------------------------------------
