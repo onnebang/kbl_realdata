@@ -2,6 +2,7 @@ import { supabaseServer as supabase } from "./supabaseServer";
 import { TAG, TTL, cachedFn, cachedMap } from "./cachePolicy";
 import { classifyShot } from "./formIndex";
 import { COURT_X, COURT_Y, HOOP_RIGHT, mirrorShotX, drawCourtMarkings, drawHoop } from "./zoneCompare";
+import { OPEN_MATCH_CATEGORY } from "./playerPageData";
 
 // "하든 차트"(perthirtysix.com류, 슛 하나하나를 존 기대값 대비 잔차로 색칠하는 개인 리포트) -
 // 선수 프로필의 "슛 분포"(15x15 히트맵)를 실제 슛 위치 + 임팩트 색상으로 업그레이드(커밋
@@ -32,9 +33,10 @@ export async function fetchPlayerSeasonShots(pcode: string, seasonName: string):
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from("shot_log")
-      .select("x, y, d, made, games!inner(season_name)")
+      .select("x, y, d, made, games!inner(season_name, season_category)")
       .eq("pcode", pcode)
       .eq("games.season_name", seasonName)
+      .neq("games.season_category", OPEN_MATCH_CATEGORY)
       .range(from, from + PAGE - 1);
     if (error || !data || !data.length) break;
     rows.push(...(data as unknown as ShotImpactRow[]));
@@ -80,9 +82,10 @@ async function computeGetPlayerSeasonBoxTotals(pcode: string, seasonName: string
   };
   const { data } = await supabase
     .from("game_player_stats")
-    .select("pts, fga, tpa, fta, ast, turnovers, usage_rtg, games!inner(season_name)")
+    .select("pts, fga, tpa, fta, ast, turnovers, usage_rtg, games!inner(season_name, season_category)")
     .eq("pcode", pcode)
-    .eq("games.season_name", seasonName);
+    .eq("games.season_name", seasonName)
+    .neq("games.season_category", OPEN_MATCH_CATEGORY);
   const rows = (data ?? []) as unknown as Row[];
   const sum = (fn: (r: Row) => number) => rows.reduce((s, r) => s + fn(r), 0);
   const usgRows = rows.filter((r) => r.usage_rtg != null);
