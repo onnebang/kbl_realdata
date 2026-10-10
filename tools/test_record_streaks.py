@@ -217,6 +217,33 @@ def test_cg_playoffs_are_ignored():
 
 
 @small_min
+def test_team_streaks_reset_each_season_and_ignore_playoffs():
+    s1, s2 = "2025-2026", "2026-2027"
+    games = [
+        game_of("S47G01N1", "2025-10-01", "H", "A", [], season=s1, score=(80, 70)),                              # H 승
+        game_of("S47G01N2", "2025-10-02", "H", "A", [], season=s1, score=(90, 85)),                              # H 승
+        game_of("S47G03N1", "2025-10-03", "A", "H", [], season=s1, score=(100, 60), category="플레이오프"),       # 플레이오프는 세지도 끊지도 않는다
+        game_of("S47G01N3", "2025-10-04", "H", "A", [], season=s1, score=(75, 74)),                              # H 승 -> H 3연승
+        game_of("S47G01N4", "2025-10-05", "A", "H", [], season=s1, score=(88, 70)),                              # A 승 -> H 3연승 끝, A 3연패 끝
+        game_of("S49G01N1", "2026-10-01", "H", "A", [], season=s2, score=(60, 70)),                              # 새 시즌: 열린 연속은 닫히고 처음부터
+    ]
+    rows, log = rs.compute(games, keep_days=None)
+    assert log_of(log, "H", "tw") == [("S47G01N1", 0, 1, False), ("S47G01N2", 1, 2, False), ("S47G01N3", 2, 3, False), ("S47G01N4", 3, 0, False)]
+    assert log_of(log, "H", "tl") == [("S47G01N4", 0, 1, False), ("S49G01N1", 0, 1, True)]
+    assert log_of(log, "A", "tl") == [("S47G01N1", 0, 1, False), ("S47G01N2", 1, 2, False), ("S47G01N3", 2, 3, False), ("S47G01N4", 3, 0, False)]
+    assert log_of(log, "A", "tw") == [("S47G01N4", 0, 1, False), ("S49G01N1", 0, 1, True)]
+    assert rows_of(rows, "tg.win_streak.max") == [("H", 3, "E:S47G01N1", "S47G01N3")]
+    assert rows_of(rows, "tg.loss_streak.max") == [("A", 3, "E:S47G01N1", "S47G01N3")]
+
+
+@small_min
+def test_team_streaks_skip_games_without_a_decisive_official_score():
+    games = [game_of("S49G01N1", "2026-10-01", "H", "A", [], score=(70, 70)), game_of("S49G01N2", "2026-10-02", "H", "A", [])]       # 동점·점수 0:0은 건너뜀
+    _, log = rs.compute(games)
+    assert not [r for r in log if r["kind"] in ("tw", "tl")]
+
+
+@small_min
 def test_shot_runs_carry_across_games_and_show_in_log_and_rows():
     games = [
         game_of("S49G01N1", "2026-10-01", "H", "A", [("p1", "H", "2+ 2+ 2- 2+")]),
@@ -272,7 +299,7 @@ def test_per_game_apply_never_touches_streak_rows():
     store = rb.MemoryStore([streak_row])
     rb.apply_game(store, "S49G01N3", [])                                                                 # 같은 gmkey를 다시 정산해도
     assert [r["board"] for r in store.all_rows()] == ["pg.streak_gp.max"]                                # 연속 보드 행은 그대로(통째 재계산 몫)
-    assert tuple(rs.BOARD.values()) == rb.STREAK_BOARDS == rs.STREAK_BOARDS
+    assert tuple(rs.BOARD.values()) == rb.STREAK_BOARDS == rs.STREAK_BOARDS and len(rb.STREAK_BOARDS) == 15
 
 
 @small_min
@@ -364,6 +391,14 @@ def test_known_streaks_on_real_data():
     assert (ft["subject_name"], ft["value"]) == ("조성민", 56), ft
     fg = top("pg.xfg_made.max")[0]
     assert (fg["subject_name"], fg["value"]) == ("서장훈", 24), fg
+    for board, name, value in (("pg.cg_pts10.max", "데이비드 사이먼", 146), ("pg.cg_pts20.max", "피트 마이클", 42), ("pg.cg_dd.max", "리카르도 라틀리프", 59),
+                               ("pg.cg_reb10.max", "리카르도 라틀리프", 59), ("pg.cg_tpm1.max", "전성현", 76), ("pg.cg_ast5.max", "주희정", 27)):
+        t = top(board)[0]
+        assert (t["subject_name"], t["value"]) == (name, value), (board, t)                                                                  # 2026-10-11 raw 실측
+    tw = top("tg.win_streak.max")[0]
+    assert (tw["value"], tw["subject"], tw["period"][:2]) == (16, "16", "E:"), tw                                                            # 원주 DB 2011-12 16연승
+    tl = top("tg.loss_streak.max")[0]
+    assert tl["value"] == 14, tl                                                                                                             # 서울 삼성 2011-12 · 원주 DB 2013-14 14연패(공동)
     alive = [r for r in log if r["pcode"] == "290381" and r["kind"] == "gp" and r["alive"]]
     assert len(alive) == 1 and alive[0]["after_len"] >= 746, alive                                                                         # 최신 행 하나만 alive
     assert len({(r["pcode"], r["kind"]) for r in log if r["alive"]}) == len([r for r in log if r["alive"]])                              # (선수, 종류)당 alive 행은 하나

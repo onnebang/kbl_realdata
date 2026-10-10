@@ -7,6 +7,7 @@ raw/games 전체를 날짜·시작시각 순으로 훑는 상태기계다(정산
 - 연속 출장(공식 방식, 2026-10-10 점프볼 보도 '이정현 699경기 연속 출전'을 그대로 재현): 정규시즌 경기에서 선수 명단(player-stat 행)에 올라 뛰면 +1, 명단에 올랐는데 한 분도
   못 뛰면 끊김, 명단에 없던 경기(부상·군 복무·이적 준비 등)는 건너뜀. 이적은 상관없고 플레이오프·챔프전은 세지도 끊지도 않는다.
 - 선수 연속 경기 6종(4단계 A, 설계 `2026-10-11-record-book-phase4a-design.md`): 연속 출장과 같은 틀에 조건만 얹는다(`GAME_COND` - 득점 10+/20+·더블더블·리바운드 10+·3점슛 1+·어시스트 5+).
+- 팀 연승·연패(`tw`/`tl`): 정규시즌 시즌 안에서 이어진 연속 승리/패배(공식 최종 점수, 시즌이 바뀌면 리셋). 로그의 pcode 칸에 팀 코드를 넣는다.
 - 보드 행(`BOARD`): 연속 하나당 한 행. period = 'A:<시작 gmkey>'(지금 이어지는 중) / 'E:<시작 gmkey>'(끝남), gmkey = 연속의 마지막 경기.
 - 로그(record_streak_log): 최근 LOG_KEEP_DAYS일 경기의 (선수, 종류)별 전·후 길이와 alive 표시 - 웹이 "이 경기 직전 연속 상태"를 읽는다.
 - 한 경기 안 연속 슛 6개 보드는 여기가 아니라 record_book.single_shot_candidates(선수-경기 후보)다.
@@ -35,7 +36,8 @@ GAME_COND = {
     "cg_pts10": _ge("score", 10), "cg_pts20": _ge("score", 20), "cg_dd": _double_double,
     "cg_reb10": _ge("rb", 10), "cg_tpm1": _ge("threep", 1), "cg_ast5": _ge("ast", 5),
 }
-KINDS = tuple(GAME_COND) + ("xfg_made", "xfg_miss", "xtp_made", "xtp_miss", "xft_made", "xft_miss")
+TEAM_KINDS = ("tw", "tl")      # 팀 시즌 내 연승 / 연패 - 로그의 pcode 칸에 팀 코드를 넣는다(선수 코드는 6자리 숫자, 팀 코드는 2자리라 겹치지 않는다)
+KINDS = tuple(GAME_COND) + ("xfg_made", "xfg_miss", "xtp_made", "xtp_miss", "xft_made", "xft_miss") + TEAM_KINDS
 BOARD = {
     "gp": "pg.streak_gp.max",
     "xfg_made": "pg.xfg_made.max", "xfg_miss": "pg.xfg_miss.max",
@@ -43,10 +45,11 @@ BOARD = {
     "xft_made": "pg.xft_made.max", "xft_miss": "pg.xft_miss.max",
     "cg_pts10": "pg.cg_pts10.max", "cg_pts20": "pg.cg_pts20.max", "cg_dd": "pg.cg_dd.max",
     "cg_reb10": "pg.cg_reb10.max", "cg_tpm1": "pg.cg_tpm1.max", "cg_ast5": "pg.cg_ast5.max",
+    "tw": "tg.win_streak.max", "tl": "tg.loss_streak.max",
 }
 STREAK_BOARDS = rb.STREAK_BOARDS
 MIN_ROW = 6               # 이보다 짧은 연속은 보드 행 후보가 아니다(보관 순위가 어차피 훨씬 높다)
-MIN_ROW_KIND = {k: 8 for k in GAME_COND if k != "gp"}      # 선수 연속 경기 종류는 더 길어야 후보(10위 값이 15~55)
+MIN_ROW_KIND = {**{k: 8 for k in GAME_COND if k != "gp"}, "tw": 6, "tl": 6}      # 선수 연속 경기 종류는 더 길어야 후보(10위 값이 15~55), 팀 연승·연패는 10위 값이 12
 LOG_KEEP_DAYS = 120       # 로그는 이 기간(최근 경기 날짜 기준)만
 RAW_HISTORY_MIN = 5000    # raw/games에 이 수 이상의 경기 폴더가 있어야 전체 재계산을 한다
 LOG_COLUMNS = rb.LOG_COLUMNS
@@ -94,6 +97,7 @@ def compute(games, keep_days=LOG_KEEP_DAYS):
     info = []                                        # 경기 번호 -> 가벼운 경기 정보
     names = {}
     game_runs = {k: {} for k in GAME_COND}           # 종류 -> pcode -> {"len", "start", "last", "tc"} - 정규시즌 명단 기준 연속(연속 출장 포함)
+    team = {}                                        # tcode -> {"season", "tw": run, "tl": run, "last": 경기 번호} - 정규시즌 시즌 내 연승·연패
     runs = {}                                        # (pcode, kind) -> {"made": run, "miss": run}
     last_seen = {}                                   # pcode -> 마지막 출전 경기 번호(어느 종류의 경기든)
     rows, log = [], []
@@ -138,6 +142,28 @@ def compute(games, keep_days=LOG_KEEP_DAYS):
                         emit(kind, pc, {"len": st["len"], "start": st["start"], "end": st["last"], "tc": st["tc"]}, False)
                         add_log(lg, pc, kind, st["len"], 0, st["start"])
                         del runs_k[pc]
+            # --- 팀 연승·연패: 공식 최종 점수로 승패가 갈린 정규시즌 경기, 시즌이 바뀌면 처음부터
+            hs, as_ = (g["teams"].get(g["home"]) or {}).get("score"), (g["teams"].get(g["away"]) or {}).get("score")
+            if isinstance(hs, int) and isinstance(as_, int) and hs != as_:
+                for tc, won in ((g["home"], hs > as_), (g["away"], as_ > hs)):
+                    names[tc] = g["names"].get(tc, tc)
+                    st = team.get(tc)
+                    if st and st["season"] != g["season"]:
+                        for kind in TEAM_KINDS:
+                            if st[kind]["len"] > 0:
+                                emit(kind, tc, st[kind], False)
+                        st = None
+                    if st is None:
+                        st = team[tc] = {"season": g["season"], "tw": _new_run(), "tl": _new_run(), "last": n}
+                    cur_k, oth_k = ("tw", "tl") if won else ("tl", "tw")
+                    if st[oth_k]["len"] > 0:
+                        add_log(lg, tc, oth_k, st[oth_k]["len"], 0, st[oth_k]["start"])
+                        emit(oth_k, tc, st[oth_k], False)
+                        st[oth_k] = _new_run()
+                    before = st[cur_k]["len"]
+                    st[cur_k] = {"len": before + 1, "start": st[cur_k]["start"] if before else n, "end": n, "tc": tc}
+                    st["last"] = n
+                    add_log(lg, tc, cur_k, before, before + 1, st[cur_k]["start"])
         # --- 경기 간 연속 슛
         ok, bad = rb.shot_sequences(g)
         for pcode, kinds in bad.items():                                  # 게이트 탈락: 그 종목 연속을 끊는다(모르는 구간을 이어 붙이지 않는다)
@@ -183,6 +209,13 @@ def compute(games, keep_days=LOG_KEEP_DAYS):
             emit(kind, pc, {"len": st["len"], "start": st["start"], "end": st["last"], "tc": st["tc"]}, alive)
             if alive and (pc, kind) in latest_log:
                 latest_log[(pc, kind)]["alive"] = True
+    for tc, st in team.items():
+        alive = info[st["last"]]["date"] >= cutoff
+        for kind in TEAM_KINDS:
+            if st[kind]["len"] > 0:
+                emit(kind, tc, st[kind], alive)
+                if alive and (tc, kind) in latest_log:
+                    latest_log[(tc, kind)]["alive"] = True
     for (pc, kind), st in runs.items():
         seen = last_seen.get(pc)
         alive_p = seen is not None and info[seen]["date"] >= cutoff
