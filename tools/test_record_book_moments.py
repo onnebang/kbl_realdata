@@ -113,6 +113,66 @@ def test_clubs_keep_every_achievement_after_retention():
     assert len(rb.retain(rows)) == 40                       # 값이 전부 1이라 순위 1 동률 - 순위 <= 15 규칙이 모두 남긴다
 
 
+# ---------------------------------------------------------------------------
+# 최단 시간 더블더블 / 트리플더블 / 5반칙 퇴장
+# ---------------------------------------------------------------------------
+
+def time_game(ast=0, fouls=0, play_min=10, rb_official=10, foul_official=None, gmkey="S49G01N1", hq=None):
+    """H의 '가드'가 Q1 10:00에 투입 -> 득점 10점(2점슛 5개, t=60~100초) -> 리바운드 10개(t=125~170) -> 어시스트(t=185~) -> 파울(t=250~) -> Q1 0:00 퇴장."""
+    ev, n = [], 0
+
+    def add(m, s, a, q="Q1"):
+        nonlocal n
+        n += 1
+        ev.append(e(n, q, m, s, "가드", "H", a))
+
+    add(10, 0, "101")
+    for m, s in [(9, 0), (8, 50), (8, 40), (8, 30), (8, 20)]:
+        add(m, s, "201")
+    for i in range(10):
+        add(7, 55 - 5 * i, "210")
+    for i in range(ast):
+        add(6, 55 - 5 * i, "211")
+    for i in range(fouls):
+        add(5, 50 - 10 * i, "215" if i % 2 == 0 else "216")
+    add(0, 0, "102")
+    p = player("g1", "가드", "H", score=10, rb=rb_official, ast=ast, foul=fouls if foul_official is None else foul_official, playMin=play_min)
+    return game(ev, [p], hq or [10, 0, 0, 0], [0, 0, 0, 0], gmkey=gmkey)
+
+
+def time_rows(g):
+    return sorted((r["board"], r["subject"], r["value"]) for r in rb.moment_candidates(g) if r["board"].endswith("_time.min"))
+
+
+def test_fastest_double_double_uses_on_court_seconds():
+    # 10번째 리바운드가 t=170초(Q1 7:10) - 그때까지 코트에 있었으므로 출전 170초
+    assert time_rows(time_game()) == [("pg.dd_time.min", "g1", 170)]
+
+
+def test_fastest_triple_double_and_five_fouls():
+    rows = time_rows(time_game(ast=10, fouls=5))
+    assert rows == [("pg.dd_time.min", "g1", 170), ("pg.foul5_time.min", "g1", 290), ("pg.td_time.min", "g1", 230)]
+    assert time_rows(time_game(fouls=4)) == [("pg.dd_time.min", "g1", 170)]            # 4반칙은 퇴장이 아니다
+
+
+def test_time_rows_need_matching_minutes_and_totals():
+    assert time_rows(time_game(play_min=9)) == []                                      # 공식 출전 540초 vs 재구성 600초 - 게이트 탈락
+    assert time_rows(time_game(rb_official=9)) == []                                   # 이벤트 리바운드 10 != 공식 9 - 그 선수 탈락
+    assert time_rows(time_game(hq=[11, 0, 0, 0])) == []                                # 게이트 1(이벤트 쿼터 득점 = 공식) 탈락
+    only_dd = time_rows(time_game(fouls=5, foul_official=4))                           # 파울 합계만 다르면 5반칙만 빠진다
+    assert only_dd == [("pg.dd_time.min", "g1", 170)]
+
+
+def test_time_rows_work_for_old_seasons_too():
+    assert time_rows(time_game(gmkey="S21G01N1")) == [("pg.dd_time.min", "g1", 170)]   # 분 단위 보드는 시즌 컷이 없다
+
+
+def test_same_name_players_are_skipped():
+    g = time_game()
+    g["players"].append(player("g2", "가드", "H", score=0, playMin=0))                  # 같은 팀 동명이인 - 이름으로 구분할 수 없다
+    assert time_rows(g) == []
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):

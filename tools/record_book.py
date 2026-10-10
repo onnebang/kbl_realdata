@@ -334,9 +334,99 @@ def official_moment_candidates(g):
     return rows
 
 
+def player_timelines(g):
+    """선수((이름, tcode)) -> [(경기 시작 후 초, 그때까지 코트 출전 초, 코드, 쿼터)] 와 코트 출전 초 합계. 101(투입)~102(퇴장)을 합산한다."""
+    on, acc = {}, collections.defaultdict(int)
+    line = collections.defaultdict(list)
+    for e in ordered_events(g):
+        q, name, tc, a = e.get("q"), e.get("p"), e.get("t"), e.get("a")
+        t = event_time(e)
+        if not (q and name and tc and a) or t is None:
+            continue
+        k = (name, tc)
+        if a == SUB_IN:
+            on[k] = t
+        elif a == SUB_OUT:
+            if k in on:
+                acc[k] += max(0, t - on.pop(k))
+        else:
+            line[k].append((t, acc[k] + (t - on[k] if k in on else 0), a, q))
+    return line, acc
+
+
+def minutes_match_official(g, acc):
+    """재구성한 코트 출전 초가 모든 선수에서 공식 출전 시간과 ±MINUTES_TOLERANCE 안이다(동명이인은 시간이 섞이므로 비교에서 뺀다)."""
+    idx = player_index(g)
+    for p in g["players"]:
+        k = (p["pname"], p["tcode"])
+        if idx.get(k) is None:
+            continue
+        if abs(played_seconds(p["rec"]) - acc.get(k, 0)) > MINUTES_TOLERANCE:
+            return False
+    return True
+
+
+def _count(tot, a):
+    """코드 a 한 건을 누적(득점·리바·어시·스틸·블록·개인 파울)."""
+    if a in PTS_BY_CODE:
+        tot["pts"] += PTS_BY_CODE[a]
+    elif a in FOUL_CODES:
+        tot["foul"] += 1
+    else:
+        for c, codes in CAT_CODES.items():
+            if a in codes:
+                tot[c] += 1
+
+
+def _new_tally():
+    tot = dict.fromkeys(CAT_ORDER, 0)
+    tot["foul"] = 0
+    return tot
+
+
+def time_candidates(g):
+    """최단 시간 더블더블·트리플더블·5반칙 퇴장(코트 출전 초). 게이트 1은 호출자가 확인한다(설계 §4-2)."""
+    line, acc = player_timelines(g)
+    if not minutes_match_official(g, acc):
+        return []
+    idx = player_index(g)
+    by_pcode = {p["pcode"]: p for p in g["players"]}
+    rows = []
+    for k, evs in line.items():
+        pcode = idx.get(k)
+        if not pcode:
+            continue
+        p = by_pcode[pcode]
+        tot = _new_tally()
+        for _, _, a, _ in evs:
+            _count(tot, a)
+        if any(tot[c] != p["rec"].get(CAT_OFFICIAL[c]) for c in CAT_ORDER):
+            continue                                    # 이 선수의 이벤트 합계가 공식과 다르면 제외
+        foul_ok = tot["foul"] == p["rec"].get("foul")
+        run, got = _new_tally(), {}
+        for _, cur, a, _ in evs:
+            _count(run, a)
+            if cur <= 0:
+                continue
+            n10 = sum(1 for c in CAT_ORDER if run[c] >= 10)
+            if n10 >= 2:
+                got.setdefault("dd", cur)
+            if n10 >= 3:
+                got.setdefault("td", cur)
+            if run["foul"] >= 5 and foul_ok:
+                got.setdefault("foul5", cur)
+        for kind, board in (("dd", "pg.dd_time.min"), ("td", "pg.td_time.min"), ("foul5", "pg.foul5_time.min")):
+            if kind in got:
+                rows.append(_row(g, board, "G", pcode, "", got[kind], p["pname"], p["tcode"]))
+    return rows
+
+
 def moment_candidates(g):
     """2단계 보드 전부 - 공식 보드는 늘, 이벤트 보드는 게이트 1을 통과한 경기만."""
-    return official_moment_candidates(g)
+    rows = official_moment_candidates(g)
+    if quarters_match_official(g):
+        rows += time_candidates(g)
+    return rows
 
 
 # ---------------------------------------------------------------------------
