@@ -42,9 +42,9 @@ const whoOf = (res: Res) => (res === "miss" ? "불명예" : "KBL");
 const crossKind = (kind: ShotKind, res: Res) => `x${kind}_${res}` as StreakKind;
 const singleBoard = (kind: ShotKind, res: Res) => `pg.s${kind}_${res}.max`;
 
-/** 연속 보드의 항목들(본인 행 제외)을 순위 요약으로 - 비교할 "다른 사람들의 연속". */
+/** 연속 보드의 항목들을 순위 요약으로 - 비교할 "다른 연속들". 본인의 *진행 중* 행(지금 재고 있는 바로 그 연속)만 빼고, 본인이 예전에 끝낸 연속은 종전 기록으로 남긴다. */
 export function summaryOf(entries: StreakEntry[], excludePcode?: string): BoardSummary {
-  const list = entries.filter((e) => e.pcode !== excludePcode).sort((a, b) => b.v - a.v);
+  const list = entries.filter((e) => !(e.pcode === excludePcode && e.active)).sort((a, b) => b.v - a.v);
   const tops: number[] = [];
   const holders: BoardSummary["holders"] = [];
   let rank = 0;
@@ -64,14 +64,15 @@ export function summaryOf(entries: StreakEntry[], excludePcode?: string): BoardS
  * 연속 출장 N경기째를 알릴 만한가 - 순위가 좋아졌거나(10위 안 처음 진입 포함) 50경기 단위 이정표일 때만.
  * 이정현처럼 신기록을 매 경기 이어가는 것은 알리지 않는다(토스트·패널·리포트·경기 전 도전 모두).
  */
-function gpVerdict(entries: StreakEntry[], pcode: string, n: number) {
+export function streakVerdict(entries: StreakEntry[], pcode: string, n: number, milestone: boolean) {
   const s = summaryOf(entries, pcode);
   const info = rankInfo(s.tops, n, "max");
   const beforeInfo = n > 1 ? rankInfo(s.tops, n - 1, "max") : null;
   const ranked = info != null && info.rank <= TOP_RANKS ? info : null;
   const improved = ranked != null && (beforeInfo == null || beforeInfo.rank > TOP_RANKS || ranked.rank < beforeInfo.rank || (ranked.breaks && !beforeInfo.breaks));
-  return { s, ranked, worthy: improved || isMilestone(n) };
+  return { s, ranked, worthy: improved || milestone };
 }
+const gpVerdict = (entries: StreakEntry[], pcode: string, n: number) => streakVerdict(entries, pcode, n, isMilestone(n));
 
 type PState = {
   run: Record<ShotKind, Record<Res, number>>;

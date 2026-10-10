@@ -15,6 +15,7 @@ import {
   type ValueFmt,
 } from "./records";
 import type { StreakContext } from "./streakKinds";
+import { buildGameStreakMoments } from "./gameStreakMoments";
 import { buildStreakMoments } from "./streakMoments";
 
 // 역대 기록 2단계 라이브 엔진(순간 기록 14개 보드) - 설계: docs/superpowers/specs/2026-10-10-record-book-phase2-design.md §3·§5
@@ -381,5 +382,6 @@ export function buildAllRecordMoments(ctx: RecordContext, events: RecordEvent[],
   const validated = ctx.validated ? new Set(ctx.validated) : null;
   const kept = validated ? extra.filter((m) => validated.has(validatedKey(m))) : extra;
   const streak = buildStreakMoments(ctx, streaks ?? null, events, opts);
-  return [...base, ...kept, ...streak].sort((a, b) => a.idx - b.idx);
+  const game = buildGameStreakMoments(streaks ?? null, events, opts);
+  return [...base, ...kept, ...streak, ...game].sort((a, b) => a.idx - b.idx);
 }

@@ -164,6 +164,12 @@ describe("경기 전 기록 도전 / finals / 합치기", () => {
     expect(all.map((x) => x.board)).toContain("pg.streak_gp.max");
     expect(buildAllRecordMoments(ctxOf({}), [ev("lee", "H", "101")], OPTS).map((x) => x.board)).not.toContain("pg.streak_gp.max");
   });
+  it("summaryOf: 본인의 *진행 중* 행만 뺀다 - 본인이 예전에 끝낸 연속은 종전 기록으로 남는다", () => {
+    const own = [ent(60, "p", "본인", true), ent(56, "p", "본인"), ent(52, "m", "문경은")];
+    const sm = summaryOf(own, "p");
+    expect(sm.tops).toEqual([56, 52]);
+    expect(sm.holders[0]).toEqual({ v: 56, who: "본인", d: "2026-03-24" });
+  });
   it("summaryOf: 본인 행을 빼고 순위 <= 10의 값과 상위 3위 보유자를 낸다", () => {
     const sm = summaryOf(GP, "lee");
     expect(sm.tops[0]).toBe(383);
