@@ -335,15 +335,27 @@ export async function getWeightedAdvanced(pcode: string, seasonName: string | nu
     const g = Array.isArray(r.games) ? r.games[0] : r.games;
     return g?.season_category ?? "";
   };
+  const isCup = seasonName.endsWith(" 컵/오픈매치");
+  const dbSeason = isCup ? seasonName.replace(" 컵/오픈매치", "") : seasonName;
+
   const { data } = await supabase
     .from("game_player_stats")
     .select("min_played, per, off_rtg, def_rtg, usage_rtg, pie, games!inner(season_name, season_category, is_ended)")
     .eq("pcode", pcode)
-    .eq("games.season_name", seasonName)
+    .eq("games.season_name", dbSeason)
     .eq("games.is_ended", true);
-  // allRows는 "정규+PO" 표본이라 오픈매치(전시경기)는 걷어낸다(위 함수 주석).
-  const allRows = ((data ?? []) as unknown as Row[]).filter((r) => categoryOf(r) !== OPEN_MATCH_CATEGORY);
-  const rows = allRows.filter((r) => categoryOf(r) === SEASON_CATEGORY_REGULAR);
+    
+  let allRows = ((data ?? []) as unknown as Row[]);
+  let rows: Row[] = [];
+  
+  if (isCup) {
+    allRows = allRows.filter((r) => categoryOf(r) === "CUP" || categoryOf(r) === OPEN_MATCH_CATEGORY);
+    rows = allRows; // Cup/Open Match는 구분 없이 모두 사용
+  } else {
+    // allRows는 "정규+PO" 표본이라 오픈매치(전시경기)/컵대회를 걷어낸다.
+    allRows = allRows.filter((r) => categoryOf(r) !== OPEN_MATCH_CATEGORY && categoryOf(r) !== "CUP");
+    rows = allRows.filter((r) => categoryOf(r) === SEASON_CATEGORY_REGULAR);
+  }
 
   const wavg = (list: Row[], pick: (r: Row) => number | null): number | null => {
     let n = 0;
@@ -377,7 +389,7 @@ export async function getWeightedAdvanced(pcode: string, seasonName: string | nu
     pie: wavg(rows, (r) => r.pie),
     gp,
     minutes,
-    sample: `${gp}경기 · ${Math.round(minutes).toLocaleString()}분 (정규시즌)`,
+    sample: `${gp}경기 · ${Math.round(minutes).toLocaleString()}분 (${isCup ? "컵/오픈매치" : "정규시즌"})`,
     method: "경기별 값의 출전 시간 가중 평균 - 짧게 뛴 경기가 과대 반영되지 않게",
     ...allCat,
   };
@@ -443,11 +455,22 @@ function poolStyleAxis(p: PoolStyle, axisKey: string): { value: number | null; d
 
 /** 그 시즌 전 카테고리 행의 usage_rtg(위 폴백 전용, 최대 63행). */
 async function fetchSeasonUsage(pcode: string, seasonName: string): Promise<Map<string, number>> {
-  const { data } = await supabase
+  const isCup = seasonName.endsWith(" 컵/오픈매치");
+  const dbSeason = isCup ? seasonName.replace(" 컵/오픈매치", "") : seasonName;
+
+  let q = supabase
     .from("game_player_stats")
-    .select("gmkey, usage_rtg, games!inner(season_name)")
+    .select("gmkey, usage_rtg, games!inner(season_name, season_category)")
     .eq("pcode", pcode)
-    .eq("games.season_name", seasonName);
+    .eq("games.season_name", dbSeason);
+    
+  if (isCup) {
+    q = q.in("games.season_category", ["CUP", OPEN_MATCH_CATEGORY]);
+  } else {
+    q = q.neq("games.season_category", "CUP").neq("games.season_category", OPEN_MATCH_CATEGORY);
+  }
+
+  const { data } = await q;
   const out = new Map<string, number>();
   for (const r of (data ?? []) as unknown as { gmkey: string; usage_rtg: number | null }[]) {
     if (r.usage_rtg != null) out.set(r.gmkey, num(r.usage_rtg));

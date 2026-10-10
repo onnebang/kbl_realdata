@@ -28,6 +28,7 @@ import { getMilestoneContext } from "@/lib/careerMarks";
 import { basisNote, buildRecordChances } from "@/lib/milestones";
 import { getRecordContext } from "@/lib/recordBook";
 import { getStreakContext } from "@/lib/recordStreaks";
+import { buildGameStreakChances } from "@/lib/gameStreakMoments";
 import { buildStreakChances } from "@/lib/streakMoments";
 import { InsightCard } from "@/components/InsightCard";
 import { deriveGameStatus } from "@/lib/gameStatus";
@@ -885,7 +886,7 @@ export default async function GamePage({
   const lastEventOrder = events.length > 0 ? events[events.length - 1].event_order : 0;
 
   // 경기 전 "기록 도전" - 아직 안 끝난 경기만(끝난 경기는 경기 후 리포트의 '기록 달성'이 대신한다). 한 경기에 닿을 만한 것만, 알릴 만한 순.
-  const recordChances = [...(status !== "final" && milestones ? buildRecordChances(milestones) : []), ...(status !== "final" && streaks ? buildStreakChances(streaks) : [])];
+  const recordChances = [...(status !== "final" && milestones ? buildRecordChances(milestones) : []), ...(status !== "final" && streaks ? [...buildStreakChances(streaks), ...buildGameStreakChances(streaks)] : [])];
   const recordChanceHtml =
     recordChances.length > 0 && game.home_team && game.away_team
       ? recordChanceList(
@@ -1005,7 +1006,7 @@ export default async function GamePage({
             <div className="panel-title">기록 도전 (이 경기에서 세울 수 있는 기록)</div>
             <div dangerouslySetInnerHTML={{ __html: recordChanceHtml }} />
             <div className="insight-caveat">
-              {milestones ? `${basisNote(milestones.split)} · ` : ""}평소 기록으로 한 경기에 닿을 만한 것만 골랐습니다. 연속 출장은 정규시즌 경기 명단 기준(명단에 올랐는데 못 뛴 경기에서 끊기고, 명단에 없던 경기는 건너뜀)·연속 슛은 선수 본인의 시도 순서 기준입니다.
+              {milestones ? `${basisNote(milestones.split)} · ` : ""}평소 기록으로 한 경기에 닿을 만한 것만 골랐습니다. 연속 출장·연속 경기 기록은 정규시즌 경기 명단 기준(명단에 올랐는데 못 뛰었거나 조건 미달이면 끊기고, 명단에 없던 경기는 건너뜀)·팀 연승/연패는 정규시즌 시즌 안 기준·연속 슛은 선수 본인의 시도 순서 기준입니다.
             </div>
           </div>
         )}

@@ -31,6 +31,23 @@ export function shortSeason(season: string): string {
   return `${a.slice(2)}-${b.slice(2)}`;
 }
 
+/** 
+ * 시즌 이름 비교 - 내림차순(최신이 먼저). 
+ * "2026-2027"과 "2026-2027 컵/오픈매치"가 있을 때 정규("2026-2027")가 먼저 오도록 한다.
+ */
+export function compareSeasons(a: string, b: string): number {
+  const aBase = a.substring(0, 9);
+  const bBase = b.substring(0, 9);
+  if (aBase !== bBase) return aBase < bBase ? 1 : -1;
+  
+  const aIsCup = a.endsWith(" 컵/오픈매치");
+  const bIsCup = b.endsWith(" 컵/오픈매치");
+  if (aIsCup && !bIsCup) return 1;
+  if (!aIsCup && bIsCup) return -1;
+  
+  return a < b ? 1 : -1;
+}
+
 // 실제 KBL gmkey는 "S47G01N174"처럼 S로 시작한다. 라이브 드라이런/시뮬레이터가 넣는
 // 합성 경기(P2LIVE-/DRYRUN-/ZZTEST-)는 같은 시즌에 예정 경기로 섞여 들어오므로 일정 집계에서
 // 제외(실측: 2026-09-02자 P2LIVE 경기가 "개막일"로 잡혔음). 프로필의 일정·다음 경기 조회

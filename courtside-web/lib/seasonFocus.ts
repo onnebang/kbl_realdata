@@ -1,4 +1,4 @@
-import { PRESEASON_SEASON, prevSeasonName, shortSeason } from "./preseason";
+import { PRESEASON_SEASON, prevSeasonName, shortSeason, compareSeasons } from "./preseason";
 
 // "이번 시즌"의 정의를 한 곳에 두는 모듈(프로필 개편 1단계, profile_direction_final.json thesis (1)).
 //
@@ -28,10 +28,10 @@ export const seasonShort = shortSeason;
 // ---------------------------------------------------------------------------
 
 /** 선수 statSeason 전환: focusSeason GP가 이 값 이상이면 히어로 타일·온/오프·슈팅 챕터 기본 시즌이 바뀐다. */
-export const STAT_SEASON_MIN_GP_PLAYER = 10;
+export const STAT_SEASON_MIN_GP_PLAYER = 1;
 
 /** 팀 statSeason 전환: focusSeason에서 치른 정규시즌 경기가 이 값 이상이면 NET/4팩터/레이팅이 바뀐다. */
-export const STAT_SEASON_MIN_REG_GAMES_TEAM = 5;
+export const STAT_SEASON_MIN_REG_GAMES_TEAM = 1;
 
 /** 퍼센타일 "잠정"(빗금) 표시 하한 - GP와 분을 모두 넘어야 함. 근거: 2025-26 개막 21일 시점 5GP&100분 충족 64명(검증). */
 export const PERCENTILE_PROVISIONAL = { gp: 5, min: 100 } as const;
@@ -89,7 +89,7 @@ export type SeasonGp = { seasonName: string; gp: number };
  */
 export function resolvePlayerSeasons(pcode: string, seasonsPlayedDesc: SeasonGp[], onRoster: boolean): SeasonFocus {
   void pcode; // 시그니처 고정용(호출부 가독성) - 판정 자체는 표본과 명단 여부만으로 결정된다.
-  const played = seasonsPlayedDesc.filter((s) => s.gp > 0).sort((a, b) => (a.seasonName < b.seasonName ? 1 : -1));
+  const played = seasonsPlayedDesc.filter((s) => s.gp > 0).sort((a, b) => compareSeasons(a.seasonName, b.seasonName));
   const base = { threshold: STAT_SEASON_MIN_GP_PLAYER, thresholdLabel: `${STAT_SEASON_MIN_GP_PLAYER}경기`, seasonsPlayed: played.length };
 
   if (!onRoster) {
@@ -103,7 +103,7 @@ export function resolvePlayerSeasons(pcode: string, seasonsPlayedDesc: SeasonGp[
   if (focusGp >= STAT_SEASON_MIN_GP_PLAYER) return { ...base, focusSeason, statSeason: focusSeason, focusGp, basis: "inprogress" };
 
   // 임계 미달이면 focusSeason "이전"에 실제로 뛴 최신 시즌(26-27 3경기가 statSeason이 되는 일이 없도록 < 비교).
-  const prior = played.find((s) => s.seasonName < focusSeason) ?? null;
+  const prior = played.find((s) => compareSeasons(s.seasonName, focusSeason) > 0) ?? null;
   if (prior) return { ...base, focusSeason, statSeason: prior.seasonName, focusGp, basis: "final" };
   return { ...base, focusSeason, statSeason: null, focusGp, basis: "career" };
 }

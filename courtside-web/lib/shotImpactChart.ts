@@ -29,15 +29,25 @@ async function computeZoneExpectedPts(): Promise<ZoneExpected> {
 // 과함 - 순차 페이지네이션이면 충분(1000행 넘는 시즌 FGA는 사실상 없음, 넘더라도 안전하게 순회).
 const PAGE = 1000;
 export async function fetchPlayerSeasonShots(pcode: string, seasonName: string): Promise<ShotImpactRow[]> {
+  const isCup = seasonName.endsWith(" 컵/오픈매치");
+  const dbSeason = isCup ? seasonName.replace(" 컵/오픈매치", "") : seasonName;
+
   const rows: ShotImpactRow[] = [];
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
+    let q = supabase
       .from("shot_log")
       .select("x, y, d, made, games!inner(season_name, season_category)")
       .eq("pcode", pcode)
-      .eq("games.season_name", seasonName)
-      .neq("games.season_category", OPEN_MATCH_CATEGORY)
+      .eq("games.season_name", dbSeason)
       .range(from, from + PAGE - 1);
+      
+    if (isCup) {
+      q = q.in("games.season_category", ["CUP", OPEN_MATCH_CATEGORY]);
+    } else {
+      q = q.neq("games.season_category", "CUP").neq("games.season_category", OPEN_MATCH_CATEGORY);
+    }
+
+    const { data, error } = await q;
     if (error || !data || !data.length) break;
     rows.push(...(data as unknown as ShotImpactRow[]));
     if (data.length < PAGE) break;
@@ -80,12 +90,23 @@ async function computeGetPlayerSeasonBoxTotals(pcode: string, seasonName: string
     turnovers: number | null;
     usage_rtg: number | null;
   };
-  const { data } = await supabase
+
+  const isCup = seasonName.endsWith(" 컵/오픈매치");
+  const dbSeason = isCup ? seasonName.replace(" 컵/오픈매치", "") : seasonName;
+
+  let q = supabase
     .from("game_player_stats")
     .select("pts, fga, tpa, fta, ast, turnovers, usage_rtg, games!inner(season_name, season_category)")
     .eq("pcode", pcode)
-    .eq("games.season_name", seasonName)
-    .neq("games.season_category", OPEN_MATCH_CATEGORY);
+    .eq("games.season_name", dbSeason);
+    
+  if (isCup) {
+    q = q.in("games.season_category", ["CUP", OPEN_MATCH_CATEGORY]);
+  } else {
+    q = q.neq("games.season_category", "CUP").neq("games.season_category", OPEN_MATCH_CATEGORY);
+  }
+
+  const { data } = await q;
   const rows = (data ?? []) as unknown as Row[];
   const sum = (fn: (r: Row) => number) => rows.reduce((s, r) => s + fn(r), 0);
   const usgRows = rows.filter((r) => r.usage_rtg != null);

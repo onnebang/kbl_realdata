@@ -1,5 +1,6 @@
 import { supabaseServer as supabase } from "./supabaseServer";
 import { TAG, TTL, cachedFn, cachedMap } from "./cachePolicy";
+import { compareSeasons } from "./preseason";
 import { displayTeamName } from "./teamNames";
 
 // 선수 프로필(README "다음 단계" 세 번째, 새 /players/[pcode] 라우트) - 커리어 스탯을
@@ -191,7 +192,7 @@ export async function getPlayerCareerBySeason(pcode: string): Promise<{ seasons:
         ftaPg: fta / gp,
       };
     })
-    .sort((a, b) => (a.seasonName < b.seasonName ? 1 : -1));
+    .sort((a, b) => compareSeasons(a.seasonName, b.seasonName));
 
   return { seasons, careerGp: statRows.length };
 }

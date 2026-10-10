@@ -1,7 +1,7 @@
 import { supabaseServer as supabase } from "./supabaseServer";
 import { TAG, TTL, cached } from "./cachePolicy";
 import { displayTeamName } from "./teamNames";
-import { DEPARTURE_LABEL, PRESEASON_SEASON, prevSeasonName, roleFromNote, type ChangeKind } from "./preseason";
+import { DEPARTURE_LABEL, PRESEASON_SEASON, prevSeasonName, roleFromNote, compareSeasons, type ChangeKind } from "./preseason";
 import { getPlayerCareerGames, type CareerGameRow } from "./playerProfile";
 
 // 선수 프로필 상태 스트립의 3상태(프로필 개편 1단계, player_profile[0]).
@@ -160,7 +160,7 @@ async function computePlayerRosterStatus(pcode: string, careerRows?: CareerGameR
     if (g.min > 0) cur.gpPlayed += 1;
     gpBySeason.set(g.seasonName, cur);
   }
-  const seasonsPlayedDesc = [...gpBySeason.entries()].map(([seasonName, v]) => ({ seasonName, ...v })).sort((a, b) => (a.seasonName < b.seasonName ? 1 : -1));
+  const seasonsPlayedDesc = [...gpBySeason.entries()].map(([seasonName, v]) => ({ seasonName, ...v })).sort((a, b) => compareSeasons(a.seasonName, b.seasonName));
   const isFinal = (g: CareerGameRow) => g.isEnded && g.teamScore != null && g.oppScore != null;
   const lastRow = games.find((g) => isFinal(g) && g.min > 0) ?? games.find(isFinal) ?? null;
   const lastPlayed: LastPlayedGame | null = lastRow
