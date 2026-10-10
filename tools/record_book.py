@@ -2,6 +2,7 @@
 """역대 기록(Record Book) - 팀·선수의 쿼터/경기 최다·최소 기록 TOP15 보관소(record_entries) 관리.
 
 설계: docs/superpowers/specs/2026-10-08-record-book-design.md
+2단계(2026-10-10): docs/superpowers/specs/2026-10-10-record-book-phase2-design.md - 순간 기록 14개 보드(`moment_candidates`)
 
 - 공식 자료(player-stat / team-record / meta.teamrecords)로 만드는 보드는 이벤트에 의존하지 않는다.
 - 이벤트(text-cast)로 만드는 보드(선수 쿼터, 팀 쿼터 리바·어시·스틸·블락)는 **검증 게이트**를 통과한 값만 후보가 된다:
@@ -79,7 +80,8 @@ def parse_game(meta, player_stat, team_record, events):
         "names": {home: g.get("tnameH") or home, away: g.get("tnameA") or away},
         "quarters": quarters,
         "has_ot": any(q["ot"] for q in quarters.values()),
-        "players": [{"pcode": r["player"]["pcode"], "pname": r["player"]["pname"], "tcode": r["player"]["tcode"], "rec": r.get("records") or {}}
+        "players": [{"pcode": r["player"]["pcode"], "pname": r["player"]["pname"], "tcode": r["player"]["tcode"], "rec": r.get("records") or {},
+                     "starter": r.get("startFlag")}
                     for r in player_stat],
         "teams": {t["tcode"]: t.get("records") or {} for t in team_record},
         "events": events,
@@ -165,6 +167,31 @@ def _bucket(period, ot_ok):
     return "OT" if (period in OT_PERIODS and ot_ok) else None
 
 
+def quarter_points(g):
+    """(tcode, 쿼터) -> 선수 귀속 이벤트 득점."""
+    out = collections.defaultdict(int)
+    for e in g["events"]:
+        a, q, tc, name = e.get("a"), e.get("q"), e.get("t"), e.get("p")
+        if a in PTS_BY_CODE and q and tc and name:
+            out[(tc, q)] += PTS_BY_CODE[a]
+    return out
+
+
+def quarters_match_official(g, team_pts=None):
+    """게이트 1 - Q1~Q4 이벤트 득점이 공식 쿼터 점수와 같고, 쿼터 합 + 연장 합이 팀 최종 점수와 같다."""
+    team_pts = quarter_points(g) if team_pts is None else team_pts
+    for tc in (g["home"], g["away"]):
+        q = g["quarters"][tc]
+        if any(not isinstance(v, int) for v in q["q"]):
+            return False
+        if any(team_pts.get((tc, f"Q{i}"), 0) != want for i, want in enumerate(q["q"], 1)):
+            return False
+        final = (g["teams"].get(tc) or {}).get("score")
+        if isinstance(final, int) and sum(q["q"]) + sum(v for v in q["ot"] if isinstance(v, int)) != final:
+            return False
+    return True
+
+
 def event_candidates(g):
     """선수 쿼터 전 종목 + 팀 쿼터 리바·어시·스틸·블락. 게이트를 통과한 값만."""
     teams = (g["home"], g["away"])
@@ -193,15 +220,8 @@ def event_candidates(g):
                     t_tot[(tc, m)] += 1
 
     # 게이트 1 - 경기: Q1~Q4 이벤트 득점이 공식 쿼터 점수와 같고, 쿼터 합 + 연장 합이 팀 최종 점수와 같다.
-    for tc in teams:
-        q = g["quarters"][tc]
-        if any(not isinstance(v, int) for v in q["q"]):
-            return []
-        if any(team_pts.get((tc, f"Q{i}"), 0) != want for i, want in enumerate(q["q"], 1)):
-            return []
-        final = (g["teams"].get(tc) or {}).get("score")
-        if isinstance(final, int) and sum(q["q"]) + sum(v for v in q["ot"] if isinstance(v, int)) != final:
-            return []
+    if not quarters_match_official(g, team_pts):
+        return []
     # 연장은 따로 검증 - 라벨이 X1~X4이고 연장별 이벤트 득점이 공식 scoreeq와 같을 때만 OT 후보를 만든다.
     ot_ok = True
     for label in labels:
@@ -240,7 +260,83 @@ def event_candidates(g):
 
 
 def game_candidates(g):
-    return official_candidates(g) + event_candidates(g)
+    return official_candidates(g) + event_candidates(g) + moment_candidates(g)
+
+
+# ---------------------------------------------------------------------------
+# 2단계 후보 - 순간 기록 14개 보드 (설계 2026-10-10-record-book-phase2-design.md §3-§4)
+# ---------------------------------------------------------------------------
+
+PERIOD_LEN = {"Q1": 600, "Q2": 600, "Q3": 600, "Q4": 600, "X1": 300, "X2": 300, "X3": 300, "X4": 300}
+PERIOD_START = {"Q1": 0, "Q2": 600, "Q3": 1200, "Q4": 1800, "X1": 2400, "X2": 2700, "X3": 3000, "X4": 3300}
+CLOCK_TRUSTED_FROM = 31          # S31(2017-18)부터 중계 시각이 믿을 만하다 - 초 단위 보드(N초 득점·팀 런)는 이 시즌 이후만
+BURST_WINDOWS = (10, 35, 60)     # N초 득점 창(초)
+MINUTES_TOLERANCE = 3            # 재구성한 코트 시간과 공식 출전 시간의 허용 오차(초)
+SUB_IN, SUB_OUT = "101", "102"
+FOUL_CODES = ("215", "216")      # 개인 파울 - 합이 공식 foul과 96% 일치(2026-10-10 실측)
+CAT_ORDER = ("pts", "reb", "ast", "stl", "blk")
+CAT_CODES = {"reb": ("209", "210"), "ast": ("211",), "stl": ("212",), "blk": ("213",)}
+CAT_OFFICIAL = {"pts": "score", "reb": "rb", "ast": "ast", "stl": "stl", "blk": "bs"}
+
+
+def season_number(gmkey):
+    """'S49G01N9' -> 49(시즌 번호). 못 읽으면 0."""
+    head = gmkey.split("G", 1)[0]
+    return int(head[1:]) if head[1:].isdigit() else 0
+
+
+def event_time(e):
+    """이벤트의 경기 시작 후 초(쿼터 시작 오프셋 + 쿼터 안 경과). 쿼터나 시각을 모르면 None."""
+    q, m, s = e.get("q"), e.get("m"), e.get("s")
+    if q not in PERIOD_LEN or not isinstance(m, int) or not isinstance(s, int):
+        return None
+    return PERIOD_START[q] + PERIOD_LEN[q] - (m * 60 + s)
+
+
+def ordered_events(g):
+    """이벤트를 n 순서로(없으면 입력 순서 그대로 - 안정 정렬)."""
+    return sorted(g["events"], key=lambda e: e.get("n", 0))
+
+
+def played_seconds(rec):
+    return (rec.get("playMin") or 0) * 60 + (rec.get("playSec") or 0)
+
+
+def official_moment_candidates(g):
+    """점수차·벤치 득점·무득점 리바/어시·클럽(트리플더블·쿼드러플더블·5x5). 공식 기록만 쓰므로 이벤트 게이트가 없다."""
+    rows = []
+    h, a = g["home"], g["away"]
+    hs, as_ = (g["teams"].get(h) or {}).get("score"), (g["teams"].get(a) or {}).get("score")
+    if isinstance(hs, int) and isinstance(as_, int) and hs != as_:
+        win = h if hs > as_ else a
+        rows.append(_row(g, "tg.margin.max", "G", win, "", abs(hs - as_), g["names"][win], win))
+    for p in g["players"]:
+        rec = p["rec"]
+        cats = [rec.get(CAT_OFFICIAL[c]) for c in CAT_ORDER]
+        if played_seconds(rec) <= 0 or not all(isinstance(v, int) for v in cats):
+            continue
+        score, reb, ast = cats[0], cats[1], cats[2]
+        found = []
+        if p.get("starter") == 0 and score > 0:
+            found.append(("pg.benchpts.max", score))
+        if score == 0 and reb > 0:
+            found.append(("pg.nopts_reb.max", reb))
+        if score == 0 and ast > 0:
+            found.append(("pg.nopts_ast.max", ast))
+        n10 = sum(1 for v in cats if v >= 10)
+        if n10 >= 3:
+            found.append(("pg.club_td.max", 1))
+        if n10 >= 4:
+            found.append(("pg.club_qd.max", 1))
+        if all(v >= 5 for v in cats):
+            found.append(("pg.club_x5.max", 1))
+        rows += [_row(g, board, "G", p["pcode"], "", v, p["pname"], p["tcode"]) for board, v in found]
+    return rows
+
+
+def moment_candidates(g):
+    """2단계 보드 전부 - 공식 보드는 늘, 이벤트 보드는 게이트 1을 통과한 경기만."""
+    return official_moment_candidates(g)
 
 
 # ---------------------------------------------------------------------------
@@ -308,12 +404,13 @@ def build_all(raw_dir=RAW_GAMES, keep=KEEP_RANK, only=None):
         g = load_game(gmkey, raw_dir)
         if g is None:
             continue
-        official, events = official_candidates(g), event_candidates(g)
+        official, events, moments = official_candidates(g), event_candidates(g), moment_candidates(g)
         stats["games"] += 1
         stats["event_games"] += 1 if events else 0
-        stats["candidates"] += len(official) + len(events)
+        stats["candidates"] += len(official) + len(events) + len(moments)
         col.add(official)
         col.add(events)
+        col.add(moments)
     return col.result(), stats
 
 
