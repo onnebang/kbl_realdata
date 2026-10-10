@@ -173,6 +173,113 @@ def test_same_name_players_are_skipped():
     assert time_rows(g) == []
 
 
+# ---------------------------------------------------------------------------
+# N초 득점(창) / 팀 연속 득점 런
+# ---------------------------------------------------------------------------
+
+def burst_game(gmkey="S49G01N1", official=10, extra=None):
+    """Q2 5:00 3점, 4:50 3점, 4:40 2점, 1:00 2점 -> 10초 창 최고 6, 35초·60초 창 최고 8."""
+    ev = [e(1, "Q2", 5, 0, "가드", "H", "205"), e(2, "Q2", 4, 50, "가드", "H", "205"), e(3, "Q2", 4, 40, "가드", "H", "201"), e(4, "Q2", 1, 0, "가드", "H", "201")]
+    ev += extra or []
+    return game(ev, [player("g1", "가드", "H", score=official)], [0, 10, 0, 0], [0, 0, 0, 0], gmkey=gmkey)
+
+
+def burst_rows(g):
+    return sorted((r["board"], r["subject"], r["value"]) for r in rb.moment_candidates(g) if ".burst" in r["board"])
+
+
+def test_burst_windows_best_points_in_same_quarter():
+    assert burst_rows(burst_game()) == [("pg.burst10.max", "g1", 6), ("pg.burst35.max", "g1", 8), ("pg.burst60.max", "g1", 8)]
+
+
+def test_burst_rows_need_modern_season_matching_total_and_ordered_clock():
+    assert burst_rows(burst_game(gmkey="S25G01N1")) == []                              # S31 이전은 시각을 믿을 수 없다
+    assert burst_rows(burst_game(official=11)) == []                                   # 득점 합계가 공식과 다르면 제외
+    # 시계가 거꾸로 가는 득점 이벤트(Q2 5:05가 4:40 뒤에 나옴) - 그 선수는 통째로 제외(이벤트 쿼터 득점은 맞춰 둔다)
+    back = burst_game(extra=[e(5, "Q2", 5, 5, "가드", "H", "201")], official=12)
+    back["quarters"]["H"]["q"] = [0, 12, 0, 0]
+    back["teams"]["H"]["score"] = 12
+    assert burst_rows(back) == []
+
+
+def test_burst_window_edges_are_inclusive():
+    ev = [e(1, "Q1", 9, 0, "가드", "H", "201"), e(2, "Q1", 8, 50, "가드", "H", "201"), e(3, "Q1", 8, 49, "가드", "H", "201")]
+    g = game(ev, [player("g1", "가드", "H", score=6)], [6, 0, 0, 0], [0, 0, 0, 0])
+    got = {r["board"]: r["value"] for r in rb.moment_candidates(g) if ".burst" in r["board"]}
+    assert got["pg.burst10.max"] == 4 and got["pg.burst35.max"] == 6                   # 정확히 10초 차이는 창 안, 11초는 밖
+
+
+def run_game(order, gmkey="S49G01N1", back=False):
+    """order: [(팀, 점수코드)] 순서의 Q3 득점 이벤트(시각은 9:00부터 5초씩)."""
+    ev, h, a = [], 0, 0
+    for i, (tc, code) in enumerate(order):
+        pts = rb.PTS_BY_CODE[code]
+        h += pts if tc == "H" else 0
+        a += pts if tc == "A" else 0
+        t = 540 - 5 * i
+        ev.append(e(i + 1, "Q3", t // 60, t % 60, "가드" if tc == "H" else "원정", tc, code))
+    if back:
+        ev.append(e(len(ev) + 1, "Q3", 9, 59, "가드", "H", "201"))                        # 시계가 거꾸로 - 게이트 탈락
+        h += 2
+    ps = [player("g1", "가드", "H", score=h), player("a1", "원정", "A", score=a)]
+    return game(ev, ps, [0, 0, h, 0], [0, 0, a, 0], gmkey=gmkey)
+
+
+def run_rows(g):
+    return sorted((r["subject"], r["value"]) for r in rb.moment_candidates(g) if r["board"] == "tg.run.max")
+
+
+def test_team_run_is_unanswered_points_across_events():
+    g = run_game([("H", "201"), ("H", "201"), ("H", "205"), ("A", "201"), ("H", "201"), ("H", "203"), ("A", "205")])
+    assert run_rows(g) == [("A", 3), ("H", 7)]                                         # H 2+2+3=7 -> A 2 -> H 2+1=3 -> A 3
+
+
+def test_team_run_needs_modern_season_and_ordered_clock():
+    order = [("H", "201"), ("H", "201"), ("A", "201")]
+    assert run_rows(run_game(order, gmkey="S25G01N1")) == []
+    assert run_rows(run_game(order, back=True)) == []
+
+
+def test_moment_candidates_are_in_the_game_candidates_and_cover_all_boards():
+    g = time_game(ast=10, fouls=5)
+    boards_made = {r["board"] for r in rb.game_candidates(g)}
+    assert {"pg.dd_time.min", "pg.td_time.min", "pg.foul5_time.min", "pg.club_td.max"} <= boards_made
+
+
+# ---------------------------------------------------------------------------
+# 실데이터 - RECORD_BOOK_SLOW=1
+# ---------------------------------------------------------------------------
+
+def test_known_records_on_real_data():
+    if os.environ.get("RECORD_BOOK_SLOW") != "1" or not os.path.isdir(rb.RAW_GAMES):
+        print("    (건너뜀: RECORD_BOOK_SLOW=1 이고 raw/games가 있을 때만)")
+        return
+    rows, stats = rb.build_all()
+    assert len(rows) < rb.MAX_ROWS, len(rows)
+
+    def top(board, n=1):
+        return [r for rank, r in rb.rank_sorted([r for r in rows if r["board"] == board]) if rank <= n]
+
+    m = top("tg.margin.max")[0]
+    assert (m["value"], m["gmkey"]) == (56, "S41G03N11"), m                            # 안양 KGC 99-43 고양 캐롯(2023-04-13 PO)
+    assert {(r["value"], r["gmkey"]) for r in top("pg.benchpts.max")} == {(47, "S43G01N236"), (47, "S33G01N9")}
+    assert [(r["value"], r["gmkey"]) for r in top("pg.nopts_reb.max")] == [(22, "S45G01N220")]
+    assert [(r["value"], r["gmkey"]) for r in top("pg.nopts_ast.max")] == [(16, "S47G01N269")]
+    assert [r["gmkey"] for r in top("pg.club_x5.max")] == ["S29G01N233"]                  # 제임스 메이스 2017-03-05
+    assert not [r for r in rows if r["board"] == "pg.club_qd.max"]                         # 쿼드러플더블은 KBL 역사에 없다
+    assert len([r for r in rows if r["board"] == "pg.club_td.max"]) == 78                 # 트리플더블 전부 남는다
+    dd = top("pg.dd_time.min")[0]
+    assert (dd["value"], dd["gmkey"]) == (465, "S43G01N218"), dd                          # 알리제 드숀 존슨 7분 45초
+    td = top("pg.td_time.min")[0]
+    assert (td["value"], td["gmkey"]) == (1168, "S35G01N162"), td                         # 애런 헤인즈 19분 28초
+    assert max(r["value"] for r in rows if r["board"] == "pg.burst35.max") == 8
+    assert max(r["value"] for r in rows if r["board"] == "pg.burst10.max") <= 8
+    assert max(r["value"] for r in rows if r["board"] == "pg.burst60.max") == 10
+    assert min(rb.season_number(r["gmkey"]) for r in rows if ".burst" in r["board"] or r["board"] == "tg.run.max") >= rb.CLOCK_TRUSTED_FROM
+    runs = [r for r in rows if r["board"] == "tg.run.max"]
+    assert max(r["value"] for r in runs) == 24 and {"S37G01N269", "S31G01N108"} & {r["gmkey"] for r in runs if r["value"] == 24}
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):

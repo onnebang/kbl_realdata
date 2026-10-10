@@ -421,11 +421,75 @@ def time_candidates(g):
     return rows
 
 
+def burst_candidates(g):
+    """같은 쿼터 안 W초 창에서 선수가 낸 최다 득점(10·35·60초). S31 이후 경기만, 그 선수의 득점 합계가 공식과 같고
+    그 선수의 득점 이벤트가 모든 쿼터에서 시계 순서(비감소)일 때만 - 어긋나면 그 선수는 통째로 제외한다."""
+    if season_number(g["gmkey"]) < CLOCK_TRUSTED_FROM:
+        return []
+    idx = player_index(g)
+    by_pcode = {p["pcode"]: p for p in g["players"]}
+    scores = collections.defaultdict(list)                        # (이름, tcode) -> [(쿼터, 초, 점수)]
+    for e in ordered_events(g):
+        a, q, tc, name = e.get("a"), e.get("q"), e.get("t"), e.get("p")
+        t = event_time(e)
+        if a in PTS_BY_CODE and q and tc and name:
+            scores[(name, tc)].append((q, t, PTS_BY_CODE[a]))
+    rows = []
+    for k, evs in scores.items():
+        pcode = idx.get(k)
+        if not pcode or any(t is None for _, t, _ in evs):
+            continue
+        p = by_pcode[pcode]
+        if sum(pts for _, _, pts in evs) != p["rec"].get("score"):
+            continue
+        by_period = collections.defaultdict(list)
+        for q, t, pts in evs:
+            by_period[q].append((t, pts))
+        if any(ps[i + 1][0] < ps[i][0] for ps in by_period.values() for i in range(len(ps) - 1)):
+            continue
+        best = dict.fromkeys(BURST_WINDOWS, 0)
+        for ps in by_period.values():
+            for w in BURST_WINDOWS:
+                lo, s = 0, 0
+                for hi in range(len(ps)):
+                    s += ps[hi][1]
+                    while ps[hi][0] - ps[lo][0] > w:
+                        s -= ps[lo][1]
+                        lo += 1
+                    best[w] = max(best[w], s)
+        for w in BURST_WINDOWS:
+            if best[w] > 0:
+                rows.append(_row(g, f"pg.burst{w}.max", "G", pcode, "", best[w], p["pname"], p["tcode"]))
+    return rows
+
+
+def run_candidates(g):
+    """팀 연속 득점(상대 무득점) 최대 길이 - 쿼터를 넘겨도 이어진다. S31 이후 경기만, 두 팀 득점 이벤트가 쿼터마다 시계 순서일 때만."""
+    if season_number(g["gmkey"]) < CLOCK_TRUSTED_FROM:
+        return []
+    seq, last_t = [], {}
+    for e in ordered_events(g):
+        a, q, tc, name = e.get("a"), e.get("q"), e.get("t"), e.get("p")
+        if a not in PTS_BY_CODE or not (q and tc and name):
+            continue
+        t = event_time(e)
+        if t is None or t < last_t.get(q, 0):
+            return []
+        last_t[q] = t
+        seq.append((tc, PTS_BY_CODE[a]))
+    best, cur_t, cur = {}, None, 0
+    for tc, pts in seq:
+        cur = cur + pts if tc == cur_t else pts
+        cur_t = tc
+        best[tc] = max(best.get(tc, 0), cur)
+    return [_row(g, "tg.run.max", "G", tc, "", v, g["names"][tc], tc) for tc, v in best.items() if tc in g["names"] and v > 0]
+
+
 def moment_candidates(g):
     """2단계 보드 전부 - 공식 보드는 늘, 이벤트 보드는 게이트 1을 통과한 경기만."""
     rows = official_moment_candidates(g)
     if quarters_match_official(g):
-        rows += time_candidates(g)
+        rows += time_candidates(g) + burst_candidates(g) + run_candidates(g)
     return rows
 
 
