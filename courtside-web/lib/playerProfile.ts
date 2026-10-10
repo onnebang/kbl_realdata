@@ -402,7 +402,9 @@ async function computePlayerCareerGames(pcode: string): Promise<CareerGameRow[]>
       rows.push({
         gmkey: row.gmkey as string,
         gameDate: row.game_date as string,
-        seasonName: row.season_name as string,
+        seasonName: row.season_category === "OPEN MATCH DAY" || row.season_category === "CUP"
+          ? `${row.season_name} 컵/오픈매치`
+          : (row.season_name as string),
         seasonCategory: row.season_category as string,
         tcode: stat.tcode,
         oppTcode: isHome ? (row.away_tcode as string) : (row.home_tcode as string),

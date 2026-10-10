@@ -41,16 +41,17 @@ async function computeCareerShots(pcode: string): Promise<CareerShot[]> {
         .from("shot_log")
         .select("x, y, d, made, tcode, quarter, games!inner(season_name, season_category)", { count: "exact" })
         .eq("pcode", pcode)
-        // "커리어"는 정규+PO 스코프다(다른 커리어 집계와 동일) - 오픈매치(전시경기, 2026-27시즌
-        // 신설)는 season_name은 같아도 여기 안 든다. 안 그러면 개막 전까지 슈팅 DNA·별자리·
-        // 시즌별 슛차트에 전시경기 슛이 "2026-27 시즌" 행세를 한다.
-        .neq("games.season_category", OPEN_MATCH_CATEGORY)
+        // 전시경기(컵대회, 오픈매치)는 슈팅 DNA/별자리에 섞이지 않도록
+        // 맵핑 시 "컵/오픈매치" 접미사를 붙여 별개의 시즌으로 분리한다.
         .order("shot_id", { ascending: true })
         .range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: unknown; count: number | null }>
   );
   return rows.map((r) => {
     const g = Array.isArray(r.games) ? r.games[0] : r.games;
-    return { x: r.x, y: r.y, d: r.d, made: r.made, tcode: r.tcode, quarter: r.quarter, season: g.season_name };
+    const seasonName = g.season_category === "OPEN MATCH DAY" || g.season_category === "CUP"
+      ? `${g.season_name} 컵/오픈매치`
+      : g.season_name;
+    return { x: r.x, y: r.y, d: r.d, made: r.made, tcode: r.tcode, quarter: r.quarter, season: seasonName };
   });
 }
 

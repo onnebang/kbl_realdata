@@ -424,8 +424,10 @@ export type SeasonTeamLine = { seasonName: string; tcode: string; lastDate: stri
 export type SeasonAgg = BoxAgg & { seasonName: string; tcodes: string[]; gpReg: number; gpPo: number };
 
 export function aggregateCareer(allRows: CareerGameRow[]): { lines: SeasonTeamLine[]; seasonsAsc: SeasonAgg[] } {
-  // 시즌별 기록표·히어로 타일 전부 "정규+PO 커리어" 스코프다 - 오픈매치(전시경기)는 통계에 안 잡힌다.
-  const rows = allRows.filter((r) => r.seasonCategory !== OPEN_MATCH_CATEGORY);
+  // 시즌별 기록표·히어로 타일 전부 "정규+PO 커리어" 스코프지만, 
+  // 오픈매치(전시경기)/컵대회는 이제 별개의 seasonName("... 컵/오픈매치")을 가지므로
+  // 표와 타일에 섞이지 않고 독립된 시즌 행으로 안전하게 노출된다.
+  const rows = allRows;
   const bySeason = new Map<string, CareerGameRow[]>();
   for (const r of rows) (bySeason.get(r.seasonName) ?? bySeason.set(r.seasonName, []).get(r.seasonName)!).push(r);
 

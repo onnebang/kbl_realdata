@@ -631,7 +631,7 @@ async function computePlayerGlance(
   statSeason: string | null,
   opts?: PlayerGlanceOptions
 ): Promise<PlayerGlance> {
-  const careerRows = (opts?.careerRows ?? (await getPlayerCareerGames(pcode))).filter((r) => r.isEnded && r.seasonCategory !== "OPEN MATCH DAY");
+  const careerRows = (opts?.careerRows ?? (await getPlayerCareerGames(pcode))).filter((r) => r.isEnded);
 
   // 기준 시즌 소속 팀 - 그 시즌 가장 오래 뛴 팀(시즌 중 이적 대비. 실측: 조은후 23-24는 정관장 -> 소노).
   let tcode = opts?.tcode ?? null;

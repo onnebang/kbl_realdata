@@ -155,7 +155,6 @@ async function computePlayerRosterStatus(pcode: string, careerRows?: CareerGameR
   const games = [...career].sort((a, b) => (a.gameDate < b.gameDate ? 1 : a.gameDate > b.gameDate ? -1 : a.gmkey < b.gmkey ? 1 : -1));
   const gpBySeason = new Map<string, { gp: number; gpPlayed: number }>();
   for (const g of games) {
-    if (g.seasonCategory === "OPEN MATCH DAY") continue;
     const cur = gpBySeason.get(g.seasonName) ?? { gp: 0, gpPlayed: 0 };
     cur.gp += 1;
     if (g.min > 0) cur.gpPlayed += 1;
