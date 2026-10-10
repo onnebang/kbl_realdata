@@ -33,6 +33,51 @@ def to_events(g):
     return out
 
 
+MOMENT_CODES = RELEVANT | {"101", "102", "215", "216"}      # 2단계가 보는 코드(코트 투입·퇴장, 개인 파울 추가)
+
+
+def to_moment_events(g):
+    """text-cast -> [pcode, tcode, code, quarter, min, sec, homeScore, awayScore] (n 순서, 득점 이벤트로 쌓은 점수 - 웹 점수차 계산용)."""
+    pidx = rb.player_index(g)
+    h = a = 0
+    out = []
+    for e in rb.ordered_events(g):
+        code, q = e.get("a"), e.get("q")
+        if code not in MOMENT_CODES or not q:
+            continue
+        pts = rb.PTS_BY_CODE.get(code, 0)
+        if pts and e.get("t") and e.get("p"):
+            if e["t"] == g["home"]:
+                h += pts
+            elif e["t"] == g["away"]:
+                a += pts
+        pcode = pidx.get((e.get("p"), e.get("t"))) if e.get("p") else None
+        out.append([pcode, e.get("t"), code, q, e.get("m"), e.get("s"), h, a])
+    return out
+
+
+def dump_moments(outdir, gmkeys):
+    os.makedirs(outdir, exist_ok=True)
+    written = 0
+    for gmkey in gmkeys:
+        g = rb.load_game(gmkey)
+        if g is None or any(v is None for v in rb.player_index(g).values()) or not rb.quarters_match_official(g):
+            print(f"  건너뜀(없음/동명이인/게이트 1 탈락): {gmkey}")
+            continue
+        rows = rb.moment_candidates(g)
+        if not rows:
+            print(f"  건너뜀(2단계 행 없음): {gmkey}")
+            continue
+        body = {"gmkey": gmkey, "home": g["home"], "away": g["away"], "events": to_moment_events(g),
+                "rows": [[r["board"], r["bucket"], r["subject"], r["period"], r["value"]] for r in rows]}
+        with open(os.path.join(outdir, f"{gmkey}.json"), "w", encoding="utf-8") as f:
+            json.dump(body, f, ensure_ascii=False, separators=(",", ":"))
+        kinds = sorted({r["board"] for r in rows})
+        print(f"  {gmkey}: 행 {len(rows)}개 ({len(kinds)}개 보드)")
+        written += 1
+    print(f"moment fixtures: {written}개 -> {outdir}")
+
+
 def parity_ok(g, official_rows, event_rows):
     """공식 합계와 이벤트 합계가 선수·팀 전부에서 같은 경기만 True."""
     if not event_rows or any(v is None for v in rb.player_index(g).values()):
@@ -96,7 +141,8 @@ def dump_freq(outdir, prefix, entries_path):
         if g is None:
             continue
         with open(os.path.join(outdir, f"{gmkey}.json"), "w", encoding="utf-8") as f:
-            json.dump({"gmkey": gmkey, "date": g["date"], "start": g["start"], "names": {p["pcode"]: p["pname"] for p in g["players"]}, "teams": g["names"], "events": to_events(g)},
+            json.dump({"gmkey": gmkey, "date": g["date"], "start": g["start"], "home": g["home"], "away": g["away"],
+                       "names": {p["pcode"]: p["pname"] for p in g["players"]}, "teams": g["names"], "events": to_moment_events(g)},
                       f, ensure_ascii=False, separators=(",", ":"))
         n += 1
     print(f"freq events: {n}경기 -> {outdir}")
@@ -112,12 +158,15 @@ def main():
     ap.add_argument("--parity", help="대조 픽스처를 쓸 폴더")
     ap.add_argument("--sample", type=int, default=12)
     ap.add_argument("--gmkeys", help="콤마 구분 - 지정하면 이 경기들만(조건을 통과해야 쓴다)")
+    ap.add_argument("--moments", help="2단계(순간 기록) 대조 픽스처를 쓸 폴더 - --gmkeys 필요")
     ap.add_argument("--freq", help="빈도 실측용 이벤트를 쓸 폴더")
     ap.add_argument("--prefix", default="S47", help="--freq: 시즌 접두사(S47 = 2025-26)")
     ap.add_argument("--entries", help="--freq: 순위 <= 50 항목 JSON 경로")
     args = ap.parse_args()
-    if not (args.parity or args.freq):
-        ap.error("--parity 또는 --freq가 필요하다")
+    if not (args.parity or args.freq or args.moments):
+        ap.error("--parity, --moments, --freq 중 하나가 필요하다")
+    if args.moments:
+        dump_moments(args.moments, [x.strip() for x in (args.gmkeys or "").split(",") if x.strip()])
     if args.parity:
         dump_parity(args.parity, [x.strip() for x in (args.gmkeys or "").split(",") if x.strip()], args.sample)
     if args.freq:

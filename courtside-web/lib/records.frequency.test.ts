@@ -1,7 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildRecordTimeline, type RecordMoment } from "./records";
+import type { RecordMoment } from "./records";
+import { buildAllRecordMoments } from "./recordsMoments";
 import { summarizeRecordBook, type RecordEntry } from "./recordBook";
 
 // 알림 빈도 실측 - 한 시즌 전 경기를 "그 경기 이전" 기록으로 재생해 경기당 기록 알림(done) 수의 분포를 본다(설계 §10-5).
@@ -13,7 +14,10 @@ const EV_DIR = process.env.RECORD_FREQ_EVENTS;
 const ENTRIES = process.env.RECORD_FREQ_ENTRIES;
 const suite = EV_DIR && ENTRIES && existsSync(EV_DIR) && existsSync(ENTRIES) ? describe : describe.skip;
 
-type Game = { gmkey: string; date: string; start: string; names: Record<string, string>; teams: Record<string, string>; events: [string | null, string | null, string, string, number | null, number | null][] };
+type Game = {
+  gmkey: string; date: string; start: string; home: string; away: string; names: Record<string, string>; teams: Record<string, string>;
+  events: [string | null, string | null, string, string, number | null, number | null, number, number][];
+};
 
 suite("알림 빈도 실측", () => {
   it("경기당 달성 알림 수", { timeout: 300_000 }, () => {
@@ -25,8 +29,9 @@ suite("알림 빈도 실측", () => {
     for (const f of readdirSync(EV_DIR!).filter((x) => x.endsWith(".json")).sort()) {
       const g = JSON.parse(readFileSync(join(EV_DIR!, f), "utf8")) as Game;
       const ctx = summarizeRecordBook(entries, { date: g.date, start: g.start, gmkey: g.gmkey }, false);
-      const events = g.events.map(([pcode, tcode, action_code, quarter, clock_min, clock_sec]) => ({ pcode, tcode, action_code, quarter, clock_min, clock_sec }));
-      const done = ctx ? buildRecordTimeline(ctx, events, { names: { player: (p) => g.names[p] ?? p, team: (t) => g.teams[t] ?? t }, final: true }).filter((m) => m.phase === "done") : [];
+      const events = g.events.map(([pcode, tcode, action_code, quarter, clock_min, clock_sec, home_score, away_score]) => ({ pcode, tcode, action_code, quarter, clock_min, clock_sec, home_score, away_score }));
+      const names = { player: (p: string) => g.names[p] ?? p, team: (t: string) => g.teams[t] ?? t };
+      const done = ctx ? buildAllRecordMoments(ctx, events, { names, final: true, home: g.home, away: g.away }).filter((m) => m.phase === "done") : [];
       perGame.push({ gmkey: g.gmkey, done });
     }
     const stat = (xs: number[]) => {
