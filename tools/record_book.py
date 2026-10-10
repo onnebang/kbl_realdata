@@ -844,6 +844,15 @@ def main(argv=None):
         if args.dry_run:
             return 0
 
+    streak_pending = None
+    if not (args.rebuild or args.verify):
+        # 연속 기록은 raw 전체를 다시 계산해 교체한다(약 90초). DB 연결을 연 채로 계산하면 유휴 연결이 끊기고 어드바이저리 락도 오래 잡으므로 연결을 열기 전에 계산해 둔다.
+        import record_streaks
+        if record_streaks.have_history():
+            streak_pending = record_streaks.build(keep=args.keep)
+        else:
+            log("연속 기록 갱신 건너뜀: raw/games에 역사 자료가 없다(클라우드 등) - 노트북이 다음에 갱신한다")
+
     from sync_upcoming_games import get_conn
     conn = get_conn()
     try:
@@ -880,13 +889,10 @@ def main(argv=None):
                 res = apply_game(store, gmkey, game_candidates(g))
                 conn.commit()
                 log(f"{gmkey}: {res}")
-            import record_streaks
-            if record_streaks.have_history():
+            if streak_pending is not None:
                 store.lock()
-                log(f"연속 기록 갱신: {record_streaks.refresh(store)}")
+                log(f"연속 기록 갱신: {record_streaks.write(store, *streak_pending)}")
                 conn.commit()
-            else:
-                log("연속 기록 갱신 건너뜀: raw/games에 역사 자료가 없다(클라우드 등) - 노트북이 다음에 갱신한다")
             _revalidate()
             return 1 if failed else 0
         return 0

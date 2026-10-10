@@ -193,9 +193,14 @@ def build(raw_dir=None, keep=rb.KEEP_RANK, games=None):
     return rb.retain(list(unique.values()), keep), log
 
 
-def refresh(store, raw_dir=None, keep=rb.KEEP_RANK, games=None):
-    """연속 보드 7개와 로그를 통째로 다시 계산해 교체한다(멱등). 호출부가 락과 트랜잭션을 잡는다."""
-    rows, log = build(raw_dir, keep, games)
+def write(store, rows, log):
+    """미리 계산한 연속 보드 7개와 로그로 통째로 교체한다(멱등). 호출부가 락과 트랜잭션을 잡는다."""
     store.replace_board_rows(STREAK_BOARDS, rows)
     store.replace_log(log)
     return {"rows": len(rows), "log": len(log)}
+
+
+def refresh(store, raw_dir=None, keep=rb.KEEP_RANK, games=None):
+    """계산 + 교체를 한 번에(테스트·스크립트용). 오래 걸리는 계산을 DB 연결을 연 채로 하지 않으려면 build()를 먼저 하고 write()만 연결 안에서 한다."""
+    rows, log = build(raw_dir, keep, games)
+    return write(store, rows, log)

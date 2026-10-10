@@ -875,12 +875,17 @@ def build(raw_dir=None, keep=rb.KEEP_RANK, games=None):
     return rb.retain(list(unique.values()), keep), log
 
 
-def refresh(store, raw_dir=None, keep=rb.KEEP_RANK, games=None):
-    """연속 보드 7개와 로그를 통째로 다시 계산해 교체한다(멱등). 호출부가 락과 트랜잭션을 잡는다."""
-    rows, log = build(raw_dir, keep, games)
+def write(store, rows, log):
+    """미리 계산한 연속 보드 7개와 로그로 통째로 교체한다(멱등). 호출부가 락과 트랜잭션을 잡는다."""
     store.replace_board_rows(STREAK_BOARDS, rows)
     store.replace_log(log)
     return {"rows": len(rows), "log": len(log)}
+
+
+def refresh(store, raw_dir=None, keep=rb.KEEP_RANK, games=None):
+    """계산 + 교체를 한 번에(테스트·스크립트용). 오래 걸리는 계산을 DB 연결을 연 채로 하지 않으려면 build()를 먼저 하고 write()만 연결 안에서 한다."""
+    rows, log = build(raw_dir, keep, games)
+    return write(store, rows, log)
 ~~~
 
 - [ ] **Step 6: 통과 확인**
@@ -1021,6 +1026,27 @@ if __name__ == "__main__":
 <!-- edit: tools/record_book.py -->
 <!-- old -->
 ~~~python
+    from sync_upcoming_games import get_conn
+    conn = get_conn()
+~~~
+<!-- new -->
+~~~python
+    streak_pending = None
+    if not (args.rebuild or args.verify):
+        # 연속 기록은 raw 전체를 다시 계산해 교체한다(약 90초). DB 연결을 연 채로 계산하면 유휴 연결이 끊기고 어드바이저리 락도 오래 잡으므로 연결을 열기 전에 계산해 둔다.
+        import record_streaks
+        if record_streaks.have_history():
+            streak_pending = record_streaks.build(keep=args.keep)
+        else:
+            log("연속 기록 갱신 건너뜀: raw/games에 역사 자료가 없다(클라우드 등) - 노트북이 다음에 갱신한다")
+
+    from sync_upcoming_games import get_conn
+    conn = get_conn()
+~~~
+
+<!-- edit: tools/record_book.py -->
+<!-- old -->
+~~~python
                 log(f"{gmkey}: {res}")
             _revalidate()
             return 1 if failed else 0
@@ -1028,13 +1054,10 @@ if __name__ == "__main__":
 <!-- new -->
 ~~~python
                 log(f"{gmkey}: {res}")
-            import record_streaks
-            if record_streaks.have_history():
+            if streak_pending is not None:
                 store.lock()
-                log(f"연속 기록 갱신: {record_streaks.refresh(store)}")
+                log(f"연속 기록 갱신: {record_streaks.write(store, *streak_pending)}")
                 conn.commit()
-            else:
-                log("연속 기록 갱신 건너뜀: raw/games에 역사 자료가 없다(클라우드 등) - 노트북이 다음에 갱신한다")
             _revalidate()
             return 1 if failed else 0
 ~~~
