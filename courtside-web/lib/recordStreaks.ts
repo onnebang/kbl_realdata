@@ -2,13 +2,15 @@ import { cachedFn, TAG, TTL } from "./cachePolicy";
 import { getTeamRoster } from "./playerPageData";
 import { isRecordEligible } from "./recordBook";
 import { supabaseServer as supabase } from "./supabaseServer";
-import { KIND_OF_BOARD, STREAK_BOARD, STREAK_KINDS, type StreakContext, type StreakEntry, type StreakKind } from "./streakKinds";
+import { GAME_BASED_KINDS, isTeamKind, KIND_OF_BOARD, STREAK_BOARD, STREAK_KINDS, type StreakContext, type StreakEntry, type StreakKind } from "./streakKinds";
 
 // 연속 기록(3단계) 서버 쪽 - record_entries의 연속 보드 7개와 record_streak_log(최근 120일)를 읽어 "이 경기 직전의 연속 상태" 요약(StreakContext)을 만든다.
 // 설계: docs/superpowers/specs/2026-10-10-record-book-streaks-design.md §5. 테이블 갱신은 tools/record_streaks.py(경기 종료 정산이 노트북에서 호출).
 
 export type StreakBoardRow = { board: string; subject: string; period: string; value: number; name: string; date: string };
-export type StreakLogRow = { gmkey: string; pcode: string; kind: string; before_len: number; after_len: number; alive: boolean };
+/** pcode: 선수 코드(팀 연승·연패 종류는 팀 코드). start_gmkey: 그 연속이 시작된 경기 */
+export type StreakLogRow = { gmkey: string; pcode: string; kind: string; before_len: number; after_len: number; alive: boolean; start_gmkey: string };
+const seasonOf = (gmkey: string) => gmkey.split("G")[0];
 
 const PAGE = 1000;
 const CATEGORIES = ["정규시즌", "플레이오프", "챔피언결정전"];
@@ -23,8 +25,10 @@ export function summarizeStreaks(args: {
   players: Record<string, { name: string; tcode?: string }>;
   /** 경기 전: 로그가 그 팀의 직전 경기까지 반영된 팀들. 종료 경기는 쓰지 않는다. */
   freshTeams: Set<string> | null;
-  /** 정규시즌 경기인가 - 연속 출장은 정규시즌만 세므로 플레이오프·챔프전에서는 그 상태를 쓰지 않는다(기본 true). */
+  /** 정규시즌 경기인가 - 연속 출장·연속 경기·팀 연승/연패는 정규시즌만 세므로 플레이오프·챔프전에서는 그 상태를 쓰지 않는다(기본 true). */
   regular?: boolean;
+  /** 이 경기 두 팀의 표시 이름(tcode -> 이름) */
+  teams?: Record<string, string>;
 }): StreakContext | null {
   const boards = Object.fromEntries(STREAK_KINDS.map((k) => [k, [] as StreakEntry[]])) as Record<StreakKind, StreakEntry[]>;
   for (const r of args.boardRows) {
@@ -36,23 +40,29 @@ export function summarizeStreaks(args: {
   for (const [pcode, p] of Object.entries(args.players)) {
     if (args.final || (p.tcode != null && args.freshTeams != null && args.freshTeams.has(p.tcode))) known.push(pcode);
   }
+  for (const tcode of Object.keys(args.teams ?? {})) {
+    if (args.final || (args.freshTeams != null && args.freshTeams.has(tcode))) known.push(tcode);
+  }
   const state: StreakContext["state"] = {};
   for (const r of args.logRows) {
     const kind = STREAK_KINDS.find((k) => k === r.kind);
-    if (!kind || (kind === "gp" && args.regular === false)) continue;
+    if (!kind) continue;
+    if (args.regular === false && GAME_BASED_KINDS.indexOf(kind) >= 0) continue;
     if (args.final ? r.gmkey !== args.gmkey : !r.alive) continue;
+    // 팀 연승·연패는 시즌 안에서만 이어진다 - 지난 시즌에 시작된 연속은 새 시즌 경기 전에 쓰지 않는다
+    if (!args.final && isTeamKind(kind) && seasonOf(r.start_gmkey) !== seasonOf(args.gmkey)) continue;
     const slot = state[r.pcode] ?? {};
     slot[kind] = args.final ? { before: r.before_len, after: r.after_len } : { before: r.after_len };
     state[r.pcode] = slot;
   }
   const hasBoard = STREAK_KINDS.some((k) => boards[k].length > 0);
   if (!hasBoard && Object.keys(state).length === 0) return null;
-  return { asOf: args.asOf, final: args.final, boards, state, known, players: args.players };
+  return { asOf: args.asOf, final: args.final, boards, state, known, players: args.players, ...(args.teams ? { teams: args.teams } : {}) };
 }
 
 const BOARD_LIST = STREAK_KINDS.map((k) => STREAK_BOARD[k]);
 
-/** 연속 보드 7개의 보관 행 전부(수백 행) - 10분 캐시, 정산이 'records' 태그로 즉시 비운다. 조회 에러는 던진다(빈 배열을 캐시에 굳히지 않는다). */
+/** 연속 보드 15개의 보관 행 전부(수백~천 행) - 10분 캐시, 정산이 'records' 태그로 즉시 비운다. 조회 에러는 던진다(빈 배열을 캐시에 굳히지 않는다). */
 const fetchStreakBoards = cachedFn(
   async (): Promise<StreakBoardRow[]> => {
     const out: StreakBoardRow[] = [];
@@ -81,7 +91,7 @@ const fetchStreakBoards = cachedFn(
 /** 한 경기의 로그 행(약 130행). */
 const fetchLogByGame = cachedFn(
   async (gmkey: string): Promise<StreakLogRow[]> => {
-    const { data, error } = await supabase.from("record_streak_log").select("gmkey, pcode, kind, before_len, after_len, alive").eq("gmkey", gmkey).limit(3000);
+    const { data, error } = await supabase.from("record_streak_log").select("gmkey, pcode, kind, before_len, after_len, alive, start_gmkey").eq("gmkey", gmkey).limit(3000);
     if (error) throw new Error(`streakLogGame: ${error.message}`);
     return (data ?? []) as StreakLogRow[];
   },
@@ -93,7 +103,7 @@ const fetchAliveLog = cachedFn(
   async (pcodesKey: string): Promise<StreakLogRow[]> => {
     const pcodes = pcodesKey.split(",").filter(Boolean);
     if (pcodes.length === 0) return [];
-    const { data, error } = await supabase.from("record_streak_log").select("gmkey, pcode, kind, before_len, after_len, alive").in("pcode", pcodes).eq("alive", true).limit(5000);
+    const { data, error } = await supabase.from("record_streak_log").select("gmkey, pcode, kind, before_len, after_len, alive, start_gmkey").in("pcode", pcodes).eq("alive", true).limit(5000);
     if (error) throw new Error(`streakLogAlive: ${error.message}`);
     return (data ?? []) as StreakLogRow[];
   },
@@ -138,7 +148,7 @@ const cachedRoster = cachedFn(
 export async function getStreakContext(
   game: {
     gmkey: string; game_date: string; game_start: string | null; season_category: string; season_name: string;
-    home_team?: { tcode: string } | null; away_team?: { tcode: string } | null;
+    home_team?: { tcode: string; name?: string } | null; away_team?: { tcode: string; name?: string } | null;
   },
   final: boolean,
   boxPlayers: { pcode: string; name: string; tcode?: string }[]
@@ -163,6 +173,8 @@ export async function getStreakContext(
           )
         ).filter((t): t is string => t != null)
       );
-  const [boardRows, logRows] = await Promise.all([fetchStreakBoards(), final ? fetchLogByGame(game.gmkey) : fetchAliveLog(Object.keys(players).sort().join(","))]);
-  return summarizeStreaks({ boardRows, logRows, gmkey: game.gmkey, final, asOf: `${game.game_date} ${start}`.trim(), players, freshTeams, regular: game.season_category === "정규시즌" });
+  const teams: Record<string, string> = {};
+  for (const t of [game.home_team, game.away_team]) if (t?.tcode) teams[t.tcode] = t.name ?? t.tcode;
+  const [boardRows, logRows] = await Promise.all([fetchStreakBoards(), final ? fetchLogByGame(game.gmkey) : fetchAliveLog(Object.keys(players).concat(tcodes).sort().join(","))]);
+  return summarizeStreaks({ boardRows, logRows, gmkey: game.gmkey, final, asOf: `${game.game_date} ${start}`.trim(), players, freshTeams, regular: game.season_category === "정규시즌", teams });
 }

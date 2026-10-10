@@ -401,7 +401,7 @@ describe("역대 기록 섹션 (요청 2026-10-08)", () => {
     const entry = (v: number, pcode: string, who: string, active = false) => ({ v, pcode, who, active, d: "2026-03-24" });
     const mk = (state: StreakContext["state"]): StreakContext => ({
       asOf: "x", final: true, known: ["p1"], players: {}, state,
-      boards: { gp: [entry(393, "lee", "이정현", true), entry(383, "jhj", "주희정")], xfg_made: [], xfg_miss: [], xtp_made: [], xtp_miss: [], xft_made: [], xft_miss: [] },
+      boards: { gp: [entry(393, "lee", "이정현", true), entry(383, "jhj", "주희정")], xfg_made: [], xfg_miss: [], xtp_made: [], xtp_miss: [], xft_made: [], xft_miss: [], cg_pts10: [], cg_pts20: [], cg_dd: [], cg_reb10: [], cg_tpm1: [], cg_ast5: [], tw: [], tl: [] },
     });
     const c: RecordContext = { asOf: "x", boards: {}, validated: [] };
     const html = htmlOf(recordBookSection(c, evs, tags, names, { home: "H", away: "A" }, mk({ p1: { gp: { before: 393, after: 394 } } }))!);

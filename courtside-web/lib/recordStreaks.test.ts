@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { summarizeStreaks, type StreakBoardRow, type StreakLogRow } from "./recordStreaks";
 
 const board = (b: string, subject: string, value: number, period: string, name = subject): StreakBoardRow => ({ board: b, subject, period, value, name, date: "2026-10-08" });
-const logRow = (gmkey: string, pcode: string, kind: string, before: number, after: number, alive: boolean): StreakLogRow => ({ gmkey, pcode, kind, before_len: before, after_len: after, alive });
+const logRow = (gmkey: string, pcode: string, kind: string, before: number, after: number, alive: boolean, start = "S49G01N1"): StreakLogRow => ({
+  gmkey, pcode, kind, before_len: before, after_len: after, alive, start_gmkey: start,
+});
 const players = { lee: { name: "이정현", tcode: "DB" }, alb: { name: "알바노", tcode: "DB" }, kim: { name: "허훈", tcode: "KT" } };
 const base = { gmkey: "S49G01N11", asOf: "2026-10-10", players };
 
@@ -49,6 +51,47 @@ describe("summarizeStreaks", () => {
     expect(po.boards.gp).toHaveLength(1);
     const reg = summarizeStreaks({ ...base, final: false, freshTeams: new Set(["DB"]), boardRows: [], logRows: rows })!;
     expect(reg.state.lee.gp).toEqual({ before: 393 });
+  });
+
+  it("정규시즌이 아니면 연속 출장·연속 경기·팀 연승 상태를 모두 버린다(슛 연속만 남는다)", () => {
+    const rows = [
+      logRow("S49G01N10", "lee", "gp", 745, 746, true),
+      logRow("S49G01N10", "lee", "cg_pts10", 3, 4, true),
+      logRow("S49G01N10", "DB", "tw", 4, 5, true, "S49G01N5"),
+      logRow("S49G01N10", "lee", "xft_made", 4, 5, true),
+    ];
+    const po = summarizeStreaks({ ...base, final: false, freshTeams: new Set(["DB"]), boardRows: [], logRows: rows, regular: false, teams: { DB: "원주 DB" } })!;
+    expect(po.state).toEqual({ lee: { xft_made: { before: 5 } } });
+  });
+
+  it("팀 연승·연패: 신선한 팀의 alive 행만, 같은 시즌의 연속만, known에 팀 코드가 들어간다", () => {
+    const rows = [
+      logRow("S49G01N10", "DB", "tw", 4, 5, true, "S49G01N5"),    // 이번 시즌 5연승 진행 중
+      logRow("S49G01N10", "KT", "tl", 2, 3, true, "S49G01N8"),    // KT는 로그가 신선하지 않다
+      logRow("S49G01N10", "SK", "tw", 7, 8, true, "S47G01N200"),  // 지난 시즌 연승 - 새 시즌 경기로 이어지지 않는다
+    ];
+    const ctx = summarizeStreaks({ ...base, final: false, freshTeams: new Set(["DB", "SK"]), boardRows: [], logRows: rows, teams: { DB: "원주 DB", KT: "부산 KT", SK: "서울 SK" } })!;
+    expect(ctx.state).toEqual({ DB: { tw: { before: 5 } }, KT: { tl: { before: 3 } } });          // 상태는 읽되 KT는 신선하지 않아 known에서 빠진다, SK는 시즌이 달라 버린다
+    expect(ctx.known).toEqual(expect.arrayContaining(["DB", "SK"]));
+    expect(ctx.known).not.toContain("KT");
+    expect(ctx.teams).toEqual({ DB: "원주 DB", KT: "부산 KT", SK: "서울 SK" });
+  });
+
+  it("종료 경기: 팀 상태는 이 경기 행의 before·after, known은 팀 전원", () => {
+    const rows = [logRow("S49G01N11", "DB", "tw", 4, 5, false, "S49G01N5"), logRow("S49G01N11", "KT", "tl", 2, 3, false, "S49G01N8")];
+    const ctx = summarizeStreaks({ ...base, final: true, freshTeams: null, boardRows: [], logRows: rows, teams: { DB: "원주 DB", KT: "부산 KT" } })!;
+    expect(ctx.state).toEqual({ DB: { tw: { before: 4, after: 5 } }, KT: { tl: { before: 2, after: 3 } } });
+    expect(ctx.known).toEqual(expect.arrayContaining(["DB", "KT"]));
+  });
+
+  it("새 보드 8개를 종류별로 읽는다", () => {
+    const ctx = summarizeStreaks({
+      ...base, final: false, freshTeams: new Set(), logRows: [],
+      boardRows: [board("pg.cg_pts20.max", "p", 42, "E:x", "마이클"), board("tg.win_streak.max", "16", 16, "E:y", "원주 DB"), board("tg.loss_streak.max", "35", 14, "E:z", "서울 삼성")],
+    })!;
+    expect(ctx.boards.cg_pts20[0]).toMatchObject({ v: 42, pcode: "p", who: "마이클", active: false });
+    expect(ctx.boards.tw[0].who).toBe("원주 DB");
+    expect(ctx.boards.tl[0].v).toBe(14);
   });
 
   it("보드도 상태도 없으면 null", () => {
