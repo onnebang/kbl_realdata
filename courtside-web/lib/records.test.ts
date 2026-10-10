@@ -6,8 +6,10 @@ import {
   nextTarget,
   rankInfo,
   RecordAccumulator,
+  holdersLine,
   recordLine,
   recordToast,
+  verdictText,
   type BoardSummary,
   type RecordContext,
   type RecordEvent,
@@ -242,6 +244,33 @@ describe("recordLine", () => {
 
   it("괄호가 연달아 붙는 문장이 만들어지지 않는다", () => {
     for (const text of ["x 신기록(종전 8개)", "x 타이 기록(공동 1위)", "x 역대 3위"]) expect(recordLine({ text, detail: "a · b" })).not.toContain(")(");
+  });
+});
+
+describe("verdictText / holdersLine - 단위를 바꿔 쓸 수 있는 문구 도우미", () => {
+  const info = (o: Partial<ReturnType<typeof rankInfo> & object>) => ({ rank: 1, tie: false, breaks: false, best: 8, n1: 1, ...o });
+  const sec = (v: number) => `${Math.floor(v / 60)}분 ${v % 60}초`;
+  it("기본(KBL 역대)은 1단계 문구와 같고, 범위·주체를 바꿀 수 있다", () => {
+    const pts = (v: number) => `${v}점`;
+    expect(verdictText(info({ breaks: true, best: 41 }), pts)).toBe("KBL 신기록(종전 41점)");
+    expect(verdictText(info({ tie: true }), pts)).toBe("KBL 타이 기록(공동 1위)");
+    expect(verdictText(info({ rank: 6, tie: true }), pts)).toBe("KBL 역대 공동 6위");
+    expect(verdictText(info({ rank: 6, tie: true }), pts, "KBL", "2017-18 이후")).toBe("KBL 2017-18 이후 공동 6위");
+    expect(verdictText(info({ breaks: true, best: 600 }), sec, "불명예")).toBe("불명예 신기록(종전 10분 0초)");
+    expect(verdictText(info({ tie: true }), pts, "KBL", "2017-18 이후")).toBe("KBL 2017-18 이후 타이 기록(공동 1위)");
+  });
+  it("보유자 줄: 1위·신기록이면 '보유', 그 밖이면 '역대 1위 값: 이름'", () => {
+    const s: BoardSummary = { tops: [465, 480], holders: [{ v: 465, who: "알리제 드숀 존슨", d: "2024-03-02" }] };
+    expect(holdersLine(s, info({ rank: 3, best: 465 }), sec)).toBe("역대 1위 7분 45초: 알리제 드숀 존슨");
+    expect(holdersLine(s, info({ breaks: true, best: 465 }), sec)).toBe("알리제 드숀 존슨 보유");
+    expect(holdersLine({ tops: [], holders: [] }, info({}), sec)).toBe("");
+  });
+});
+
+describe("recordToast - 클럽", () => {
+  it("클럽 알림은 순위 문구 없이 '🏅 트리플더블 달성!'", () => {
+    const m = { board: "pg.club_td.max", club: "트리플더블", provisional: true, name: "마레이", text: "트리플더블 달성 — KBL 역대 79번째", rank: 1, breaks: false } as never;
+    expect(recordToast(m)).toEqual({ icon: "🏅", title: "트리플더블 달성!", msg: "(잠정) 마레이 트리플더블 달성 — KBL 역대 79번째" });
   });
 });
 

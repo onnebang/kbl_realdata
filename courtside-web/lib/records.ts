@@ -34,6 +34,9 @@ export type RecordEvent = {
   quarter: string;
   clock_min?: number | null;
   clock_sec?: number | null;
+  /** 이 이벤트까지의 점수(있으면 2단계 점수차 보드가 쓴다). */
+  home_score?: number | null;
+  away_score?: number | null;
 };
 export type RecordNames = { player: (pcode: string) => string; team: (tcode: string) => string };
 
@@ -221,11 +224,13 @@ export type RecordMoment = {
   provisional: boolean;
   /** 정렬용 - 낮을수록 중요(신기록 0, 아니면 순위). */
   sig: number;
+  /** 클럽(트리플더블·쿼드러플더블·5x5) 알림이면 클럽 이름 - 순위가 없어 토스트 제목이 다르다. */
+  club?: string;
 };
 
 export const validatedKey = (m: Pick<RecordMoment, "board" | "bucket" | "subject" | "period">) => `${m.board}|${m.bucket}|${m.subject}|${m.period}`;
 
-function clockOf(e: RecordEvent): string {
+export function clockOf(e: RecordEvent): string {
   if (!e.quarter || e.quarter === "PRE") return "경기 시작 전";
   return `${e.quarter} ${e.clock_min ?? 0}:${String(e.clock_sec ?? 0).padStart(2, "0")}`;
 }
@@ -234,23 +239,31 @@ const whenWord = (unit: "q" | "g", period: string) => (unit === "g" ? "한 경�
 const metricWord = (m: RecordMetric, dir: RecordDir) => (dir === "min" ? `최소 ${METRIC_TEXT[m].name}` : METRIC_TEXT[m].name);
 const who = (m: RecordMetric) => (m === "to" ? "불명예" : "KBL");
 
-function verdict(info: RankInfo, m: RecordMetric): string {
-  const unit = METRIC_TEXT[m].unit;
-  if (info.breaks) return `${who(m)} 신기록(종전 ${info.best}${unit})`;
-  if (info.rank === 1) return `${who(m)} 타이 기록(공동 1위)`;
-  return `${who(m)} 역대 ${info.tie ? "공동 " : ""}${info.rank}위`;
+/** 값 한 개를 문구로(단위 포함) - 점수·개수·초 등 보드마다 다르다. */
+export type ValueFmt = (v: number) => string;
+
+/**
+ * 판정 문구. 기본은 1단계 그대로("KBL 신기록(종전 41점)" / "KBL 타이 기록(공동 1위)" / "KBL 역대 공동 6위").
+ * scope를 주면 "역대" 자리에 들어간다("KBL 2017-18 이후 공동 6위", 신기록·타이도 "KBL 2017-18 이후 신기록(종전 …)").
+ */
+export function verdictText(info: RankInfo, fmt: ValueFmt, who = "KBL", scope = "역대"): string {
+  const head = scope === "역대" ? who : `${who} ${scope}`;
+  if (info.breaks) return `${head} 신기록(종전 ${fmt(info.best)})`;
+  if (info.rank === 1) return `${head} 타이 기록(공동 1위)`;
+  return `${head} ${scope === "역대" ? "역대 " : ""}${info.tie ? "공동 " : ""}${info.rank}위`;
 }
+const verdict = (info: RankInfo, m: RecordMetric) => verdictText(info, (v) => `${v}${METRIC_TEXT[m].unit}`, who(m));
 const shortVerdict = (info: RankInfo) => (info.breaks ? "신기록" : `${info.tie ? "공동 " : ""}${info.rank}위`);
 
-function holdersText(s: BoardSummary, info: RankInfo, m: RecordMetric): string {
-  const unit = METRIC_TEXT[m].unit;
+/** 보유자 줄 - 신기록·타이면 본문이 이미 "(종전 N개)"·"(공동 1위)"로 값을 말하므로 값을 되풀이하지 않고 보유자만 적는다. */
+export function holdersLine(s: BoardSummary, info: RankInfo, fmt: ValueFmt): string {
   const names = [...new Set(s.holders.filter((h) => h.v === info.best).map((h) => h.who))];
   if (names.length === 0) return "";
   const shown = names.slice(0, 3).join("·");
   const more = info.n1 > 3 ? ` 외 ${info.n1 - 3}건` : "";
-  // 신기록·타이면 본문이 이미 "(종전 N개)"·"(공동 1위)"로 값을 말하므로 값을 되풀이하지 않고 보유자만 적는다.
-  return info.breaks || info.rank === 1 ? `${shown}${more} 보유` : `역대 1위 ${info.best}${unit}: ${shown}${more}`;
+  return info.breaks || info.rank === 1 ? `${shown}${more} 보유` : `역대 1위 ${fmt(info.best)}: ${shown}${more}`;
 }
+const holdersText = (s: BoardSummary, info: RankInfo, m: RecordMetric) => holdersLine(s, info, (v) => `${v}${METRIC_TEXT[m].unit}`);
 
 /** 본문과 설명을 한 줄로. 본문이 "…(종전 8개)"처럼 괄호로 끝나면 같은 괄호 안에 이어 붙여 괄호가 연달아 나오지 않게 한다. */
 export function recordLine(m: Pick<RecordMoment, "text" | "detail">): string {
@@ -258,7 +271,14 @@ export function recordLine(m: Pick<RecordMoment, "text" | "detail">): string {
   return m.text.endsWith(")") ? `${m.text.slice(0, -1)} · ${m.detail})` : `${m.text}(${m.detail})`;
 }
 
-export type RecordTimelineOptions = { names: RecordNames; /** 종료된 경기면 true - 마지막 쿼터·경기 끝 판정(최소 보드)까지 한다. */ final: boolean };
+export type RecordTimelineOptions = {
+  names: RecordNames;
+  /** 종료된 경기면 true - 마지막 쿼터·경기 끝 판정(최소 보드)까지 한다. */
+  final: boolean;
+  /** 2단계 점수차 보드용 - 홈/원정 tcode(이벤트의 home_score/away_score와 짝). 없으면 점수차는 건너뛴다. */
+  home?: string;
+  away?: string;
+};
 
 /**
  * 이벤트를 처음부터 한 번 훑어 "언제 TOP10에 닿았는지(done)"와 "언제 기록 선 가까이 갔는지(near)"를 뽑는다.
@@ -403,6 +423,7 @@ export const nearAt = (moments: RecordMoment[], idx: number) =>
 
 /** 토스트 문구 - 달성(done)만 알린다(임박은 패널 전용). */
 export function recordToast(m: RecordMoment): { icon: string; title: string; msg: string } {
+  if (m.club) return { icon: "🏅", title: `${m.club} 달성!`, msg: `${m.provisional ? "(잠정) " : ""}${m.name} ${m.text}` };
   const icon = m.rank === 1 || m.breaks ? "🏆" : m.rank <= 3 ? "🥈" : "🏅";
   const title = m.breaks ? (m.board.includes(".to.") ? "불명예 신기록!" : "KBL 신기록!") : m.rank === 1 ? (m.board.includes(".to.") ? "불명예 타이 기록" : "KBL 타이 기록") : "역대 기록";
   return { icon, title, msg: `${m.provisional ? "(잠정) " : ""}${m.name} ${m.text}` };
