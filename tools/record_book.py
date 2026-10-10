@@ -485,9 +485,74 @@ def run_candidates(g):
     return [_row(g, "tg.run.max", "G", tc, "", v, g["names"][tc], tc) for tc, v in best.items() if tc in g["names"] and v > 0]
 
 
+# 3단계 - 한 경기 안 연속 슛. 종목: fg(2점+3점 야투, 자유투 제외) / tp(3점) / ft(자유투). (성공 코드, 실패 코드, 공식 성공 열, 공식 시도 열)
+SHOT_KINDS = {
+    "fg": (("201", "205", "207"), ("202", "206", "208"), "fgt", "fgtA"),
+    "tp": (("205",), ("206",), "threep", "threepA"),
+    "ft": (("203",), ("204",), "ft", "ftA"),
+}
+SINGLE_BOARD = {
+    ("fg", "made"): "pg.sfg_made.max", ("fg", "miss"): "pg.sfg_miss.max",
+    ("tp", "made"): "pg.stp_made.max", ("tp", "miss"): "pg.stp_miss.max",
+    ("ft", "made"): "pg.sft_made.max", ("ft", "miss"): "pg.sft_miss.max",
+}
+SINGLE_MIN = 5
+
+
+def shot_sequences(g):
+    """선수-경기의 슛 결과 순서 -> (ok, bad). ok = {pcode: {kind: [True(성공)/False(실패), ...]}} - 이벤트의 시도·성공 수가 공식 박스와 같은 (선수, 종목)만.
+    bad = {pcode: {kind}} - 어긋났거나(또는 같은 팀 동명이인이라 이름으로 선수를 못 가린) 종목. 슛이 없는 선수도 공식 시도 0이면 빈 순서로 ok다."""
+    idx = player_index(g)
+    seqs = collections.defaultdict(lambda: collections.defaultdict(list))
+    for e in ordered_events(g):
+        a, name, tc = e.get("a"), e.get("p"), e.get("t")
+        pcode = idx.get((name, tc)) if (a and name and tc) else None
+        if not pcode:
+            continue
+        for kind, (mk, ms, _, _) in SHOT_KINDS.items():
+            if a in mk:
+                seqs[pcode][kind].append(True)
+            elif a in ms:
+                seqs[pcode][kind].append(False)
+    ok, bad = {}, collections.defaultdict(set)
+    for p in g["players"]:
+        pcode = p["pcode"]
+        if idx.get((p["pname"], p["tcode"])) != pcode:
+            bad[pcode].update(SHOT_KINDS)
+            continue
+        for kind, (_, _, fm, fa) in SHOT_KINDS.items():
+            seq = seqs[pcode][kind] if pcode in seqs else []
+            made, att = p["rec"].get(fm), p["rec"].get(fa)
+            if isinstance(made, int) and isinstance(att, int) and len(seq) == att and sum(seq) == made:
+                ok.setdefault(pcode, {})[kind] = seq
+            else:
+                bad[pcode].add(kind)
+    return ok, dict(bad)
+
+
+def single_shot_candidates(g):
+    """한 경기 안 최대 연속 성공/실패(종목별) - 선수-경기당 한 행. SINGLE_MIN(5) 미만은 후보가 아니다."""
+    ok, _ = shot_sequences(g)
+    by_pcode = {p["pcode"]: p for p in g["players"]}
+    rows = []
+    for pcode, kinds in ok.items():
+        p = by_pcode[pcode]
+        for kind, seq in kinds.items():
+            run, best = {"made": 0, "miss": 0}, {"made": 0, "miss": 0}
+            for s in seq:
+                cur, oth = ("made", "miss") if s else ("miss", "made")
+                run[cur] += 1
+                run[oth] = 0
+                best[cur] = max(best[cur], run[cur])
+            for res, v in best.items():
+                if v >= SINGLE_MIN:
+                    rows.append(_row(g, SINGLE_BOARD[(kind, res)], "G", pcode, "", v, p["pname"], p["tcode"]))
+    return rows
+
+
 def moment_candidates(g):
-    """2단계 보드 전부 - 공식 보드는 늘, 이벤트 보드는 게이트 1을 통과한 경기만."""
-    rows = official_moment_candidates(g)
+    """2·3단계 선수-경기 보드 전부 - 공식 보드와 한 경기 안 연속 슛은 늘, 이벤트 보드는 게이트 1을 통과한 경기만."""
+    rows = official_moment_candidates(g) + single_shot_candidates(g)
     if quarters_match_official(g):
         rows += time_candidates(g) + burst_candidates(g) + run_candidates(g)
     return rows
