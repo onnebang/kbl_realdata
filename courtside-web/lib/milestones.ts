@@ -24,7 +24,8 @@ export const CAT_TEXT: Record<MilestoneCat, { name: string; unit: string; verb: 
 export const MAX_GAIN: Record<MilestoneCat, number> = { pts: 60, reb: 30, ast: 25, stl: 10, blk: 10, threep: 12 };
 
 /** "임박" 기준 - 목표까지 남은 수가 이 값 이하일 때만 화면에 올린다(커리어 하이는 한 경기 안의 값이라 더 좁다). */
-export const NEAR: Record<"rank" | "step" | "high", Record<MilestoneCat, number>> = {
+export const NEAR: Record<"rank" | "step" | "high" | "avg", Record<MilestoneCat, number>> = {
+  avg: { pts: 10, reb: 6, ast: 5, stl: 3, blk: 3, threep: 3 },
   rank: { pts: 10, reb: 6, ast: 5, stl: 3, blk: 3, threep: 3 },
   step: { pts: 10, reb: 6, ast: 5, stl: 3, blk: 3, threep: 3 },
   high: { pts: 6, reb: 3, ast: 3, stl: 1, blk: 1, threep: 1 },
@@ -36,7 +37,12 @@ export type MilestoneTarget =
   /** 100개 단위 통산 이정표(at = 100의 배수). */
   | { kind: "step"; cat: MilestoneCat; at: number }
   /** 한 경기 커리어 하이(high). 같으면 타이, 넘으면 경신. */
-  | { kind: "high"; cat: MilestoneCat; high: number };
+  | { kind: "high"; cat: MilestoneCat; high: number }
+  /**
+   * 통산 평균 순위 돌파(정규리그, 300경기 이상) - 이 경기에서 `need` 이상을 기록하면 평균이 앞선 rival의 평균을 엄밀히 넘어 `rank`위가 된다.
+   * 평균은 경기 중 오르내리므로 "지금 평균"이 아니라 이 경기 한 번의 값(need)으로 판정한다(basis game). rival.avg = 그 선수의 통산 평균.
+   */
+  | { kind: "avg"; cat: MilestoneCat; scope: "all" | "active"; rank: number; need: number; rival: { pcode: string; name: string; avg: number }; activeRank?: number };
 
 export type MilestonePlayer = {
   name: string;
@@ -62,7 +68,9 @@ export const basisNote = (split: MilestoneContext["split"]) =>
 
 /** 알릴 만한 정도(작을수록 크다): 100개 단위 통산 < 커리어 하이 < 순위 돌파(숫자가 작은 순위일수록 앞 - 현역은 풀이 작아 같은 숫자여도 한 단계 약하게 본다). */
 export function significance(t: MilestoneTarget): number {
-  return t.kind === "step" ? 0 : t.kind === "high" ? 1_000 : 2_000 + (t.scope === "all" ? t.rank : t.rank * 2);
+  if (t.kind === "step") return 0;
+  if (t.kind === "high") return 1_000;
+  return (t.kind === "avg" ? 1_500 : 2_000) + (t.scope === "all" ? t.rank : t.rank * 2);
 }
 
 export type GameStats = Record<MilestoneCat, number>;
@@ -96,14 +104,16 @@ const fmt = (n: number) => n.toLocaleString("ko-KR");
 type Check = { id: string; target: MilestoneTarget; cat: MilestoneCat; at: number; basis: "career" | "game"; variant?: "tie" | "break" };
 
 function checksOf(pcode: string, p: MilestonePlayer): Check[] {
-  return p.targets.flatMap((t, i): Check[] =>
-    t.kind === "high"
-      ? [
-          { id: `${pcode}:${i}:tie`, target: t, cat: t.cat, at: t.high, basis: "game", variant: "tie" },
-          { id: `${pcode}:${i}:break`, target: t, cat: t.cat, at: t.high + 1, basis: "game", variant: "break" },
-        ]
-      : [{ id: `${pcode}:${i}`, target: t, cat: t.cat, at: t.at, basis: "career" }]
-  );
+  return p.targets.flatMap((t, i): Check[] => {
+    if (t.kind === "high") {
+      return [
+        { id: `${pcode}:${i}:tie`, target: t, cat: t.cat, at: t.high, basis: "game", variant: "tie" },
+        { id: `${pcode}:${i}:break`, target: t, cat: t.cat, at: t.high + 1, basis: "game", variant: "break" },
+      ];
+    }
+    if (t.kind === "avg") return [{ id: `${pcode}:${i}`, target: t, cat: t.cat, at: t.need, basis: "game" }];
+    return [{ id: `${pcode}:${i}`, target: t, cat: t.cat, at: t.at, basis: "career" }];
+  });
 }
 
 const valueOf = (c: Check, p: MilestonePlayer, g: GameStats) => (c.basis === "career" ? p.before[c.cat] + g[c.cat] : g[c.cat]);
@@ -113,6 +123,17 @@ function describe(c: Check, p: MilestonePlayer, g: GameStats, phase: "done" | "n
   const t = c.target;
   const cat = CAT_TEXT[c.cat];
   const today = `오늘 ${g[c.cat]}${cat.unit}째`;
+  if (t.kind === "avg") {
+    const scope = t.scope === "all" ? "올타임" : "현역";
+    const active = t.activeRank != null ? ` · 현역 ${t.activeRank}위` : "";
+    const rival = `기존 ${t.rank}위 ${t.rival.name}(${t.rival.avg.toFixed(2)}${cat.unit})`;
+    if (phase === "done") {
+      const after = (p.before[c.cat] + g[c.cat]) / ((p.gp ?? 0) + 1);
+      const by = cat.unit === "점" ? "으로" : "로";
+      return { text: `통산 평균 ${cat.name} ${after.toFixed(2)}${cat.unit}${by} 올라 ${scope} ${t.rank}위 진입${active}`, detail: `${rival} 추월 · 오늘 ${g[c.cat]}${cat.unit}` };
+    }
+    return { text: `${remaining}${cat.unit}만 더 ${cat.verb} 통산 평균 ${cat.name} ${scope} ${t.rank}위${active}`, detail: `${rival} · ${today}` };
+  }
   if (t.kind === "rank") {
     const scope = t.scope === "all" ? "올타임" : "현역";
     const target = `${scope} ${cat.name} ${t.rank}위`;
@@ -276,6 +297,16 @@ function chanceOf(pcode: string, p: MilestonePlayer, t: MilestoneTarget, need: n
   const ask = need === 1 ? `1${cat.unit}만 ${cat.verb}` : `${need}${cat.unit} 이상 ${cat.verb}`;
   const base = { id: `${pcode}:${i}`, pcode, name: p.name, ...(p.tcode ? { tcode: p.tcode } : {}), cat: t.cat, kind: t.kind, need, sig: significance(t) };
   const now = `현재 통산 ${fmt(p.before[t.cat])}${cat.unit}`;
+  if (t.kind === "avg") {
+    const scope = t.scope === "all" ? "올타임" : "현역";
+    const active = t.activeRank != null ? `(현역 ${t.activeRank}위)` : "";
+    const avgNow = p.gp ? (p.before[t.cat] / p.gp).toFixed(2) : "-";
+    return {
+      ...base,
+      text: `${ask} 통산 평균 ${cat.name} ${scope} ${t.rank}위${active}에 오른다`,
+      detail: `기존 ${t.rank}위 ${t.rival.name}(${t.rival.avg.toFixed(2)}${cat.unit}) 추월 · 현재 평균 ${avgNow}${cat.unit}`,
+    };
+  }
   if (t.kind === "rank") {
     const active = t.activeRank != null ? `(현역 ${t.activeRank}위)` : "";
     return {
@@ -300,9 +331,9 @@ export function buildRecordChances(ctx: MilestoneContext, opts: { perPlayer?: nu
   for (const [pcode, p] of Object.entries(ctx.players)) {
     const best = new Map<string, RecordChance>();
     p.targets.forEach((t, i) => {
-      const need = t.kind === "high" ? t.high + 1 : t.at - p.before[t.cat];
+      const need = t.kind === "high" ? t.high + 1 : t.kind === "avg" ? t.need : t.at - p.before[t.cat];
       if (need < 1 || need > reachOf(t.cat, p)) return;
-      const key = `${t.cat}:${t.kind}:${t.kind === "rank" ? t.scope : ""}`;
+      const key = `${t.cat}:${t.kind}:${t.kind === "rank" || t.kind === "avg" ? t.scope : ""}`;
       const sig = significance(t);
       const prev = best.get(key);
       if (!prev || sig < prev.sig || (sig === prev.sig && need < prev.need)) best.set(key, chanceOf(pcode, p, t, need, i));

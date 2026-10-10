@@ -35,6 +35,11 @@ export const RANK_CAP = { all: 100, active: 50 } as const;
 /** 커리어 하이 알림의 노이즈 컷 - 하이 자체가 이만큼은 돼야 의미가 있고, 신인의 첫 몇 경기(하이가 곧 평균)는 뺀다. */
 export const HIGH_MIN: Record<MilestoneCat, number> = { pts: 15, reb: 8, ast: 6, stl: 3, blk: 3, threep: 4 };
 export const HIGH_MIN_GP = 15;
+/** 통산 평균 순위(2단계 B) - 정규리그 이 경기 포함 300경기 이상만 순위표에 넣고, 올타임 TOP20·현역 TOP10까지 목표를 만든다(상수라 바꾸기 쉽다). */
+export const AVG_MIN_GP = 300;
+export const AVG_CATS = ["pts", "reb", "ast", "stl", "blk"] as const;
+export const AVG_RANK_CAP = { all: 20, active: 10 } as const;
+
 /** 스냅샷 기준일과 이 경기 날짜가 이보다 벌어지면 보정할 경기가 너무 많아져 기능을 끈다. */
 const MAX_GAP_DAYS = 60;
 const STEP = 100;
@@ -58,6 +63,33 @@ type Adjusted = {
   /** 부문별로 hi를 믿어도 되는지 - 뺀 경기가 하이 자리를 차지했을 수 있으면 false. */
   hiOk: boolean[] | null;
 };
+
+type AvgEntry = { pcode: string; name: string; total: number; gp: number; active: boolean };
+/** a의 평균이 b의 평균보다 큰 정도의 부호 - total/gp를 나누지 않는 교차곱(정수)이라 동률 판정이 정확하다. */
+const avgCmp = (a: AvgEntry, b: AvgEntry) => a.total * b.gp - b.total * a.gp;
+
+/**
+ * 한 부문의 통산 평균 순위 돌파 목표. me는 오늘 뛰면 (total + x)/(gp + 1)이 되는 선수 - 앞선 선수(rival)를 엄밀히 넘는 가장 작은 x(need)와
+ * 넘은 뒤 순위(rival보다 평균이 엄밀히 큰 다른 선수 수 + 1)를 낸다. 오늘 0을 기록해도 이미 넘는 rival(need <= 0)은 건너뛰고,
+ * need가 한 경기 현실 한도(MAX_GAIN)를 넘으면 거기서 멈춘다.
+ */
+function avgTargetsFor(cat: MilestoneCat, me: { pcode: string; total: number; gp: number }, entries: AvgEntry[], scope: "all" | "active"): Extract<MilestoneTarget, { kind: "avg" }>[] {
+  const others = entries.filter((e) => e.pcode !== me.pcode && (scope === "all" || e.active)).sort((x, y) => avgCmp(x, y));
+  const found: Extract<MilestoneTarget, { kind: "avg" }>[] = [];
+  for (const q of others) {
+    const num = q.total * (me.gp + 1);
+    const need = (num - (num % q.gp)) / q.gp - me.total + 1; // floor(q.total*(gp+1)/q.gp) - total + 1 - 정수 나눗셈
+    if (need <= 0) continue; // 오늘 0을 기록해도 이미 넘는다(그 rival은 한참 아래) - 목표가 아니다
+    if (need > MAX_GAIN[cat]) break; // others가 평균 오름차순이라 need도 늘어난다
+    const rank = others.filter((o) => avgCmp(o, q) > 0).length + 1;
+    if (rank > AVG_RANK_CAP[scope]) continue;
+    const t = { kind: "avg" as const, cat, scope, rank, need, rival: { pcode: q.pcode, name: q.name, avg: q.total / q.gp } };
+    // 필요량이 같으면 더 높은 평균의 rival을 넘는 목표가 이긴다(그 값이면 아래 rival도 함께 넘는다).
+    if (found.length && found[found.length - 1].need === need) found[found.length - 1] = t;
+    else found.push(t);
+  }
+  return found;
+}
 
 /** 이 값을 가진 선수의 순위 = 그보다 큰 값을 가진 선수 수 + 1(동률은 같은 순위). list는 값 오름차순. */
 function rankOf(list: { value: number }[], value: number): number {
@@ -138,6 +170,15 @@ export function buildMilestoneContext(args: {
     { all: ReturnType<typeof board>; active: ReturnType<typeof board> }
   >;
 
+  // 통산 평균 순위표 - 정규시즌 경기에서만(플레이오프는 평균 목표 없음), 이 경기 직전 기준 300경기 이상.
+  const avgEntries = (cat: MilestoneCat): AvgEntry[] =>
+    split !== "regular"
+      ? []
+      : [...adj.entries()]
+          .filter(([, a]) => a.totals[6] >= AVG_MIN_GP && a.totals[CAT_INDEX[cat]] > 0)
+          .map(([pcode, a]) => ({ pcode, name: a.name, total: a.totals[CAT_INDEX[cat]], gp: a.totals[6], active: a.active }));
+  const avgBoards = Object.fromEntries(AVG_CATS.map((cat) => [cat, avgEntries(cat)])) as Record<(typeof AVG_CATS)[number], AvgEntry[]>;
+
   // ponytail: 아래 순위 목표는 (경기 선수 × 부문 × 범위)마다 board 전체를 훑고 후보마다 rankOf로 또 훑는다 - 역대 선수 수 N에 거의 N².
   // 실측(2026-10-07, N=1,049·선수 34명): 요청당 중앙 14ms, N 2배 ≈ 3배, 4배 ≈ 10배. N은 리그 역사(연 +50명 안팎)라 지금은 둔다.
   // 느려지면 board가 값 오름차순이니 이분 탐색으로 시작 위치와 순위를 구한다.
@@ -180,6 +221,19 @@ export function buildMilestoneContext(args: {
       const i = CAT_INDEX[cat];
       const hi = a.hi && a.hiOk?.[i] ? a.hi[i] : undefined;
       if (hi != null && hi >= HIGH_MIN[cat] && a.gpAll >= HIGH_MIN_GP) targets.push({ kind: "high", cat, high: hi });
+    }
+    // 통산 평균 순위 - 오늘 뛰면 이 경기를 포함해 300경기 이상이 되는 선수만. 올타임 목표에 같은 rival을 현역에서도 넘으면 한 줄로 합친다.
+    if (split === "regular" && a.totals[6] + 1 >= AVG_MIN_GP) {
+      for (const cat of AVG_CATS) {
+        const me = { pcode: p.pcode, total: a.totals[CAT_INDEX[cat]], gp: a.totals[6] };
+        const allT = avgTargetsFor(cat, me, avgBoards[cat], "all");
+        const activeT = avgTargetsFor(cat, me, avgBoards[cat], "active");
+        for (const t of allT) {
+          const twin = activeT.find((x) => x.rival.pcode === t.rival.pcode);
+          targets.push(twin ? { ...t, activeRank: twin.rank } : t);
+        }
+        for (const t of activeT) if (!allT.some((x) => x.rival.pcode === t.rival.pcode)) targets.push(t);
+      }
     }
     if (targets.length) out[p.pcode] = { name: a.name, ...(p.tcode ? { tcode: p.tcode } : {}), gp: a.totals[6], before, targets };
   }

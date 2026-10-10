@@ -30,6 +30,36 @@ const ctx: MilestoneContext = {
 const ev = (pcode: string, code: string, quarter = "Q1", min = 5, sec = 0): TimelineEvent => ({ pcode, action_code: code, quarter, clock_min: min, clock_sec: sec });
 const stats = (over: Record<string, Partial<GameStats>>) => (pcode: string): GameStats => ({ ...zeros, ...(over[pcode] ?? {}) });
 
+describe("통산 평균 순위(avg) 목표", () => {
+  const avgPlayer = (): MilestoneContext["players"][string] => ({
+    name: "김선형", gp: 299, before: { pts: 5660, reb: 0, ast: 0, stl: 0, blk: 0, threep: 0 },
+    targets: [{ kind: "avg", cat: "pts", scope: "all", rank: 3, need: 41, rival: { pcode: "C", name: "씨", avg: 19 }, activeRank: 1 }],
+  });
+  const avgCtx: MilestoneContext = { split: "regular", asOf: "2026-10-06", players: { P: avgPlayer() } };
+  it("need 이상을 기록하는 순간 '통산 평균 득점 N점으로 올라 올타임 3위 진입'(done), 직전엔 임박(near)", () => {
+    const ev = (code: string, i: number) => ({ pcode: "P", action_code: code, quarter: "Q4", clock_min: 9, clock_sec: 50 - i });
+    const events = [...Array.from({ length: 20 }, (_, i) => ev("201", i)), ev("203", 20)];
+    const m = buildMilestoneTimeline(avgCtx, events);
+    const done = m.filter((x) => x.phase === "done");
+    expect(done).toHaveLength(1);
+    expect(done[0].text).toBe("통산 평균 득점 19.00점으로 올라 올타임 3위 진입 · 현역 1위");
+    expect(done[0].detail).toBe("기존 3위 씨(19.00점) 추월 · 오늘 41점");
+    const near = m.find((x) => x.phase === "near");
+    expect(near?.text).toBe("9점만 더 넣으면 통산 평균 득점 올타임 3위 · 현역 1위");        // 임박 구간(남은 10점 이내)에 처음 든 순간은 32점째 - 남은 9점
+  });
+  it("경기 전 '기록 도전': 41점은 평균 18.9 x 1.7 = 32 > 30(cap)이라 닿지 않고, need가 작으면 문장으로", () => {
+    expect(buildRecordChances(avgCtx)).toEqual([]);
+    const near: MilestoneContext = { ...avgCtx, players: { P: { ...avgPlayer(), targets: [{ kind: "avg", cat: "pts", scope: "all", rank: 3, need: 12, rival: { pcode: "C", name: "씨", avg: 19 } }] } } };
+    const [c] = buildRecordChances(near);
+    expect(c).toMatchObject({ kind: "avg", need: 12, text: "12점 이상 넣으면 통산 평균 득점 올타임 3위에 오른다", detail: "기존 3위 씨(19.00점) 추월 · 현재 평균 18.93점" });
+  });
+  it("중요도는 통산 합계 순위 돌파보다 위, 커리어 하이보다 아래", () => {
+    const avg = significance({ kind: "avg", cat: "pts", scope: "all", rank: 3, need: 5, rival: { pcode: "x", name: "x", avg: 1 } });
+    expect(avg).toBeGreaterThan(significance({ kind: "high", cat: "pts", high: 20 }));
+    expect(avg).toBeLessThan(significance({ kind: "rank", cat: "pts", scope: "all", at: 10, rank: 1, rival: { pcode: "x", name: "x", value: 1 } }));
+  });
+});
+
 describe("evaluateApproaching", () => {
   it("임박 기준 밖의 목표는 안 올린다", () => {
     // A: 순위 목표는 9점 남음(기준 10점 이내) / 8500점 이정표는 97점 남음. B: 이정표 15개, 커리어 하이 19개 남음.

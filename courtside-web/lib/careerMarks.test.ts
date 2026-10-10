@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMilestoneContext, type DeltaGame, type Snapshot } from "./careerMarks";
+import { AVG_MIN_GP, buildMilestoneContext, type DeltaGame, type Snapshot } from "./careerMarks";
 
 const row = (pcode: string, pts: number, extra: Partial<DeltaGame["rows"][number]> = {}) => ({ pcode, pts, reb: 0, ast: 0, stl: 0, blk: 0, tpm: 0, ...extra });
 const game = (gmkey: string, game_date: string, rows: DeltaGame["rows"], season_category = "정규시즌"): DeltaGame => ({ gmkey, game_date, season_category, rows });
@@ -30,6 +30,41 @@ describe("buildMilestoneContext - 순위 돌파", () => {
     const rank = targetsOf(buildMilestoneContext({ ...base, games: [], gameDate: "2026-10-07" }), "P").filter((t) => t.kind === "rank");
     // 현역 중에는 이정현(9990)·워니(8411)만 김선형(8403) 앞이라 워니를 넘으면 현역 2위.
     expect(rank[0]).toMatchObject({ activeRank: 2 });
+  });
+});
+
+// 통산 평균 득점표(정규리그, 300경기): A 22.0 · B 20.0 · C 19.0(현역) · D 18.5. 나(M)는 299경기 5,660점(18.93) - 오늘 뛰면 300경기가 된다.
+const avgPlayers = (me: { total: number; gp: number }): Snapshot["players"] => ({
+  A: { n: "에이", a: 0, reg: [6600, 0, 0, 0, 0, 0, 300], po: [0, 0, 0, 0, 0, 0, 0], hi: null },
+  B: { n: "비", a: 0, reg: [6000, 0, 0, 0, 0, 0, 300], po: [0, 0, 0, 0, 0, 0, 0], hi: null },
+  C: { n: "씨", a: 1, reg: [5700, 0, 0, 0, 0, 0, 300], po: [0, 0, 0, 0, 0, 0, 0], hi: null },
+  D: { n: "디", a: 1, reg: [5550, 0, 0, 0, 0, 0, 300], po: [0, 0, 0, 0, 0, 0, 0], hi: null },
+  M: { n: "나", a: 1, reg: [me.total, 0, 0, 0, 0, 0, me.gp], po: [0, 0, 0, 0, 0, 0, 0], hi: null },
+});
+const avgCtx = (me: { total: number; gp: number }, split: "regular" | "playoffs" = "regular") =>
+  buildMilestoneContext({ snapshot: { asOf: "2026-10-06", recentFrom: "2026-09-15", recentGmkeys: [], players: avgPlayers(me) }, games: [], gameDate: "2026-10-07", split, players: [{ pcode: "M", name: "나" }] });
+const avgTargets = (ctx: ReturnType<typeof buildMilestoneContext>) => (ctx.players.M?.targets ?? []).filter((t) => t.kind === "avg");
+
+describe("buildMilestoneContext - 통산 평균 순위(avg)", () => {
+  it("앞선 선수의 평균을 엄밀히 넘으려면 필요한 한 경기 값(정수 계산)과 넘은 뒤 순위", () => {
+    // C(5700/300 = 19.0)를 넘으려면 (5660 + x)/300 > 19.0 -> x > 40 -> 41점. 더 위(B 20.0)는 341점이라 한 경기에 못 닿는다.
+    const t = avgTargets(avgCtx({ total: 5660, gp: 299 }));
+    expect(t).toHaveLength(1);
+    expect(t[0]).toMatchObject({ kind: "avg", cat: "pts", scope: "all", need: 41, rank: 3, rival: { pcode: "C", name: "씨", avg: 19 }, activeRank: 1 });
+  });
+  it("정확히 같은 평균은 추월이 아니다(경계)", () => {
+    // 5699 + 1 = 5700 -> 19.0 == C. 한 점 더(2점)여야 넘는다.
+    expect(avgTargets(avgCtx({ total: 5699, gp: 299 }))[0]).toMatchObject({ need: 2, rival: { pcode: "C" } });
+  });
+  it("자격: 이 경기를 포함해 300경기 미만이면 목표가 없고, 정규시즌이 아니면 만들지 않는다", () => {
+    expect(AVG_MIN_GP).toBe(300);
+    expect(avgTargets(avgCtx({ total: 5000, gp: 298 }))).toEqual([]);
+    expect(avgTargets(avgCtx({ total: 5660, gp: 299 }, "playoffs"))).toEqual([]);
+  });
+  it("이미 앞선 선수는 목표가 아니고, 순위표 자격이 없는(299경기) 선수는 rival이 아니다", () => {
+    const snap: Snapshot = { asOf: "2026-10-06", recentFrom: "2026-09-15", recentGmkeys: [], players: { ...avgPlayers({ total: 6700, gp: 299 }), Z: { n: "제트", a: 0, reg: [6900, 0, 0, 0, 0, 0, 299], po: [0, 0, 0, 0, 0, 0, 0], hi: null } } };
+    const ctx = buildMilestoneContext({ snapshot: snap, games: [], gameDate: "2026-10-07", split: "regular", players: [{ pcode: "M", name: "나" }] });
+    expect((ctx.players.M?.targets ?? []).filter((t) => t.kind === "avg")).toEqual([]);     // M(22.4)이 A(22.0)보다도 앞, Z는 299경기라 순위표에 없다
   });
 });
 
