@@ -1,8 +1,6 @@
-"use client";
-
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { Suspense } from "react";
+import { NavAutoClose } from "./NavAutoClose";
 
 // 사용자 요청("선수프로필/득점분포탐색기/승리기여도 리더보드/폼지수 리더보드/코트사이드까지
 // 모든것을 연동") - 여러 페이지가 생기면서 전역 내비게이션이 필요해짐. 각 항목은 완성되는
@@ -65,19 +63,12 @@ const DROPDOWN_GROUPS = [
 ];
 
 export function NavBar() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const navRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    // 페이지 이동이나 쿼리 파라미터 변경 시 열려있는 탭(패널)을 닫는다.
-    if (!navRef.current) return;
-    const details = navRef.current.querySelectorAll("details[open]");
-    details.forEach((d) => d.removeAttribute("open"));
-  }, [pathname, searchParams]);
-
   return (
-    <nav className="nav-bar" ref={navRef}>
+    <nav className="nav-bar">
+      {/* 페이지 이동·쿼리 변경 시 열린 그룹 닫기 - 작은 클라이언트 조각만 Suspense 안에 붙이고 NavBar 본체는 서버 컴포넌트(JS 0)로 둔다 */}
+      <Suspense fallback={null}>
+        <NavAutoClose />
+      </Suspense>
       <div className="nav-bar-inner">
         <div className="nav-main">
           {MAIN_LINKS.map((l) => (
