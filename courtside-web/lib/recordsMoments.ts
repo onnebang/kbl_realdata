@@ -14,6 +14,8 @@ import {
   type RecordTimelineOptions,
   type ValueFmt,
 } from "./records";
+import type { StreakContext } from "./streakKinds";
+import { buildStreakMoments } from "./streakMoments";
 
 // 역대 기록 2단계 라이브 엔진(순간 기록 14개 보드) - 설계: docs/superpowers/specs/2026-10-10-record-book-phase2-design.md §3·§5
 //
@@ -369,11 +371,15 @@ export function buildMomentTimeline(ctx: RecordContext, events: RecordEvent[], o
   return out;
 }
 
-/** 1단계(쿼터·경기 최다/최소)와 2단계(순간 기록)를 합쳐 시간순으로. 종료 경기는 2단계도 테이블에 있는(validated) 항목만 남긴다. */
-export function buildAllRecordMoments(ctx: RecordContext, events: RecordEvent[], opts: RecordTimelineOptions): RecordMoment[] {
+/**
+ * 1단계(쿼터·경기 최다/최소)와 2단계(순간 기록)와 3단계(연속 기록)를 합쳐 시간순으로. 종료 경기는 1·2단계 순간을 테이블에 있는(validated) 항목만 남기고,
+ * 3단계(streakMoments)는 스스로 같은 기준(한 경기 안 = validated, 연속 출장·경기 간 = 이 경기 로그 행)으로 거른다.
+ */
+export function buildAllRecordMoments(ctx: RecordContext, events: RecordEvent[], opts: RecordTimelineOptions, streaks?: StreakContext | null): RecordMoment[] {
   const base = buildRecordTimeline(ctx, events, opts);
   const extra = buildMomentTimeline(ctx, events, opts);
   const validated = ctx.validated ? new Set(ctx.validated) : null;
   const kept = validated ? extra.filter((m) => validated.has(validatedKey(m))) : extra;
-  return [...base, ...kept].sort((a, b) => a.idx - b.idx);
+  const streak = buildStreakMoments(ctx, streaks ?? null, events, opts);
+  return [...base, ...kept, ...streak].sort((a, b) => a.idx - b.idx);
 }
