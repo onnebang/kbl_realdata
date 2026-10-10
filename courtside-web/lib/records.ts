@@ -226,8 +226,6 @@ export type RecordMoment = {
   sig: number;
   /** 클럽(트리플더블·쿼드러플더블·5x5) 알림이면 클럽 이름 - 순위가 없어 토스트 제목이 다르다. */
   club?: string;
-  /** true면 패널·리포트에만 올리고 토스트는 띄우지 않는다(신기록 경신을 매 경기 이어가는 연속 출장 등 새로울 게 없는 줄). */
-  quiet?: boolean;
 };
 
 export const validatedKey = (m: Pick<RecordMoment, "board" | "bucket" | "subject" | "period">) => `${m.board}|${m.bucket}|${m.subject}|${m.period}`;

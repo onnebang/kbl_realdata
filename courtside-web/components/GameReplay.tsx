@@ -245,7 +245,7 @@ function computePushNotifications(
 
   // 역대 기록 - 맨 뒤(가장 드문 사건이라 라이브 버스트의 마지막 3개 제한에서 밀려나지 않게).
   for (const m of records?.get(newIdx) ?? []) {
-    if (m.phase === "done" && !m.quiet) out.push(recordToast(m));
+    if (m.phase === "done") out.push(recordToast(m));
   }
 
   return out;

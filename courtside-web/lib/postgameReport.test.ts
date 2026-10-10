@@ -393,7 +393,7 @@ describe("역대 기록 섹션 (요청 2026-10-08)", () => {
     expect(recordBookSection({ ...c, validated: [] }, evs, tags, names, { home: "H", away: "A" })).toBeNull();
   });
 
-  it("3단계 연속 기록(연속 출장)도 같은 섹션에 - 이 경기 로그 행이 있을 때만, 신기록 경신 줄도 리포트에는 남는다", () => {
+  it("3단계 연속 기록(연속 출장)도 같은 섹션에 - 이 경기 로그 행이 있을 때만, 새로 신기록이 되는 줄이 남는다", () => {
     const evs = attachDerivedFields([
       ev({ event_order: 0, quarter: "PRE", home_score: 0, away_score: 0, home_win_prob: 0.5 }),
       ev({ event_order: 1, quarter: "Q1", clock_min: 10, clock_sec: 0, home_score: 0, away_score: 0, action_code: "101", pcode: "p1", player_name: "허훈", tcode: "H", home_win_prob: 0.5 }),

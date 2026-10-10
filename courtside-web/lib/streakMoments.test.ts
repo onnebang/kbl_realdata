@@ -33,41 +33,36 @@ const GP = [ent(393, "lee", "이정현", true), ent(383, "jhj", "주희정"), en
   ent(223, "rga", "라건아"), ent(206, "lhm", "이현민"), ent(195, "alb", "알바노", true), ent(191, "ldj", "이동준"), ent(190, "xx", "엑스")];
 
 describe("연속 출장(gp) - 그 선수의 첫 이벤트에서", () => {
-  it("신기록 경신을 이어가는 줄(순위 그대로)은 quiet, 문구는 종전 기록과 보유자", () => {
+  it("신기록을 매 경기 이어가는 것(순위 그대로)은 알리지 않는다 - 이정현이 출전할 때마다 뜨지 않게", () => {
     const s = streaksOf({ boards: { gp: GP }, state: { lee: { gp: { before: 393 } } }, known: ["lee"] });
-    const m = buildStreakMoments(null, s, [ev("lee", "H", "101")], OPTS).filter((x) => x.phase === "done");
-    expect(m).toHaveLength(1);
-    expect(m[0]).toMatchObject({ board: "pg.streak_gp.max", subject: "lee", value: 394, rank: 1, breaks: true, quiet: true, provisional: true, idx: 0 });
-    expect(m[0].text).toBe("연속 출장 394경기째 KBL 신기록(종전 383경기)");
-    expect(m[0].detail).toBe("주희정 보유");
+    expect(buildStreakMoments(null, s, [ev("lee", "H", "101")], OPTS)).toEqual([]);
   });
-  it("50의 배수(100 이상) 이정표는 quiet이 아니다", () => {
+  it("50의 배수(100 이상) 이정표 경기에서는 알린다 - 문구는 종전 기록과 보유자", () => {
     expect(isMilestone(400) && isMilestone(150) && !isMilestone(50) && !isMilestone(399)).toBe(true);
     const s = streaksOf({ boards: { gp: GP }, state: { lee: { gp: { before: 399 } } }, known: ["lee"] });
-    const m = buildStreakMoments(null, s, [ev("lee", "H", "101")], OPTS)[0];
-    expect(m.text).toBe("연속 출장 400경기째 KBL 신기록(종전 383경기)");
-    expect(m.quiet).toBeFalsy();
+    const m = buildStreakMoments(null, s, [ev("lee", "H", "101")], OPTS).filter((x) => x.phase === "done");
+    expect(m).toHaveLength(1);
+    expect(m[0]).toMatchObject({ board: "pg.streak_gp.max", subject: "lee", value: 400, rank: 1, breaks: true, provisional: true, idx: 0 });
+    expect(m[0].text).toBe("연속 출장 400경기째 KBL 신기록(종전 383경기)");
+    expect(m[0].detail).toBe("주희정 보유");
   });
-  it("TOP10 밖에서 순위가 처음 10위 안으로 들어오면 알린다(공동 10위), 이미 10위 안이고 그대로면 quiet", () => {
+  it("순위가 좋아지면 알린다 - 10위 밖에서 처음 10위 안(공동 10위)으로 들어올 때, 이미 10위 안이고 순위 그대로면 알리지 않는다", () => {
     const enter = streaksOf({ boards: { gp: GP }, state: { z: { gp: { before: 190 } } }, known: ["z"] });
     const a = buildStreakMoments(null, enter, [ev("z", "H", "101")], OPTS)[0];
     expect(a.text).toBe("연속 출장 191경기째 KBL 역대 공동 10위");
-    expect(a.quiet).toBeFalsy();
     const stay = streaksOf({ boards: { gp: GP }, state: { alb: { gp: { before: 195 } } }, known: ["alb"] });
-    const b = buildStreakMoments(null, stay, [ev("alb", "H", "101")], OPTS)[0];
-    expect(b.value).toBe(196);
-    expect(b.quiet).toBe(true);
+    expect(buildStreakMoments(null, stay, [ev("alb", "H", "101")], OPTS)).toEqual([]);
   });
   it("10위 밖이고 이정표도 아니면 만들지 않고, 상태를 믿을 수 없는 선수(known 밖)나 상태가 없는 선수도 건너뛴다", () => {
     const s = streaksOf({ boards: { gp: GP }, state: { a: { gp: { before: 30 } }, b: { gp: { before: 399 } } }, known: ["a"] });
     expect(buildStreakMoments(null, s, [ev("a", "H", "101"), ev("b", "H", "101"), ev("c", "H", "101")], OPTS)).toEqual([]);
   });
   it("종료 경기: 이 경기 로그 행(after)이 있어야 하고 '잠정'이 아니다", () => {
-    const withRow = streaksOf({ boards: { gp: GP }, state: { lee: { gp: { before: 393, after: 394 } } }, known: ["lee"], final: true });
+    const withRow = streaksOf({ boards: { gp: GP }, state: { lee: { gp: { before: 399, after: 400 } } }, known: ["lee"], final: true });
     const m = buildStreakMoments(null, withRow, [ev("lee", "H", "101")], { ...OPTS, final: true });
     expect(m).toHaveLength(1);
     expect(m[0].provisional).toBe(false);
-    expect(m[0].value).toBe(394);
+    expect(m[0].value).toBe(400);
     const noRow = streaksOf({ boards: { gp: GP }, state: {}, known: ["lee"], final: true });
     expect(buildStreakMoments(null, noRow, [ev("lee", "H", "101")], { ...OPTS, final: true })).toEqual([]);
   });
@@ -147,10 +142,10 @@ describe("경기 전 기록 도전 / finals / 합치기", () => {
   const players = { lee: { name: "이정현", tcode: "DB" }, p: { name: "조성민", tcode: "KT" } };
   it("연속 출장 도전(순위 문구)과 성공 연속이 다음 개수로 기록 선을 넘는 경우만", () => {
     const FT = [ent(56, "s", "조성민"), ent(52, "m", "문경은"), ent(44, "y", "양희승"), ent(43, "t", "문태종"), ent(42, "u", "유현준"), ent(42, "v", "레이션 테리"), ent(40, "w", "헤인즈"), ent(40, "x", "리틀"), ent(39, "a", "에이"), ent(38, "b", "비"), ent(37, "c", "씨")];
-    const s = { ...streaksOf({ boards: { gp: GP, xft_made: FT }, state: { lee: { gp: { before: 393 } }, p: { xft_made: { before: 41 } } }, known: ["lee", "p"] }), players };
+    const s = { ...streaksOf({ boards: { gp: GP, xft_made: FT }, state: { lee: { gp: { before: 399 } }, p: { xft_made: { before: 41 } } }, known: ["lee", "p"] }), players };
     const chances = buildStreakChances(s);
     expect(chances.map((c) => c.text)).toEqual([
-      "오늘 출전하면 연속 출장 394경기째 KBL 신기록(종전 383경기)",
+      "오늘 출전하면 연속 출장 400경기째 KBL 신기록(종전 383경기)",
       "다음 자유투가 들어가면 연속 성공 42개째 KBL 역대 공동 5위",
     ]);
     expect(chances[0]).toMatchObject({ pcode: "lee", name: "이정현", tcode: "DB" });
@@ -164,7 +159,7 @@ describe("경기 전 기록 도전 / finals / 합치기", () => {
     expect(finals.has("pg.sft_miss.max|G|p|")).toBe(false);
   });
   it("buildAllRecordMoments의 4번째 인자로 합쳐지고 시간순이다", () => {
-    const s = streaksOf({ boards: { gp: GP }, state: { lee: { gp: { before: 393 } } }, known: ["lee"] });
+    const s = streaksOf({ boards: { gp: GP }, state: { lee: { gp: { before: 399 } } }, known: ["lee"] });
     const all = buildAllRecordMoments(ctxOf({}), [ev("lee", "H", "101"), ev("lee", "H", "201", 1)], OPTS, s);
     expect(all.map((x) => x.board)).toContain("pg.streak_gp.max");
     expect(buildAllRecordMoments(ctxOf({}), [ev("lee", "H", "101")], OPTS).map((x) => x.board)).not.toContain("pg.streak_gp.max");

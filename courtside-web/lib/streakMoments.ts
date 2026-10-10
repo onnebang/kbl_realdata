@@ -60,6 +60,19 @@ export function summaryOf(entries: StreakEntry[], excludePcode?: string): BoardS
   return { tops, holders };
 }
 
+/**
+ * 연속 출장 N경기째를 알릴 만한가 - 순위가 좋아졌거나(10위 안 처음 진입 포함) 50경기 단위 이정표일 때만.
+ * 이정현처럼 신기록을 매 경기 이어가는 것은 알리지 않는다(토스트·패널·리포트·경기 전 도전 모두).
+ */
+function gpVerdict(entries: StreakEntry[], pcode: string, n: number) {
+  const s = summaryOf(entries, pcode);
+  const info = rankInfo(s.tops, n, "max");
+  const beforeInfo = n > 1 ? rankInfo(s.tops, n - 1, "max") : null;
+  const ranked = info != null && info.rank <= TOP_RANKS ? info : null;
+  const improved = ranked != null && (beforeInfo == null || beforeInfo.rank > TOP_RANKS || ranked.rank < beforeInfo.rank || (ranked.breaks && !beforeInfo.breaks));
+  return { s, ranked, worthy: improved || isMilestone(n) };
+}
+
 type PState = {
   run: Record<ShotKind, Record<Res, number>>;
   carried: Record<ShotKind, Record<Res, boolean>>;
@@ -113,7 +126,7 @@ export function buildStreakMoments(
   type Who = { pcode: string; name: string; tcode: string; idx: number; clock: string };
 
   /** 순위 보드 판정 - 상위 10위 안이고 순위가 좋아질 때(신기록 이후엔 값이 늘 때마다)만 알린다. */
-  const emit = (a: Who & { key: string; board: string; summary: BoardSummary; value: number; label: string; fmt: ValueFmt; who: string; quiet?: boolean }) => {
+  const emit = (a: Who & { key: string; board: string; summary: BoardSummary; value: number; label: string; fmt: ValueFmt; who: string }) => {
     const info = rankInfo(a.summary.tops, a.value, "max");
     if (!info || info.rank > TOP_RANKS) return;
     const level = levelOf(info);
@@ -126,7 +139,7 @@ export function buildStreakMoments(
       board: a.board, bucket: "G", subject: a.pcode, period: "", scope: "p", name: a.name, tcode: a.tcode, value: a.value,
       rank: info.rank, tie: info.tie, breaks: info.breaks, remaining: 0,
       text: `${a.label} ${verdictText(info, a.fmt, a.who)}`, detail: holdersLine(a.summary, info, a.fmt),
-      provisional, sig: level, ...(a.quiet ? { quiet: true } : {}),
+      provisional, sig: level,
     });
   };
 
@@ -162,22 +175,16 @@ export function buildStreakMoments(
       const st = streaks && known.has(pcode) ? streaks.state[pcode]?.gp : undefined;
       if (streaks && st && (!streaks.final || st.after != null)) {
         const n = streaks.final ? (st.after as number) : st.before + 1;
-        const before = n - 1;
-        const s = summaryOf(streaks.boards.gp, pcode);
-        const info = rankInfo(s.tops, n, "max");
-        const beforeInfo = before > 0 ? rankInfo(s.tops, before, "max") : null;
-        const ranked = info != null && info.rank <= TOP_RANKS;
-        const improved = ranked && (beforeInfo == null || beforeInfo.rank > TOP_RANKS || info.rank < beforeInfo.rank || (info.breaks && !beforeInfo.breaks));
-        const milestone = isMilestone(n);
+        const { s, ranked, worthy } = gpVerdict(streaks.boards.gp, pcode, n);
         finals?.set(`gp|${pcode}`, n);
-        if (ranked || milestone) {
+        if (worthy) {
           out.push({
             id: `gp|${pcode}|${n}`, idx, until: Infinity, clock: w.clock, phase: "done",
             board: STREAK_BOARD.gp, bucket: "G", subject: pcode, period: "", scope: "p", name, tcode: e.tcode, value: n,
-            rank: ranked ? info.rank : TOP_RANKS + 1, tie: ranked ? info.tie : false, breaks: ranked ? info.breaks : false, remaining: 0,
-            text: ranked ? `연속 출장 ${n}경기째 ${verdictText(info, gameCnt, "KBL")}` : `연속 출장 ${n}경기 달성`,
-            detail: ranked ? holdersLine(s, info, gameCnt) : "",
-            provisional, sig: ranked ? levelOf(info) : 50, ...(improved || milestone ? {} : { quiet: true }),
+            rank: ranked ? ranked.rank : TOP_RANKS + 1, tie: ranked ? ranked.tie : false, breaks: ranked ? ranked.breaks : false, remaining: 0,
+            text: ranked ? `연속 출장 ${n}경기째 ${verdictText(ranked, gameCnt, "KBL")}` : `연속 출장 ${n}경기 달성`,
+            detail: ranked ? holdersLine(s, ranked, gameCnt) : "",
+            provisional, sig: ranked ? levelOf(ranked) : 50,
           });
         }
       }
@@ -246,10 +253,9 @@ export function buildStreakChances(streaks: StreakContext): StreakChance[] {
     const who = { pcode, name: p.name, ...(p.tcode ? { tcode: p.tcode } : {}) };
     const gp = st.gp?.before ?? 0;
     if (gp > 0) {
-      const s = summaryOf(streaks.boards.gp, pcode);
-      const info = rankInfo(s.tops, gp + 1, "max");
-      if (info && info.rank <= TOP_RANKS) out.push({ ...who, id: `gp|${pcode}`, text: `오늘 출전하면 연속 출장 ${gp + 1}경기째 ${verdictText(info, gameCnt, "KBL")}`, detail: holdersLine(s, info, gameCnt), sig: levelOf(info) });
-      else if (isMilestone(gp + 1)) out.push({ ...who, id: `gp|${pcode}`, text: `오늘 출전하면 연속 출장 ${gp + 1}경기 달성`, detail: "", sig: 50 });
+      const { s, ranked, worthy } = gpVerdict(streaks.boards.gp, pcode, gp + 1);
+      if (worthy && ranked) out.push({ ...who, id: `gp|${pcode}`, text: `오늘 출전하면 연속 출장 ${gp + 1}경기째 ${verdictText(ranked, gameCnt, "KBL")}`, detail: holdersLine(s, ranked, gameCnt), sig: levelOf(ranked) });
+      else if (worthy) out.push({ ...who, id: `gp|${pcode}`, text: `오늘 출전하면 연속 출장 ${gp + 1}경기 달성`, detail: "", sig: 50 });
     }
     for (const kind of SHOT_KINDS) {
       const before = st[crossKind(kind, "made")]?.before ?? 0;
