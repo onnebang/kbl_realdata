@@ -643,7 +643,8 @@ LOG_PK = ("gmkey", "pcode", "kind")
 LOG_COLUMNS = ("gmkey", "pcode", "kind", "before_len", "after_len", "start_gmkey", "game_date", "game_start", "alive")
 # 3단계 연속 보드(연속 출장·경기 간 연속 슛) - tools/record_streaks.py가 통째로 다시 계산해 교체한다. 경기 단위 반영(apply_game)은 이 행들을 지우거나 건드리지 않는다
 # (gmkey가 '연속의 마지막 경기'라서 그 경기를 다시 정산할 때 같이 지워지면 클라우드처럼 역사 자료가 없는 곳에서는 복구할 수 없다).
-STREAK_BOARDS = ("pg.streak_gp.max", "pg.xfg_made.max", "pg.xfg_miss.max", "pg.xtp_made.max", "pg.xtp_miss.max", "pg.xft_made.max", "pg.xft_miss.max")
+STREAK_BOARDS = ("pg.streak_gp.max", "pg.xfg_made.max", "pg.xfg_miss.max", "pg.xtp_made.max", "pg.xtp_miss.max", "pg.xft_made.max", "pg.xft_miss.max",
+                 "pg.cg_pts10.max", "pg.cg_pts20.max", "pg.cg_dd.max", "pg.cg_reb10.max", "pg.cg_tpm1.max", "pg.cg_ast5.max")
 
 
 class MemoryStore:

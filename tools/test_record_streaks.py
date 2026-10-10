@@ -14,14 +14,16 @@ import record_book as rb  # noqa: E402
 CODE = {"2+": "201", "2-": "202", "3+": "205", "3-": "206", "f+": "203", "f-": "204"}
 
 
-def game_of(gmkey, date, home, away, specs, start="19:00", season="2026-2027", category="정규시즌"):
-    """specs: [(pcode, tcode, tokens)] - tokens가 None이면 명단에 없음(박스에 안 나옴), "dnp"이면 명단에는 올랐지만 0분, ""이면 출전했지만 슛 없음.
-    슛 토큰('2+','2-','3+','3-','f+','f-')은 공식 박스(rec)와 이벤트(text-cast)에 같이 반영돼 게이트를 통과한다."""
+def game_of(gmkey, date, home, away, specs, start="19:00", season="2026-2027", category="정규시즌", score=None):
+    """specs: [(pcode, tcode, tokens[, rec 덮어쓰기])] - tokens가 None이면 명단에 없음(박스에 안 나옴), "dnp"이면 명단에는 올랐지만 0분, ""이면 출전했지만 슛 없음.
+    슛 토큰('2+','2-','3+','3-','f+','f-')은 공식 박스(rec)와 이벤트(text-cast)에 같이 반영돼 게이트를 통과한다. score=(홈, 원정)은 팀 최종 점수."""
     players, events, n = [], [], 0
-    for pcode, tc, tokens in specs:
+    for spec in specs:
+        pcode, tc, tokens = spec[:3]
         if tokens is None:
             continue
         rec = {"playMin": 0 if tokens == "dnp" else 10, "playSec": 0, "fgt": 0, "fgtA": 0, "threep": 0, "threepA": 0, "ft": 0, "ftA": 0, "score": 0}
+        rec.update(spec[3] if len(spec) > 3 else {})
         for t in ([] if tokens == "dnp" else tokens.split()):
             n += 1
             events.append({"n": n, "q": "Q1", "m": 9, "s": 59 - (n % 50), "p": f"선수{pcode}", "t": tc, "a": CODE[t]})
@@ -42,7 +44,7 @@ def game_of(gmkey, date, home, away, specs, start="19:00", season="2026-2027", c
         "gmkey": gmkey, "date": date, "start": start, "season": season, "category": category, "home": home, "away": away,
         "names": {home: "홈", away: "원정"}, "has_ot": False,
         "quarters": {home: {"q": [0, 0, 0, 0], "ot": []}, away: {"q": [0, 0, 0, 0], "ot": []}},
-        "players": players, "teams": {home: {"score": 0}, away: {"score": 0}}, "events": events,
+        "players": players, "teams": {home: {"score": score[0] if score else 0}, away: {"score": score[1] if score else 0}}, "events": events,
     }
 
 
@@ -103,12 +105,12 @@ def small_min(fn):
     """테스트에서는 행 후보 최소 길이를 2로 낮춘다(짧은 합성 연속도 행이 되게)."""
     @functools.wraps(fn)
     def run():
-        old = rs.MIN_ROW
-        rs.MIN_ROW = 2
+        old, old_kind = rs.MIN_ROW, rs.MIN_ROW_KIND
+        rs.MIN_ROW, rs.MIN_ROW_KIND = 2, {}
         try:
             return fn()
         finally:
-            rs.MIN_ROW = old
+            rs.MIN_ROW, rs.MIN_ROW_KIND = old, old_kind
     return run
 
 
@@ -168,6 +170,50 @@ def test_gp_alive_means_seen_within_the_log_window():
     periods = {r["subject"]: r["period"][:2] for r in rows if r["board"] == "pg.streak_gp.max"}
     assert periods == {"old": "E:", "p1": "A:", "q1": "A:"}                                              # 오래전에 멈춘 연속은 '끝남'으로 표시
     assert not [r for r in log if r["pcode"] == "old"]                                                   # 120일 밖이라 로그에서 빠진다
+
+
+@small_min
+def test_cg_conditions_at_the_boundary():
+    a = {"score": 10, "rb": 9, "ast": 4}                                  # 득점 10만
+    b = {"score": 20, "rb": 10, "ast": 5, "threep": 1}                    # 전부
+    c = {"score": 9, "stl": 10, "bs": 10}                                 # 스틸·블록으로 더블더블만
+    d = {"score": 9, "rb": 9, "ast": 4}                                   # 아무것도 못 채움
+    g = game_of("S49G01N1", "2026-10-01", "H", "A", [("a", "H", "", a), ("b", "H", "", b), ("c", "A", "", c), ("d", "A", "", d)])
+    _, log = rs.compute([g])
+    got = sorted((r["pcode"], r["kind"]) for r in log if r["kind"].startswith("cg_") and r["after_len"] == 1)
+    assert got == sorted([("a", "cg_pts10"), ("b", "cg_pts10"), ("b", "cg_pts20"), ("b", "cg_dd"), ("b", "cg_reb10"), ("b", "cg_tpm1"), ("b", "cg_ast5"), ("c", "cg_dd")]), got
+    assert not [r for r in log if r["pcode"] == "d" and r["kind"].startswith("cg_")]          # 조건 미달 + 이어진 연속 없음 -> 로그 행도 없다
+
+
+@small_min
+def test_cg_a_failed_game_or_a_dnp_entry_breaks_and_unlisted_games_are_skipped():
+    ok, low = {"score": 12}, {"score": 5}
+    games = [
+        game_of("S49G01N1", "2026-10-01", "H", "A", [("p1", "H", "", ok)]),
+        game_of("S49G01N2", "2026-10-02", "H", "A", [("p1", "H", "", ok)]),
+        game_of("S49G01N3", "2026-10-03", "H", "A", [("p1", "H", "", low)]),              # 뛰었지만 조건 미달 -> 끊김
+        game_of("S49G01N4", "2026-10-04", "H", "A", [("p1", "H", "", ok)]),
+        game_of("S49G01N5", "2026-10-05", "H", "A", [("p1", "H", None)]),                  # 명단에 없음 -> 건너뜀
+        game_of("S49G01N6", "2026-10-06", "H", "A", [("p1", "H", "", ok)]),
+        game_of("S49G01N7", "2026-10-07", "H", "A", [("p1", "H", "dnp", ok)]),             # 명단에 올랐는데 0분 -> 끊김
+        game_of("S49G01N8", "2026-10-08", "H", "A", [("p1", "H", "", ok)]),
+    ]
+    rows, log = rs.compute(games)
+    assert log_of(log, "p1", "cg_pts10") == [("S49G01N1", 0, 1, False), ("S49G01N2", 1, 2, False), ("S49G01N3", 2, 0, False), ("S49G01N4", 0, 1, False),
+                                             ("S49G01N6", 1, 2, False), ("S49G01N7", 2, 0, False), ("S49G01N8", 0, 1, True)]
+    assert rows_of(rows, "pg.cg_pts10.max") == [("p1", 2, "E:S49G01N1", "S49G01N2"), ("p1", 2, "E:S49G01N4", "S49G01N6")]
+
+
+@small_min
+def test_cg_playoffs_are_ignored():
+    ok = {"score": 12}
+    games = [
+        game_of("S49G01N1", "2026-10-01", "H", "A", [("p1", "H", "", ok)]),
+        game_of("S49G03N1", "2026-10-02", "H", "A", [("p1", "H", "", {"score": 2})], category="플레이오프"),     # 플레이오프의 조건 미달도 끊지 않는다
+        game_of("S49G01N2", "2026-10-03", "H", "A", [("p1", "H", "", ok)]),
+    ]
+    _, log = rs.compute(games)
+    assert log_of(log, "p1", "cg_pts10") == [("S49G01N1", 0, 1, False), ("S49G01N2", 1, 2, True)]
 
 
 @small_min
