@@ -46,7 +46,8 @@ import { OnCourtCards } from "./OnCourtCards";
 import { applyBoxEvent, emptyBoxLine, type BoxLine } from "@/lib/boxEvents";
 import { MilestoneWatch } from "./MilestoneWatch";
 import { buildMilestoneTimeline, type MilestoneContext, type MilestoneMoment } from "@/lib/milestones";
-import { buildRecordTimeline, recordToast, type RecordContext, type RecordMoment } from "@/lib/records";
+import { recordToast, type RecordContext, type RecordMoment } from "@/lib/records";
+import { buildAllRecordMoments } from "@/lib/recordsMoments";
 import { buildOnCourtTeam } from "@/lib/onCourtCards";
 import type { CourtCardInfo } from "@/lib/courtCardInfo"; // 타입만 - 값을 가져오면 OVR JSON이 브라우저 번들에 들어간다
 
@@ -686,12 +687,14 @@ export default function GameReplay({
   const recordMoments = useMemo(
     () =>
       records
-        ? buildRecordTimeline(records, events, {
+        ? buildAllRecordMoments(records, events, {
             names: {
               player: (pcode) => nameByPcode.get(pcode) ?? liveNames?.[pcode] ?? liveCtx.lateNames[pcode] ?? pcode,
               team: (tcode) => (tcode === homeTeam.tcode ? homeTeam.name : tcode === awayTeam.tcode ? awayTeam.name : tcode),
             },
             final: !live,
+            home: homeTeam.tcode,
+            away: awayTeam.tcode,
           })
         : [],
     [records, events, nameByPcode, liveNames, liveCtx.lateNames, homeTeam, awayTeam, live]

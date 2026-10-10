@@ -16,7 +16,8 @@ import { computeEntryUsage, type EntryPlayer } from "./report/entryUsage";
 import { getPlayerOvrHistory } from "./ovr";
 import { pickRecord } from "./courtCardInfo";
 import { basisNote, buildMilestoneTimeline, type MilestoneContext, type RecordChance } from "./milestones";
-import { buildRecordTimeline, recordLine, type RecordContext, type RecordMoment, type RecordNames } from "./records";
+import { recordLine, type RecordContext, type RecordMoment, type RecordNames } from "./records";
+import { buildAllRecordMoments } from "./recordsMoments";
 
 export { fmtDuration };
 export type { ReportSection, ReportSectionData, ReportTeamMeta };
@@ -951,9 +952,9 @@ export function recordChanceList(chances: RecordChance[], homeTeam: ReportTeamMe
  * buildRecordTimeline을 **종료 경기의 최종 이벤트**로 돌려 시각(점프 링크)을 얻고, 테이블에 있는(= 공식 기록과 대조를 통과한) 항목만 쓴다.
  * 같은 (보드·대상·구간)에서 여러 번 알린 것(7개 -> 8개 -> 9개)은 마지막(가장 좋은) 한 줄만. 없으면 null.
  */
-export function recordBookSection(ctx: RecordContext, events: GameEvent[], tags: ReportTags, names: RecordNames): ReportSection | null {
+export function recordBookSection(ctx: RecordContext, events: GameEvent[], tags: ReportTags, names: RecordNames, sides?: { home: string; away: string }): ReportSection | null {
   const last = new Map<string, RecordMoment>();
-  for (const m of buildRecordTimeline(ctx, events, { names, final: true })) if (m.phase === "done") last.set(`${m.board}|${m.subject}|${m.period}`, m);
+  for (const m of buildAllRecordMoments(ctx, events, { names, final: true, ...(sides ?? {}) })) if (m.phase === "done") last.set(`${m.board}|${m.subject}|${m.period}`, m);
   const done = [...last.values()];
   if (done.length === 0) return null;
   const shown = done
@@ -1259,10 +1260,16 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
 
   // 1.05 역대 기록 - "경기 결과" 바로 아래, 선수 통산 기록('기록 달성')보다 위: KBL 역대 TOP10에 닿은 쿼터·경기 기록(새 조회 0회).
   if (input.records) {
-    const book = recordBookSection(input.records, events, tags, {
-      player: (pcode) => boxByPcode.get(pcode)?.name ?? pcode,
-      team: (tcode) => (tcode === homeTcode ? homeTname : tcode === awayTcode ? awayTname : tcode),
-    });
+    const book = recordBookSection(
+      input.records,
+      events,
+      tags,
+      {
+        player: (pcode) => boxByPcode.get(pcode)?.name ?? pcode,
+        team: (tcode) => (tcode === homeTcode ? homeTname : tcode === awayTcode ? awayTname : tcode),
+      },
+      { home: homeTcode, away: awayTcode }
+    );
     if (book) sections.push(book);
   }
 

@@ -379,6 +379,19 @@ describe("역대 기록 섹션 (요청 2026-10-08)", () => {
     expect(html).toContain("KBL 역대 TOP10 기준");
   });
 
+  it("2단계 순간 기록(클럽)도 같은 섹션에 나온다 - 테이블에 있는 이 경기 행만", () => {
+    const evs = attachDerivedFields([
+      ev({ event_order: 0, quarter: "PRE", home_score: 0, away_score: 0, home_win_prob: 0.5 }),
+      ...Array.from({ length: 10 }, (_, i) => ev({ event_order: i + 1, quarter: "Q1", clock_min: 9, clock_sec: 59 - i, home_score: 0, away_score: 0, action_code: "211", pcode: "p1", player_name: "허훈", tcode: "H", home_win_prob: 0.5 })),
+      ...Array.from({ length: 10 }, (_, i) => ev({ event_order: i + 11, quarter: "Q1", clock_min: 8, clock_sec: 59 - i, home_score: 0, away_score: 0, action_code: "210", pcode: "p1", player_name: "허훈", tcode: "H", home_win_prob: 0.5 })),
+      ...Array.from({ length: 5 }, (_, i) => ev({ event_order: i + 21, quarter: "Q1", clock_min: 7, clock_sec: 59 - i, home_score: i * 2 + 2, away_score: 0, action_code: "201", pcode: "p1", player_name: "허훈", tcode: "H", home_win_prob: 0.5 })),
+    ]);
+    const c: RecordContext = { asOf: "x", boards: { "pg.club_td.max|G": { tops: Array(77).fill(1), holders: [] } }, validated: ["pg.club_td.max|G|p1|"] };
+    const html = htmlOf(recordBookSection(c, evs, tags, names, { home: "H", away: "A" })!);
+    expect(html).toContain("트리플더블 달성 — KBL 역대 78번째");
+    expect(recordBookSection({ ...c, validated: [] }, evs, tags, names, { home: "H", away: "A" })).toBeNull();
+  });
+
   it("종료 경기에서 테이블에 없는 항목(validated 밖)은 쓰지 않고, 아무것도 없으면 null", () => {
     expect(recordBookSection(ctx([]), events, tags, names)).toBeNull();
     expect(recordBookSection(ctx(["pq.ast.max|Q2|p1|Q2"]), events, tags, names)).toBeNull();
