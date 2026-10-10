@@ -182,7 +182,7 @@ function TeamPowerLadderPanel({
 }: {
   powers: ReturnType<typeof getAllTeamPowers>;
   currentTeamName: string;
-  teamByName: Map<string, { abbr: string; color: string; logoUrl: string | null }>;
+  teamByName: Map<string, { abbr: string; color: string; logoUrl: string | null; tcode: string }>;
   accent: string;
 }) {
   if (powers.length === 0) return <div className="empty-note">팀 파워 데이터 없음</div>;
@@ -200,7 +200,7 @@ function TeamPowerLadderPanel({
           return (
             <div className={styles.pctRow} key={p.teamName}>
               <div className={styles.pctLabel} style={isCurrent ? { color: accent } : undefined}>
-                {i + 1}. {meta?.abbr ?? p.teamName}
+                {i + 1}. {meta?.tcode ? <Link href={`/teams/${meta.tcode}`}>{meta.abbr ?? p.teamName}</Link> : (meta?.abbr ?? p.teamName)}
               </div>
               <div className={styles.pctTrack}>
                 <div
@@ -769,7 +769,7 @@ export default async function TeamPage({
   // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - 보고 있는 factSeason 기준으로
   // 표시 이름만 덮어씀(기존 페이지 로직 유지).
   const oppByTcode = new Map(
-    [...opponents.values()].map((t) => [t.tcode, { ...t, name: displayTeamName(t.tcode, t.name, factSeason) }])
+    [...opponents.values()].map((t) => [t.tcode, { ...t, rawName: t.name, name: displayTeamName(t.tcode, t.name, factSeason) }])
   );
   const teamName = displayTeamName(team.tcode, team.name, factSeason);
   // 저명도 팀 색(KT #1A1A1A 등)은 차트에서만 보조 액센트로 - 데이터 주장이 아닌 디자인 상수.
@@ -785,7 +785,7 @@ export default async function TeamPage({
   // 10팀 전체를 카드로 보여주니 그걸 다시 만들지 않고, 이 페이지엔 같은 데이터(getAllTeamPowers)로
   // 압축된 막대 사다리만 붙이고 전체 보기는 그 페이지로 링크한다.
   const allPowers = teamPower ? getAllTeamPowers(teamPower.season) : [];
-  const powerByTeamName = new Map([...oppByTcode.values()].map((t) => [t.name, t]));
+  const powerByTeamName = new Map([...oppByTcode.values()].flatMap((t) => [[t.name, t], [t.rawName, t]]));
 
   const constellationSvg = shots.length ? buildConstellationSvg(shots) : null;
 
@@ -1120,8 +1120,7 @@ export default async function TeamPage({
                       </td>
                       <td>
                         {isFinal ? (
-                          <>
-                            {/* 승/패도 승률과 같은 축의 양 끝 색을 쓴다(요청: "실제 결과도 색상이 동일하도록"). */}
+                          <Link href={`/games/${g.gmkey}`} style={{ textDecoration: 'none' }}>
                             <span
                               className="sched-result"
                               style={{ color: outcomeTone(won ? 1 : 0).color, fontWeight: 800 }}
@@ -1130,10 +1129,10 @@ export default async function TeamPage({
                             </span>{" "}
                             {g.teamScore}-{g.oppScore}
                             {tag ? <span className={styles.schedTag}>{GAME_TAG_LABELS[tag.key]}</span> : null}
-                          </>
+                          </Link>
                         ) : (
                           <span className={styles.schedPending}>
-                            {g.status === "live" ? "진행 중" : "예정"}
+                            {g.status === "live" ? <Link href={`/games/${g.gmkey}`}>진행 중</Link> : "예정"}
                             {g.stadium ? ` · ${g.stadium}` : ""}
                           </span>
                         )}
