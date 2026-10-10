@@ -6,6 +6,7 @@ import {
   nextTarget,
   rankInfo,
   RecordAccumulator,
+  recordLine,
   recordToast,
   type BoardSummary,
   type RecordContext,
@@ -101,9 +102,15 @@ describe("buildRecordTimeline - 허훈 1쿼터 9어시스트(경기 이전 기�
     ]);
     expect(done[2]).toMatchObject({ name: "허훈", bucket: "Q1", period: "Q1", board: "pq.ast.max", value: 9, provisional: true, sig: 0 });
     expect(done[2].text).toBe("1쿼터 어시스트 9개 KBL 신기록(종전 8개)");
-    expect(done[2].detail).toBe("1쿼터 기준 신기록 · 종전 최고 8개: 문태종·박지현·허훈 외 3건");
+    // 설명에는 값을 되풀이하지 않는다("종전 8개"는 본문에 있다) - 보유자만. 1쿼터 판정이 본문(전체 구간)과 같으면 덧붙이지 않는다.
+    expect(done[2].detail).toBe("문태종·박지현·허훈 외 3건 보유");
     expect(done[1].text).toBe("1쿼터 어시스트 8개 KBL 타이 기록(공동 1위)");
+    expect(done[1].detail).toBe("문태종·박지현·허훈 외 3건 보유");
     expect(done[0].text).toBe("1쿼터 어시스트 7개 KBL 역대 공동 7위");
+    expect(done[0].detail).toBe("역대 1위 8개: 문태종·박지현·허훈 외 3건");
+    expect(recordLine(done[2])).toBe("1쿼터 어시스트 9개 KBL 신기록(종전 8개 · 문태종·박지현·허훈 외 3건 보유)");
+    expect(recordLine(done[1])).toBe("1쿼터 어시스트 8개 KBL 타이 기록(공동 1위 · 문태종·박지현·허훈 외 3건 보유)");
+    expect(recordLine(done[0])).toBe("1쿼터 어시스트 7개 KBL 역대 공동 7위(역대 1위 8개: 문태종·박지현·허훈 외 3건)");
     expect(done[0].clock).toMatch(/^Q1 3:\d{2}$/);                  // 7번째 이벤트 = 남은 시간 3분대
   });
 
@@ -222,6 +229,19 @@ describe("buildRecordTimeline - 팀·경기·연장·최소 보드", () => {
     const m = buildRecordTimeline(ctxOf({ "pq.to.max|Q1": [5, 5, 4] }), events, { names, final: false }).filter((x) => x.phase === "done");
     expect(m[m.length - 1].text).toBe("1쿼터 턴오버 6개 불명예 신기록(종전 5개)");
     expect(recordToast(m[m.length - 1])).toEqual({ icon: "🏆", title: "불명예 신기록!", msg: "(잠정) 선수p 1쿼터 턴오버 6개 불명예 신기록(종전 5개)" });
+  });
+});
+
+describe("recordLine", () => {
+  it("본문이 괄호로 끝나면 같은 괄호 안에 이어 붙이고, 아니면 괄호로 감싸며, 설명이 없으면 본문만", () => {
+    expect(recordLine({ text: "A 신기록(종전 8개)", detail: "보유자 외 3건 보유" })).toBe("A 신기록(종전 8개 · 보유자 외 3건 보유)");
+    expect(recordLine({ text: "A 역대 공동 6위", detail: "역대 1위 6개: 허웅" })).toBe("A 역대 공동 6위(역대 1위 6개: 허웅)");
+    expect(recordLine({ text: "A 역대 공동 6위", detail: "" })).toBe("A 역대 공동 6위");
+    expect(recordLine({ text: "A 신기록(종전 8개)", detail: "" })).toBe("A 신기록(종전 8개)");
+  });
+
+  it("괄호가 연달아 붙는 문장이 만들어지지 않는다", () => {
+    for (const text of ["x 신기록(종전 8개)", "x 타이 기록(공동 1위)", "x 역대 3위"]) expect(recordLine({ text, detail: "a · b" })).not.toContain(")(");
   });
 });
 

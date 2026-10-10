@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { buildRecordTimeline } from "./records";
+import { buildRecordTimeline, recordLine } from "./records";
 import { summarizeRecordBook, type RecordEntry } from "./recordBook";
 
 // 실전 재현(설계 §10-4): 2026-10-07 S49G01N9(KCC-가스공사)의 실제 이벤트를 "그 경기 이전" 기록으로 재생하면
@@ -49,7 +49,8 @@ describe("실전 재현 - S49G01N9 허훈 1쿼터 9어시스트", () => {
     ]);
     expect(m[0].text).toBe("1쿼터 어시스트 8개 KBL 타이 기록(공동 1위)");
     expect(m[1].text).toBe("1쿼터 어시스트 9개 KBL 신기록(종전 8개)");
-    expect(m[1].detail).toContain("종전 최고 8개: 문태종");
+    expect(m[1].detail).toBe("문태종·박지현·이정현 외 3건 보유");
+    expect(recordLine(m[1])).toBe("1쿼터 어시스트 9개 KBL 신기록(종전 8개 · 문태종·박지현·이정현 외 3건 보유)");
     expect(m[1].provisional).toBe(true);
     expect(m[1].idx).toBeGreaterThan(m[0].idx);
   });

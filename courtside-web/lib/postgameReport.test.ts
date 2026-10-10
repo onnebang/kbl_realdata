@@ -374,8 +374,8 @@ describe("역대 기록 섹션 (요청 2026-10-08)", () => {
     expect(html.match(/<li /g)).toHaveLength(1);
     expect(html).toContain('<a href="#" class="report-jump-link" data-jump-idx="9">Q1 1:00</a>');
     expect(html).toContain("허훈</b></span>이 "); // 받침 있는 이름 + 이
-    expect(html).toContain("1쿼터 어시스트 9개 KBL 신기록(종전 8개)");
-    expect(html).toContain("1쿼터 기준 신기록 · 종전 최고 8개: 문태종");
+    expect(html).toContain("1쿼터 어시스트 9개 KBL 신기록(종전 8개 · 문태종 외 3건 보유)");
+    expect(html).not.toContain(")(");
     expect(html).toContain("KBL 역대 TOP10 기준");
   });
 

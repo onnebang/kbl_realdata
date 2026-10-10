@@ -6,7 +6,7 @@ import { MilestoneWatch } from "./MilestoneWatch";
 const moment = (o: Partial<RecordMoment>): RecordMoment => ({
   id: "m", idx: 5, until: Infinity, clock: "Q1 2:10", phase: "done", board: "pq.ast.max", bucket: "Q1", subject: "290001", period: "Q1", scope: "p",
   name: "허훈", tcode: "H", value: 9, rank: 1, tie: false, breaks: true, remaining: 0, text: "1쿼터 어시스트 9개 KBL 신기록(종전 8개)",
-  detail: "종전 최고 8개: 문태종", provisional: true, sig: 0, ...o,
+  detail: "문태종 외 3건 보유", provisional: true, sig: 0, ...o,
 });
 
 const render = (records: RecordMoment[], idx: number, hideNear = false) =>
@@ -20,7 +20,7 @@ describe("MilestoneWatch - 역대 기록 그룹", () => {
     expect(out).toContain("🏆 역대 기록");
     expect(out).toContain('href="/players/290001"');
     expect(out).toContain("1쿼터 어시스트 9개 KBL 신기록(종전 8개)");
-    expect(out).toContain("잠정 · 종전 최고 8개: 문태종");
+    expect(out).toContain("잠정 · 문태종 외 3건 보유");
     expect(out).toContain("Q1 2:10");
     expect(out).not.toContain("🏅 달성"); // 통산 그룹은 ctx가 있을 때만
   });

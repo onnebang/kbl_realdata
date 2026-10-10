@@ -248,7 +248,14 @@ function holdersText(s: BoardSummary, info: RankInfo, m: RecordMetric): string {
   if (names.length === 0) return "";
   const shown = names.slice(0, 3).join("·");
   const more = info.n1 > 3 ? ` 외 ${info.n1 - 3}건` : "";
-  return `${info.breaks ? "종전 최고" : "역대 1위"} ${info.best}${unit}: ${shown}${more}`;
+  // 신기록·타이면 본문이 이미 "(종전 N개)"·"(공동 1위)"로 값을 말하므로 값을 되풀이하지 않고 보유자만 적는다.
+  return info.breaks || info.rank === 1 ? `${shown}${more} 보유` : `역대 1위 ${info.best}${unit}: ${shown}${more}`;
+}
+
+/** 본문과 설명을 한 줄로. 본문이 "…(종전 8개)"처럼 괄호로 끝나면 같은 괄호 안에 이어 붙여 괄호가 연달아 나오지 않게 한다. */
+export function recordLine(m: Pick<RecordMoment, "text" | "detail">): string {
+  if (!m.detail) return m.text;
+  return m.text.endsWith(")") ? `${m.text.slice(0, -1)} · ${m.detail})` : `${m.text}(${m.detail})`;
 }
 
 export type RecordTimelineOptions = { names: RecordNames; /** 종료된 경기면 true - 마지막 쿼터·경기 끝 판정(최소 보드)까지 한다. */ final: boolean };
@@ -301,7 +308,8 @@ export function buildRecordTimeline(ctx: RecordContext, events: RecordEvent[], o
     closeNear(key, args.idx);
     const unit = METRIC_TEXT[args.metric].unit;
     const stored = args.unit === "g" ? "G" : bucketOfPeriod(args.period)!;
-    const extra = hits.slice(1).map((h) => `${BUCKET_WORD[h.b]} 기준 ${shortVerdict(h.info)}`);
+    // 다른 구간 판정이 본문과 같으면("1쿼터 기준 신기록" + 본문 "신기록") 덧붙일 정보가 없다.
+    const extra = hits.slice(1).filter((h) => shortVerdict(h.info) !== shortVerdict(primary.info)).map((h) => `${BUCKET_WORD[h.b]} 기준 ${shortVerdict(h.info)}`);
     const holders = holdersText(primary.s, primary.info, args.metric);
     push({
       id: `${key}|${primary.level}|${args.value}|done`,

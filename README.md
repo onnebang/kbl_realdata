@@ -245,6 +245,12 @@ python live_collector.py --max-runtime 21600 --stall-timeout 5400
 | `KBL_LineupRecalc` | 매일 13:00부터 8분마다 | 라인업 승률 재계산(`recalc_lineup_winprob.py --today`) |
 | `KBL_WeeklyTrain` | 매주 월요일 06:20 (2026-10-06 등록) | `weekly_retrain.py` - SQLite 재적재 → 신선도 확인 → OVR 재계산 → OVR 가드 → 학습테이블 재생성 → 경기전 승률모델 재학습(승격 게이트) → 올타임 리더스·통산 스냅샷(`career_marks.json`) 재계산 → 깨끗한 임시 worktree에서 git commit+push. 로그: `raw/weekly_retrain.log` |
 
+**`live_collector.py`를 고치면 재시작해야 반영된다** - 경기일 13:00 무렵 뜬 프로세스 하나가 마지막 경기 정산까지 계속 도는 상주형이고(10분 트리거는
+`IgnoreNew`라 무시됨, 결과코드 `0x800710E0`) 파이썬은 코드를 다시 읽지 않으므로, 그 사이에 커밋한 수정은 다음 기동까지 옛 코드로 돈다(2026-10-08 정산 훅 사례).
+킥오프 30분 전(폴링 시작) 이전의 대기 중에 재시작하고(감시 함수 `live_collector_problems()`는 킥오프 20분 전부터만 본다), `Stop-ScheduledTask`만으로는
+`cmd → python` 프로세스가 남으므로 `taskkill /PID <cmd.exe PID> /T /F`로 트리째 끈 뒤 `Start-ScheduledTask -TaskName KBL_LiveCollector`(또는 다음 :x0 트리거).
+로그에 `승률 모델 로딩... / 대상 N경기`가 찍히면 정상. `daily_batch.py`는 매일 새 프로세스라 다음 실행부터 자동 반영.
+
 ```powershell
 Get-ScheduledTaskInfo -TaskName "KBL_LiveCollector"   # 다음/마지막 실행, 결과코드
 Get-ScheduledTaskInfo -TaskName "KBL_DailyBatch"
@@ -252,7 +258,9 @@ Get-ScheduledTaskInfo -TaskName "KBL_WeeklyTrain"
 Disable-ScheduledTask  -TaskName "KBL_LiveCollector"  # 끄기
 ```
 
-**`KBL_WeeklyTrain` 참고** - OVR·경기전 모델은 전부 로컬 SQLite(`raw/kbl_realdata.db`, git에 안 올라감)만
+**`KBL_WeeklyTrain` 참고** - 절전 해제(WakeToRun)는 2026-10-10에 켰다(나머지 KBL_* 태스크와 같게). 전원 구성표의 "절전 모드 해제 타이머 허용"은 AC만 켜져 있어
+충전기를 꽂아 둔 상태에서만 깨운다. 아직 `StartWhenAvailable`(놓친 실행 만회)은 꺼져 있어 PC가 꺼져 있던 월요일은 그 주를 건너뛴다.
+OVR·경기전 모델은 전부 로컬 SQLite(`raw/kbl_realdata.db`, git에 안 올라감)만
 읽는다. 이 태스크가 매주 `raw/games`의 최신 경기를 SQLite에 다시 적재해야 OVR/모델이 갱신된다 - PC가
 꺼져 있으면 그 주는 건너뛰고 다음 주에 누적 반영됨. `tools/save_pregame_model.py`는 2026-27 시즌(새
 Q2/Q3 용병 2인 규정 첫 시즌) 학습테이블 표본이 `SAMPLE_THRESHOLD`(150행, 사용자 지정 2026-10-06)

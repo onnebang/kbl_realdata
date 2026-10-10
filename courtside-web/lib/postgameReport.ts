@@ -16,7 +16,7 @@ import { computeEntryUsage, type EntryPlayer } from "./report/entryUsage";
 import { getPlayerOvrHistory } from "./ovr";
 import { pickRecord } from "./courtCardInfo";
 import { basisNote, buildMilestoneTimeline, type MilestoneContext, type RecordChance } from "./milestones";
-import { buildRecordTimeline, type RecordContext, type RecordMoment, type RecordNames } from "./records";
+import { buildRecordTimeline, recordLine, type RecordContext, type RecordMoment, type RecordNames } from "./records";
 
 export { fmtDuration };
 export type { ReportSection, ReportSectionData, ReportTeamMeta };
@@ -963,7 +963,7 @@ export function recordBookSection(ctx: RecordContext, events: GameEvent[], tags:
   const items = shown
     .map((m) => {
       const who = m.scope === "p" ? tags.playerTag(m.name, m.tcode) : tags.teamTag(m.tcode, m.name);
-      return `${tags.liOpen(m.tcode)}${who}${iGa(m.name)} ${jumpLink(m.idx, escHtml(m.clock))} ${escHtml(m.text)}${m.detail ? `(${escHtml(m.detail)})` : ""}.</li>`;
+      return `${tags.liOpen(m.tcode)}${who}${iGa(m.name)} ${jumpLink(m.idx, escHtml(m.clock))} ${escHtml(recordLine(m))}.</li>`;
     })
     .join("");
   const rest = done.length - shown.length;
