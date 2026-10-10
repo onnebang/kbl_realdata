@@ -78,6 +78,22 @@ def dump_moments(outdir, gmkeys):
     print(f"moment fixtures: {written}개 -> {outdir}")
 
 
+def box_matches_official(g):
+    """pcode -> 그 선수의 이벤트 합계(득점·리바·어시·스틸·블록·3점)가 공식 박스와 모두 같은가 - 선수 연속 경기(cg_*)는 공식 박스로 판정하므로 이벤트가 어긋난 선수는 대조에서 뺀다."""
+    idx = rb.player_index(g)
+    tot = collections.defaultdict(collections.Counter)
+    for e in g["events"]:
+        a, name, tc = e.get("a"), e.get("p"), e.get("t")
+        pcode = idx.get((name, tc)) if (a and name and tc) else None
+        if not pcode:
+            continue
+        tot[pcode]["pts"] += rb.PTS_BY_CODE.get(a, 0)
+        for m, codes in rb.COUNT_CODES.items():
+            if a in codes:
+                tot[pcode][m] += 1
+    return {p["pcode"]: all(tot[p["pcode"]][m] == (p["rec"].get(rb.PLAYER_OFFICIAL[m]) or 0) for m in ("pts", "reb", "ast", "stl", "blk", "tpm")) for p in g["players"]}
+
+
 def dump_streaks(outdir, gmkeys):
     """3단계 대조 픽스처 - 경기마다 이벤트, 파이썬 상태기계의 (선수, 종류)별 [전, 후] 길이, 한 경기 안 연속 후보 행."""
     import record_streaks as rs
@@ -93,8 +109,11 @@ def dump_streaks(outdir, gmkeys):
             print(f"  건너뜀(없음/동명이인): {gmkey}")
             continue
         _, bad = rb.shot_sequences(g)
+        box_ok = box_matches_official(g)
         state = collections.defaultdict(dict)
         for r in by_game.get(gmkey, []):
+            if r["kind"].startswith("cg_") and not box_ok.get(r["pcode"], False):
+                continue                      # 이벤트 합계가 공식 박스와 다른 선수의 조건 연속은 대조 대상이 아니다
             if r["kind"] != "gp" and r["kind"][1:].split("_")[0] in bad.get(r["pcode"], ()):
                 continue                      # 게이트 탈락 선수-종목은 파이썬이 연속을 끊지만 웹은 이벤트로 이어간다 - 대조 대상이 아니다
             if r["kind"] == "gp" and r["after_len"] == 0:

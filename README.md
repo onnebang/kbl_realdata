@@ -311,6 +311,10 @@ Q2/Q3 용병 2인 규정 첫 시즌) 학습테이블 표본이 `SAMPLE_THRESHOLD
   **노트북에서만 갱신된다**: `--gmkeys`는 `raw/games`에 경기가 5,000개 이상 있을 때만 연속 기록을 다시 계산하고(클라우드 수집기·배치는 오늘 경기뿐이라 건너뜀), 웹은 로그가
   그 팀의 직전 경기까지 반영되지 않았으면(클라우드만 정산한 날) 그 선수의 "오늘 N경기째"를 말하지 않는다. DDL: `schema_record_streak_log.sql` / 롤백 `rollback_record_streak_log.sql`.
 
+- **4단계 A(2026-10-11, 설계 `docs/superpowers/specs/2026-10-11-record-book-phase4a-design.md`)** - 선수 연속 경기 6종(정규시즌 명단 기준, 연속 출장과 같은 방식: 득점 10+/20+·더블더블·리바운드 10+·3점슛 성공·어시스트 5+)과
+  팀 시즌 내 연승·연패. 같은 `record_streaks.py` 전체 재계산이 보드 8개를 더 만든다(총 15개, `STREAK_BOARDS`) — DDL 없음, 로그의 `pcode` 칸에 팀 코드. 알림은 순위가 좋아지거나 이정표일 때만이고
+  팀 연승·연패는 종료 경기 리포트·재생과 경기 전 줄에서만 보인다. 롤백: 웹 `git revert`, DB는 새 보드 8개 + 로그 종류 8개 삭제(`rollback_record_streak_log.sql` 주석).
+
 **감시**: Supabase pg_cron(`watch_live_collector`, 1분마다)이 수집기 심박(`live_collector_status`)을
 보고 있다가 멈추면 Discord로 알림(🔴 응답 없음 / 🟠 문자중계 멈춤 / 🟢 해제). 지금 걸린 문제 보기:
 `select * from live_collector_problems();` (Supabase SQL 편집기).
