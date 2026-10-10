@@ -296,6 +296,33 @@ def test_schema_sql_matches_log_columns():
     assert "enable row level security" in body and "revoke all on record_streak_log from anon, authenticated" in body and "create policy" not in body
 
 
+# ---------------------------------------------------------------------------
+# 실데이터 - RECORD_BOOK_SLOW=1
+# ---------------------------------------------------------------------------
+
+def test_known_streaks_on_real_data():
+    if os.environ.get("RECORD_BOOK_SLOW") != "1" or not os.path.isdir(rb.RAW_GAMES):
+        print("    (건너뜀: RECORD_BOOK_SLOW=1 이고 raw/games가 있을 때만)")
+        return
+    rows, log = rs.build()
+
+    def top(board, n=1):
+        return [r for rank, r in rb.rank_sorted([r for r in rows if r["board"] == board]) if rank <= n]
+
+    gp = top("pg.streak_gp.max")[0]
+    assert (gp["subject_name"], gp["subject"]) == ("이정현", "290381") and gp["value"] >= 393 and gp["period"].startswith("A:"), gp   # 이정현 진행 중(2019-03-01~)
+    ended = [r for r in rows if r["board"] == "pg.streak_gp.max" and r["subject_name"] == "주희정" and r["value"] == 383]
+    assert ended and ended[0]["period"].startswith("E:"), ended                                                                            # 주희정 383(2006-11~2013-10)
+    ft = top("pg.xft_made.max")[0]
+    assert (ft["subject_name"], ft["value"]) == ("조성민", 56), ft
+    fg = top("pg.xfg_made.max")[0]
+    assert (fg["subject_name"], fg["value"]) == ("서장훈", 24), fg
+    alive = [r for r in log if r["pcode"] == "290381" and r["kind"] == "gp" and r["alive"]]
+    assert len(alive) == 1 and alive[0]["after_len"] >= 393, alive                                                                         # 최신 행 하나만 alive
+    assert len({(r["pcode"], r["kind"]) for r in log if r["alive"]}) == len([r for r in log if r["alive"]])                              # (선수, 종류)당 alive 행은 하나
+    assert min(r["game_date"] for r in log) >= "2026-05-01"                                                                                # 120일 로그
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):

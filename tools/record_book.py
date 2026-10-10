@@ -3,6 +3,8 @@
 
 설계: docs/superpowers/specs/2026-10-08-record-book-design.md
 2단계(2026-10-10): docs/superpowers/specs/2026-10-10-record-book-phase2-design.md - 순간 기록 14개 보드(`moment_candidates`)
+3단계(2026-10-10): docs/superpowers/specs/2026-10-10-record-book-streaks-design.md - 연속 기록(한 경기 안 연속 슛 6개 보드는 `single_shot_candidates`,
+경기 간 연속 슛·연속 출장 7개 보드와 로그는 tools/record_streaks.py - raw 전체를 다시 계산해 교체)
 
 - 공식 자료(player-stat / team-record / meta.teamrecords)로 만드는 보드는 이벤트에 의존하지 않는다.
 - 이벤트(text-cast)로 만드는 보드(선수 쿼터, 팀 쿼터 리바·어시·스틸·블락)는 **검증 게이트**를 통과한 값만 후보가 된다:
@@ -827,7 +829,10 @@ def main(argv=None):
 
     if args.rebuild or args.verify:
         rows, stats = build_all(keep=args.keep)
-        log(f"경기 {stats['games']}개(이벤트 검증 통과 {stats['event_games']}개), 후보 {stats['candidates']}개")
+        import record_streaks
+        streak_rows, streak_log = record_streaks.build(keep=args.keep)
+        rows = rows + streak_rows
+        log(f"경기 {stats['games']}개(이벤트 검증 통과 {stats['event_games']}개), 후보 {stats['candidates']}개, 연속 보드 {len(streak_rows)}행 + 로그 {len(streak_log)}행")
         _summary(rows)
         if len(rows) > MAX_ROWS:
             log(f"!!! 보관 행이 {MAX_ROWS}개를 넘는다 - 정의 오류로 보고 중단")
@@ -847,8 +852,9 @@ def main(argv=None):
         if args.rebuild:
             store.lock()
             store.replace_all(rows)
+            store.replace_log(streak_log)
             conn.commit()
-            log(f"교체 완료: {len(rows)}행")
+            log(f"교체 완료: {len(rows)}행 + 연속 로그 {len(streak_log)}행")
             _revalidate()
         elif args.verify:
             missing, extra, changed = diff_rows(rows, store.all_rows())
@@ -856,7 +862,12 @@ def main(argv=None):
             for label, ks in (("없음", missing), ("남음", extra), ("다름", changed)):
                 for k in ks[:10]:
                     log(f"  {label}: {k}")
-            return 0 if not (missing or extra or changed) else 1
+            lmissing, lextra, lchanged = diff_log(streak_log, store.all_log())
+            log(f"연속 로그 검증: 없는 행 {len(lmissing)} / 남는 행 {len(lextra)} / 값이 다른 행 {len(lchanged)}")
+            for label, ks in (("로그 없음", lmissing), ("로그 남음", lextra), ("로그 다름", lchanged)):
+                for k in ks[:10]:
+                    log(f"  {label}: {k}")
+            return 0 if not (missing or extra or changed or lmissing or lextra or lchanged) else 1
         else:
             failed = 0
             for gmkey in [x.strip() for x in args.gmkeys.split(",") if x.strip()]:
@@ -869,6 +880,13 @@ def main(argv=None):
                 res = apply_game(store, gmkey, game_candidates(g))
                 conn.commit()
                 log(f"{gmkey}: {res}")
+            import record_streaks
+            if record_streaks.have_history():
+                store.lock()
+                log(f"연속 기록 갱신: {record_streaks.refresh(store)}")
+                conn.commit()
+            else:
+                log("연속 기록 갱신 건너뜀: raw/games에 역사 자료가 없다(클라우드 등) - 노트북이 다음에 갱신한다")
             _revalidate()
             return 1 if failed else 0
         return 0
