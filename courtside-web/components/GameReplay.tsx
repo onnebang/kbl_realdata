@@ -48,6 +48,7 @@ import { MilestoneWatch } from "./MilestoneWatch";
 import { buildMilestoneTimeline, type MilestoneContext, type MilestoneMoment } from "@/lib/milestones";
 import { recordToast, type RecordContext, type RecordMoment } from "@/lib/records";
 import { buildAllRecordMoments } from "@/lib/recordsMoments";
+import type { StreakContext } from "@/lib/streakKinds";
 import { buildOnCourtTeam } from "@/lib/onCourtCards";
 import type { CourtCardInfo } from "@/lib/courtCardInfo"; // 타입만 - 값을 가져오면 OVR JSON이 브라우저 번들에 들어간다
 
@@ -244,7 +245,7 @@ function computePushNotifications(
 
   // 역대 기록 - 맨 뒤(가장 드문 사건이라 라이브 버스트의 마지막 3개 제한에서 밀려나지 않게).
   for (const m of records?.get(newIdx) ?? []) {
-    if (m.phase === "done") out.push(recordToast(m));
+    if (m.phase === "done" && !m.quiet) out.push(recordToast(m));
   }
 
   return out;
@@ -590,6 +591,7 @@ export default function GameReplay({
   cardInfo,
   milestones,
   records,
+  streaks,
   boxOnly = false,
 }: {
   // 파생 필드(elapsed/runHome/runAway/surge = 실측 34,382B)와 action_label/player_name까지
@@ -632,6 +634,8 @@ export default function GameReplay({
   // 역대 기록(KBL 역대 TOP10 - 쿼터·경기·연장별 최다/최소) - page.tsx가 서버에서 lib/recordBook.ts로 "이 경기 이전" 기준 보드 요약을 만들어 내려준다.
   // 없으면(전시경기·오래된 경기·기록 테이블 없음) 패널·알림 모두 없다.
   records?: RecordContext | null;
+  // 연속 기록(연속 출장·경기 간 연속 슛) - page.tsx가 lib/recordStreaks.ts로 "이 경기 직전" 상태와 보드를 만들어 내려준다. 없으면 연속 줄만 없다.
+  streaks?: StreakContext | null;
   // true면 "코트 위" 박스스코어 패널만 그린다(경기 후 AI 분석 탭의 최종 스탯창). 이벤트로 최종 기록을 다시 계산하므로 live=false(종료 경기)에서만 쓴다.
   boxOnly?: boolean;
 }) {
@@ -686,18 +690,23 @@ export default function GameReplay({
   // 역대 기록 타임라인 - 기록 워치와 같은 방식(이벤트를 한 번 훑어 TOP10에 닿은 순간·임박 구간을 뽑는다). 종료 경기는 정산된(validated) 항목만 남는다.
   const recordMoments = useMemo(
     () =>
-      records
-        ? buildAllRecordMoments(records, events, {
-            names: {
-              player: (pcode) => nameByPcode.get(pcode) ?? liveNames?.[pcode] ?? liveCtx.lateNames[pcode] ?? pcode,
-              team: (tcode) => (tcode === homeTeam.tcode ? homeTeam.name : tcode === awayTeam.tcode ? awayTeam.name : tcode),
+      records || streaks
+        ? buildAllRecordMoments(
+            records ?? { asOf: "", boards: {} },
+            events,
+            {
+              names: {
+                player: (pcode) => nameByPcode.get(pcode) ?? liveNames?.[pcode] ?? liveCtx.lateNames[pcode] ?? pcode,
+                team: (tcode) => (tcode === homeTeam.tcode ? homeTeam.name : tcode === awayTeam.tcode ? awayTeam.name : tcode),
+              },
+              final: !live,
+              home: homeTeam.tcode,
+              away: awayTeam.tcode,
             },
-            final: !live,
-            home: homeTeam.tcode,
-            away: awayTeam.tcode,
-          })
+            streaks
+          )
         : [],
-    [records, events, nameByPcode, liveNames, liveCtx.lateNames, homeTeam, awayTeam, live]
+    [records, streaks, events, nameByPcode, liveNames, liveCtx.lateNames, homeTeam, awayTeam, live]
   );
   const recordsByIdx = useMemo(() => {
     const byIdx = new Map<number, RecordMoment[]>();

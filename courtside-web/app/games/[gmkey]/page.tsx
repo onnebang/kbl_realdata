@@ -27,6 +27,8 @@ import { buildCourtCardInfo } from "@/lib/courtCardInfo";
 import { getMilestoneContext } from "@/lib/careerMarks";
 import { basisNote, buildRecordChances } from "@/lib/milestones";
 import { getRecordContext } from "@/lib/recordBook";
+import { getStreakContext } from "@/lib/recordStreaks";
+import { buildStreakChances } from "@/lib/streakMoments";
 import { InsightCard } from "@/components/InsightCard";
 import { deriveGameStatus } from "@/lib/gameStatus";
 import { initialGameTab } from "@/lib/gameTabs";
@@ -584,6 +586,18 @@ export default async function GamePage({
   // KBL 역대 기록(쿼터·경기·연장별 TOP10) 요약 - 이 경기 이전 기준(lib/recordBook.ts). 예정 경기는 실시간 탭·경기 후 리포트가 없어 건너뛰고,
   // 실패하면 이 기능만 사라진다(soft). 읽기는 10분 캐시이고 경기 종료 정산이 'records' 태그로 즉시 비운다.
   const recordsPromise = status === "scheduled" ? Promise.resolve(null) : soft("records", getRecordContext(game, status === "final"), null);
+  // 연속 기록(연속 출장·연속 슛) 상태 - 이 경기 직전 기준. 예정 경기도 경기 전 "기록 도전"에 필요해서 만든다. 실패하면 그 줄들만 사라진다(soft).
+  const streaksPromise = soft(
+    "streaks",
+    getStreakContext(
+      game,
+      status === "final",
+      playerStats.length > 0
+        ? playerStats.map((p) => ({ pcode: p.pcode, name: p.player?.name ?? p.pcode, tcode: p.tcode }))
+        : [...liveTcodeByPcode].map(([pcode, tcode]) => ({ pcode, name: livePlayerFallback.get(pcode)?.name ?? pcode, tcode }))
+    ),
+    null
+  );
 
 
   // pregameLines는 아래 최근 일정(homeSchedule)이 있어야 "이 폼 수치가 지난 시즌 것인지"를
@@ -632,6 +646,7 @@ export default async function GamePage({
   }
   const milestones = await milestonesPromise;
   const records = await recordsPromise;
+  const streaks = await streaksPromise;
   let reportSections: ReportSection[] = [];
   if (status === "final" && game.home_score != null && game.away_score != null && derivedEvents.length > 0 && game.home_team && game.away_team) {
     // 희소성은 games 4,207행을 훑는 부수 지표다 - 없으면 리포트에서 그 문장만 빠진다.
@@ -699,6 +714,7 @@ export default async function GamePage({
       seasonName: game.season_name,
       milestones,
       records,
+      streaks,
     });
   }
   // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - allTeams는 teams 전체를 시즌
@@ -869,7 +885,7 @@ export default async function GamePage({
   const lastEventOrder = events.length > 0 ? events[events.length - 1].event_order : 0;
 
   // 경기 전 "기록 도전" - 아직 안 끝난 경기만(끝난 경기는 경기 후 리포트의 '기록 달성'이 대신한다). 한 경기에 닿을 만한 것만, 알릴 만한 순.
-  const recordChances = status !== "final" && milestones ? buildRecordChances(milestones) : [];
+  const recordChances = [...(status !== "final" && milestones ? buildRecordChances(milestones) : []), ...(status !== "final" && streaks ? buildStreakChances(streaks) : [])];
   const recordChanceHtml =
     recordChances.length > 0 && game.home_team && game.away_team
       ? recordChanceList(
@@ -984,11 +1000,13 @@ export default async function GamePage({
         {/* 경기 전 "기록 도전"(요청 2026-10-07: "누가 몇 득점을 하면 기록을 세운다") - lib/milestones.ts buildRecordChances가
             올타임/현역 순위 돌파·100개 단위 통산·커리어 하이 중 한 경기에 닿을 만한 것만 알릴 만한 순으로 골라 준 것.
             끝난 경기는 경기 후 리포트의 '기록 달성'이 대신하므로 안 그린다. */}
-        {recordChanceHtml && milestones && (
+        {recordChanceHtml && (
           <div className="panel">
             <div className="panel-title">기록 도전 (이 경기에서 세울 수 있는 기록)</div>
             <div dangerouslySetInnerHTML={{ __html: recordChanceHtml }} />
-            <div className="insight-caveat">{basisNote(milestones.split)} · 평소 기록으로 한 경기에 닿을 만한 것만 골랐습니다.</div>
+            <div className="insight-caveat">
+              {milestones ? `${basisNote(milestones.split)} · ` : ""}평소 기록으로 한 경기에 닿을 만한 것만 골랐습니다. 연속 기록은 팀 경기 기준(이적해도 이어짐)·선수 본인의 시도 순서 기준입니다.
+            </div>
           </div>
         )}
 
@@ -1247,6 +1265,7 @@ export default async function GamePage({
             cardInfo={cardInfo}
             milestones={milestones}
             records={records}
+            streaks={streaks}
             live={status === "live"}
             /* action_codes 33행 맵(약 800B). 예전엔 라이브 경기에만 보냈지만, 행마다 라벨
                문자열을 박는 것(14,060B)보다 압도적으로 싸서 이제 항상 보낸다. 복원 규칙은

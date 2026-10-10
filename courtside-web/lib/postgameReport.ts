@@ -18,6 +18,8 @@ import { pickRecord } from "./courtCardInfo";
 import { basisNote, buildMilestoneTimeline, type MilestoneContext, type RecordChance } from "./milestones";
 import { recordLine, type RecordContext, type RecordMoment, type RecordNames } from "./records";
 import { buildAllRecordMoments } from "./recordsMoments";
+import type { StreakContext } from "./streakKinds";
+export type { StreakContext } from "./streakKinds";
 
 export { fmtDuration };
 export type { ReportSection, ReportSectionData, ReportTeamMeta };
@@ -936,7 +938,7 @@ export function recordsSection(ctx: MilestoneContext, events: GameEvent[], tags:
 }
 
 /** 경기 전 "기록 도전" 목록(경기 전 탭) - 문장은 buildRecordChances가 만들고 여기서는 이름·팀 칩을 붙인다. 점프 링크는 없다(아직 경기 전). */
-export function recordChanceList(chances: RecordChance[], homeTeam: ReportTeamMeta, awayTeam: ReportTeamMeta): string {
+export function recordChanceList<T extends Pick<RecordChance, "name" | "tcode" | "text" | "detail">>(chances: T[], homeTeam: ReportTeamMeta, awayTeam: ReportTeamMeta): string {
   const { playerTag, liOpen } = createReportTags(homeTeam, awayTeam);
   const items = chances
     .map((c) => {
@@ -952,9 +954,16 @@ export function recordChanceList(chances: RecordChance[], homeTeam: ReportTeamMe
  * buildRecordTimeline을 **종료 경기의 최종 이벤트**로 돌려 시각(점프 링크)을 얻고, 테이블에 있는(= 공식 기록과 대조를 통과한) 항목만 쓴다.
  * 같은 (보드·대상·구간)에서 여러 번 알린 것(7개 -> 8개 -> 9개)은 마지막(가장 좋은) 한 줄만. 없으면 null.
  */
-export function recordBookSection(ctx: RecordContext, events: GameEvent[], tags: ReportTags, names: RecordNames, sides?: { home: string; away: string }): ReportSection | null {
+export function recordBookSection(
+  ctx: RecordContext,
+  events: GameEvent[],
+  tags: ReportTags,
+  names: RecordNames,
+  sides?: { home: string; away: string },
+  streaks?: StreakContext | null
+): ReportSection | null {
   const last = new Map<string, RecordMoment>();
-  for (const m of buildAllRecordMoments(ctx, events, { names, final: true, ...(sides ?? {}) })) if (m.phase === "done") last.set(`${m.board}|${m.subject}|${m.period}`, m);
+  for (const m of buildAllRecordMoments(ctx, events, { names, final: true, ...(sides ?? {}) }, streaks)) if (m.phase === "done") last.set(`${m.board}|${m.subject}|${m.period}`, m);
   const done = [...last.values()];
   if (done.length === 0) return null;
   const shown = done
@@ -1012,6 +1021,8 @@ export type BuildReportInput = {
   milestones?: MilestoneContext | null;
   /** 이 경기 이전 기준 KBL 역대 TOP10 요약(lib/recordBook.ts getRecordContext, 종료 경기라 validated 포함) - '역대 기록'. 없으면 그 섹션만 빠진다. */
   records?: RecordContext | null;
+  /** 연속 기록(연속 출장·연속 슛) 상태 - 종료 경기라 이 경기 로그 행(before·after)이 들어 있다. 없으면 연속 줄만 빠진다. */
+  streaks?: StreakContext | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -1259,16 +1270,17 @@ export function buildPostgameReport(input: BuildReportInput): ReportSection[] {
   }
 
   // 1.05 역대 기록 - "경기 결과" 바로 아래, 선수 통산 기록('기록 달성')보다 위: KBL 역대 TOP10에 닿은 쿼터·경기 기록(새 조회 0회).
-  if (input.records) {
+  if (input.records || input.streaks) {
     const book = recordBookSection(
-      input.records,
+      input.records ?? { asOf: "", boards: {}, validated: [] },
       events,
       tags,
       {
         player: (pcode) => boxByPcode.get(pcode)?.name ?? pcode,
         team: (tcode) => (tcode === homeTcode ? homeTname : tcode === awayTcode ? awayTname : tcode),
       },
-      { home: homeTcode, away: awayTcode }
+      { home: homeTcode, away: awayTcode },
+      input.streaks ?? null
     );
     if (book) sections.push(book);
   }

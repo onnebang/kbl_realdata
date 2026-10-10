@@ -10,6 +10,7 @@ import {
   estimatePossessions,
   isOvertimeQuarter,
   recordBookSection,
+  type StreakContext,
   recordChanceList,
   recordsSection,
 } from "./postgameReport";
@@ -390,6 +391,22 @@ describe("역대 기록 섹션 (요청 2026-10-08)", () => {
     const html = htmlOf(recordBookSection(c, evs, tags, names, { home: "H", away: "A" })!);
     expect(html).toContain("트리플더블 달성 — KBL 역대 78번째");
     expect(recordBookSection({ ...c, validated: [] }, evs, tags, names, { home: "H", away: "A" })).toBeNull();
+  });
+
+  it("3단계 연속 기록(연속 출장)도 같은 섹션에 - 이 경기 로그 행이 있을 때만, 신기록 경신 줄도 리포트에는 남는다", () => {
+    const evs = attachDerivedFields([
+      ev({ event_order: 0, quarter: "PRE", home_score: 0, away_score: 0, home_win_prob: 0.5 }),
+      ev({ event_order: 1, quarter: "Q1", clock_min: 10, clock_sec: 0, home_score: 0, away_score: 0, action_code: "101", pcode: "p1", player_name: "허훈", tcode: "H", home_win_prob: 0.5 }),
+    ]);
+    const entry = (v: number, pcode: string, who: string, active = false) => ({ v, pcode, who, active, d: "2026-03-24" });
+    const mk = (state: StreakContext["state"]): StreakContext => ({
+      asOf: "x", final: true, known: ["p1"], players: {}, state,
+      boards: { gp: [entry(393, "lee", "이정현", true), entry(383, "jhj", "주희정")], xfg_made: [], xfg_miss: [], xtp_made: [], xtp_miss: [], xft_made: [], xft_miss: [] },
+    });
+    const c: RecordContext = { asOf: "x", boards: {}, validated: [] };
+    const html = htmlOf(recordBookSection(c, evs, tags, names, { home: "H", away: "A" }, mk({ p1: { gp: { before: 393, after: 394 } } }))!);
+    expect(html).toContain("연속 출장 394경기째 KBL 신기록(종전 393경기 · 이정현 보유)");              // 허훈이 진행 중인 이정현 393을 넘는다
+    expect(recordBookSection(c, evs, tags, names, { home: "H", away: "A" }, mk({}))).toBeNull();
   });
 
   it("종료 경기에서 테이블에 없는 항목(validated 밖)은 쓰지 않고, 아무것도 없으면 null", () => {
