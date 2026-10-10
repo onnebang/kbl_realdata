@@ -521,8 +521,7 @@ export default async function PlayerPage({
     shotSeason ? getPercentileProfile(pcode, shotSeason) : Promise.resolve(null),
     null
   );
-  const glancePercentileP: Promise<PercentileProfile | null | undefined> =
-    shotSeason === focus.statSeason ? percentileP : Promise.resolve(undefined);
+  const glancePercentileP: Promise<PercentileProfile | null | undefined> = percentileP;
   // Promise.all 배열 순서 == 구조분해 순서: boxTotals, percentile, wpaRank, wpaBySeason,
   // seasonCombos(방금 추가), glance(제일 마지막 - glancePercentileP.then(...)).
   // 이 파도는 전부 선택적 패널이라 하나씩 soft() - null/빈 Map/failedCombos()는 각 패널이 이미
@@ -545,7 +544,7 @@ export default async function PlayerPage({
     soft<PlayerGlance | null>(
       "playerGlance",
       glancePercentileP.then((p) =>
-        getPlayerGlance(pcode, focus.statSeason, {
+        getPlayerGlance(pcode, shotSeason, {
           careerRows,
           form: form ?? undefined,
           careerShots,
@@ -577,15 +576,7 @@ export default async function PlayerPage({
   const statChip = panelChip(shotSeason ?? null);
   // 개막 후·임계 전에만 붙는 두 번째 칩('26-27 진행 중 · 3경기 (임계 10경기)'). 다른 시즌을 직접 고른 경우엔 생략.
   const statProgressChip = shotSeason === focus.statSeason ? progressChip(focus) : null;
-  // ?season=으로 기준 시즌이 아닌 시즌을 고른 경우 = 화면 맨 위 한눈 카드(언제나 focus.statSeason)와
-  // 그 아래 모든 패널(선택 시즌)이 서로 다른 시즌을 답하는 상태. 실측: /players/291248?season=2024-2025
-  // 는 카드 칩 '25-26 최종' 바로 아래에서 패널 칩이 전부 '24-25 최종'으로 찍힌다. 칩 두 개가 각자
-  // 자기 시즌을 밝히긴 하지만 세로로 붙어 있어 차이가 오히려 눈에 안 띄고, 스크롤하지 않은 독자가
-  // 카드 숫자를 "내가 고른 24-25"로 읽을 여지가 남는다. 그래서 두 기준이 갈리는 자리(카드와 §1 사이)에
-  // 그 사실을 문장으로 한 줄 세운다. seasonQuery에서 유도해야 값이 string으로 좁혀진다
-  // (shotSeason은 seasonQuery가 없으면 focus.statSeason과 같으므로 어긋남 자체가 성립하지 않는다).
-  const glanceSeasonMismatch: string | null =
-    seasonQuery && seasonQuery !== focus.statSeason ? seasonQuery : null;
+  const glanceSeasonMismatch: string | null = null;
 
   // 슛 임팩트 리포트의 시즌 슛 = 커리어 슛에서 필터(별자리/DNA와 요청 1회 공유).
   const seasonShots = careerShots.filter((s) => s.season === shotSeason);
@@ -883,23 +874,46 @@ export default async function PlayerPage({
       {/* glance가 null이면 soft 폴백(위 console.error) - "기록 없음"이 아니라 "불러오지 못함"으로 적는다.
           카드 자리를 비워 두지 않는 이유: 첫 화면이 조용히 짧아지면 사용자는 "원래 카드가 없는 선수"로 읽는다. */}
       {glance ? (
-        <PlayerGlanceCard glance={glance} focus={focus} teams={teamByTcode} />
+        <div className={styles.panel} style={{ background: 'transparent', padding: 0, boxShadow: 'none' }}>
+          {seasonNames.length > 1 && (
+            <div style={{ display: "flex", gap: "6px", overflowX: "auto", paddingBottom: "12px", marginBottom: "4px", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
+              {seasonNames.map((sn) => {
+                const q = new URLSearchParams();
+                q.set("season", sn);
+                if (w) q.set("w", String(windowN));
+                if (rate) q.set("rate", formUnit);
+                if (rw) q.set(RECENT_RATE_PARAM, recentRate);
+                
+                const isActive = shotSeason === sn;
+                return (
+                  <Link
+                    key={sn}
+                    href={`?${q.toString()}`}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "16px",
+                      fontSize: "0.85rem",
+                      fontWeight: isActive ? 700 : 500,
+                      whiteSpace: "nowrap",
+                      background: isActive ? "var(--team, #333)" : "rgba(128,128,128,0.15)",
+                      color: isActive ? "#fff" : "var(--text-secondary)",
+                      border: isActive ? "none" : "1px solid rgba(128,128,128,0.2)",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    {sn}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+          <PlayerGlanceCard glance={glance} focus={focus} teams={teamByTcode} chip={glanceSeasonMismatch ? undefined : undefined} />
+        </div>
       ) : (
         <div className={styles.panel}>
           <div className={styles.panelTitle}>한눈에 보기</div>
           <div className="empty-note">한눈 카드를 불러오지 못했습니다. 아래 패널은 그대로 볼 수 있고, 잠시 후 새로고침하면 카드도 열립니다.</div>
         </div>
-      )}
-
-      {/* 카드(기준 시즌)와 아래 패널(선택 시즌)의 기준이 갈렸을 때만 뜨는 이음새 문장.
-          카드를 선택 시즌으로 재집계하지 않는 이유까지 같이 밝힌다 - 퍼센타일은 그 시즌 리그 풀에서만
-          계산되므로 시즌을 바꿔 끼우면 값과 순위의 기준이 서로 어긋난 칸이 생긴다. */}
-      {glanceSeasonMismatch && (
-        <p className={styles.glanceSeasonNote}>
-          <span className={styles.glanceSeasonNoteChip}>{statSeasonChip(focus)}</span>
-          위 한눈 카드의 기준 시즌입니다. 선택한 {shortSeason(glanceSeasonMismatch)} 시즌은 아래 패널부터 적용됩니다 - 카드의 리그
-          퍼센타일이 기준 시즌 풀에서만 계산되는 값이라, 카드는 선택 시즌으로 다시 집계하지 않습니다.
-        </p>
       )}
 
       {/* ── 1. 리그 퍼센타일 프로필 ── */}
