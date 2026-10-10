@@ -23,6 +23,8 @@ export function summarizeStreaks(args: {
   players: Record<string, { name: string; tcode?: string }>;
   /** 경기 전: 로그가 그 팀의 직전 경기까지 반영된 팀들. 종료 경기는 쓰지 않는다. */
   freshTeams: Set<string> | null;
+  /** 정규시즌 경기인가 - 연속 출장은 정규시즌만 세므로 플레이오프·챔프전에서는 그 상태를 쓰지 않는다(기본 true). */
+  regular?: boolean;
 }): StreakContext | null {
   const boards = Object.fromEntries(STREAK_KINDS.map((k) => [k, [] as StreakEntry[]])) as Record<StreakKind, StreakEntry[]>;
   for (const r of args.boardRows) {
@@ -37,7 +39,7 @@ export function summarizeStreaks(args: {
   const state: StreakContext["state"] = {};
   for (const r of args.logRows) {
     const kind = STREAK_KINDS.find((k) => k === r.kind);
-    if (!kind) continue;
+    if (!kind || (kind === "gp" && args.regular === false)) continue;
     if (args.final ? r.gmkey !== args.gmkey : !r.alive) continue;
     const slot = state[r.pcode] ?? {};
     slot[kind] = args.final ? { before: r.before_len, after: r.after_len } : { before: r.after_len };
@@ -156,11 +158,11 @@ export async function getStreakContext(
             tcodes.map(async (t) => {
               const prev = await fetchPrevGame(t, game.game_date, start, game.gmkey);
               if (prev == null) return t; // 그 팀의 첫 경기 - 이어받을 상태가 없으니 믿어도 된다
-              return (await fetchLogByGame(prev)).some((r) => r.kind === "gp") ? t : null;
+              return (await fetchLogByGame(prev)).length > 0 ? t : null; // 플레이오프 경기는 연속 출장 행이 없으므로 종류와 상관없이 그 경기 로그가 있는지만 본다
             })
           )
         ).filter((t): t is string => t != null)
       );
   const [boardRows, logRows] = await Promise.all([fetchStreakBoards(), final ? fetchLogByGame(game.gmkey) : fetchAliveLog(Object.keys(players).sort().join(","))]);
-  return summarizeStreaks({ boardRows, logRows, gmkey: game.gmkey, final, asOf: `${game.game_date} ${start}`.trim(), players, freshTeams });
+  return summarizeStreaks({ boardRows, logRows, gmkey: game.gmkey, final, asOf: `${game.game_date} ${start}`.trim(), players, freshTeams, regular: game.season_category === "정규시즌" });
 }

@@ -8,6 +8,10 @@
 
 **Tech Stack:** Python 3.11(venv, 테스트는 평범한 스크립트), TypeScript/Next.js 16 + vitest, Supabase Postgres.
 
+> **개정 (2026-10-10 밤, 구현 후):** 이 계획서의 연속 출장(gp) 코드·테스트는 처음 정의(팀 경기 기준·이적 이어감, `_continues`·`team_games`)로 쓰였다. 점프볼 보도('이정현 699경기 연속 출전')를 raw로 재현하려고
+> 공식 방식(정규시즌 명단 기준: 뛰면 +1, 명단에 올랐는데 0분이면 끊김, 명단에 없으면 건너뜀, 플레이오프 무시, 이적 무관)으로 바꿨다 — 현재 코드는 `tools/record_streaks.py`와 스펙 §2가 기준이고, 계획서의 해당 코드 블록은 이력이다.
+> 같은 개정으로 웹은 정규시즌이 아닌 경기에서 gp 상태를 쓰지 않고(`regular=false`), 경기 전 신선도는 gp 행이 아니라 그 경기 로그 유무로 본다.
+
 **Spec:** `docs/superpowers/specs/2026-10-10-record-book-streaks-design.md` (이전 단계: `2026-10-08-record-book-design.md`, `2026-10-10-record-book-phase2-design.md`)
 
 ## Global Constraints

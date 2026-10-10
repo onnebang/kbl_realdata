@@ -14,15 +14,15 @@ import record_book as rb  # noqa: E402
 CODE = {"2+": "201", "2-": "202", "3+": "205", "3-": "206", "f+": "203", "f-": "204"}
 
 
-def game_of(gmkey, date, home, away, specs, start="19:00", season="2026-2027"):
-    """specs: [(pcode, tcode, tokens)] - tokens가 None이면 결장(박스에 안 나옴), ""이면 출전했지만 슛 없음.
+def game_of(gmkey, date, home, away, specs, start="19:00", season="2026-2027", category="정규시즌"):
+    """specs: [(pcode, tcode, tokens)] - tokens가 None이면 명단에 없음(박스에 안 나옴), "dnp"이면 명단에는 올랐지만 0분, ""이면 출전했지만 슛 없음.
     슛 토큰('2+','2-','3+','3-','f+','f-')은 공식 박스(rec)와 이벤트(text-cast)에 같이 반영돼 게이트를 통과한다."""
     players, events, n = [], [], 0
     for pcode, tc, tokens in specs:
         if tokens is None:
             continue
-        rec = {"playMin": 10, "playSec": 0, "fgt": 0, "fgtA": 0, "threep": 0, "threepA": 0, "ft": 0, "ftA": 0, "score": 0}
-        for t in tokens.split():
+        rec = {"playMin": 0 if tokens == "dnp" else 10, "playSec": 0, "fgt": 0, "fgtA": 0, "threep": 0, "threepA": 0, "ft": 0, "ftA": 0, "score": 0}
+        for t in ([] if tokens == "dnp" else tokens.split()):
             n += 1
             events.append({"n": n, "q": "Q1", "m": 9, "s": 59 - (n % 50), "p": f"선수{pcode}", "t": tc, "a": CODE[t]})
             if t in ("2+", "3+"):
@@ -39,7 +39,7 @@ def game_of(gmkey, date, home, away, specs, start="19:00", season="2026-2027"):
                 rec["ftA"] += 1
         players.append({"pcode": pcode, "pname": f"선수{pcode}", "tcode": tc, "rec": rec, "starter": 1})
     return {
-        "gmkey": gmkey, "date": date, "start": start, "season": season, "category": "정규시즌", "home": home, "away": away,
+        "gmkey": gmkey, "date": date, "start": start, "season": season, "category": category, "home": home, "away": away,
         "names": {home: "홈", away: "원정"}, "has_ot": False,
         "quarters": {home: {"q": [0, 0, 0, 0], "ot": []}, away: {"q": [0, 0, 0, 0], "ot": []}},
         "players": players, "teams": {home: {"score": 0}, away: {"score": 0}}, "events": events,
@@ -121,52 +121,53 @@ def rows_of(rows, board):
 
 
 @small_min
-def test_gp_same_team_streak_breaks_on_a_missed_team_game():
+def test_gp_a_dnp_entry_breaks_but_not_being_on_the_roster_does_not():
     games = [
         game_of("S49G01N1", "2026-10-01", "H", "A", [("p1", "H", ""), ("q1", "A", "")]),
         game_of("S49G01N2", "2026-10-02", "H", "A", [("p1", "H", ""), ("q1", "A", "")]),
-        game_of("S49G01N3", "2026-10-03", "H", "A", [("p1", "H", ""), ("q1", "A", "")]),
-        game_of("S49G01N4", "2026-10-04", "H", "A", [("p1", "H", None), ("q1", "A", "")]),   # p1 결장
-        game_of("S49G01N5", "2026-10-05", "H", "A", [("p1", "H", ""), ("q1", "A", "")]),
+        game_of("S49G01N3", "2026-10-03", "H", "A", [("p1", "H", None), ("q1", "A", "")]),     # p1이 명단에 없다(부상·군 복무 등) -> 건너뜀
+        game_of("S49G01N4", "2026-10-04", "H", "A", [("p1", "H", ""), ("q1", "A", "")]),
+        game_of("S49G01N5", "2026-10-05", "H", "A", [("p1", "H", "dnp"), ("q1", "A", "")]),    # 명단에 올랐는데 못 뛰었다 -> 끊김
+        game_of("S49G01N6", "2026-10-06", "H", "A", [("p1", "H", ""), ("q1", "A", "")]),
     ]
     rows, log = rs.compute(games)
-    assert log_of(log, "p1", "gp") == [("S49G01N1", 0, 1, False), ("S49G01N2", 1, 2, False), ("S49G01N3", 2, 3, False), ("S49G01N5", 0, 1, True)]
-    assert rows_of(rows, "pg.streak_gp.max") == [("p1", 3, "E:S49G01N1", "S49G01N3"), ("q1", 5, "A:S49G01N1", "S49G01N5")]   # p1 끝난 3경기, q1 진행 중 5경기
-    assert log_of(log, "q1", "gp")[-1] == ("S49G01N5", 4, 5, True)
+    assert log_of(log, "p1", "gp") == [("S49G01N1", 0, 1, False), ("S49G01N2", 1, 2, False), ("S49G01N4", 2, 3, False), ("S49G01N5", 3, 0, False), ("S49G01N6", 0, 1, True)]
+    assert rows_of(rows, "pg.streak_gp.max") == [("p1", 3, "E:S49G01N1", "S49G01N4"), ("q1", 6, "A:S49G01N1", "S49G01N6")]
+    assert log_of(log, "q1", "gp")[-1] == ("S49G01N6", 5, 6, True)
 
 
 @small_min
-def test_gp_continues_across_an_offseason_transfer_only_if_he_plays_the_new_teams_first_game():
+def test_gp_follows_the_player_across_teams_and_seasons():
     old = [game_of("S47G01N1", "2025-10-01", "X", "Z", [("p1", "X", ""), ("z", "Z", "")]), game_of("S47G01N2", "2025-10-02", "X", "Z", [("p1", "X", ""), ("z", "Z", "")])]
-    new_ok = [game_of("S49G01N1", "2026-10-01", "Y", "Z", [("p1", "Y", ""), ("z", "Z", "")]), game_of("S49G01N2", "2026-10-02", "Y", "Z", [("p1", "Y", ""), ("z", "Z", "")])]
-    _, log = rs.compute(old + new_ok, keep_days=None)                                                    # 시즌이 달라 로그 120일 창 밖이 생기므로 전체 로그로
+    new = [game_of("S49G01N1", "2026-10-01", "Y", "Z", [("p1", "Y", ""), ("z", "Z", "")]), game_of("S49G01N2", "2026-10-02", "Y", "Z", [("p1", "Y", ""), ("z", "Z", "")])]
+    _, log = rs.compute(old + new, keep_days=None)                                                       # 시즌이 달라 로그 120일 창 밖이 생기므로 전체 로그로
     assert log_of(log, "p1", "gp") == [("S47G01N1", 0, 1, False), ("S47G01N2", 1, 2, False), ("S49G01N1", 2, 3, False), ("S49G01N2", 3, 4, True)]
-    new_late = [game_of("S49G01N1", "2026-10-01", "Y", "Z", [("p1", "Y", None), ("z", "Z", "")]), game_of("S49G01N2", "2026-10-02", "Y", "Z", [("p1", "Y", ""), ("z", "Z", "")])]
-    _, log2 = rs.compute(old + new_late, keep_days=None)
-    assert log_of(log2, "p1", "gp")[-1] == ("S49G01N2", 0, 1, True)                       # 새 팀 첫 경기를 건너뛰면 끊긴다
 
 
 @small_min
-def test_gp_in_season_transfer_needs_the_first_new_team_game_after_his_last_one():
-    g1 = game_of("S49G01N1", "2026-10-01", "X", "Z", [("p1", "X", ""), ("z", "Z", "")])
-    g2 = game_of("S49G01N2", "2026-10-02", "Y", "Z", [("p1", "Y", ""), ("z", "Z", "")])          # 이적 직후 첫 경기에 출전 -> 이어짐
-    _, log = rs.compute([g1, g2])
-    assert log_of(log, "p1", "gp") == [("S49G01N1", 0, 1, False), ("S49G01N2", 1, 2, True)]
-    g2b = game_of("S49G01N2", "2026-10-02", "Y", "Z", [("p1", "Y", None), ("z", "Z", "")])       # Y가 먼저 치른 경기를 건너뛰고
-    g3 = game_of("S49G01N3", "2026-10-03", "Y", "Z", [("p1", "Y", ""), ("z", "Z", "")])          # 다음 경기에 출전 -> 끊김
-    _, log2 = rs.compute([g1, g2b, g3])
-    assert log_of(log2, "p1", "gp")[-1] == ("S49G01N3", 0, 1, True)
-
-
-@small_min
-def test_gp_alive_only_when_he_played_his_teams_latest_game():
+def test_gp_playoffs_neither_count_nor_break():
     games = [
-        game_of("S49G01N1", "2026-10-01", "H", "A", [("p1", "H", ""), ("p2", "H", ""), ("q1", "A", "")]),
-        game_of("S49G01N2", "2026-10-02", "H", "A", [("p1", "H", ""), ("p2", "H", None), ("q1", "A", "")]),
+        game_of("S49G01N1", "2026-10-01", "H", "A", [("p1", "H", "")]),
+        game_of("S49G03N1", "2026-10-02", "H", "A", [("p1", "H", "dnp")], category="플레이오프"),      # 플레이오프의 0분 명단도 끊지 않는다
+        game_of("S49G03N2", "2026-10-03", "H", "A", [("p1", "H", "")], category="플레이오프"),         # 플레이오프 출전도 세지 않는다
+        game_of("S49G01N2", "2026-10-04", "H", "A", [("p1", "H", "")]),
     ]
-    _, log = rs.compute(games)
-    assert log_of(log, "p1", "gp")[-1][3] is True and log_of(log, "p1", "gp")[0][3] is False         # 최신 행만 alive
-    assert all(r["alive"] is False for r in log if r["pcode"] == "p2")                                  # 팀의 마지막 경기에 안 나왔다
+    rows, log = rs.compute(games)
+    assert log_of(log, "p1", "gp") == [("S49G01N1", 0, 1, False), ("S49G01N2", 1, 2, True)]
+
+
+@small_min
+def test_gp_alive_means_seen_within_the_log_window():
+    games = [
+        game_of("S49G01N0", "2026-01-01", "H", "A", [("old", "H", ""), ("q1", "A", "")]),
+        game_of("S49G01N1", "2026-01-02", "H", "A", [("old", "H", ""), ("q1", "A", "")]),
+        game_of("S49G01N2", "2026-10-01", "H", "A", [("p1", "H", ""), ("q1", "A", "")]),
+        game_of("S49G01N3", "2026-10-02", "H", "A", [("p1", "H", ""), ("q1", "A", "")]),
+    ]
+    rows, log = rs.compute(games)
+    periods = {r["subject"]: r["period"][:2] for r in rows if r["board"] == "pg.streak_gp.max"}
+    assert periods == {"old": "E:", "p1": "A:", "q1": "A:"}                                              # 오래전에 멈춘 연속은 '끝남'으로 표시
+    assert not [r for r in log if r["pcode"] == "old"]                                                   # 120일 밖이라 로그에서 빠진다
 
 
 @small_min
@@ -310,15 +311,15 @@ def test_known_streaks_on_real_data():
         return [r for rank, r in rb.rank_sorted([r for r in rows if r["board"] == board]) if rank <= n]
 
     gp = top("pg.streak_gp.max")[0]
-    assert (gp["subject_name"], gp["subject"]) == ("이정현", "290381") and gp["value"] >= 393 and gp["period"].startswith("A:"), gp   # 이정현 진행 중(2019-03-01~)
-    ended = [r for r in rows if r["board"] == "pg.streak_gp.max" and r["subject_name"] == "주희정" and r["value"] == 383]
-    assert ended and ended[0]["period"].startswith("E:"), ended                                                                            # 주희정 383(2006-11~2013-10)
+    assert (gp["subject_name"], gp["subject"]) == ("이정현", "290381") and gp["value"] >= 746 and gp["period"].startswith("A:"), gp   # 이정현 진행 중(2010-10-15~) - 점프볼: 2025-10-29 경기 전 699경기
+    ended = [r for r in rows if r["board"] == "pg.streak_gp.max" and r["subject_name"] == "함지훈" and r["value"] == 713]
+    assert ended and ended[0]["period"].startswith("E:"), ended                                                                            # 함지훈 713(2007-10~2023-03)
     ft = top("pg.xft_made.max")[0]
     assert (ft["subject_name"], ft["value"]) == ("조성민", 56), ft
     fg = top("pg.xfg_made.max")[0]
     assert (fg["subject_name"], fg["value"]) == ("서장훈", 24), fg
     alive = [r for r in log if r["pcode"] == "290381" and r["kind"] == "gp" and r["alive"]]
-    assert len(alive) == 1 and alive[0]["after_len"] >= 393, alive                                                                         # 최신 행 하나만 alive
+    assert len(alive) == 1 and alive[0]["after_len"] >= 746, alive                                                                         # 최신 행 하나만 alive
     assert len({(r["pcode"], r["kind"]) for r in log if r["alive"]}) == len([r for r in log if r["alive"]])                              # (선수, 종류)당 alive 행은 하나
     assert min(r["game_date"] for r in log) >= "2026-05-01"                                                                                # 120일 로그
 

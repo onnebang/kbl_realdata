@@ -1005,7 +1005,7 @@ export default async function GamePage({
             <div className="panel-title">기록 도전 (이 경기에서 세울 수 있는 기록)</div>
             <div dangerouslySetInnerHTML={{ __html: recordChanceHtml }} />
             <div className="insight-caveat">
-              {milestones ? `${basisNote(milestones.split)} · ` : ""}평소 기록으로 한 경기에 닿을 만한 것만 골랐습니다. 연속 기록은 팀 경기 기준(이적해도 이어짐)·선수 본인의 시도 순서 기준입니다.
+              {milestones ? `${basisNote(milestones.split)} · ` : ""}평소 기록으로 한 경기에 닿을 만한 것만 골랐습니다. 연속 출장은 정규시즌 경기 명단 기준(명단에 올랐는데 못 뛴 경기에서 끊기고, 명단에 없던 경기는 건너뜀)·연속 슛은 선수 본인의 시도 순서 기준입니다.
             </div>
           </div>
         )}

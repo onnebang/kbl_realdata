@@ -4,12 +4,13 @@
 설계: docs/superpowers/specs/2026-10-10-record-book-streaks-design.md
 
 raw/games 전체를 날짜·시작시각 순으로 훑는 상태기계다(정산이 순서 없이 와도 안 틀어지게 매번 전체를 다시 계산한다).
+- 연속 출장(공식 방식, 2026-10-10 점프볼 보도 '이정현 699경기 연속 출전'을 그대로 재현): 정규시즌 경기에서 선수 명단(player-stat 행)에 올라 뛰면 +1, 명단에 올랐는데 한 분도
+  못 뛰면 끊김, 명단에 없던 경기(부상·군 복무·이적 준비 등)는 건너뜀. 이적은 상관없고 플레이오프·챔프전은 세지도 끊지도 않는다.
 - 보드 행 7개(`BOARD`): 연속 하나당 한 행. period = 'A:<시작 gmkey>'(지금 이어지는 중) / 'E:<시작 gmkey>'(끝남), gmkey = 연속의 마지막 경기.
 - 로그(record_streak_log): 최근 LOG_KEEP_DAYS일 경기의 (선수, 종류)별 전·후 길이와 alive 표시 - 웹이 "이 경기 직전 연속 상태"를 읽는다.
 - 한 경기 안 연속 슛 6개 보드는 여기가 아니라 record_book.single_shot_candidates(선수-경기 후보)다.
 역사 자료(raw/games)가 충분히 있을 때만 갱신한다(`have_history`) - 클라우드 수집기처럼 오늘 경기뿐인 환경이 부분 자료로 테이블을 덮어쓰지 못하게.
 """
-import bisect
 import collections
 import datetime
 import json
@@ -64,29 +65,17 @@ def iter_games(raw_dir=None):
             yield g
 
 
-def _continues(st, tc, n, season, team_games, season_first):
-    """선수의 이전 출전(st)에서 이번 출전(팀 tc, 경기 번호 n; team_games[tc]의 마지막이 n)으로 연속이 이어지는가."""
-    lst = team_games[tc]
-    if st["tc"] == tc:
-        return len(lst) >= 2 and lst[-2] == st["last"]                  # 같은 팀: 그 팀의 바로 다음 경기
-    if st["season"] == season:
-        return lst[bisect.bisect_right(lst, st["last"])] == n           # 시즌 중 이적: 마지막 출전 이후 새 팀의 첫 경기
-    return season_first[(tc, season)] == n                               # 시즌을 넘는 이적: 새 팀의 그 시즌 첫 경기
-
-
 def _new_run():
     return {"len": 0, "start": -1, "end": -1, "tc": ""}
 
 
 def compute(games, keep_days=LOG_KEEP_DAYS):
     """날짜순 경기 dict iterable(이벤트 포함) -> (보드 행, 로그 행). 행은 아직 보관 순위로 자르지 않았다. keep_days=None이면 로그를 자르지 않는다(검증 픽스처용)."""
-    team_games = collections.defaultdict(list)       # tcode -> [경기 번호]
-    season_first = {}                                # (tcode, 시즌 번호) -> 그 팀 그 시즌 첫 경기 번호
     info = []                                        # 경기 번호 -> 가벼운 경기 정보
     names = {}
-    gp = {}                                          # pcode -> {"len", "start", "last", "tc", "season"}
+    gp = {}                                          # pcode -> {"len", "start", "last", "tc"} - 정규시즌 연속 출장
     runs = {}                                        # (pcode, kind) -> {"made": run, "miss": run}
-    last_seen = {}                                   # pcode -> 마지막 출전 경기 번호
+    last_seen = {}                                   # pcode -> 마지막 출전 경기 번호(어느 종류의 경기든)
     rows, log = [], []
     latest_log = {}
 
@@ -106,26 +95,26 @@ def compute(games, keep_days=LOG_KEEP_DAYS):
     for n, g in enumerate(games):
         lg = {k: g[k] for k in ("gmkey", "date", "start", "season", "category", "home", "away", "names", "has_ot")}
         info.append(lg)
-        season = rb.season_number(g["gmkey"])
-        for tc in (g["home"], g["away"]):
-            team_games[tc].append(n)
-            season_first.setdefault((tc, season), n)
         by_pcode = {p["pcode"]: p for p in g["players"]}
-        # --- 연속 출장
+        regular = g["category"] == "정규시즌"
         for p in g["players"]:
             names[p["pcode"]] = p["pname"]
-            if rb.played_seconds(p["rec"]) <= 0 or p["tcode"] not in (g["home"], g["away"]):
-                continue
-            pc, tc = p["pcode"], p["tcode"]
-            st = gp.get(pc)
-            cont = st is not None and _continues(st, tc, n, season, team_games, season_first)
-            if st is not None and not cont:
-                emit("gp", pc, {"len": st["len"], "start": st["start"], "end": st["last"], "tc": st["tc"]}, False)
-            before = st["len"] if cont else 0
-            start = st["start"] if cont else n
-            gp[pc] = {"len": before + 1, "start": start, "last": n, "tc": tc, "season": season}
-            last_seen[pc] = n
-            add_log(lg, pc, "gp", before, before + 1, start)
+            if rb.played_seconds(p["rec"]) > 0:
+                last_seen[p["pcode"]] = n
+        # --- 연속 출장 (정규시즌만): 명단에 올라 뛰면 +1, 명단에 올랐는데 못 뛰면 끊김, 명단에 없으면 그대로
+        if regular:
+            for p in g["players"]:
+                pc, tc = p["pcode"], p["tcode"]
+                st = gp.get(pc)
+                if rb.played_seconds(p["rec"]) > 0:
+                    before = st["len"] if st else 0
+                    start = st["start"] if st else n
+                    gp[pc] = {"len": before + 1, "start": start, "last": n, "tc": tc}
+                    add_log(lg, pc, "gp", before, before + 1, start)
+                elif st:
+                    emit("gp", pc, {"len": st["len"], "start": st["start"], "end": st["last"], "tc": st["tc"]}, False)
+                    add_log(lg, pc, "gp", st["len"], 0, st["start"])
+                    del gp[pc]
         # --- 경기 간 연속 슛
         ok, bad = rb.shot_sequences(g)
         for pcode, kinds in bad.items():                                  # 게이트 탈락: 그 종목 연속을 끊는다(모르는 구간을 이어 붙이지 않는다)
@@ -165,7 +154,8 @@ def compute(games, keep_days=LOG_KEEP_DAYS):
     if keep_days is not None and last_date:
         cutoff = (datetime.date.fromisoformat(last_date) - datetime.timedelta(days=keep_days)).isoformat()
     for pc, st in gp.items():
-        alive = team_games[st["tc"]][-1] == st["last"]
+        seen = last_seen.get(pc)
+        alive = seen is not None and info[seen]["date"] >= cutoff       # 최근 120일 안에 뛰었으면 '지금 이어지는 중'(명단에 없던 경기는 끊지 않는다)
         emit("gp", pc, {"len": st["len"], "start": st["start"], "end": st["last"], "tc": st["tc"]}, alive)
         if alive and (pc, "gp") in latest_log:
             latest_log[(pc, "gp")]["alive"] = True

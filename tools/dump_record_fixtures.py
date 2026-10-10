@@ -97,6 +97,8 @@ def dump_streaks(outdir, gmkeys):
         for r in by_game.get(gmkey, []):
             if r["kind"] != "gp" and r["kind"][1:].split("_")[0] in bad.get(r["pcode"], ()):
                 continue                      # 게이트 탈락 선수-종목은 파이썬이 연속을 끊지만 웹은 이벤트로 이어간다 - 대조 대상이 아니다
+            if r["kind"] == "gp" and r["after_len"] == 0:
+                continue                      # 명단에 올랐는데 못 뛴 선수(연속 출장 끊김) - 이벤트가 없어 웹이 볼 수 없다
             state[r["pcode"]][r["kind"]] = [r["before_len"], r["after_len"]]
         single = [[r["board"], r["subject"], r["value"]] for r in rb.single_shot_candidates(g)]
         with open(os.path.join(outdir, f"{gmkey}.json"), "w", encoding="utf-8") as f:

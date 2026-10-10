@@ -42,6 +42,15 @@ describe("summarizeStreaks", () => {
     expect(ctx.known.sort()).toEqual(["alb", "kim", "lee"]);
   });
 
+  it("정규시즌이 아닌 경기(regular=false)에서는 연속 출장 상태를 쓰지 않는다(슛 연속은 그대로)", () => {
+    const rows = [logRow("S49G01N10", "lee", "gp", 392, 393, true), logRow("S49G01N10", "lee", "xft_made", 4, 5, true)];
+    const po = summarizeStreaks({ ...base, final: false, freshTeams: new Set(["DB"]), boardRows: [board("pg.streak_gp.max", "lee", 746, "A:x")], logRows: rows, regular: false })!;
+    expect(po.state).toEqual({ lee: { xft_made: { before: 5 } } });
+    expect(po.boards.gp).toHaveLength(1);
+    const reg = summarizeStreaks({ ...base, final: false, freshTeams: new Set(["DB"]), boardRows: [], logRows: rows })!;
+    expect(reg.state.lee.gp).toEqual({ before: 393 });
+  });
+
   it("보드도 상태도 없으면 null", () => {
     expect(summarizeStreaks({ ...base, final: false, freshTeams: new Set(), boardRows: [], logRows: [] })).toBeNull();
   });
