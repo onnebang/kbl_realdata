@@ -78,6 +78,36 @@ def dump_moments(outdir, gmkeys):
     print(f"moment fixtures: {written}개 -> {outdir}")
 
 
+def dump_streaks(outdir, gmkeys):
+    """3단계 대조 픽스처 - 경기마다 이벤트, 파이썬 상태기계의 (선수, 종류)별 [전, 후] 길이, 한 경기 안 연속 후보 행."""
+    import record_streaks as rs
+    os.makedirs(outdir, exist_ok=True)
+    _, log = rs.compute(rs.iter_games(), keep_days=None)          # 전체 로그(120일로 자르지 않는다)
+    by_game = collections.defaultdict(list)
+    for r in log:
+        by_game[r["gmkey"]].append(r)
+    written = 0
+    for gmkey in gmkeys:
+        g = rb.load_game(gmkey)
+        if g is None or any(v is None for v in rb.player_index(g).values()):
+            print(f"  건너뜀(없음/동명이인): {gmkey}")
+            continue
+        _, bad = rb.shot_sequences(g)
+        state = collections.defaultdict(dict)
+        for r in by_game.get(gmkey, []):
+            if r["kind"] != "gp" and r["kind"][1:].split("_")[0] in bad.get(r["pcode"], ()):
+                continue                      # 게이트 탈락 선수-종목은 파이썬이 연속을 끊지만 웹은 이벤트로 이어간다 - 대조 대상이 아니다
+            state[r["pcode"]][r["kind"]] = [r["before_len"], r["after_len"]]
+        single = [[r["board"], r["subject"], r["value"]] for r in rb.single_shot_candidates(g)]
+        with open(os.path.join(outdir, f"{gmkey}.json"), "w", encoding="utf-8") as f:
+            json.dump({"gmkey": gmkey, "home": g["home"], "away": g["away"], "events": to_moment_events(g), "state": state, "single": single},
+                      f, ensure_ascii=False, separators=(",", ":"))
+        carried = sum(1 for kinds in state.values() for k, (b, a) in kinds.items() if k != "gp" and b > 0)
+        print(f"  {gmkey}: 선수 {len(state)}명, 이어진 슛 연속 {carried}개, 한 경기 안 행 {len(single)}개")
+        written += 1
+    print(f"streak fixtures: {written}개 -> {outdir}")
+
+
 def parity_ok(g, official_rows, event_rows):
     """공식 합계와 이벤트 합계가 선수·팀 전부에서 같은 경기만 True."""
     if not event_rows or any(v is None for v in rb.player_index(g).values()):
@@ -159,12 +189,15 @@ def main():
     ap.add_argument("--sample", type=int, default=12)
     ap.add_argument("--gmkeys", help="콤마 구분 - 지정하면 이 경기들만(조건을 통과해야 쓴다)")
     ap.add_argument("--moments", help="2단계(순간 기록) 대조 픽스처를 쓸 폴더 - --gmkeys 필요")
+    ap.add_argument("--streaks", help="3단계(연속 기록) 대조 픽스처를 쓸 폴더 - --gmkeys 필요(raw 전체를 한 번 훑어 약 1분)")
     ap.add_argument("--freq", help="빈도 실측용 이벤트를 쓸 폴더")
     ap.add_argument("--prefix", default="S47", help="--freq: 시즌 접두사(S47 = 2025-26)")
     ap.add_argument("--entries", help="--freq: 순위 <= 50 항목 JSON 경로")
     args = ap.parse_args()
-    if not (args.parity or args.freq or args.moments):
-        ap.error("--parity, --moments, --freq 중 하나가 필요하다")
+    if not (args.parity or args.freq or args.moments or args.streaks):
+        ap.error("--parity, --moments, --streaks, --freq 중 하나가 필요하다")
+    if args.streaks:
+        dump_streaks(args.streaks, [x.strip() for x in (args.gmkeys or "").split(",") if x.strip()])
     if args.moments:
         dump_moments(args.moments, [x.strip() for x in (args.gmkeys or "").split(",") if x.strip()])
     if args.parity:
