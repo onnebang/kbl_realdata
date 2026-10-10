@@ -326,7 +326,8 @@ def test_pgstore_sql_shape():
     assert "pg_advisory_xact_lock" in cur.statements[-1][0] and cur.statements[-1][1] == (rb.LOCK_KEY,)
     cur2 = _FakeCur(rows=[("pq.ast.max", "Q1")])
     assert rb.PgStore(cur2).delete_game("G1") == {("pq.ast.max", "Q1")}
-    assert "delete from record_entries where gmkey = %s returning board, bucket" in cur2.statements[-1][0]
+    assert "delete from record_entries where gmkey = %s and not (board = any(%s)) returning board, bucket" in cur2.statements[-1][0]    # 3단계 연속 보드는 경기 단위 반영이 건드리지 않는다
+    assert cur2.statements[-1][1] == ("G1", list(rb.STREAK_BOARDS))
 
 
 def test_schema_sql_matches_row_columns():

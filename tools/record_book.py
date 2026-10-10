@@ -637,18 +637,38 @@ def build_all(raw_dir=RAW_GAMES, keep=KEEP_RANK, only=None):
 # 저장소 - MemoryStore(테스트) / PgStore(운영)
 # ---------------------------------------------------------------------------
 
+LOG_PK = ("gmkey", "pcode", "kind")
+LOG_COLUMNS = ("gmkey", "pcode", "kind", "before_len", "after_len", "start_gmkey", "game_date", "game_start", "alive")
+# 3단계 연속 보드(연속 출장·경기 간 연속 슛) - tools/record_streaks.py가 통째로 다시 계산해 교체한다. 경기 단위 반영(apply_game)은 이 행들을 지우거나 건드리지 않는다
+# (gmkey가 '연속의 마지막 경기'라서 그 경기를 다시 정산할 때 같이 지워지면 클라우드처럼 역사 자료가 없는 곳에서는 복구할 수 없다).
+STREAK_BOARDS = ("pg.streak_gp.max", "pg.xfg_made.max", "pg.xfg_miss.max", "pg.xtp_made.max", "pg.xtp_miss.max", "pg.xft_made.max", "pg.xft_miss.max")
+
+
 class MemoryStore:
     def __init__(self, rows=()):
         self._rows = {pk(r): dict(r) for r in rows}
+        self._log = {}
 
     def all_rows(self):
         return [dict(r) for r in self._rows.values()]
+
+    def replace_board_rows(self, boards, rows):
+        """3단계 - 이 보드들의 행만 통째로 교체(다른 보드는 그대로)."""
+        self._rows = {k: r for k, r in self._rows.items() if r["board"] not in boards}
+        for r in rows:
+            self._rows[pk(r)] = dict(r)
+
+    def replace_log(self, rows):
+        self._log = {tuple(r[c] for c in LOG_PK): dict(r) for r in rows}
+
+    def all_log(self):
+        return [dict(r) for r in self._log.values()]
 
     def replace_all(self, rows):
         self._rows = {pk(r): dict(r) for r in rows}
 
     def delete_game(self, gmkey):
-        gone = [k for k, r in self._rows.items() if r["gmkey"] == gmkey]
+        gone = [k for k, r in self._rows.items() if r["gmkey"] == gmkey and r["board"] not in STREAK_BOARDS]
         boards = {(self._rows[k]["board"], self._rows[k]["bucket"]) for k in gone}
         for k in gone:
             del self._rows[k]
@@ -692,7 +712,7 @@ class PgStore:
         self.upsert(rows)
 
     def delete_game(self, gmkey):
-        self.cur.execute("delete from record_entries where gmkey = %s returning board, bucket", (gmkey,))
+        self.cur.execute("delete from record_entries where gmkey = %s and not (board = any(%s)) returning board, bucket", (gmkey, list(STREAK_BOARDS)))
         return {(b, k) for b, k in self.cur.fetchall()}
 
     def upsert(self, rows):
@@ -718,6 +738,30 @@ class PgStore:
         for r in rows:
             self.cur.execute("delete from record_entries where board = %s and bucket = %s and gmkey = %s and subject = %s and period = %s", pk(r))
 
+    def replace_board_rows(self, boards, rows):
+        """3단계 - 이 보드들의 행만 통째로 교체(다른 보드는 그대로). 호출부가 한 트랜잭션으로 묶는다."""
+        self.cur.execute("delete from record_entries where board = any(%s)", (list(boards),))
+        self.upsert(rows)
+
+    def replace_log(self, rows):
+        self.cur.execute("delete from record_streak_log")
+        if not rows:
+            return
+        from psycopg2.extras import execute_values
+        execute_values(
+            self.cur,
+            f"insert into record_streak_log ({', '.join(LOG_COLUMNS)}) values %s",
+            [tuple(r[c] for c in LOG_COLUMNS) for r in rows],
+            page_size=1000,
+        )
+
+    def all_log(self):
+        self.cur.execute(f"select {', '.join(LOG_COLUMNS)} from record_streak_log")
+        rows = [dict(zip(LOG_COLUMNS, r)) for r in self.cur.fetchall()]
+        for r in rows:
+            r["game_date"] = r["game_date"].isoformat() if hasattr(r["game_date"], "isoformat") else str(r["game_date"])
+        return rows
+
 
 def apply_game(store, gmkey, candidates, keep=KEEP_RANK):
     """한 경기를 반영한다(멱등): 그 경기 기존 행 삭제 -> 후보 삽입 -> 영향받은 보드·구간의 순위 > keep 삭제."""
@@ -739,6 +783,17 @@ def diff_rows(expected, actual):
     extra = sorted(set(a) - set(e))
     changed = sorted(k for k in set(e) & set(a) if e[k] != a[k])
     return missing, extra, changed
+
+
+def diff_log(expected, actual):
+    """--verify(3단계): 연속 상태 로그 비교 -> (없는 것, 남는 것, 값이 다른 것) - 키 = (gmkey, pcode, kind), 값 = 길이·alive·시작 경기."""
+    def key(r):
+        return tuple(r[c] for c in LOG_PK)
+
+    def val(r):
+        return (r["before_len"], r["after_len"], bool(r["alive"]), r["start_gmkey"])
+    e, a = {key(r): val(r) for r in expected}, {key(r): val(r) for r in actual}
+    return sorted(set(e) - set(a)), sorted(set(a) - set(e)), sorted(k for k in set(e) & set(a) if e[k] != a[k])
 
 
 # ---------------------------------------------------------------------------
