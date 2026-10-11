@@ -15,6 +15,7 @@ import {
   type ValueFmt,
 } from "./records";
 import type { StreakContext } from "./streakKinds";
+import { buildComebackMoments } from "./comebackMoments";
 import { buildGameStreakMoments } from "./gameStreakMoments";
 import { buildStreakMoments } from "./streakMoments";
 
@@ -383,5 +384,6 @@ export function buildAllRecordMoments(ctx: RecordContext, events: RecordEvent[],
   const kept = validated ? extra.filter((m) => validated.has(validatedKey(m))) : extra;
   const streak = buildStreakMoments(ctx, streaks ?? null, events, opts);
   const game = buildGameStreakMoments(streaks ?? null, events, opts);
-  return [...base, ...kept, ...streak, ...game].sort((a, b) => a.idx - b.idx);
+  const comeback = buildComebackMoments(ctx, events, opts);
+  return [...base, ...kept, ...streak, ...game, ...comeback].sort((a, b) => a.idx - b.idx);
 }
