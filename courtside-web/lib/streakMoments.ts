@@ -64,10 +64,10 @@ export function summaryOf(entries: StreakEntry[], excludePcode?: string): BoardS
  * 연속 출장 N경기째를 알릴 만한가 - 순위가 좋아졌거나(10위 안 처음 진입 포함) 50경기 단위 이정표일 때만.
  * 이정현처럼 신기록을 매 경기 이어가는 것은 알리지 않는다(토스트·패널·리포트·경기 전 도전 모두).
  */
-export function streakVerdict(entries: StreakEntry[], pcode: string, n: number, milestone: boolean) {
+export function streakVerdict(entries: StreakEntry[], pcode: string, n: number, milestone: boolean, before = n - 1) {
   const s = summaryOf(entries, pcode);
   const info = rankInfo(s.tops, n, "max");
-  const beforeInfo = n > 1 ? rankInfo(s.tops, n - 1, "max") : null;
+  const beforeInfo = before > 0 ? rankInfo(s.tops, before, "max") : null;
   const ranked = info != null && info.rank <= TOP_RANKS ? info : null;
   const improved = ranked != null && (beforeInfo == null || beforeInfo.rank > TOP_RANKS || ranked.rank < beforeInfo.rank || (ranked.breaks && !beforeInfo.breaks));
   return { s, ranked, worthy: improved || milestone };
