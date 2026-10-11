@@ -265,15 +265,15 @@ export async function getGames(
   };
 }
 
-// 예상 승률(요청: "양 팀의 예상 승률도 제공") - game_events의 첫 행(event_order=0,
-// quarter='PRE', 0-0 스코어)이 바로 그 경기 시작 전 모델 예측값. 라이브 승률(경기 중
-// 매 플레이마다 갱신되는 home_win_prob와 같은 컬럼이지만, 첫 행만 걸러서 "경기 전
-// 예측"으로 씀 - 별도 예측 모델을 새로 만들 필요 없음.
+// 예상 승률(요청: "양 팀의 예상 승률도 제공") - 경기 전 30개 피처 사전 모델
+// (pregame_features.home_win_prob)을 최우선으로 씀. 경기가 시작(LIVE)되거나 종료된
+// 후에도 "경기 전 예측" 수치는 불변이어야 하므로(경기 시작 후 라이브 5개 피처 모델인
+// game_events PRE 행으로 덮어써져 숫자가 바뀌는 버그 방지), pregame_features를 1순위로 읽고
+// 해당 데이터가 없는 과거 경기만 game_events(event_order=0)로 폴백한다.
 //
-// 캐시: 종료 경기의 event_order=0 행은 불변이고, 예정 경기의 pregame_features는
-// daily_batch에서만 바뀐다(TTL.scheduled의 정의 그대로). 키는 넘어온 gmkey 목록 자체라
-// 페이지가 바뀌면 자동으로 다른 키가 된다. **라이브 승률(getLiveWinProbs)과는 다른
-// 값이다 - 그쪽은 절대 캐시하지 않는다.**
+// 캐시: pregame_features는 daily_batch에서만 바뀐다(TTL.scheduled의 정의 그대로).
+// 키는 넘어온 gmkey 목록 자체라 페이지가 바뀌면 자동으로 다른 키가 된다.
+// **라이브 승률(getLiveWinProbs)과는 다른 값이다 - 그쪽은 절대 캐시하지 않는다.**
 export async function getPregameWinProbs(gmkeys: string[]): Promise<Map<string, number>> {
   if (!gmkeys.length) return new Map();
   return cachedMap(
@@ -334,21 +334,21 @@ async function fetchLineupWinProbs(gmkeys: string[]): Promise<Map<string, Lineup
 
 async function fetchPregameWinProbs(gmkeys: string[]): Promise<Map<string, number>> {
   const map = new Map<string, number>();
+  // 1순위: 경기 전 30개 피처 예측 모델(pregame_features.home_win_prob).
+  // 경기가 시작(LIVE)되거나 종료된 후에도 경기 전 예측값이 변하지 않고 영구 유지된다.
   for (let i = 0; i < gmkeys.length; i += 200) {
     const chunk = gmkeys.slice(i, i + 200);
-    const { data } = await supabase.from("game_events").select("gmkey, home_win_prob").eq("event_order", 0).in("gmkey", chunk);
+    const { data } = await supabase.from("pregame_features").select("gmkey, home_win_prob").in("gmkey", chunk);
     for (const r of data ?? []) {
       if (r.home_win_prob != null) map.set(r.gmkey, r.home_win_prob);
     }
   }
-  // Phase 0 - 예정 경기는 game_events가 아직 없으므로(경기 전) 위 조회에서 안 잡힘.
-  // tools/sync_upcoming_games.py가 pregame_features.home_win_prob에 넣어둔 경기 전 모델
-  // 예측으로 폴백 - 종료 경기는 event_order=0 행이 항상 있어서 여기까지 안 내려옴(기존
-  // 표시값 불변).
+  // 2순위(폴백): pregame_features에 예측값이 없는 과거 경기(동기화 도입 이전 시즌 등)만
+  // game_events의 PRE 행(event_order=0)에서 가져온다.
   const missing = gmkeys.filter((k) => !map.has(k));
   for (let i = 0; i < missing.length; i += 200) {
     const chunk = missing.slice(i, i + 200);
-    const { data } = await supabase.from("pregame_features").select("gmkey, home_win_prob").in("gmkey", chunk);
+    const { data } = await supabase.from("game_events").select("gmkey, home_win_prob").eq("event_order", 0).in("gmkey", chunk);
     for (const r of data ?? []) {
       if (r.home_win_prob != null) map.set(r.gmkey, r.home_win_prob);
     }

@@ -817,11 +817,9 @@ export default async function TeamPage({
     status: f.status,
     teamScore: f.teamScore,
     oppScore: f.oppScore,
-    // 치른 경기 = 경기 시작 시점(game_events event_order=0), 예정 = pregame_features. 둘 다 홈 기준이라 팀 기준으로 뒤집는다.
-    prob:
-      f.status === "final"
-        ? teamSideProb(playedProbs.get(f.gmkey), f.isHome)
-        : teamSideProb(pregame.get(f.gmkey)?.homeWinProb, f.isHome),
+    // 경기 전 모델 승률: pregame_features.homeWinProb(30개 피처 예측)을 최우선으로 쓰고,
+    // 데이터가 없는 과거 경기만 playedProbs(game_events event_order=0)로 폴백.
+    prob: teamSideProb(pregame.get(f.gmkey)?.homeWinProb ?? playedProbs.get(f.gmkey), f.isHome),
     tag: tags.get(f.gmkey)?.key ?? null,
   }));
   // 아직 한 경기도 안 치른 팀만 첫 칸에 D-N(리그 개막 여부가 아니라 팀 단위 판정).
@@ -1091,9 +1089,10 @@ export default async function TeamPage({
                   const isFinal = g.status === "final" && g.teamScore != null && g.oppScore != null;
                   const won = isFinal && (g.teamScore as number) > (g.oppScore as number);
                   const tag: GameTag | undefined = tags.get(g.gmkey);
-                  const prob = isFinal
-                    ? teamSideProb(playedProbs.get(g.gmkey), g.isHome)
-                    : teamSideProb(pregame.get(g.gmkey)?.homeWinProb, g.isHome);
+                  const prob = teamSideProb(
+                    pregame.get(g.gmkey)?.homeWinProb ?? playedProbs.get(g.gmkey),
+                    g.isHome
+                  );
                   const start = fmtStart(g.gameStart);
                   return (
                     <tr key={g.gmkey}>

@@ -851,10 +851,9 @@ export default async function GamePage({
       homeSeasonStats,
       awaySeasonStats,
       leagueAvgOrebPct,
-      // 승률 인사이트 - 이벤트가 있으면 기존 그대로 첫 이벤트(경기 전 모델 예측)를,
-      // 예정 경기(이벤트 없음)는 tools/sync_upcoming_games.py가 pregame_features에 넣어둔
-      // 같은 모델의 예측(home_win_prob)을 사용.
-      homeWinProb: derivedEvents[0]?.home_win_prob ?? pregameFeatures?.home_win_prob ?? null,
+      // 승률 인사이트 - 경기 전 30개 피처 사전 모델(pregameFeatures.home_win_prob)을 최우선으로 쓰고,
+      // 데이터가 없는 과거 경기만 derivedEvents[0](이벤트 시작 시점)을 폴백으로 사용.
+      homeWinProb: pregameFeatures?.home_win_prob ?? derivedEvents[0]?.home_win_prob ?? null,
       homePriorGame,
       awayPriorGame,
       homeDeparted: departedByTeam.get(game.home_team.tcode),
