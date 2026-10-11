@@ -487,6 +487,28 @@ def run_candidates(g):
     return [_row(g, "tg.run.max", "G", tc, "", v, g["names"][tc], tc) for tc, v in best.items() if tc in g["names"] and v > 0]
 
 
+COMEBACK_MIN = 15       # 4단계 B - 이긴 팀이 이만큼 이상 뒤졌던 경기만 후보(보관 순위 ≤15가 21점이라 이보다 작은 값은 어차피 잘린다). lib/comebackMoments.ts COMEBACK_MIN과 같아야 한다.
+
+
+def comeback_candidates(g):
+    """역전승 - 이긴 팀이 경기 중 뒤졌던 최대 점수차(연장 포함), 경기당 이긴 팀 한 행. 이벤트 득점으로 쌓은 두 팀 점수의 이벤트 순서(n) 경로이며,
+    호출부가 게이트 1(이벤트 득점 = 공식 쿼터·최종 점수)을 통과한 경기에만 부른다. 진 팀의 '리드를 날린 패배'는 같은 값이라 보드를 따로 만들지 않는다."""
+    h, a = g["home"], g["away"]
+    hs, as_ = (g["teams"].get(h) or {}).get("score"), (g["teams"].get(a) or {}).get("score")
+    if not (isinstance(hs, int) and isinstance(as_, int)) or hs == as_:
+        return []
+    win, lose = (h, a) if hs > as_ else (a, h)
+    sc, worst = {h: 0, a: 0}, 0
+    for e in ordered_events(g):
+        pts, q, tc, name = PTS_BY_CODE.get(e.get("a")), e.get("q"), e.get("t"), e.get("p")
+        if pts and q and name and tc in sc:
+            sc[tc] += pts
+            worst = max(worst, sc[lose] - sc[win])
+    if worst < COMEBACK_MIN or win not in g["names"]:
+        return []
+    return [_row(g, "tg.comeback.max", "G", win, "", worst, g["names"][win], win)]
+
+
 # 3단계 - 한 경기 안 연속 슛. 종목: fg(2점+3점 야투, 자유투 제외) / tp(3점) / ft(자유투). (성공 코드, 실패 코드, 공식 성공 열, 공식 시도 열)
 SHOT_KINDS = {
     "fg": (("201", "205", "207"), ("202", "206", "208"), "fgt", "fgtA"),
@@ -553,10 +575,10 @@ def single_shot_candidates(g):
 
 
 def moment_candidates(g):
-    """2·3단계 선수-경기 보드 전부 - 공식 보드와 한 경기 안 연속 슛은 늘, 이벤트 보드는 게이트 1을 통과한 경기만."""
+    """2·3·4B단계 경기 단위 보드 전부 - 공식 보드와 한 경기 안 연속 슛은 늘, 이벤트 보드(시간·창·런·역전승)는 게이트 1을 통과한 경기만."""
     rows = official_moment_candidates(g) + single_shot_candidates(g)
     if quarters_match_official(g):
-        rows += time_candidates(g) + burst_candidates(g) + run_candidates(g)
+        rows += time_candidates(g) + burst_candidates(g) + run_candidates(g) + comeback_candidates(g)
     return rows
 
 

@@ -240,6 +240,27 @@ def test_team_run_needs_modern_season_and_ordered_clock():
     assert run_rows(run_game(order, back=True)) == []
 
 
+def comeback_rows(order):
+    return boards(rb.moment_candidates(run_game(order)), "tg.comeback.max")
+
+
+def test_comeback_is_the_winners_max_deficit():
+    assert comeback_rows([("A", "201")] * 8 + [("H", "205")] * 6) == [("H", 16)]           # A가 16-0까지 앞섰고 H가 18-16으로 뒤집었다
+
+
+def test_comeback_needs_a_win_and_the_minimum_deficit():
+    assert comeback_rows([("A", "201")] * 7 + [("H", "205")] * 5) == []                     # 14점 열세는 후보가 아니다(15 미만)
+    assert comeback_rows([("A", "201")] * 8 + [("H", "201")] * 2) == []                     # 끝까지 앞선 팀은 열세가 없고 졌다
+    assert comeback_rows([("A", "201")] * 8 + [("H", "201")] * 8) == []                     # 동점은 승자가 없다
+    assert comeback_rows([("H", "205")] * 3 + [("A", "205")] * 8 + [("H", "205")] * 8) == [("H", 15)]   # 먼저 앞섰다가 15점 뒤진 뒤 뒤집어도 센다(9-0 -> 9-24 -> 33-24)
+
+
+def test_comeback_is_skipped_when_events_disagree_with_the_official_score():
+    g = run_game([("A", "201")] * 8 + [("H", "205")] * 6)
+    g["quarters"]["H"]["q"] = [0, 0, 20, 0]                                                 # 이벤트 득점 18과 공식 쿼터 점수 20이 다르다 - 게이트 1 탈락
+    assert boards(rb.moment_candidates(g), "tg.comeback.max") == []
+
+
 def test_moment_candidates_are_in_the_game_candidates_and_cover_all_boards():
     g = time_game(ast=10, fouls=5)
     boards_made = {r["board"] for r in rb.game_candidates(g)}
@@ -278,6 +299,9 @@ def test_known_records_on_real_data():
     assert min(rb.season_number(r["gmkey"]) for r in rows if ".burst" in r["board"] or r["board"] == "tg.run.max") >= rb.CLOCK_TRUSTED_FROM
     runs = [r for r in rows if r["board"] == "tg.run.max"]
     assert max(r["value"] for r in runs) == 24 and {"S37G01N269", "S31G01N108"} & {r["gmkey"] for r in runs if r["value"] == 24}
+    cb = top("tg.comeback.max")[0]
+    assert (cb["value"], cb["gmkey"]) == (29, "S39G01N151"), cb                            # 서울 SK가 안양 KGC에 29점 뒤지다 역전(2022-01-09)
+    assert all(r["value"] >= rb.COMEBACK_MIN for r in rows if r["board"] == "tg.comeback.max")
 
 
 if __name__ == "__main__":
