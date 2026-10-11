@@ -1,6 +1,7 @@
 "use client";
 import { PlayerPhoto } from "./PlayerPhoto";
 import { teamInkStyle } from "@/lib/teamAccent";
+import { awayFillBackground } from "./report/TeamSplitBar";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
@@ -2164,8 +2165,22 @@ export default function GameReplay({
               </div>
             </div>
             <div className="replay-split-bar">
-              <div className="replay-split-home" style={{ width: `${row.home_win_prob * 100}%`, background: homeTeam.color }} />
-              <div className="replay-split-away" style={{ width: `${(1 - row.home_win_prob) * 100}%`, background: awayTeam.color }} />
+              <div
+                className="replay-split-home"
+                style={{
+                  width: `${row.home_win_prob * 100}%`,
+                  background: homeTeam.color,
+                  borderRight: row.home_win_prob > 0.01 && row.home_win_prob < 0.99 ? "2px solid rgba(255, 255, 255, 0.95)" : undefined,
+                  boxSizing: "border-box",
+                }}
+              />
+              <div
+                className="replay-split-away"
+                style={{
+                  width: `${(1 - row.home_win_prob) * 100}%`,
+                  background: awayFillBackground(homeTeam.color, awayTeam.color),
+                }}
+              />
             </div>
           </>
         )}

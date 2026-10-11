@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { teamInkStyle } from "@/lib/teamAccent";
+import { teamInkStyle, relativeLuminance } from "@/lib/teamAccent";
 
 // 홈/원정이 가운데서 마주보는 비교 막대 한 줄. 원래 app/games/[gmkey]/page.tsx 안의
 // tsBarRow()였고, 리포트 섹션(FourFactorsSection)도 같은 막대를 써야 해서 여기로 꺼냈다.
@@ -14,9 +14,7 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 /**
- * redmean 색상거리 - 단순 유클리드보다 사람 눈 인지에 가깝다. 두 팀 색이 너무 가까우면
- * (예: 서울 SK #E4002B vs 안양 정관장 #C8102E는 둘 다 빨강이라 거리 ~57) 원정 막대에만
- * 대각선 줄무늬 텍스처를 줘서 구분한다.
+ * redmean 색상거리 - 단순 유클리드보다 사람 눈 인지에 가깝다.
  */
 export function colorDistance(hex1: string, hex2: string): number {
   const [r1, g1, b1] = hexToRgb(hex1);
@@ -28,14 +26,25 @@ export function colorDistance(hex1: string, hex2: string): number {
   return Math.sqrt((2 + rMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rMean) / 256) * db * db);
 }
 
-export const SIMILAR_COLOR_THRESHOLD = 90;
+// 110: 안양 정관장 #C8102E vs 창원 LG #8E1B3D(거리 99.9), 서울 SK #E4002B vs 창원 LG(거리 104) 등
+// 유사 색상 매치업을 정확히 감지하면서, KCC(남색 #0C2340) vs 한국가스공사(파랑 #0072CE, 거리 291)처럼
+// 명도 대비가 뚜렷한 다른 색상은 제외하는 최적 임계값.
+export const SIMILAR_COLOR_THRESHOLD = 110;
+
+/**
+ * 두 팀 색이 비슷해 한눈에 구분이 안 되는지 판별(Kit / Color Clash).
+ */
+export function isColorSimilar(hex1: string, hex2: string): boolean {
+  if (!hex1 || !hex2) return false;
+  return colorDistance(hex1, hex2) < SIMILAR_COLOR_THRESHOLD;
+}
 
 /**
  * 원정 막대 배경 - 색이 비슷하면 팀 색 그대로 위에 흰색 대각선 줄무늬를 겹쳐서(그 팀 색
  * 자체는 유지한 채 질감만 다르게) 홈과 눈으로 구분되게. 안 비슷하면 그냥 단색.
  */
 export function awayFillBackground(homeColor: string, awayColor: string): string {
-  if (colorDistance(homeColor, awayColor) >= SIMILAR_COLOR_THRESHOLD) return awayColor;
+  if (!isColorSimilar(homeColor, awayColor)) return awayColor;
   return `repeating-linear-gradient(45deg, transparent 0 4px, rgba(255,255,255,0.45) 4px 8px), ${awayColor}`;
 }
 
