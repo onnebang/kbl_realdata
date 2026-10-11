@@ -8,6 +8,7 @@ raw/games 전체를 날짜·시작시각 순으로 훑는 상태기계다(정산
   못 뛰면 끊김, 명단에 없던 경기(부상·군 복무·이적 준비 등)는 건너뜀. 이적은 상관없고 플레이오프·챔프전은 세지도 끊지도 않는다.
 - 선수 연속 경기 6종(4단계 A, 설계 `2026-10-11-record-book-phase4a-design.md`): 연속 출장과 같은 틀에 조건만 얹는다(`GAME_COND` - 득점 10+/20+·더블더블·리바운드 10+·3점슛 1+·어시스트 5+).
 - 팀 연승·연패(`tw`/`tl`): 정규시즌 시즌 안에서 이어진 연속 승리/패배(공식 최종 점수, 시즌이 바뀌면 리셋). 로그의 pcode 칸에 팀 코드를 넣는다.
+- 선수-시즌 누적(4단계 C, `ss_*`): 정규시즌에서 뛴 경기의 공식 박스 합계(득점·리바·어시·스틸·블록·3점)를 시즌별로 쌓는다. 보드는 bucket `S`, 선수-시즌당 한 행(period `A:/E:<시즌>`).
 - 보드 행(`BOARD`): 연속 하나당 한 행. period = 'A:<시작 gmkey>'(지금 이어지는 중) / 'E:<시작 gmkey>'(끝남), gmkey = 연속의 마지막 경기.
 - 로그(record_streak_log): 최근 LOG_KEEP_DAYS일 경기의 (선수, 종류)별 전·후 길이와 alive 표시 - 웹이 "이 경기 직전 연속 상태"를 읽는다.
 - 한 경기 안 연속 슛 6개 보드는 여기가 아니라 record_book.single_shot_candidates(선수-경기 후보)다.
@@ -36,8 +37,14 @@ GAME_COND = {
     "cg_pts10": _ge("score", 10), "cg_pts20": _ge("score", 20), "cg_dd": _double_double,
     "cg_reb10": _ge("rb", 10), "cg_tpm1": _ge("threep", 1), "cg_ast5": _ge("ast", 5),
 }
+# 4단계 C - 선수-시즌 누적(정규시즌, 뛴 경기의 공식 박스 합계). 종류 -> (rec 키, 보드 이름, 보드 행 후보 최소값 - 10위 값보다 한참 낮게). 로그의 ss_gp는 그 시즌 출전 경기 수(보드 없음).
+SEASON_STAT = {
+    "ss_pts": ("score", "pg.season_pts.max", 600), "ss_reb": ("rb", "pg.season_reb.max", 300), "ss_ast": ("ast", "pg.season_ast.max", 150),
+    "ss_stl": ("stl", "pg.season_stl.max", 60), "ss_blk": ("bs", "pg.season_blk.max", 50), "ss_tpm": ("threep", "pg.season_tpm.max", 60),
+}
+SEASON_MIN = {k: v[2] for k, v in SEASON_STAT.items()}
 TEAM_KINDS = ("tw", "tl")      # 팀 시즌 내 연승 / 연패 - 로그의 pcode 칸에 팀 코드를 넣는다(선수 코드는 6자리 숫자, 팀 코드는 2자리라 겹치지 않는다)
-KINDS = tuple(GAME_COND) + ("xfg_made", "xfg_miss", "xtp_made", "xtp_miss", "xft_made", "xft_miss") + TEAM_KINDS
+KINDS = tuple(GAME_COND) + ("xfg_made", "xfg_miss", "xtp_made", "xtp_miss", "xft_made", "xft_miss") + TEAM_KINDS + ("ss_gp",) + tuple(SEASON_STAT)
 BOARD = {
     "gp": "pg.streak_gp.max",
     "xfg_made": "pg.xfg_made.max", "xfg_miss": "pg.xfg_miss.max",
@@ -46,6 +53,7 @@ BOARD = {
     "cg_pts10": "pg.cg_pts10.max", "cg_pts20": "pg.cg_pts20.max", "cg_dd": "pg.cg_dd.max",
     "cg_reb10": "pg.cg_reb10.max", "cg_tpm1": "pg.cg_tpm1.max", "cg_ast5": "pg.cg_ast5.max",
     "tw": "tg.win_streak.max", "tl": "tg.loss_streak.max",
+    **{k: v[1] for k, v in SEASON_STAT.items()},
 }
 STREAK_BOARDS = rb.STREAK_BOARDS
 MIN_ROW = 6               # 이보다 짧은 연속은 보드 행 후보가 아니다(보관 순위가 어차피 훨씬 높다)
@@ -102,6 +110,7 @@ def compute(games, keep_days=LOG_KEEP_DAYS):
     last_seen = {}                                   # pcode -> 마지막 출전 경기 번호(어느 종류의 경기든)
     rows, log = [], []
     latest_log = {}
+    season_tot = {}                                  # pcode -> {"season", "gp", "tot": {종류: 합계}, "first": 첫 경기 번호, "last": 마지막 경기 번호, "tc"} - 정규시즌 선수-시즌 누적
 
     def add_log(lg, pcode, kind, before, after, start_n):
         row = {"gmkey": lg["gmkey"], "pcode": pcode, "kind": kind, "before_len": before, "after_len": after,
@@ -115,6 +124,13 @@ def compute(games, keep_days=LOG_KEEP_DAYS):
         g = info[run["end"]]
         period = ("A:" if alive else "E:") + info[run["start"]]["gmkey"]
         rows.append(rb._row(g, BOARD[kind], "G", pcode, period, run["len"], names.get(pcode, pcode), run["tc"]))
+
+    def emit_season(pcode, st, alive):
+        g = info[st["last"]]
+        for kind, (_, board, _) in SEASON_STAT.items():
+            v = st["tot"][kind]
+            if v > 0 and v >= SEASON_MIN.get(kind, 0):
+                rows.append(rb._row(g, board, "S", pcode, ("A:" if alive else "E:") + st["season"], v, f"{names.get(pcode, pcode)}({st['season']})", st["tc"]))
 
     for n, g in enumerate(games):
         lg = {k: g[k] for k in ("gmkey", "date", "start", "season", "category", "home", "away", "names", "has_ot")}
@@ -142,6 +158,25 @@ def compute(games, keep_days=LOG_KEEP_DAYS):
                         emit(kind, pc, {"len": st["len"], "start": st["start"], "end": st["last"], "tc": st["tc"]}, False)
                         add_log(lg, pc, kind, st["len"], 0, st["start"])
                         del runs_k[pc]
+            # --- 선수-시즌 누적: 뛴 경기의 공식 박스를 시즌(seasonName)별로 합산, 시즌이 바뀌면 이전 시즌을 행으로 닫고 처음부터
+            for p in g["players"]:
+                if rb.played_seconds(p["rec"]) <= 0:
+                    continue
+                pc, tc = p["pcode"], p["tcode"]
+                st = season_tot.get(pc)
+                if st and st["season"] != g["season"]:
+                    emit_season(pc, st, False)
+                    st = None
+                if st is None:
+                    st = season_tot[pc] = {"season": g["season"], "gp": 0, "tot": {k: 0 for k in SEASON_STAT}, "first": n, "last": n, "tc": tc}
+                add_log(lg, pc, "ss_gp", st["gp"], st["gp"] + 1, st["first"])
+                st["gp"] += 1
+                for kind, (key, _, _) in SEASON_STAT.items():
+                    v = p["rec"].get(key) or 0
+                    if v > 0:
+                        add_log(lg, pc, kind, st["tot"][kind], st["tot"][kind] + v, st["first"])
+                        st["tot"][kind] += v
+                st["last"], st["tc"] = n, tc
             # --- 팀 연승·연패: 공식 최종 점수로 승패가 갈린 정규시즌 경기, 시즌이 바뀌면 처음부터
             hs, as_ = (g["teams"].get(g["home"]) or {}).get("score"), (g["teams"].get(g["away"]) or {}).get("score")
             if isinstance(hs, int) and isinstance(as_, int) and hs != as_:
@@ -209,6 +244,15 @@ def compute(games, keep_days=LOG_KEEP_DAYS):
             emit(kind, pc, {"len": st["len"], "start": st["start"], "end": st["last"], "tc": st["tc"]}, alive)
             if alive and (pc, kind) in latest_log:
                 latest_log[(pc, kind)]["alive"] = True
+    for pc, st in season_tot.items():
+        seen = last_seen.get(pc)
+        alive = seen is not None and info[seen]["date"] >= cutoff
+        emit_season(pc, st, alive)
+        if alive:
+            for kind in ("ss_gp",) + tuple(SEASON_STAT):
+                row = latest_log.get((pc, kind))
+                if row and row["start_gmkey"] == info[st["first"]]["gmkey"]:        # 이번 시즌 행일 때만(지난 시즌 마지막 행은 alive가 아니다)
+                    row["alive"] = True
     for tc, st in team.items():
         alive = info[st["last"]]["date"] >= cutoff
         for kind in TEAM_KINDS:

@@ -105,12 +105,12 @@ def small_min(fn):
     """테스트에서는 행 후보 최소 길이를 2로 낮춘다(짧은 합성 연속도 행이 되게)."""
     @functools.wraps(fn)
     def run():
-        old, old_kind = rs.MIN_ROW, rs.MIN_ROW_KIND
-        rs.MIN_ROW, rs.MIN_ROW_KIND = 2, {}
+        old, old_kind, old_season = rs.MIN_ROW, rs.MIN_ROW_KIND, rs.SEASON_MIN
+        rs.MIN_ROW, rs.MIN_ROW_KIND, rs.SEASON_MIN = 2, {}, {}
         try:
             return fn()
         finally:
-            rs.MIN_ROW, rs.MIN_ROW_KIND = old, old_kind
+            rs.MIN_ROW, rs.MIN_ROW_KIND, rs.SEASON_MIN = old, old_kind, old_season
     return run
 
 
@@ -217,6 +217,42 @@ def test_cg_playoffs_are_ignored():
 
 
 @small_min
+def test_season_totals_accumulate_reset_each_season_and_ignore_playoffs_and_dnp():
+    s1, s2 = "2025-2026", "2026-2027"
+    games = [
+        game_of("S47G01N1", "2025-10-01", "H", "A", [("p1", "H", "", {"score": 10, "threep": 2})], season=s1),
+        game_of("S47G01N2", "2025-10-02", "H", "A", [("p1", "H", "", {"score": 20, "ast": 5})], season=s1),
+        game_of("S47G01N3", "2025-10-03", "H", "A", [("p1", "H", "dnp", {"score": 99})], season=s1),                       # 0분 명단은 세지 않는다
+        game_of("S47G03N1", "2025-10-04", "H", "A", [("p1", "H", "", {"score": 40})], season=s1, category="플레이오프"),     # 플레이오프도 세지 않는다
+        game_of("S49G01N1", "2026-10-01", "H", "A", [("p1", "H", "", {"score": 7})], season=s2),                           # 새 시즌: 처음부터
+    ]
+    rows, log = rs.compute(games, keep_days=None)
+    assert log_of(log, "p1", "ss_pts") == [("S47G01N1", 0, 10, False), ("S47G01N2", 10, 30, False), ("S49G01N1", 0, 7, True)]
+    assert log_of(log, "p1", "ss_gp") == [("S47G01N1", 0, 1, False), ("S47G01N2", 1, 2, False), ("S49G01N1", 0, 1, True)]
+    assert log_of(log, "p1", "ss_tpm") == [("S47G01N1", 0, 2, False)]                                                       # 값이 0인 경기엔 행이 없고, 지난 시즌 마지막 행은 alive가 아니다
+    assert log_of(log, "p1", "ss_ast") == [("S47G01N2", 0, 5, False)]
+    starts = {(r["gmkey"], r["kind"]): r["start_gmkey"] for r in log if r["pcode"] == "p1"}
+    assert starts[("S47G01N2", "ss_pts")] == "S47G01N1" and starts[("S49G01N1", "ss_pts")] == "S49G01N1"                  # 시즌 첫 출전 경기
+    assert rows_of(rows, "pg.season_pts.max") == [("p1", 7, "A:2026-2027", "S49G01N1"), ("p1", 30, "E:2025-2026", "S47G01N2")]
+    assert [r["subject_name"] for r in rows if r["board"] == "pg.season_pts.max" and r["value"] == 30] == ["선수p1(2025-2026)"]
+    assert {r["bucket"] for r in rows if r["board"].startswith("pg.season_")} == {"S"}
+
+
+@small_min
+def test_season_totals_follow_the_player_across_teams_and_use_the_candidate_floor():
+    games = [
+        game_of("S49G01N1", "2026-10-01", "H", "A", [("p1", "H", "", {"score": 10})]),
+        game_of("S49G01N2", "2026-10-02", "X", "A", [("p1", "X", "", {"score": 12})]),           # 같은 시즌에 팀을 옮겼다
+    ]
+    rows, _ = rs.compute(games)
+    row = [r for r in rows if r["board"] == "pg.season_pts.max"][0]
+    assert (row["value"], row["tcode"], row["gmkey"]) == (22, "X", "S49G01N2")
+    rs.SEASON_MIN = {"ss_pts": 50}
+    rows2, _ = rs.compute(games)
+    assert not [r for r in rows2 if r["board"] == "pg.season_pts.max"]                      # 후보 최소값 미만은 행이 아니다(small_min이 끝나면 원래 값으로 돌아온다)
+
+
+@small_min
 def test_team_streaks_reset_each_season_and_ignore_playoffs():
     s1, s2 = "2025-2026", "2026-2027"
     games = [
@@ -299,7 +335,7 @@ def test_per_game_apply_never_touches_streak_rows():
     store = rb.MemoryStore([streak_row])
     rb.apply_game(store, "S49G01N3", [])                                                                 # 같은 gmkey를 다시 정산해도
     assert [r["board"] for r in store.all_rows()] == ["pg.streak_gp.max"]                                # 연속 보드 행은 그대로(통째 재계산 몫)
-    assert tuple(rs.BOARD.values()) == rb.STREAK_BOARDS == rs.STREAK_BOARDS and len(rb.STREAK_BOARDS) == 15
+    assert tuple(rs.BOARD.values()) == rb.STREAK_BOARDS == rs.STREAK_BOARDS and len(rb.STREAK_BOARDS) == 21
 
 
 @small_min
@@ -399,6 +435,10 @@ def test_known_streaks_on_real_data():
     assert (tw["value"], tw["subject"], tw["period"][:2]) == (16, "16", "E:"), tw                                                            # 원주 DB 2011-12 16연승
     tl = top("tg.loss_streak.max")[0]
     assert tl["value"] == 14, tl                                                                                                             # 서울 삼성 2011-12 · 원주 DB 2013-14 14연패(공동)
+    for board, name, value in (("pg.season_pts.max", "피트 마이클(2006-2007)", 1826), ("pg.season_reb.max", "제임스 메이스(2018-2019)", 780), ("pg.season_ast.max", "주희정(2008-2009)", 450),
+                               ("pg.season_stl.max", "크리스 윌리엄스(2011-2012)", 142), ("pg.season_blk.max", "브라이언 던스톤(2008-2009)", 162), ("pg.season_tpm.max", "전성현(2021-2022)", 177)):
+        t = top(board)[0]
+        assert (t["subject_name"], t["value"]) == (name, value), (board, t)                                                                  # 2026-10-11 raw 실측
     alive = [r for r in log if r["pcode"] == "290381" and r["kind"] == "gp" and r["alive"]]
     assert len(alive) == 1 and alive[0]["after_len"] >= 746, alive                                                                         # 최신 행 하나만 alive
     assert len({(r["pcode"], r["kind"]) for r in log if r["alive"]}) == len([r for r in log if r["alive"]])                              # (선수, 종류)당 alive 행은 하나
