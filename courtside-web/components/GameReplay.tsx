@@ -1454,22 +1454,18 @@ export default function GameReplay({
   // "두경민 3점 실패 - 공격리바운드 - 유기상 3점" 같은 실제 흐름을 훨씬 잘 보여줌.
   const recentFeed = useMemo(() => buildRecentFeed(events, idx), [events, idx]);
   const playerByPcode = useMemo(() => new Map(players.map((p) => [p.pcode, p])), [players]);
-  const awayTeamWithClash = useMemo(
-    () => (isClash ? { ...awayTeam, color: awayFillBackground(homeTeam.color, awayTeam.color) } : awayTeam),
-    [awayTeam, isClash, homeTeam.color]
-  );
   // 기록 워치 줄의 팀 점 색 - 박스에 있는 선수는 그 팀, 아직 안 나온 벤치 선수는 서버가 로스터로 붙여 준 tcode.
   const milestoneTeamOf = useCallback(
     (pcode: string, tcode?: string) => {
       const t = playerByPcode.get(pcode)?.tcode ?? tcode;
-      return t === homeTeam.tcode ? homeTeam : t === awayTeam.tcode ? awayTeamWithClash : null;
+      return t === homeTeam.tcode ? homeTeam : t === awayTeam.tcode ? awayTeam : null;
     },
-    [playerByPcode, homeTeam, awayTeam, awayTeamWithClash]
+    [playerByPcode, homeTeam, awayTeam]
   );
   // 역대 기록 줄의 팀 점 색 - 기록 이벤트가 소속 팀 코드를 직접 들고 있다.
   const recordTeamOf = useCallback(
-    (tcode: string | null) => (tcode === homeTeam.tcode ? homeTeam : tcode === awayTeam.tcode ? awayTeamWithClash : null),
-    [homeTeam, awayTeam, awayTeamWithClash]
+    (tcode: string | null) => (tcode === homeTeam.tcode ? homeTeam : tcode === awayTeam.tcode ? awayTeam : null),
+    [homeTeam, awayTeam]
   );
 
 

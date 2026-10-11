@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import {
   teamInkStyle,
-  relativeLuminance,
   colorDistance,
   SIMILAR_COLOR_THRESHOLD,
   isColorSimilar,

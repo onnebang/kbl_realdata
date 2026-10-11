@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import type { FourFactors } from "@/lib/report/fourFactors";
 import { buildScoreChart, scoreSourceNotes, SCORE_GRID_STEP_PTS, type ChartRow, type Lead } from "@/lib/report/scoreSourceChart";
 import { teamBarStyle, teamInkStyle } from "@/lib/teamAccent";
-import { colorDistance, SIMILAR_COLOR_THRESHOLD, isColorSimilar } from "./TeamSplitBar";
+import { isColorSimilar } from "./TeamSplitBar";
 
 // 리포트 '득점 출처' 차트 - 계산·근거는 lib/report/scoreSourceChart.ts(그 파일 머리주석에 왜
 // 다시 그렸는지와 세 디자인 안의 비교 결과가 있다). 이 파일은 모델을 그리기만 한다.
