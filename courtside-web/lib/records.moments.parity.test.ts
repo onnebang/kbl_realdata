@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { buildComebackMoments } from "./comebackMoments";
 import { buildMomentTimeline } from "./recordsMoments";
 import type { RecordEvent } from "./records";
 
@@ -28,7 +29,9 @@ describe("파이썬 2단계 후보 행 vs 웹 순간 기록 최종 값", () => {
         pcode, tcode, action_code, quarter, clock_min, clock_sec, home_score, away_score,
       }));
       const finals = new Map<string, number>();
-      buildMomentTimeline({ asOf: "x", boards: {} }, events, { names: { player: (p) => p, team: (t) => t }, final: true, home: fx.home, away: fx.away }, finals);
+      const opts = { names: { player: (p: string) => p, team: (t: string) => t }, final: true, home: fx.home, away: fx.away };
+      buildMomentTimeline({ asOf: "x", boards: {} }, events, opts, finals);
+      buildComebackMoments(null, events, opts, finals);
       const bad = fx.rows.filter(([board, bucket, subject, period, value]) => finals.get(`${board}|${bucket}|${subject}|${period}`) !== value);
       expect(bad.slice(0, 5).map((r) => ({ row: r, got: finals.get(`${r[0]}|${r[1]}|${r[2]}|${r[3]}`) }))).toEqual([]);
       expect(fx.rows.length).toBeGreaterThan(0);
@@ -37,6 +40,6 @@ describe("파이썬 2단계 후보 행 vs 웹 순간 기록 최종 값", () => {
   it("보드 종류가 고루 덮인다(점수차·벤치·클럽·시간·창·런 중 대부분)", () => {
     const seen = new Set<string>();
     for (const file of files) for (const r of (JSON.parse(readFileSync(file, "utf8")) as Fixture).rows) seen.add(r[0]);
-    for (const b of ["tg.margin.max", "pg.benchpts.max", "pg.club_td.max", "pg.dd_time.min", "pg.td_time.min", "pg.burst35.max", "tg.run.max"]) expect(seen.has(b)).toBe(true);
+    for (const b of ["tg.margin.max", "pg.benchpts.max", "pg.club_td.max", "pg.dd_time.min", "pg.td_time.min", "pg.burst35.max", "tg.run.max", "tg.comeback.max"]) expect(seen.has(b)).toBe(true);
   });
 });

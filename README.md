@@ -315,6 +315,10 @@ Q2/Q3 용병 2인 규정 첫 시즌) 학습테이블 표본이 `SAMPLE_THRESHOLD
   팀 시즌 내 연승·연패. 같은 `record_streaks.py` 전체 재계산이 보드 8개를 더 만든다(총 15개, `STREAK_BOARDS`) — DDL 없음, 로그의 `pcode` 칸에 팀 코드. 알림은 순위가 좋아지거나 이정표일 때만이고
   팀 연승·연패는 종료 경기 리포트·재생과 경기 전 줄에서만 보인다. 롤백: 웹 `git revert`, DB는 새 보드 8개 + 로그 종류 8개 삭제(`rollback_record_streak_log.sql` 주석).
 
+- **4단계 B(2026-10-11, 설계 `docs/superpowers/specs/2026-10-11-record-book-phase4b-design.md`)** - 최다 점수차 역전승: 이긴 팀이 경기 중 뒤졌던 최대 점수차(연장·플레이오프 포함)를 경기 단위 보드
+  `tg.comeback.max`(이긴 팀 tcode, 15점 미만 제외, 게이트 1 통과 경기만)로 쌓는다 — 상태 테이블·DDL 없음(`--gmkeys`/`--rebuild`가 처리). 라이브는 20점 이상 열세 중 임박 줄, TOP10 열세를 뒤집고 리드를 잡는
+  순간 잠정 토스트, 종료 후 리포트에 "○점차 열세를 뒤집은 역전승 … 진 팀은 ○점 리드를 날림". 롤백: 웹 `git revert`, DB `DELETE FROM record_entries WHERE board = 'tg.comeback.max'`.
+
 **감시**: Supabase pg_cron(`watch_live_collector`, 1분마다)이 수집기 심박(`live_collector_status`)을
 보고 있다가 멈추면 Discord로 알림(🔴 응답 없음 / 🟠 문자중계 멈춤 / 🟢 해제). 지금 걸린 문제 보기:
 `select * from live_collector_problems();` (Supabase SQL 편집기).

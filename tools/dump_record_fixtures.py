@@ -64,7 +64,8 @@ def dump_moments(outdir, gmkeys):
         if g is None or any(v is None for v in rb.player_index(g).values()) or not rb.quarters_match_official(g):
             print(f"  건너뜀(없음/동명이인/게이트 1 탈락): {gmkey}")
             continue
-        rows = rb.moment_candidates(g)
+        single = set(rb.SINGLE_BOARD.values())                       # 한 경기 안 연속 슛 보드는 3단계 엔진이 만든다(--streaks 픽스처의 'single'이 대조한다)
+        rows = [r for r in rb.moment_candidates(g) if r["board"] not in single]
         if not rows:
             print(f"  건너뜀(2단계 행 없음): {gmkey}")
             continue
