@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { RecordEvent } from "./records";
 import { STREAK_KINDS, type StreakContext, type StreakKind } from "./streakKinds";
 import { buildGameStreakMoments } from "./gameStreakMoments";
+import { buildSeasonMoments } from "./seasonMoments";
 import { buildStreakMoments } from "./streakMoments";
 
 // 파이썬 상태기계(tools/record_streaks.py)가 실제 경기에서 계산한 (선수, 종류)별 [경기 전, 경기 후] 연속 길이와 한 경기 안 연속 후보 행을 웹 엔진이
@@ -38,6 +39,7 @@ describe("파이썬 연속 상태 vs 웹 엔진(경기 전 상태 + 이벤트)",
       const opts = { names: { player: (p: string) => p, team: (t: string) => t }, final: false, home: fx.home, away: fx.away };
       buildStreakMoments({ asOf: "x", boards: {} }, streaks, events, opts, finals);
       buildGameStreakMoments(streaks, events, opts, finals);
+      buildSeasonMoments(streaks, events, opts, finals);
       // 경기 간 연속: 파이썬 로그가 있는 (선수, 종류) - 슛 종류는 경기 끝 길이가 같고, 연속 출장은 N경기째 = after
       const bad: unknown[] = [];
       for (const [pcode, kinds] of Object.entries(fx.state)) {

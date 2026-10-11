@@ -113,8 +113,10 @@ def dump_streaks(outdir, gmkeys):
         box_ok = box_matches_official(g)
         state = collections.defaultdict(dict)
         for r in by_game.get(gmkey, []):
-            if r["kind"].startswith("cg_") and not box_ok.get(r["pcode"], False):
-                continue                      # 이벤트 합계가 공식 박스와 다른 선수의 조건 연속은 대조 대상이 아니다
+            if r["kind"] == "ss_gp":
+                continue                      # 시즌 출전 경기 수는 이벤트로 재현할 값이 아니다(파이썬 테스트가 본다)
+            if r["kind"].startswith(("cg_", "ss_")) and not box_ok.get(r["pcode"], False):
+                continue                      # 이벤트 합계가 공식 박스와 다른 선수의 조건 연속·시즌 누적은 대조 대상이 아니다
             if r["kind"] != "gp" and r["kind"][1:].split("_")[0] in bad.get(r["pcode"], ()):
                 continue                      # 게이트 탈락 선수-종목은 파이썬이 연속을 끊지만 웹은 이벤트로 이어간다 - 대조 대상이 아니다
             if r["kind"] == "gp" and r["after_len"] == 0:

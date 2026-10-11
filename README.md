@@ -319,6 +319,11 @@ Q2/Q3 용병 2인 규정 첫 시즌) 학습테이블 표본이 `SAMPLE_THRESHOLD
   `tg.comeback.max`(이긴 팀 tcode, 15점 미만 제외, 게이트 1 통과 경기만)로 쌓는다 — 상태 테이블·DDL 없음(`--gmkeys`/`--rebuild`가 처리). 라이브는 20점 이상 열세 중 임박 줄, TOP10 열세를 뒤집고 리드를 잡는
   순간 잠정 토스트, 종료 후 리포트에 "○점차 열세를 뒤집은 역전승 … 진 팀은 ○점 리드를 날림". 롤백: 웹 `git revert`, DB `DELETE FROM record_entries WHERE board = 'tg.comeback.max'`.
 
+- **4단계 C(2026-10-11, 설계 `docs/superpowers/specs/2026-10-11-record-book-phase4c-design.md`)** - 시즌 누적 기록: 선수의 정규시즌 득점·리바·어시·스틸·블록·3점슛 합계를 역대 선수-시즌 순위와 비교한다.
+  같은 `record_streaks.py` 전체 재계산이 보드 6개(`pg.season_*.max`, bucket `S`, 선수-시즌당 한 행, period `A:/E:<시즌>`, 이름은 `이름(시즌)`)와 로그 종류 7개(`ss_gp`, `ss_*` - before/after가 시즌 누적)를 만든다 —
+  DDL 없음, `STREAK_BOARDS`는 21개, 로그가 약 1.5만 행 늘어난다. 알림은 순위가 좋아질 때만이고, 경기 전 "기록 도전"에는 한 경기 안에 닿는 거리 줄과 10경기 이상 뛴 선수의 54경기 페이스(5위 안) 줄이 나온다.
+  롤백: 웹 `git revert`, DB `DELETE FROM record_entries WHERE board LIKE 'pg.season\_%'` + `DELETE FROM record_streak_log WHERE kind LIKE 'ss\_%'`.
+
 **감시**: Supabase pg_cron(`watch_live_collector`, 1분마다)이 수집기 심박(`live_collector_status`)을
 보고 있다가 멈추면 Discord로 알림(🔴 응답 없음 / 🟠 문자중계 멈춤 / 🟢 해제). 지금 걸린 문제 보기:
 `select * from live_collector_problems();` (Supabase SQL 편집기).
