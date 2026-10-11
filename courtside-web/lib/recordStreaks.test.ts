@@ -84,6 +84,31 @@ describe("summarizeStreaks", () => {
     expect(ctx.known).toEqual(expect.arrayContaining(["DB", "KT"]));
   });
 
+  it("시즌 누적: 같은 시즌 상태만, 합계는 after, 정규시즌이 아니면 버린다", () => {
+    const rows = [
+      logRow("S49G01N10", "lee", "ss_pts", 120, 134, true, "S49G01N1"),     // 이번 시즌 누적 134점
+      logRow("S49G01N10", "lee", "ss_gp", 7, 8, true, "S49G01N1"),
+      logRow("S49G01N10", "alb", "ss_ast", 40, 47, true, "S47G01N3"),       // 지난 시즌 합계 - 새 시즌 경기 전에 쓰지 않는다
+    ];
+    const pre = summarizeStreaks({ ...base, final: false, freshTeams: new Set(["DB"]), boardRows: [], logRows: rows })!;
+    expect(pre.state).toEqual({ lee: { ss_pts: { before: 134 }, ss_gp: { before: 8 } } });
+    const fin = summarizeStreaks({ ...base, final: true, freshTeams: null, boardRows: [], logRows: rows.map((r) => ({ ...r, gmkey: "S49G01N11" })) })!;
+    expect(fin.state.lee.ss_pts).toEqual({ before: 120, after: 134 });
+    expect(fin.state.alb.ss_ast).toEqual({ before: 40, after: 47 });                       // 종료 경기는 이 경기 행이라 시즌 확인이 필요 없다
+    const po = summarizeStreaks({ ...base, final: false, freshTeams: new Set(["DB"]), boardRows: [], logRows: rows, regular: false });
+    expect(po).toBeNull();
+  });
+
+  it("시즌 보드 6개를 종류별로 읽는다", () => {
+    const ctx = summarizeStreaks({
+      ...base, final: false, freshTeams: new Set(), logRows: [],
+      boardRows: [board("pg.season_pts.max", "mk", 1826, "E:2006-2007", "피트 마이클(2006-2007)"), board("pg.season_tpm.max", "js", 177, "E:2021-2022", "전성현(2021-2022)")],
+    })!;
+    expect(ctx.boards.ss_pts[0]).toMatchObject({ v: 1826, pcode: "mk", who: "피트 마이클(2006-2007)", active: false });
+    expect(ctx.boards.ss_tpm[0].v).toBe(177);
+    expect(ctx.boards.ss_gp).toEqual([]);
+  });
+
   it("새 보드 8개를 종류별로 읽는다", () => {
     const ctx = summarizeStreaks({
       ...base, final: false, freshTeams: new Set(), logRows: [],

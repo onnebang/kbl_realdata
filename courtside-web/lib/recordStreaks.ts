@@ -2,7 +2,7 @@ import { cachedFn, TAG, TTL } from "./cachePolicy";
 import { getTeamRoster } from "./playerPageData";
 import { isRecordEligible } from "./recordBook";
 import { supabaseServer as supabase } from "./supabaseServer";
-import { GAME_BASED_KINDS, isTeamKind, KIND_OF_BOARD, STREAK_BOARD, STREAK_KINDS, type StreakContext, type StreakEntry, type StreakKind } from "./streakKinds";
+import { GAME_BASED_KINDS, isSeasonKind, isTeamKind, KIND_OF_BOARD, STREAK_BOARD, STREAK_KINDS, type StreakContext, type StreakEntry, type StreakKind } from "./streakKinds";
 
 // 연속 기록(3단계) 서버 쪽 - record_entries의 연속 보드 7개와 record_streak_log(최근 120일)를 읽어 "이 경기 직전의 연속 상태" 요약(StreakContext)을 만든다.
 // 설계: docs/superpowers/specs/2026-10-10-record-book-streaks-design.md §5. 테이블 갱신은 tools/record_streaks.py(경기 종료 정산이 노트북에서 호출).
@@ -49,8 +49,8 @@ export function summarizeStreaks(args: {
     if (!kind) continue;
     if (args.regular === false && GAME_BASED_KINDS.indexOf(kind) >= 0) continue;
     if (args.final ? r.gmkey !== args.gmkey : !r.alive) continue;
-    // 팀 연승·연패는 시즌 안에서만 이어진다 - 지난 시즌에 시작된 연속은 새 시즌 경기 전에 쓰지 않는다
-    if (!args.final && isTeamKind(kind) && seasonOf(r.start_gmkey) !== seasonOf(args.gmkey)) continue;
+    // 팀 연승·연패와 시즌 누적은 시즌 안에서만 이어진다 - 지난 시즌에 시작된 상태는 새 시즌 경기 전에 쓰지 않는다
+    if (!args.final && (isTeamKind(kind) || isSeasonKind(kind)) && seasonOf(r.start_gmkey) !== seasonOf(args.gmkey)) continue;
     const slot = state[r.pcode] ?? {};
     slot[kind] = args.final ? { before: r.before_len, after: r.after_len } : { before: r.after_len };
     state[r.pcode] = slot;
@@ -62,7 +62,7 @@ export function summarizeStreaks(args: {
 
 const BOARD_LIST = STREAK_KINDS.map((k) => STREAK_BOARD[k]);
 
-/** 연속 보드 15개의 보관 행 전부(수백~천 행) - 10분 캐시, 정산이 'records' 태그로 즉시 비운다. 조회 에러는 던진다(빈 배열을 캐시에 굳히지 않는다). */
+/** 연속·시즌 보드 21개의 보관 행 전부(수백~천 행) - 10분 캐시, 정산이 'records' 태그로 즉시 비운다. 조회 에러는 던진다(빈 배열을 캐시에 굳히지 않는다). */
 const fetchStreakBoards = cachedFn(
   async (): Promise<StreakBoardRow[]> => {
     const out: StreakBoardRow[] = [];

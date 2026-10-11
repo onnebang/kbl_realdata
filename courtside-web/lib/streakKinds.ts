@@ -4,6 +4,7 @@
 export const STREAK_KINDS = [
   "gp", "xfg_made", "xfg_miss", "xtp_made", "xtp_miss", "xft_made", "xft_miss",
   "cg_pts10", "cg_pts20", "cg_dd", "cg_reb10", "cg_tpm1", "cg_ast5", "tw", "tl",
+  "ss_gp", "ss_pts", "ss_reb", "ss_ast", "ss_stl", "ss_blk", "ss_tpm",
 ] as const;
 export type StreakKind = (typeof STREAK_KINDS)[number];
 /** 선수 연속 경기 6종(4단계 A) - 정규시즌 명단 기준 */
@@ -12,8 +13,12 @@ export type CgKind = (typeof CG_KINDS)[number];
 /** 팀 시즌 내 연승·연패 - 로그의 pcode 칸에 팀 코드가 들어간다 */
 export const TEAM_KINDS = ["tw", "tl"] as const;
 export const isTeamKind = (k: StreakKind) => k === "tw" || k === "tl";
+/** 선수-시즌 누적 6종(4단계 C) - 로그의 before/after가 그 시즌 합계다. ss_gp는 그 시즌 출전 경기 수(상태만 있고 보드 행은 없다). */
+export const SEASON_KINDS = ["ss_pts", "ss_reb", "ss_ast", "ss_stl", "ss_blk", "ss_tpm"] as const;
+export type SeasonKind = (typeof SEASON_KINDS)[number];
+export const isSeasonKind = (k: StreakKind) => k === "ss_gp" || (SEASON_KINDS as readonly string[]).indexOf(k) >= 0;
 /** 정규시즌 경기에서만 의미가 있는 종류 - 플레이오프·챔프전에서는 상태를 쓰지 않는다(슛 연속만 유지). */
-export const GAME_BASED_KINDS: readonly StreakKind[] = ["gp", ...CG_KINDS, ...TEAM_KINDS];
+export const GAME_BASED_KINDS: readonly StreakKind[] = ["gp", ...CG_KINDS, ...TEAM_KINDS, "ss_gp", ...SEASON_KINDS];
 
 /** 보드 이름(record_entries.board) - tools/record_streaks.py BOARD와 같아야 한다. */
 export const STREAK_BOARD: Record<StreakKind, string> = {
@@ -32,6 +37,13 @@ export const STREAK_BOARD: Record<StreakKind, string> = {
   cg_ast5: "pg.cg_ast5.max",
   tw: "tg.win_streak.max",
   tl: "tg.loss_streak.max",
+  ss_gp: "pg.season_gp.max", // 행이 없는 이름(상태 전용 종류)
+  ss_pts: "pg.season_pts.max",
+  ss_reb: "pg.season_reb.max",
+  ss_ast: "pg.season_ast.max",
+  ss_stl: "pg.season_stl.max",
+  ss_blk: "pg.season_blk.max",
+  ss_tpm: "pg.season_tpm.max",
 };
 export const KIND_OF_BOARD: Record<string, StreakKind> = Object.fromEntries(STREAK_KINDS.map((k) => [STREAK_BOARD[k], k]));
 
