@@ -134,29 +134,50 @@ function Card({ p, topTitle }: { p: OnCourtCardPlayer; topTitle: string }) {
  * 홈(위)·원정(아래) 두 줄, 줄마다 코트 위 선수 카드. key=pcode라 교체로 새로 들어온 선수만 CSS로 살짝 나타난다.
  * 두 팀 모두 코트에 아무도 없으면: 경기 시작 전이면 안내 문구, 그 밖(경기 종료 - 아래 표가 "경기 종료 · 최종 기록"이라 말한다)이면 아무것도 안 그린다.
  */
-export const OnCourtCards = memo(function OnCourtCards({ teams, pre, topTitle }: { teams: OnCourtCardTeam[]; pre: boolean; topTitle: string }) {
+export const OnCourtCards = memo(function OnCourtCards({
+  teams,
+  pre,
+  topTitle,
+  isClash,
+}: {
+  teams: OnCourtCardTeam[];
+  pre: boolean;
+  topTitle: string;
+  isClash?: boolean;
+}) {
   const shown = teams.map((t, i) => ({ t, i })).filter(({ t }) => t.players.length > 0);
   if (shown.length === 0) return pre ? <p className={styles.note}>경기 시작 전 — 선발 명단 대기 중</p> : null;
   const caption = pre ? "선발 라인업" : "지금 코트 위";
   return (
     <div className={styles.court} role="group" aria-label="코트 위 선수 카드">
-      {shown.map(({ t, i }, n) => (
-        <Fragment key={t.tcode}>
-          {n > 0 && <div className={styles.mid} aria-hidden="true" />}
-          <section className={`${styles.half} ${i === 0 ? styles.home : styles.away}`} style={{ ...teamBarStyle(t.color), ...teamInkStyle(t.color) }}>
-            <header className={styles.head}>
-              <TeamBadge team={{ name: t.name, abbr: t.abbr, color: t.color, logoUrl: t.logoUrl }} size={20} />
-              <span className={styles.teamName}>{t.name}</span>
-              <span className={styles.caption}>{caption}</span>
-            </header>
-            <ul className={styles.row} role="list" aria-label={`${t.name} ${caption}`}>
-              {t.players.map((p) => (
-                <Card key={p.pcode} p={p} topTitle={topTitle} />
-              ))}
-            </ul>
-          </section>
-        </Fragment>
-      ))}
+      {shown.map(({ t, i }, n) => {
+        const isAway = i > 0;
+        const awayClashClass = isAway && isClash ? ` ${styles.awayClash}` : "";
+        return (
+          <Fragment key={t.tcode}>
+            {n > 0 && <div className={styles.mid} aria-hidden="true" />}
+            <section
+              className={`${styles.half} ${isAway ? styles.away : styles.home}${awayClashClass}`}
+              style={{ ...teamBarStyle(t.color), ...teamInkStyle(t.color) }}
+            >
+              <header className={styles.head}>
+                <TeamBadge team={{ name: t.name, abbr: t.abbr, color: t.color, logoUrl: t.logoUrl }} size={20} />
+                <span className={styles.teamName}>
+                  {t.name}
+                  {isAway && isClash && <span className={styles.awayTag}>원정</span>}
+                </span>
+                <span className={styles.caption}>{caption}</span>
+              </header>
+              <ul className={styles.row} role="list" aria-label={`${t.name} ${caption}`}>
+                {t.players.map((p) => (
+                  <Card key={p.pcode} p={p} topTitle={topTitle} />
+                ))}
+              </ul>
+            </section>
+          </Fragment>
+        );
+      })}
     </div>
   );
 });
+

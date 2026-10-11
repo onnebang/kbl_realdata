@@ -12,14 +12,18 @@ import type { ReportTeamMeta } from "@/lib/report/renderKit";
 
 /** 문장 속 팀 이름 - 칩 없이 색만(팀명 자체가 이미 텍스트 단서다). renderKit의 teamTag(). */
 export function TeamInk({ team, children }: { team: ReportTeamMeta; children?: ReactNode }) {
-  return <b className="report-team" style={teamInkStyle(team.color)}>{children ?? team.name}</b>;
+  const isAwayClash = Boolean(team.isClash && team.isAway);
+  const teamClass = isAwayClash ? "report-team report-clash-team-away" : "report-team";
+  return <b className={teamClass} style={teamInkStyle(team.color)}>{children ?? team.name}</b>;
 }
 
 /** 선수 이름 - 약어 칩 + 팀색. 색만으로는 색각 이상·흑백에서 무력해서 약어를 같이 붙인다. */
 export function PlayerTag({ team, name }: { team: ReportTeamMeta; name: string }) {
+  const isAwayClash = Boolean(team.isClash && team.isAway);
+  const abbrClass = isAwayClash ? "report-team-abbr report-clash-away" : "report-team-abbr";
   return (
     <span className="report-team" style={teamInkStyle(team.color)}>
-      <span className="report-team-abbr" title={team.name}>{team.abbr}</span>
+      <span className={abbrClass} title={team.name}>{team.abbr}</span>
       <b className="report-player">{name}</b>
     </span>
   );
@@ -30,5 +34,8 @@ export function PlayerTag({ team, name }: { team: ReportTeamMeta; name: string }
  * 상대 팀 이름과 구분이 사라진다(실측). 그래서 색을 상속시키지 않는 전용 클래스를 쓴다.
  */
 export function ReportLi({ team, children }: { team: ReportTeamMeta; children: ReactNode }) {
-  return <li className="report-li" style={teamInkStyle(team.color)}>{children}</li>;
+  const isAwayClash = Boolean(team.isClash && team.isAway);
+  const liClass = isAwayClash ? "report-li report-clash-li-away" : "report-li";
+  return <li className={liClass} style={teamInkStyle(team.color)}>{children}</li>;
 }
+

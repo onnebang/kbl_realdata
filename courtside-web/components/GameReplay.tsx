@@ -1,7 +1,7 @@
 "use client";
 import { PlayerPhoto } from "./PlayerPhoto";
 import { teamInkStyle } from "@/lib/teamAccent";
-import { awayFillBackground } from "./report/TeamSplitBar";
+import { awayFillBackground, isColorSimilar } from "./report/TeamSplitBar";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
@@ -649,6 +649,8 @@ export default function GameReplay({
   // 병합은 realtime/폴링과 완전히 같은 mergeEventRows 하나를 쓴다.
   const liveCtx = useLiveGameContext();
   const liveRows = liveCtx.rows;
+  const isClash = isColorSimilar(homeTeam.color, awayTeam.color);
+
   // 아래 serverEvents 복원이 이름 맵을 필요로 해서 원래 있던 자리(박스스코어 섹션)에서
   // 여기로 올렸다. 값/의존성은 그대로 - 위치만 이동.
   const nameByPcode = useMemo(() => new Map(players.map((p) => [p.pcode, p.name])), [players]);
@@ -1442,7 +1444,7 @@ export default function GameReplay({
     [nameByPcode, shotToEventIdx, events, firstIdxByQuarter]
   );
   const homeDotsSvg = homeQuarterShots.length > 0 ? buildCourtDotsSvg(homeQuarterShots, homeTeam.color, shotDotMeta) : null;
-  const awayDotsSvg = awayQuarterShots.length > 0 ? buildCourtDotsSvg(awayQuarterShots, awayTeam.color, shotDotMeta) : null;
+  const awayDotsSvg = awayQuarterShots.length > 0 ? buildCourtDotsSvg(awayQuarterShots, awayTeam.color, shotDotMeta, { clashAway: isClash }) : null;
 
   // 요청: "실시간 중계에서 팀별로 묶어서 보여주고, 누가 어시를 했는지, 승률이 어떻게
   // 변화됐는지 표시" - "한 공격(포제션)" 단위로 이벤트를 묶어(스틸-어시-득점처럼) 시간
@@ -1452,19 +1454,24 @@ export default function GameReplay({
   // "두경민 3점 실패 - 공격리바운드 - 유기상 3점" 같은 실제 흐름을 훨씬 잘 보여줌.
   const recentFeed = useMemo(() => buildRecentFeed(events, idx), [events, idx]);
   const playerByPcode = useMemo(() => new Map(players.map((p) => [p.pcode, p])), [players]);
+  const awayTeamWithClash = useMemo(
+    () => (isClash ? { ...awayTeam, color: awayFillBackground(homeTeam.color, awayTeam.color) } : awayTeam),
+    [awayTeam, isClash, homeTeam.color]
+  );
   // 기록 워치 줄의 팀 점 색 - 박스에 있는 선수는 그 팀, 아직 안 나온 벤치 선수는 서버가 로스터로 붙여 준 tcode.
   const milestoneTeamOf = useCallback(
     (pcode: string, tcode?: string) => {
       const t = playerByPcode.get(pcode)?.tcode ?? tcode;
-      return t === homeTeam.tcode ? homeTeam : t === awayTeam.tcode ? awayTeam : null;
+      return t === homeTeam.tcode ? homeTeam : t === awayTeam.tcode ? awayTeamWithClash : null;
     },
-    [playerByPcode, homeTeam, awayTeam]
+    [playerByPcode, homeTeam, awayTeam, awayTeamWithClash]
   );
   // 역대 기록 줄의 팀 점 색 - 기록 이벤트가 소속 팀 코드를 직접 들고 있다.
   const recordTeamOf = useCallback(
-    (tcode: string | null) => (tcode === homeTeam.tcode ? homeTeam : tcode === awayTeam.tcode ? awayTeam : null),
-    [homeTeam, awayTeam]
+    (tcode: string | null) => (tcode === homeTeam.tcode ? homeTeam : tcode === awayTeam.tcode ? awayTeamWithClash : null),
+    [homeTeam, awayTeam, awayTeamWithClash]
   );
+
 
   // 박스스코어 +/- 컬럼 - game_player_stats엔 plus_minus 컬럼이 없어서 game_events 전체를
   // 훑어 직접 계산(lib/gameLineups.ts의 computeFinalPlusMinus, currentOnCourt와 같은 IN=101/
@@ -1906,7 +1913,7 @@ export default function GameReplay({
     <div className="replay-court">
       <div className="panel-title">코트 위</div>
       {/* 게임식 선수 카드 - 아래 표(상세)와 같은 온코트 5인을 프로필 카드로. 경기 시작 전(PRE)에만 빈 상태 안내가 나온다. */}
-      <OnCourtCards teams={courtCardTeams} pre={row.quarter === "PRE"} topTitle={topBadgeTitle} />
+      <OnCourtCards teams={courtCardTeams} pre={row.quarter === "PRE"} topTitle={topBadgeTitle} isClash={isClash} />
       {/* 표를 넘기는 탭(요청: "길어진다면, 표를 여러개 만들어서 항목을 넘기도록"). 세 장 모두
           지금 스크럽 시점까지의 이벤트만으로 계산한다 - 아래 캡션이 그 사실을 들고 있다. */}
       <div className="replay-boxtabs" role="tablist">
@@ -2143,6 +2150,7 @@ export default function GameReplay({
             <TeamBadge team={awayTeam} size={56} />
             <div className="replay-team-name team-ink" style={teamInkStyle(awayTeam.color)}>
               {awayTeam.name}
+              {isClash && <span className="replay-clash-away-tag">원정</span>}
             </div>
             <div className="replay-team-score"><CountUp value={row.away_score} ms={countMs} /></div>
           </div>
@@ -2160,6 +2168,7 @@ export default function GameReplay({
               <div style={{ textAlign: "right" }}>
                 <span className="replay-prob-pct team-ink" style={teamInkStyle(awayTeam.color)}>
                   <CountUp value={(1 - row.home_win_prob) * 100} ms={countMs} />%
+                  {isClash && <span className="replay-prob-away-sub"> (원정)</span>}
                 </span>
                 <span className="replay-prob-label">승리확률</span>
               </div>
@@ -2210,8 +2219,9 @@ export default function GameReplay({
                 <td className="replay-quarter-total">{row.home_score}</td>
               </tr>
               <tr>
-                <td className="replay-quarter-tname team-ink" style={teamInkStyle(awayTeam.color)}>
+                <td className={`replay-quarter-tname team-ink${isClash ? " replay-quarter-clash-away" : ""}`} style={teamInkStyle(awayTeam.color)}>
                   {awayTeam.abbr}
+                  {isClash && <span className="replay-quarter-away-badge">원정</span>}
                 </td>
                 {awayByQ.map((c, i) => (
                   <td key={i}>
@@ -2248,11 +2258,13 @@ export default function GameReplay({
             <TeamBadge team={homeTeam} size={18} />
             {homeTeam.name}
           </div>
-          <div className="replay-leaders-team-tag away team-ink" style={teamInkStyle(awayTeam.color)}>
+          <div className={`replay-leaders-team-tag away team-ink${isClash ? " replay-leaders-clash-away" : ""}`} style={teamInkStyle(awayTeam.color)}>
             {awayTeam.name}
+            {isClash && <span className="replay-leaders-away-sub">(원정)</span>}
             <TeamBadge team={awayTeam} size={18} />
           </div>
         </div>
+
         {LEADER_STATS.map(({ key, label, sub }) => {
           const home = leaderOf(homeTeam.tcode, key);
           const away = leaderOf(awayTeam.tcode, key);

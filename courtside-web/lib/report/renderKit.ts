@@ -1,4 +1,4 @@
-import { teamInkPair } from "../teamAccent";
+import { teamInkPair, isColorSimilar } from "../teamAccent";
 import type { AceDuel } from "./aceDuel";
 import type { EntryUsage } from "./entryUsage";
 import type { FourFactors } from "./fourFactors";
@@ -15,7 +15,15 @@ import type { UnsungHeroes } from "./unsungHero";
 // 하위호환을 위해 postgameReport.ts가 그대로 re-export한다.
 
 /** 리포트가 선수·팀 이름에 색과 약어, 로고를 붙이는 데 필요한 최소 정보. */
-export type ReportTeamMeta = { tcode: string; name: string; abbr: string; color: string | null; logo_url?: string | null };
+export type ReportTeamMeta = {
+  tcode: string;
+  name: string;
+  abbr: string;
+  color: string | null;
+  logo_url?: string | null;
+  isAway?: boolean;
+  isClash?: boolean;
+};
 
 /** 문자열 HTML을 만드는 섹션. 아직 옮기지 않은 섹션 전부와 render*Section() 반환값. */
 export type HtmlSection = { title: string; html: string };
@@ -58,29 +66,37 @@ export type ReportTags = {
 };
 
 export function createReportTags(homeTeam: ReportTeamMeta, awayTeam: ReportTeamMeta): ReportTags {
+  const isClash = isColorSimilar(homeTeam.color, awayTeam.color);
   // ── 팀 색 태그 ──────────────────────────────────────────────────────────────
   // 두 색을 같이 내려보내고 CSS 미디어쿼리가 고른다(서버는 테마를 모른다 - teamAccent.ts 참고).
   const inkVars = (t: ReportTeamMeta) => {
     const ink = teamInkPair(t.color);
     return `--ti-l:${ink.light};--ti-d:${ink.dark}`;
   };
-  const metaOf = (tcode: string | null): ReportTeamMeta | null =>
-    tcode === homeTeam.tcode ? homeTeam : tcode === awayTeam.tcode ? awayTeam : null;
+  const metaOf = (tcode: string | null): ReportTeamMeta | null => {
+    if (tcode === homeTeam.tcode) return { ...homeTeam, isAway: false, isClash };
+    if (tcode === awayTeam.tcode) return { ...awayTeam, isAway: true, isClash };
+    return null;
+  };
 
   /** 선수 이름 - 약어 칩 + 팀색. 색만으로는 색각 이상·흑백에서 무력해서 약어를 같이 붙인다. */
   const playerTag = (name: string, tcode: string | null): string => {
     const t = metaOf(tcode);
     if (!t) return escHtml(name);
+    const isAwayClash = isClash && t.tcode === awayTeam.tcode;
+    const abbrClass = isAwayClash ? "report-team-abbr report-clash-away" : "report-team-abbr";
     return (
       `<span class="report-team" style="${inkVars(t)}">` +
-      `<span class="report-team-abbr" title="${escHtml(t.name)}">${escHtml(t.abbr)}</span>` +
+      `<span class="${abbrClass}" title="${escHtml(t.name)}">${escHtml(t.abbr)}</span>` +
       `<b class="report-player">${escHtml(name)}</b></span>`
     );
   };
   /** 문장 속 팀 이름 - 칩 없이 색만(팀명 자체가 이미 텍스트 단서다). */
   const teamTag = (tcode: string | null, text: string): string => {
     const t = metaOf(tcode);
-    return t ? `<b class="report-team" style="${inkVars(t)}">${escHtml(text)}</b>` : escHtml(text);
+    const isAwayClash = isClash && t && t.tcode === awayTeam.tcode;
+    const teamClass = isAwayClash ? "report-team report-clash-team-away" : "report-team";
+    return t ? `<b class="${teamClass}" style="${inkVars(t)}">${escHtml(text)}</b>` : escHtml(text);
   };
   /**
    * 그 줄의 주체 팀 - **마커만** 팀 색으로. 본문까지 칠하면 문장 전체가 팀 색이 되어
@@ -89,8 +105,11 @@ export function createReportTags(homeTeam: ReportTeamMeta, awayTeam: ReportTeamM
    */
   const liOpen = (tcode: string | null): string => {
     const t = metaOf(tcode);
-    return t ? `<li class="report-li" style="${inkVars(t)}">` : "<li>";
+    const isAwayClash = isClash && t && t.tcode === awayTeam.tcode;
+    const liClass = isAwayClash ? "report-li report-clash-li-away" : "report-li";
+    return t ? `<li class="${liClass}" style="${inkVars(t)}">` : "<li>";
   };
 
   return { metaOf, playerTag, teamTag, liOpen };
 }
+

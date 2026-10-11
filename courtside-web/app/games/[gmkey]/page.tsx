@@ -7,7 +7,7 @@ import { attachDerivedFields, buildPostgameReport, recordChanceList, type GameEv
 import { DataSectionBody } from "@/components/report/DataSectionBody";
 import { HtmlSectionRenderer } from "@/components/report/HtmlSectionRenderer";
 import { HighlightReel } from "@/components/report/HighlightReel";
-import { TeamSplitBar, awayFillBackground } from "@/components/report/TeamSplitBar";
+import { TeamSplitBar, awayFillBackground, isColorSimilar } from "@/components/report/TeamSplitBar";
 import { teamInkStyle } from "@/lib/teamAccent";
 import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights";
 import { getGameRarity } from "@/lib/rarity";
@@ -543,6 +543,8 @@ export default async function GamePage({
   // null인 경우는 사실상 없지만 타입상 대비.
   const hColor = game.home_team?.color ?? "#888888";
   const aColor = game.away_team?.color ?? "#888888";
+  const isClash = isColorSimilar(hColor, aColor);
+
 
   // 최대 리드(팀 스탯 바의 마지막 행) - courtside_template.html의 renderTeamStats()가
   // timeline을 훑어 계산하던 것과 동일하게 game_events 전체를 훑음.
@@ -928,9 +930,12 @@ export default async function GamePage({
           {status !== "scheduled" && <LiveScore side="home" initial={game.home_score} />}
         </div>
         <div className="matchup-banner-vs">VS</div>
-        <div className="matchup-banner-side away" style={{ background: game.away_team?.color ?? "#888" }}>
+        <div className="matchup-banner-side away" style={{ background: awayFillBackground(hColor, aColor) }}>
           {status !== "scheduled" && <LiveScore side="away" initial={game.away_score} />}
-          <span className="matchup-banner-name">{game.away_team?.name ?? ""}</span>
+          <span className="matchup-banner-name">
+            {game.away_team?.name ?? ""}
+            {isClash && <span className="matchup-banner-away-tag">원정</span>}
+          </span>
           <span className="matchup-banner-abbr" aria-label={game.away_team?.name ?? ""}>
             {game.away_team?.abbr ?? ""}
           </span>
@@ -983,6 +988,7 @@ export default async function GamePage({
                 homeTname={game.home_team?.name ?? ""}
                 awayTname={game.away_team?.name ?? ""}
                 lineup={insight.kind === "win_prob" ? lineupWinProbs.get(gmkey) : undefined}
+                isClash={isClash}
               />
             ))}
             {/* 이적 게이트의 실제 적용 범위를 밝힌다 - roster_changes의 이탈 행은 확정 로스터가
@@ -1053,7 +1059,15 @@ export default async function GamePage({
                       const team = side === "home" ? game.home_team : game.away_team;
                       const bits = scheduleSummary(c);
                       return (
-                        <div className="sched-col" key={side} style={{ borderLeftColor: side === "home" ? hColor : aColor }}>
+                        <div
+                          className={`sched-col${side === "away" && isClash ? " sched-col-away-clash" : ""}`}
+                          key={side}
+                          style={{
+                            borderLeftColor: side === "home" ? hColor : aColor,
+                            borderLeftStyle: side === "away" && isClash ? "dashed" : "solid",
+                            borderLeftWidth: side === "away" && isClash ? 4 : 3,
+                          }}
+                        >
                           <div className="sched-team">
                             {team?.name}
                             <span className="sched-side">{c.isHome ? "홈" : "원정"}</span>
@@ -1089,8 +1103,12 @@ export default async function GamePage({
                   <div className="panel-title">시즌 평균 비교 ({(homeSeasonStats ?? awaySeasonStats)?.gp}경기 기준, 이 경기 이전)</div>
                   <div className="ts-header">
                     <span className="team-ink" style={teamInkStyle(game.home_team?.color)}>{game.home_team?.name}</span>
-                    <span className="team-ink" style={teamInkStyle(game.away_team?.color)}>{game.away_team?.name}</span>
+                    <span className="team-ink" style={teamInkStyle(game.away_team?.color)}>
+                      {game.away_team?.name}
+                      {isClash && " (원정)"}
+                    </span>
                   </div>
+
                   {tsAvgRow("경기당 득점", homeSeasonStats?.ppg ?? 0, awaySeasonStats?.ppg ?? 0, hColor, aColor)}
                   {tsAvgRow("경기당 실점", homeSeasonStats?.oppPpg ?? 0, awaySeasonStats?.oppPpg ?? 0, hColor, aColor)}
                   {tsAvgRow("3점 성공", homeSeasonStats?.threePg ?? 0, awaySeasonStats?.threePg ?? 0, hColor, aColor)}

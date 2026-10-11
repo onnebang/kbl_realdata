@@ -28,6 +28,7 @@ export function InsightCard({
   awayTname,
   actual,
   lineup,
+  isClash,
 }: {
   insight: PreviewInsight;
   hColor: string;
@@ -37,16 +38,27 @@ export function InsightCard({
   actual?: string | null;
   // 12인 엔트리 발표 후 재계산한 홈 승률(예정 경기의 win_prob 카드에만 - 홈 목록 카드와 같은 규칙).
   lineup?: LineupWinProb | null;
+  // 유사 색상(Color Clash) 매치업 여부
+  isClash?: boolean;
 }) {
   let borderColor = "var(--ink-faint)";
   let title = "";
   let body: ReactNode = null;
 
+  const isAway =
+    insight.kind === "weak_defender"
+      ? insight.theirTeam === "away"
+      : insight.kind === "win_prob"
+        ? false
+        : insight.team === "away";
+  const clashAway = Boolean(isClash && isAway);
+  const awaySuffix = clashAway ? " (원정)" : "";
+
   switch (insight.kind) {
     case "watch_player": {
       const tname = insight.team === "home" ? homeTname : awayTname;
       borderColor = insight.team === "home" ? hColor : aColor;
-      title = `${tname} - ${insight.name} 주의`;
+      title = `${tname}${awaySuffix} - ${insight.name} 주의`;
       body = (
         <>
           {insight.statLine}
@@ -60,7 +72,8 @@ export function InsightCard({
       const tname = insight.theirTeam === "home" ? homeTname : awayTname;
       const ourTname = insight.theirTeam === "home" ? awayTname : homeTname;
       borderColor = insight.theirTeam === "home" ? hColor : aColor;
-      title = `${tname} - ${insight.theirName} 온코트 열세 (${POS_LABEL_KO[insight.pos]})`;
+      title = `${tname}${awaySuffix} - ${insight.theirName} 온코트 열세 (${POS_LABEL_KO[insight.pos]})`;
+
       body = (
         <>
           {insight.reason}
@@ -81,7 +94,7 @@ export function InsightCard({
     case "combo_synergy": {
       const tname = insight.team === "home" ? homeTname : awayTname;
       borderColor = insight.team === "home" ? hColor : aColor;
-      title = `${tname} - ${insight.names.join("+")} 조합`;
+      title = `${tname}${awaySuffix} - ${insight.names.join("+")} 조합`;
       body = (
         <>
           {insight.priorLabel ?? `직전 경기(${insight.gameDate})`} 이 조합이 함께 뛴 동안 {insight.pts}득점 {insight.ast}어시 {insight.reb}리바 합작
@@ -93,28 +106,28 @@ export function InsightCard({
     case "trend": {
       const tname = insight.team === "home" ? homeTname : awayTname;
       borderColor = insight.team === "home" ? hColor : aColor;
-      title = `${tname} 최근 추세`;
+      title = `${tname}${awaySuffix} 최근 추세`;
       body = <>{insight.text}</>;
       break;
     }
     case "oreb_watch": {
       const tname = insight.team === "home" ? homeTname : awayTname;
       borderColor = insight.team === "home" ? hColor : aColor;
-      title = `${tname} 오펜스 리바운드 주의`;
+      title = `${tname}${awaySuffix} 오펜스 리바운드 주의`;
       body = <>{insight.reason}</>;
       break;
     }
     case "block_watch": {
       const tname = insight.team === "home" ? homeTname : awayTname;
       borderColor = insight.team === "home" ? hColor : aColor;
-      title = `${tname} - ${insight.name} 블록 주의`;
+      title = `${tname}${awaySuffix} - ${insight.name} 블록 주의`;
       body = <>{insight.reason}</>;
       break;
     }
     case "season_ace": {
       const tname = insight.team === "home" ? homeTname : awayTname;
       borderColor = insight.team === "home" ? hColor : aColor;
-      title = `${tname} 시즌 에이스`;
+      title = `${tname}${awaySuffix} 시즌 에이스`;
       // watch_player가 "직전 경기 한 판"을 보는 반면 이 카드는 같은 자(게임스코어)를 시즌
       // 전체에 댄 것이다. 둘이 같은 선수를 가리키면 그 자체가 "반짝이 아니다"라는 뜻이 된다.
       const row = (label: string, e: AceEntry | null) =>
@@ -163,16 +176,18 @@ export function InsightCard({
       const lineupPct = lineup ? Math.round(lineup.lineupProb * 100) : null;
       const delta = lineupPct != null ? lineupPct - homePct : 0;
       const absent = lineup ? absenceText(homeTname, awayTname, lineup) : "";
+      const homeTag = isClash ? " (홈)" : "";
+      const awayTag = isClash ? " (원정)" : "";
       body = (
         <>
           {lineup && <span className="prob-caveat">시즌 기준 · </span>}
-          <b className="team-ink" style={teamInkStyle(hColor)}>{homeTname}</b> 승률 {homePct}% · <b className="team-ink" style={teamInkStyle(aColor)}>{awayTname}</b> 승률{" "}
+          <b className="team-ink" style={teamInkStyle(hColor)}>{homeTname}{homeTag}</b> 승률 {homePct}% · <b className="team-ink" style={teamInkStyle(aColor)}>{awayTname}{awayTag}</b> 승률{" "}
           {Math.round(insight.awayProb * 100)}%
           {lineupPct != null && (
             <>
               <br />
               <span className="prob-caveat">엔트리 반영 · </span>
-              <b className="team-ink" style={teamInkStyle(hColor)}>{homeTname}</b> 승률 {lineupPct}% · <b className="team-ink" style={teamInkStyle(aColor)}>{awayTname}</b> 승률{" "}
+              <b className="team-ink" style={teamInkStyle(hColor)}>{homeTname}{homeTag}</b> 승률 {lineupPct}% · <b className="team-ink" style={teamInkStyle(aColor)}>{awayTname}{awayTag}</b> 승률{" "}
               {100 - lineupPct}%{" "}
               <span className="prob-caveat">
                 ({delta === 0 ? "변동 없음" : `${homeTname} ${delta > 0 ? "+" : "−"}${Math.abs(delta)}%p`})
@@ -187,7 +202,14 @@ export function InsightCard({
   }
 
   return (
-    <div className="insight-card" style={{ borderLeftColor: borderColor }}>
+    <div
+      className={`insight-card${clashAway ? " insight-card-away-clash" : ""}`}
+      style={{
+        borderLeftColor: borderColor,
+        borderLeftStyle: clashAway ? "dashed" : "solid",
+        borderLeftWidth: clashAway ? "4px" : "3px",
+      }}
+    >
       <span className="insight-card-icon">{KIND_ICON[insight.kind]}</span>
       <div className="insight-card-body">
         <div className="insight-card-title">{title}</div>

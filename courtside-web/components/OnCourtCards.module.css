@@ -69,6 +69,23 @@
 .away {
   background: linear-gradient(to top, color-mix(in srgb, var(--tb) 12%, transparent), transparent 60%);
 }
+.awayClash {
+  background:
+    repeating-linear-gradient(45deg, transparent 0 6px, rgba(var(--line-rgb), 0.05) 6px 12px),
+    linear-gradient(to top, color-mix(in srgb, var(--tb) 14%, transparent), transparent 60%);
+  border-bottom: 2px dashed rgba(var(--line-rgb), 0.25);
+}
+.awayTag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  margin-left: 6px;
+  border-radius: var(--r-led);
+  background: rgba(var(--line-rgb), 0.14);
+  vertical-align: 1px;
+}
+
 
 .head {
   display: flex;

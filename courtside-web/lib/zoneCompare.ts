@@ -178,10 +178,16 @@ function escapeSvgText(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export function buildCourtDotsSvg<T extends ShotRow>(shots: T[], color: string, getMeta?: (shot: T) => ShotDotMeta | null): string {
+export function buildCourtDotsSvg<T extends ShotRow>(
+  shots: T[],
+  color: string,
+  getMeta?: (shot: T) => ShotDotMeta | null,
+  options?: { clashAway?: boolean }
+): string {
   const HX = HOOP_RIGHT[0];
   let svg = `<rect x="${COURT_X[0]}" y="${COURT_Y[0]}" width="${COURT_X[1] - COURT_X[0]}" height="${COURT_Y[1] - COURT_Y[0]}" fill="#d9b98a" stroke="var(--ink-faint)" stroke-width="2"/>`;
   svg += drawCourtMarkings(HX, COURT_X[1], -1, "#fff", 1.6);
+  const clashAway = Boolean(options?.clashAway);
 
   for (const s of shots) {
     const x = mirrorShotX(s.x, s.d);
@@ -190,7 +196,13 @@ export function buildCourtDotsSvg<T extends ShotRow>(shots: T[], color: string, 
     const meta = getMeta ? getMeta(s) : null;
     const extraAttrs = meta?.jumpIdx != null ? ` class="zc-dot-jump" data-jump-idx="${meta.jumpIdx}"` : "";
     const titleEl = meta?.title ? `<title>${escapeSvgText(meta.title)}</title>` : "";
-    const fillAttrs = s.made ? `fill="${color}" opacity="0.88"` : `fill="none" stroke="${color}" stroke-width="1.3" opacity="0.4"`;
+    const fillAttrs = clashAway
+      ? s.made
+        ? `fill="${color}" stroke="#ffffff" stroke-width="1.6" opacity="0.95"`
+        : `fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="2.5 1.5" opacity="0.7"`
+      : s.made
+        ? `fill="${color}" opacity="0.88"`
+        : `fill="none" stroke="${color}" stroke-width="1.3" opacity="0.4"`;
     if (titleEl || extraAttrs) {
       svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" ${fillAttrs}${extraAttrs}>${titleEl}</circle>`;
     } else {
@@ -201,3 +213,4 @@ export function buildCourtDotsSvg<T extends ShotRow>(shots: T[], color: string, 
   svg += drawHoop(HOOP_RIGHT[0], HOOP_RIGHT[1], false);
   return svg;
 }
+

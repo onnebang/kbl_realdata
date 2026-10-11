@@ -1218,6 +1218,87 @@ table.data-table td:nth-child(2) {
   }
 }
 
+/* 유사 색상(Color Clash) 매치업 시 원정팀 구분 */
+.report-team-abbr.report-clash-away {
+  background: repeating-linear-gradient(45deg, var(--surface-soft) 0 3px, rgba(var(--line-rgb), 0.22) 3px 6px);
+  border-left: 3px double currentColor;
+  border-right: 1px dashed rgba(var(--line-rgb), 0.4);
+  padding: 0 4px;
+}
+.report-team-abbr.report-clash-away::after {
+  content: "·원정";
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 3px;
+  opacity: 0.85;
+}
+.report-clash-team-away {
+  text-decoration: underline dashed 1.5px;
+  text-underline-offset: 3px;
+}
+.report-clash-team-away::after {
+  content: " (원정)";
+  font-size: 0.85em;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.report-list li.report-clash-li-away::marker {
+  content: "○  ";
+}
+.matchup-banner-away-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--r-led);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.04em;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+.replay-clash-away-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: var(--r-led);
+  background: rgba(var(--line-rgb), 0.15);
+  border: 1px dashed currentColor;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+.replay-prob-away-sub {
+  font-size: 0.8em;
+  opacity: 0.8;
+  font-weight: 600;
+}
+.replay-quarter-away-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 0 3px;
+  border-radius: 2px;
+  background: rgba(var(--line-rgb), 0.14);
+  margin-left: 3px;
+  vertical-align: 0.5px;
+}
+.replay-leaders-clash-away {
+  background: repeating-linear-gradient(45deg, transparent 0 4px, rgba(var(--line-rgb), 0.08) 4px 8px), var(--surface-soft);
+  border-left: 2px dashed currentColor;
+}
+.replay-leaders-away-sub {
+  font-size: 0.85em;
+  opacity: 0.8;
+  margin: 0 4px;
+}
+.insight-card-away-clash {
+  border-left-style: dashed !important;
+}
+.sched-col-away-clash {
+  border-left-style: dashed !important;
+}
+
 /* 프리뷰 스카우팅 인사이트 카드(요청 항목 1~7, lib/matchupInsights.ts) - 기존
    .report-text/.report-list(문자열 HTML)와 달리 타입이 있는 구조화 데이터를 렌더하는 자리라
    .panel 안 리스트로 살짝 구분되게 카드화. 어느 팀 얘기인지 왼쪽 보더를 그 팀의 실제 브랜드
