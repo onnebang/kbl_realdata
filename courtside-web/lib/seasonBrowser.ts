@@ -1,6 +1,7 @@
 import { supabaseServer as supabase } from "./supabaseServer";
 import { displayTeamName } from "./teamNames";
 import { cachedFn, TAG, TTL } from "./cachePolicy";
+import { isRealGmkey } from "./preseason";
 
 // 시즌 브라우저(app/season-browser) 데이터 레이어 - web/season_browser_template.html 포팅.
 // 원본 정적 템플릿은 한 시즌(283경기) 전체의 게임목록+박스스코어를 미리 구운 JSON
@@ -36,6 +37,11 @@ export type SeasonGameRow = {
   away_team: SeasonTeamRef;
 };
 
+export type SeasonScheduleRow = SeasonGameRow & {
+  game_start: string | null;
+  is_ended: boolean;
+};
+
 // 캐시(2026-09-15): 요청마다 시즌 목록 + 시즌 경기 전체를 다시 읽고 있었다(프로덕션 로그). 경기 목록은
 // 진행 중 경기의 점수도 담기므로(home_score가 경기 중에도 채워진다) 예정 경기와 같은 10분.
 export const getSeasons = cachedFn(
@@ -48,6 +54,16 @@ export const getSeasons = cachedFn(
 
 export const getSeasonGames = cachedFn(computeSeasonGames, { name: "browserSeasonGames", ttl: TTL.scheduled, tags: (s) => [TAG.season(s ?? "")] });
 
+/**
+ * 시즌 홈·팀 순위의 일정 스냅샷. 종료 경기와 예정 경기를 한 번에 읽어 최근 흐름과
+ * 다음 상대를 같은 데이터에서 만든다. 팀별로 열 번 조회하지 않도록 시즌 단위로 캐시한다.
+ */
+export const getSeasonSchedule = cachedFn(computeSeasonSchedule, {
+  name: "seasonSchedule",
+  ttl: TTL.scheduled,
+  tags: (s) => [TAG.season(s ?? "")],
+});
+
 async function computeSeasonGames(seasonName: string): Promise<SeasonGameRow[]> {
   const { data, error } = await supabase
     .from("games")
@@ -57,17 +73,42 @@ async function computeSeasonGames(seasonName: string): Promise<SeasonGameRow[]> 
        away_team:teams!games_away_tcode_fkey(tcode, name, abbr, color, logo_url)`
     )
     .eq("season_name", seasonName)
+    .eq("is_ended", true)
     .not("home_score", "is", null)
     .order("game_date", { ascending: true })
     .order("gmkey", { ascending: true })
     .limit(1000);
   if (error) throw error;
-  const rows = (data ?? []) as unknown as SeasonGameRow[];
+  const rows = ((data ?? []) as unknown as SeasonGameRow[]).filter((g) => isRealGmkey(g.gmkey));
   // 요청: "23~24년부터 전주KCC에서 부산KCC로 변경되었어" - seasonName은 이미 이 함수의
   // 인자로 알고 있으니 그대로 덮어씀.
   for (const g of rows) {
     if (g.home_team) g.home_team.name = displayTeamName(g.home_team.tcode, g.home_team.name, seasonName);
     if (g.away_team) g.away_team.name = displayTeamName(g.away_team.tcode, g.away_team.name, seasonName);
+  }
+  return rows;
+}
+
+async function computeSeasonSchedule(seasonName: string): Promise<SeasonScheduleRow[]> {
+  const { data, error } = await supabase
+    .from("games")
+    .select(
+      `gmkey, game_date, game_start, home_score, away_score, is_ended, season_category,
+       home_team:teams!games_home_tcode_fkey(tcode, name, abbr, color, logo_url),
+       away_team:teams!games_away_tcode_fkey(tcode, name, abbr, color, logo_url)`
+    )
+    .eq("season_name", seasonName)
+    .eq("season_category", "정규시즌")
+    .order("game_date", { ascending: true })
+    .order("game_start", { ascending: true, nullsFirst: false })
+    .order("gmkey", { ascending: true })
+    .limit(1000);
+  if (error) throw error;
+
+  const rows = ((data ?? []) as unknown as SeasonScheduleRow[]).filter((g) => isRealGmkey(g.gmkey));
+  for (const game of rows) {
+    if (game.home_team) game.home_team.name = displayTeamName(game.home_team.tcode, game.home_team.name, seasonName);
+    if (game.away_team) game.away_team.name = displayTeamName(game.away_team.tcode, game.away_team.name, seasonName);
   }
   return rows;
 }

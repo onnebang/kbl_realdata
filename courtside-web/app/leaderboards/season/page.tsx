@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SeasonNav } from "@/components/SeasonNav";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getTeams, shortSeason, PRESEASON_SEASON } from "@/lib/preseason";
 import {
@@ -27,12 +28,13 @@ export const dynamic = "force-dynamic";
  * 그룹 탭은 URL에 한글이 들어가지 않게 라틴 키로 주고받는다(퍼센트 인코딩된 주소를
  * 사용자가 복사해 나눠도 읽히도록). 값은 lib의 LeaderGroup으로 매핑.
  */
-const GROUP_TABS: { key: string; label: string; group: LeaderGroup | null }[] = [
-  { key: "all", label: "전체", group: null },
-  { key: "basic", label: "기본", group: "기본" },
+const GROUP_TABS: { key: string; label: string; group: LeaderGroup | null; categories?: LeaderCategoryKey[] }[] = [
+  { key: "overview", label: "핵심", group: null, categories: ["totalPts", "totalReb", "totalAst", "tpm"] },
+  { key: "basic", label: "경기당", group: "기본" },
   { key: "total", label: "총량", group: "총량" },
   { key: "shoot", label: "슈팅", group: "슈팅" },
   { key: "adv", label: "고급", group: "고급" },
+  { key: "all", label: "전체", group: null },
 ];
 
 const GROUP_BLURB: Record<LeaderGroup, string> = {
@@ -182,9 +184,9 @@ export default async function SeasonLeadersPage({
 
   const tab = GROUP_TABS.find((t) => t.key === g) ?? GROUP_TABS[0];
   // 그룹 탭이 걸려 있으면 그 그룹만 계산한다(원본 행 조회는 어차피 한 번, 집계만 줄어든다).
-  const wantedKeys: LeaderCategoryKey[] | undefined = tab.group
+  const wantedKeys: LeaderCategoryKey[] | undefined = tab.categories ?? (tab.group
     ? LEADER_CATEGORIES.filter((c) => c.group === tab.group).map((c) => c.key)
-    : undefined;
+    : undefined);
 
   const [data, teams] = await Promise.all([
     getSeasonLeaderboards(activeSeason, wantedKeys ? { categories: wantedKeys } : undefined),
@@ -203,30 +205,21 @@ export default async function SeasonLeadersPage({
 
   return (
     <div className="wrap">
-      <div className={styles.headRow}>
-        <div>
-          <span className={styles.kicker}>SEASON LEADERS</span>
-          <div className="title">시즌 리더보드</div>
-        </div>
-        <form className={styles.seasonForm} action="/leaderboards/season">
-          {tab.key !== "all" && <input type="hidden" name="g" value={tab.key} />}
-          <select name="season" defaultValue={activeSeason} aria-label="시즌 선택">
-            {seasons.map((s) => (
-              <option key={s} value={s}>
-                {s} 시즌
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="btn-primary">
-            시즌 보기
-          </button>
-        </form>
-      </div>
+      <SeasonNav
+        active="leaders"
+        activeSeason={activeSeason}
+        seasons={seasons}
+        action="/leaderboards/season"
+        kicker="SEASON LEADERS"
+        title="선수 리더"
+        description="득점·리바운드·어시스트부터 슈팅 효율과 고급 지표까지, 표본과 자격 기준을 함께 확인합니다."
+        hiddenFields={{ g: tab.key }}
+      />
 
       <p className={styles.lede}>
-        한 시즌의 부문별 상위 20명입니다. 이름을 누르면 선수 프로필로 들어갑니다. 평균·성공률
-        부문에는 자격 기준을 걸었고, 그 기준과 통과 인원을 카드마다 그대로 적어 뒀습니다 - 기준
-        없는 순위표는 3점 5/10을 성공률 1위로 만들기 때문입니다.
+        {tab.key === "overview"
+          ? "먼저 봐야 할 누적 핵심 부문입니다. 아래 탭에서 경기당 평균·성공률·고급 지표 또는 전체 부문으로 넓혀 보세요."
+          : "부문별 상위 20명입니다. 평균·성공률에는 최소 출전과 시도 자격을 적용하고, 카드마다 표본을 함께 표시합니다."}
       </p>
 
       <div className={styles.tabs}>
@@ -235,6 +228,7 @@ export default async function SeasonLeadersPage({
             key={t.key}
             href={linkTo({ g: t.key })}
             className={`${styles.tab} ${t.key === tab.key ? styles.tabActive : ""}`}
+            aria-current={t.key === tab.key ? "page" : undefined}
           >
             {t.label}
           </Link>

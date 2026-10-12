@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getSeasons, getSeasonGames, formatSeasonShort } from "@/lib/seasonBrowser";
 import { getLeaderboardSeasons } from "@/lib/seasonLeaders";
 import SeasonBrowserBoard from "@/components/SeasonBrowserBoard";
+import { SeasonNav } from "@/components/SeasonNav";
 import { WidgetBoundary } from "@/components/WidgetBoundary";
 import styles from "./season-browser.module.css";
 
@@ -32,28 +33,24 @@ export default async function SeasonBrowserPage({
   return (
     <div className={styles.pageRoot}>
       <div className={styles.wrap}>
-        <div className={styles.headerRow}>
-          <div className={styles.title}>{activeSeason ? formatSeasonShort(activeSeason) : ""} 시즌 브라우저</div>
-          <div className={styles.subtitle}>
-            {fellBack && `${fellBack} 시즌은 아직 경기 기록이 없어 ${formatSeasonShort(activeSeason)} 시즌을 보여드립니다. `}
-            {regularCount > 0 || playoffCount > 0 || finalsCount > 0
-              ? `정규시즌 ${regularCount}경기 + 플레이오프 ${playoffCount}경기${finalsCount > 0 ? ` + 챔피언결정전 ${finalsCount}경기` : ""} - 전체 박스스코어. 문자중계 재생/승률그래프는 없고 최종 기록만.`
-              : "이 시즌 경기 데이터가 아직 없습니다."}
+        <SeasonNav
+          active="games"
+          activeSeason={activeSeason ?? ""}
+          seasons={playedSeasons}
+          action="/season-browser"
+          kicker="SEASON ARCHIVE"
+          title="경기 기록"
+          description={
+            regularCount > 0 || playoffCount > 0 || finalsCount > 0
+              ? `${activeSeason ? formatSeasonShort(activeSeason) : ""} 시즌 정규시즌 ${regularCount}경기 · 플레이오프 ${playoffCount}경기${finalsCount > 0 ? ` · 챔피언결정전 ${finalsCount}경기` : ""}. 검색과 필터로 원하는 박스스코어를 바로 찾습니다.`
+              : "이 시즌 경기 데이터가 아직 없습니다."
+          }
+        />
+        {fellBack && (
+          <div className={styles.fallback}>
+            {fellBack} 시즌은 아직 경기 기록이 없어 {activeSeason ? formatSeasonShort(activeSeason) : "최근"} 시즌을 보여드립니다.
           </div>
-
-          <form className={styles.seasonForm}>
-            <select name="season" aria-label="시즌 선택" defaultValue={activeSeason}>
-              {seasons.map((s) => (
-                <option key={s} value={s}>
-                  {formatSeasonShort(s)} 시즌
-                </option>
-              ))}
-            </select>
-            <button type="submit" className={styles.btnPrimary}>
-              보기
-            </button>
-          </form>
-        </div>
+        )}
 
         <WidgetBoundary name="시즌 경기 목록">
           <SeasonBrowserBoard games={games} />

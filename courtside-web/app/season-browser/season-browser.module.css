@@ -69,6 +69,16 @@
   padding: 28px 18px 80px;
 }
 
+.fallback {
+  margin: -6px 0 18px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+  border-radius: var(--r-inset);
+  color: var(--ink-soft);
+  background: var(--gold-soft);
+  font-size: var(--fs-100);
+}
+
 .headerRow {
   margin-bottom: 18px;
 }

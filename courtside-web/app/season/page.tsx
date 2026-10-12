@@ -1,25 +1,51 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SeasonNav } from "@/components/SeasonNav";
 import { TeamBadge } from "@/components/TeamBadge";
 import { getTeams, shortSeason } from "@/lib/preseason";
 import { getLeaderboardSeasons, getSeasonLeaderboards } from "@/lib/seasonLeaders";
 import { getStandingsAsOfCached } from "@/lib/teamPageData";
 import { getRoundAwards } from "@/lib/roundAwards";
-import { getSeasonGames } from "@/lib/seasonBrowser";
+import { getSeasonSchedule, type SeasonScheduleRow, type SeasonTeamRef } from "@/lib/seasonBrowser";
 import { signed, signTone } from "@/lib/format";
-import styles from "@/app/leaderboards/season/season-leaders.module.css";
 import hub from "./season-hub.module.css";
 
-// 시즌 허브(2026-10-06, 사용자 요청) - 팀 순위/시즌 리더보드/라운드 MVP/최근 경기를 한 화면에
-// 요약해서 모아 보여준다. 각 섹션은 기존 전용 페이지(/rankings/teams, /leaderboards/season,
-// /awards/round, /season-browser)가 쓰는 lib 함수를 그대로 재사용한 "미리보기"이고, 전체
-// 표/필터는 "전체 보기" 링크로 기존 페이지에 그대로 넘긴다 - 안정적으로 돌고 있는 4개 페이지의
-// 로직을 복제하거나 바꾸지 않는다.
 export const dynamic = "force-dynamic";
 
-function diffClass(v: number): string | undefined {
-  const t = signTone(v, 1);
-  return t === "pos" ? hub.pos : t === "neg" ? hub.neg : undefined;
+function diffClass(value: number): string | undefined {
+  const tone = signTone(value, 1);
+  return tone === "pos" ? hub.pos : tone === "neg" ? hub.neg : undefined;
+}
+
+function kstToday(): string {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function shortDate(date: string): string {
+  return date.slice(5).replace("-", ".");
+}
+
+function teamBadge(team: SeasonTeamRef) {
+  if (!team) return null;
+  return { name: team.name, abbr: team.abbr, color: team.color, logoUrl: team.logo_url };
+}
+
+function GameLine({ game, mode }: { game: SeasonScheduleRow; mode: "upcoming" | "result" }) {
+  const score = game.home_score != null && game.away_score != null ? `${game.away_score} : ${game.home_score}` : null;
+  return (
+    <Link href={`/games/${game.gmkey}`} className={hub.gameLine}>
+      <div className={hub.gameWhen}>
+        <strong>{shortDate(game.game_date)}</strong>
+        <span>{mode === "result" ? "종료" : game.game_start?.slice(0, 5) ?? "시간 미정"}</span>
+      </div>
+      <div className={hub.gameMatchup}>
+        <span><TeamBadge team={teamBadge(game.away_team)} size={20} />{game.away_team?.abbr ?? "원정"}</span>
+        <b>{score ?? "vs"}</b>
+        <span>{game.home_team?.abbr ?? "홈"}<TeamBadge team={teamBadge(game.home_team)} size={20} /></span>
+      </div>
+      <span className={hub.gameArrow}>→</span>
+    </Link>
+  );
 }
 
 export default async function SeasonHubPage({
@@ -28,209 +54,220 @@ export default async function SeasonHubPage({
   searchParams: Promise<{ season?: string }>;
 }) {
   const { season } = await searchParams;
-
   const seasons = await getLeaderboardSeasons();
   if (!seasons.length) {
     return (
       <div className="wrap">
-        <div className="title">시즌 허브</div>
-        <div className="empty-note">종료된 정규시즌 경기가 아직 없어 시즌 허브를 만들 수 없습니다.</div>
+        <div className="title">시즌 홈</div>
+        <div className="empty-note">종료된 정규시즌 경기가 아직 없어 시즌 현황을 만들 수 없습니다.</div>
       </div>
     );
   }
+
   const requested = (season ?? "").trim();
   const activeSeason = seasons.includes(requested) ? requested : seasons[0];
   const fellBack = requested && requested !== activeSeason ? requested : null;
   const qs = `season=${encodeURIComponent(activeSeason)}`;
 
-  const [standings, teams, leaders, awards, games] = await Promise.all([
+  const [dbStandings, teams, leaders, awards, schedule] = await Promise.all([
     getStandingsAsOfCached(activeSeason, "9999-12-31"),
     getTeams(activeSeason),
     getSeasonLeaderboards(activeSeason, { categories: ["totalPts", "totalReb", "totalAst"], topN: 5 }),
     getRoundAwards(activeSeason),
-    getSeasonGames(activeSeason),
+    getSeasonSchedule(activeSeason),
   ]);
 
-  const recentGames = [...games].reverse().slice(0, 6);
+  const activeTeams = [...teams.values()].filter((team) => !["30", "65", "73"].includes(team.tcode));
+  const standings = activeTeams
+    .map((team) => dbStandings.find((row) => row.tcode === team.tcode) ?? {
+      tcode: team.tcode,
+      wins: 0,
+      losses: 0,
+      pct: 0,
+      gb: 0,
+      streak: null,
+      last10: { wins: 0, losses: 0 },
+      home: { wins: 0, losses: 0 },
+      away: { wins: 0, losses: 0 },
+      diff: 0,
+    })
+    .sort((a, b) => {
+      const aPlayed = a.wins + a.losses > 0;
+      const bPlayed = b.wins + b.losses > 0;
+      if (aPlayed !== bPlayed) return aPlayed ? -1 : 1;
+      return b.pct - a.pct || b.diff - a.diff;
+    });
+
+  const leader = standings.find((row) => row.wins + row.losses > 0) ?? standings[0];
+  const completed = schedule.filter((game) => game.is_ended && game.home_score != null && game.away_score != null);
+  const recentGames = completed.slice(-3).reverse();
+  const today = kstToday();
+  const upcomingGames = schedule.filter((game) => !game.is_ended && game.game_date >= today).slice(0, 3);
+  const closeGames = completed.filter((game) => Math.abs((game.home_score ?? 0) - (game.away_score ?? 0)) <= 5).length;
+  const scoringLeader = leaders?.boards.find((board) => board.key === "totalPts")?.rows[0] ?? null;
 
   return (
     <div className="wrap">
-      <div className={styles.headRow}>
-        <div>
-          <span className={styles.kicker}>SEASON HUB</span>
-          <div className="title">시즌 허브</div>
-        </div>
-        <form className={styles.seasonForm} action="/season">
-          <select name="season" defaultValue={activeSeason} aria-label="시즌 선택">
-            {seasons.map((s) => (
-              <option key={s} value={s}>
-                {s} 시즌
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="btn-primary">
-            시즌 보기
-          </button>
-        </form>
-      </div>
-
-      <p className="lede">{shortSeason(activeSeason)} 시즌 요약입니다. 각 섹션의 &ldquo;전체 보기&rdquo;에서 상세 페이지로 이동합니다.</p>
+      <SeasonNav
+        active="overview"
+        activeSeason={activeSeason}
+        seasons={seasons}
+        action="/season"
+        kicker="SEASON CENTER"
+        title="시즌 홈"
+        description={`${shortSeason(activeSeason)} 시즌의 순위 경쟁, 다음 경기, 주요 리더와 라운드 MVP를 한 번에 확인합니다.`}
+      />
 
       {fellBack && (
-        <div className={styles.fallback}>
-          {fellBack} 시즌은 아직 종료된 정규시즌 경기가 없어 가장 최근 시즌인 <strong>{activeSeason}</strong> 기록을 보여줍니다.
+        <div className={hub.fallback}>
+          {fellBack} 시즌에는 종료된 정규시즌 경기가 없어, 최근 시즌 <strong>{activeSeason}</strong>을 보여드립니다.
         </div>
       )}
 
-      <div className={hub.sectionHead}>
-        <h2 className={styles.groupName}>팀 순위</h2>
-        <Link href={`/rankings/teams?${qs}`} className={hub.seeAll}>
-          전체 보기 →
-        </Link>
-      </div>
-      {!standings.length ? (
-        <div className="empty-note">아직 순위표를 만들 수 없습니다.</div>
-      ) : (
-        <div className="table-scroll">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>팀</th>
-                <th>승</th>
-                <th>패</th>
-                <th>승률</th>
-                <th>연속</th>
-                <th>득실마진</th>
-              </tr>
-            </thead>
-            <tbody>
-              {standings.slice(0, 6).map((r, i) => {
-                const tm = teams.get(r.tcode);
-                const badge = tm ? { name: tm.name, abbr: tm.abbr, color: tm.color, logoUrl: tm.logoUrl } : null;
-                return (
-                  <tr key={r.tcode}>
-                    <td>{i + 1}</td>
-                    <td className={hub.teamCell}>
-                      <TeamBadge team={badge} size={18} />
-                      <Link href={`/teams/${r.tcode}`}>{tm?.name ?? r.tcode}</Link>
-                    </td>
-                    <td>{r.wins}</td>
-                    <td>{r.losses}</td>
-                    <td>{(r.pct * 100).toFixed(1)}%</td>
-                    <td>{r.streak ? `${r.streak.length}${r.streak.result === "W" ? "연승" : "연패"}` : "-"}</td>
-                    <td className={diffClass(r.diff)}>{signed(r.diff, 1)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <section className={hub.snapshot} aria-label="시즌 핵심 현황">
+        <article>
+          <span>진행된 경기</span>
+          <strong>{completed.length}</strong>
+          <small>정규시즌 종료 경기</small>
+        </article>
+        <article>
+          <span>현재 선두</span>
+          <strong>{leader ? teams.get(leader.tcode)?.abbr ?? leader.tcode : "-"}</strong>
+          <small>{leader ? `${leader.wins}승 ${leader.losses}패 · ${(leader.pct * 100).toFixed(1)}%` : "기록 없음"}</small>
+        </article>
+        <article>
+          <span>5점 차 이내</span>
+          <strong>{completed.length ? Math.round((closeGames / completed.length) * 100) : 0}%</strong>
+          <small>{closeGames}경기 · 접전 비율</small>
+        </article>
+        <article>
+          <span>득점 선두</span>
+          <strong>{scoringLeader?.name ?? "-"}</strong>
+          <small>{scoringLeader ? `${scoringLeader.display}점 · ${scoringLeader.teamAbbr}` : "기록 없음"}</small>
+        </article>
+      </section>
 
-      <div className={hub.sectionHead}>
-        <h2 className={styles.groupName}>시즌 리더보드</h2>
-        <Link href={`/leaderboards/season?${qs}`} className={hub.seeAll}>
-          전체 보기 →
-        </Link>
+      <div className={hub.dashboardGrid}>
+        <section className={hub.panel}>
+          <header className={hub.panelHead}>
+            <div>
+              <span className={hub.eyebrow}>STANDINGS</span>
+              <h2>순위 경쟁</h2>
+            </div>
+            <Link href={`/rankings/teams?${qs}`}>전체 순위·최근 5경기 →</Link>
+          </header>
+          <div className={hub.standingsList}>
+            {standings.map((row, index) => {
+              const team = teams.get(row.tcode);
+              const badge = team ? { name: team.name, abbr: team.abbr, color: team.color, logoUrl: team.logoUrl } : null;
+              const played = row.wins + row.losses;
+              return (
+                <Link key={row.tcode} href={`/teams/${row.tcode}`} className={hub.standingRow}>
+                  <span className={`${hub.rank} ${index < 2 ? hub.rankDirect : index < 6 ? hub.rankPlayoff : ""}`}>{index + 1}</span>
+                  <span className={hub.teamName}><TeamBadge team={badge} size={22} />{team?.name ?? row.tcode}</span>
+                  <span className={hub.record}>{row.wins}-{row.losses}</span>
+                  <strong>{played ? (row.pct * 100).toFixed(1) : "0.0"}%</strong>
+                  <span className={diffClass(row.diff)}>{played ? signed(row.diff, 1) : "-"}</span>
+                </Link>
+              );
+            })}
+          </div>
+          <div className={hub.panelLegend}><span className={hub.directKey} />4강 직행 <span className={hub.playoffKey} />6강 PO</div>
+        </section>
+
+        <section className={hub.panel}>
+          <header className={hub.panelHead}>
+            <div>
+              <span className={hub.eyebrow}>GAMES</span>
+              <h2>다음 경기와 최근 결과</h2>
+            </div>
+            <Link href={`/season-browser?${qs}`}>전체 일정·결과 →</Link>
+          </header>
+          <div className={hub.gameGroup}>
+            <h3>다음 경기</h3>
+            {upcomingGames.length ? upcomingGames.map((game) => <GameLine key={game.gmkey} game={game} mode="upcoming" />) : <p className={hub.empty}>남은 정규시즌 일정이 없습니다.</p>}
+          </div>
+          <div className={hub.gameGroup}>
+            <h3>최근 결과</h3>
+            {recentGames.length ? recentGames.map((game) => <GameLine key={game.gmkey} game={game} mode="result" />) : <p className={hub.empty}>아직 종료된 경기가 없습니다.</p>}
+          </div>
+        </section>
       </div>
-      {!leaders ? (
-        <div className="empty-note">아직 리더보드를 만들 수 없습니다.</div>
-      ) : (
-        <>
-          <p className={styles.lede}>
-            시즌 초반엔 경기당 평균 대신 <strong>누적 총량</strong>을 보여드립니다 - 적게 뛴 선수가 한두
-            경기 잘하면 과장되는 평균과 달리, 총량은 자격 기준 없이 그대로 쌓인 기록입니다. 평균·슈팅·고급
-            지표는 전체 보기에서 확인하세요.
-          </p>
-          <div className={styles.grid}>
-            {leaders.boards.map((b) => (
-              <section key={b.key} className={styles.card}>
-                <header className={styles.cardHead}>
-                  <h3 className={styles.cardTitle}>{b.label}</h3>
-                  <span className={styles.cardPool}>{b.unit}</span>
-                </header>
-                {b.rows.length === 0 ? (
-                  <div className={styles.note}>자격을 통과한 선수가 없습니다.</div>
-                ) : (
-                  <div className={styles.rows}>
-                    {b.rows.map((r, i) => (
-                      <Link key={r.pcode} href={`/players/${r.pcode}`} className={styles.row}>
-                        <div className={styles.rank}>{i + 1}</div>
-                        <div className={styles.rowBody}>
-                          <div className={styles.rowName}>{r.name}</div>
-                          <div className={styles.rowSub}>{[r.teamAbbr, r.posLabel || null].filter(Boolean).join(" · ")}</div>
-                        </div>
-                        <div className={styles.rowValue}>{b.unit === "%" ? `${r.display}%` : r.display}</div>
+
+      <section className={hub.section}>
+        <header className={hub.sectionHead}>
+          <div>
+            <span className={hub.eyebrow}>SEASON LEADERS</span>
+            <h2>시즌을 만드는 선수들</h2>
+            <p>시즌 초반 왜곡이 적은 누적 총량 기준입니다. 경기당 평균·슈팅 효율·고급 지표도 별도 제공합니다.</p>
+          </div>
+          <Link href={`/leaderboards/season?${qs}`}>모든 부문 보기 →</Link>
+        </header>
+        {!leaders ? (
+          <div className="empty-note">아직 리더보드를 만들 수 없습니다.</div>
+        ) : (
+          <div className={hub.leaderGrid}>
+            {leaders.boards.map((board) => {
+              const top = board.rows[0];
+              return (
+                <article key={board.key} className={hub.leaderCard}>
+                  <header><h3>{board.label}</h3><span>{board.unit}</span></header>
+                  {top ? (
+                    <>
+                      <Link href={top.href} className={hub.leaderHero}>
+                        <span className={hub.leaderValue}>{top.display}</span>
+                        <span><strong>{top.name}</strong><small>{top.teamAbbr} · {top.posLabel} · {top.sample}</small></span>
                       </Link>
-                    ))}
-                  </div>
-                )}
-              </section>
-            ))}
+                      <div className={hub.leaderRows}>
+                        {board.rows.slice(1, 5).map((row) => (
+                          <Link key={row.pcode} href={row.href}><span>{row.rank}</span><strong>{row.name}</strong><b>{row.display}</b></Link>
+                        ))}
+                      </div>
+                    </>
+                  ) : <p className={hub.empty}>아직 기록이 없습니다.</p>}
+                </article>
+              );
+            })}
           </div>
-        </>
-      )}
+        )}
+      </section>
 
-      <div className={hub.sectionHead}>
-        <h2 className={styles.groupName}>라운드 MVP</h2>
-        <Link href={`/awards/round?${qs}`} className={hub.seeAll}>
-          전체 보기 →
-        </Link>
-      </div>
-      {awards.gamesEnded === 0 ? (
-        <div className="empty-note">이 라운드는 아직 끝난 경기가 없습니다.</div>
-      ) : (
-        <>
-          <div className={hub.roundMeta}>
-            {awards.round}라운드 ({awards.roundCount}라운드 중) · 종료 경기 {awards.gamesEnded}/{awards.gamesTotal}
+      <section className={hub.section}>
+        <header className={hub.sectionHead}>
+          <div>
+            <span className={hub.eyebrow}>ROUND MVP</span>
+            <h2>{awards.round}라운드 퍼포머</h2>
+            <p>종료 경기 {awards.gamesEnded}/{awards.gamesTotal} · 국내·용병·아시아쿼터를 같은 화면에서 비교합니다.</p>
           </div>
-          <div className={styles.grid}>
-            {awards.mvpBoards.map((b) => (
-              <section key={b.role} className={styles.card}>
-                <header className={styles.cardHead}>
-                  <h3 className={styles.cardTitle}>{b.label} MVP</h3>
-                </header>
-                {b.rows.length === 0 ? (
-                  <div className={styles.note}>자격을 통과한 선수가 없습니다.</div>
-                ) : (
-                  <Link href={`/players/${b.rows[0].pcode}`} className={hub.mvpLine}>
-                    <strong>{b.rows[0].name}</strong>
-                    <span>{[b.rows[0].team?.abbr, b.rows[0].posLabel || null].filter(Boolean).join(" · ")}</span>
-                    <span className={hub.mvpValue}>{b.rows[0].perW.toFixed(1)} PER</span>
-                  </Link>
-                )}
-              </section>
-            ))}
+          <Link href={`/awards/round?${qs}`}>라운드 전체 보기 →</Link>
+        </header>
+        {awards.gamesEnded === 0 ? (
+          <div className="empty-note">이 라운드는 아직 끝난 경기가 없습니다.</div>
+        ) : (
+          <div className={hub.mvpGrid}>
+            {awards.mvpBoards.map((board) => {
+              const player = board.rows[0];
+              return (
+                <article key={board.role} className={hub.mvpCard}>
+                  <span>{board.label} MVP</span>
+                  {player ? (
+                    <Link href={`/players/${player.pcode}`}>
+                      <strong>{player.name}</strong>
+                      <small>{player.team?.abbr} · {player.posLabel}</small>
+                      <b>{player.perW.toFixed(1)} <em>PER</em></b>
+                    </Link>
+                  ) : <p className={hub.empty}>자격을 통과한 선수가 없습니다.</p>}
+                </article>
+              );
+            })}
           </div>
-        </>
-      )}
-
-      <div className={hub.sectionHead}>
-        <h2 className={styles.groupName}>최근 경기</h2>
-        <Link href={`/season-browser?${qs}`} className={hub.seeAll}>
-          시즌 브라우저 전체 보기 →
-        </Link>
-      </div>
-      {!recentGames.length ? (
-        <div className="empty-note">아직 끝난 경기가 없습니다.</div>
-      ) : (
-        <div className={hub.gameList}>
-          {recentGames.map((g) => (
-            <Link key={g.gmkey} href={`/games/${g.gmkey}`} className={hub.gameRow}>
-              <span className={hub.gameDate}>{g.game_date.slice(5)}</span>
-              <span className={hub.gameTeams}>
-                {g.away_team?.name ?? g.away_team?.tcode} {g.away_score} : {g.home_score} {g.home_team?.name ?? g.home_team?.tcode}
-              </span>
-            </Link>
-          ))}
-        </div>
-      )}
+        )}
+      </section>
     </div>
   );
 }
 
 export const metadata: Metadata = {
-  title: "시즌 허브",
-  description: "팀 순위, 시즌 리더보드(누적 총량), 라운드 MVP, 최근 경기를 한 화면에 모아 보기",
+  title: "시즌 홈",
+  description: "KBL 시즌 순위, 일정과 결과, 시즌 리더, 라운드 MVP를 한 화면에서 확인",
 };

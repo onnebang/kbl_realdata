@@ -342,6 +342,7 @@ export async function getStandingsAsOf(seasonName: string, beforeDate: string): 
     .select("home_tcode, away_tcode, home_score, away_score, game_date, game_start")
     .eq("season_name", seasonName)
     .eq("season_category", "정규시즌")
+    .eq("is_ended", true)
     .lte("game_date", beforeDate)
     .not("home_score", "is", null);
   return computeStandings((data ?? []) as StandingsGameRow[]);

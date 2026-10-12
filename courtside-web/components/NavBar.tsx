@@ -18,27 +18,19 @@ import { NavAutoClose } from "./NavAutoClose";
 // 보여야 하는 항목들이라 더 추가하면 전에 겪은 overflow 문제가 재발함).
 const MAIN_LINKS = [
   { href: "/", label: "경기 목록" },
-  { href: "/rankings/teams", label: "팀 순위" },
+  { href: "/season", label: "시즌" },
   { href: "/preseason", label: "개막 리포트" },
-  { href: "/teams", label: "팀 자세히 보기" },
-  { href: "/players", label: "선수 자세히 보기" },
+  { href: "/teams", label: "팀" },
+  { href: "/players", label: "선수" },
   { href: "/coaches", label: "감독" },
 ];
 
 const DROPDOWN_GROUPS = [
   {
-    key: "season",
-    label: "시즌 개관",
-    links: [
-      { href: "/season", label: "시즌 허브" },
-      { href: "/season-browser", label: "시즌 브라우저" },
-    ],
-  },
-  {
     key: "leaders",
-    label: "리더보드·시상",
+    label: "기록·시상",
     links: [
-      { href: "/leaderboards/season", label: "시즌 리더보드" },
+      { href: "/season-browser", label: "시즌 브라우저" },
       { href: "/awards/round", label: "라운드 어워드" },
       { href: "/rankings/legends", label: "올타임 리더스" },
     ],

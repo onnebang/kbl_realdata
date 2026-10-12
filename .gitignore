@@ -35,4 +35,9 @@ tools/check.py
 tools/check_missing_photos.py
 tools/check_missing_photos2.py
 tools/missing_photos.json
-data/kbl_realdata.db
+data/*.db
+
+# Obsidian & Local scratch
+.obsidian/
+*.canvas
+scratch_*.js

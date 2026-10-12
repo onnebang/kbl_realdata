@@ -25,7 +25,8 @@ export const getTeamSeasonFixturesCached = cachedFn(getTeamSeasonFixtures, {
 });
 
 export const getStandingsAsOfCached = cachedFn(getStandingsAsOf, {
-  name: "standingsAsOf",
+  // v2: 진행 중 스코어를 순위에 세지 않고 is_ended=true만 집계한다.
+  name: "standingsAsOfV2",
   ttl: TTL.batchDaily,
   tags: (seasonName) => [TAG.batch, TAG.season(seasonName)],
 });

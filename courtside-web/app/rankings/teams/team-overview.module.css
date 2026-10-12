@@ -37,6 +37,20 @@
   gap: 10px;
 }
 
+.rankBadge {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--ink-faint);
+  background: var(--surface-soft);
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+}
+
 .cardName {
   font-size: 1rem;
   font-weight: 700;
