@@ -648,7 +648,10 @@ def roster_from_player_stat(player_stat, home_tcode, away_tcode):
         p = row.get("player")
         if not isinstance(p, dict) or not p.get("pcode"):
             continue
-        name_to_pcode[(p.get("tcode"), p.get("pname"))] = p["pcode"]
+        pname = p.get("pname") or ""
+        name_to_pcode[(p.get("tcode"), pname)] = p["pcode"]
+        if " " in pname:
+            name_to_pcode.setdefault((p.get("tcode"), pname.split()[-1]), p["pcode"])
         if row.get("startFlag") == 1 and p.get("tcode") in starters:
             starters[p["tcode"]].append(p["pcode"])
     return name_to_pcode, starters
@@ -656,7 +659,7 @@ def roster_from_player_stat(player_stat, home_tcode, away_tcode):
 
 def roster_from_db(cur, home_tcode, away_tcode, since_date):
     """player-stat이 경기 중엔 안 나올 수도 있다는 가정(미검증)에 대한 폴백 - 최근 경기
-    박스스코어에서 (팀, 선수이름) -> pcode 맵만 복원한다. 선발 5인은 알 수 없으므로 빈
+    박스스코어 및 확정 season_roster에서 (팀, 선수이름) -> pcode 맵을 복원한다. 선발 5인은 알 수 없으므로 빈
     리스트로 두고, 문자중계 맨 앞의 101(교체 IN) 이벤트들로 라인업이 자연히 채워진다
     (실제 저장된 경기들을 보면 경기 시작 시 선발 10명이 전부 101 이벤트로 찍힌다)."""
     cur.execute("""
@@ -668,6 +671,16 @@ def roster_from_db(cur, home_tcode, away_tcode, since_date):
         order by gps.tcode, p.name, g.game_date desc
     """, ([home_tcode, away_tcode], since_date))
     name_to_pcode = {(r[0], r[1]): r[2] for r in cur.fetchall()}
+    # 신규 영입/대체 외국인 등 아직 최근 출전 기록이 없는 선수를 위해 season_roster도 보충
+    cur.execute("""
+        select tcode, player_name, pcode
+        from season_roster
+        where tcode = any(%s) and pcode is not null
+    """, ([home_tcode, away_tcode],))
+    for tc, pname, pc in cur.fetchall():
+        name_to_pcode.setdefault((tc, pname), pc)
+        if " " in (pname or ""):
+            name_to_pcode.setdefault((tc, pname.split()[-1]), pc)
     return name_to_pcode, {home_tcode: [], away_tcode: []}
 
 

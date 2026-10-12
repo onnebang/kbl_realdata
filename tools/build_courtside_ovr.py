@@ -267,6 +267,18 @@ SCOUTED_ROOKIE_PROFILES = {
         'role': 'Scoring Threat', 'role2': 'Sharpshooter',  # 예전 'Shot Creator'는 표준 스타일 목록에 없어 가장 가까운 것으로 정규화
         'reason': '루이스 킹. NBA 출신 다재다능한 스코어러.',
     },
+    '291890': {
+        'OVR': 86, 'OFF': 87, 'DEF': 84,
+        'attributes': {'outside': 88, 'inside': 80, 'playmaking': 76, 'athletic': 83, 'defense': 84, 'rebounding': 78},
+        'role': 'Scoring Threat', 'role2': 'Sharpshooter',
+        'reason': '데이본 리드. NBA 122경기 출전 스코어러(덴버 21-23 3P 43%), 196cm 3&D 윙. 라숀 토마스 2주 무릎 부상 일시 대체.',
+    },
+    'tbd_데이본 리드': {
+        'OVR': 86, 'OFF': 87, 'DEF': 84,
+        'attributes': {'outside': 88, 'inside': 80, 'playmaking': 76, 'athletic': 83, 'defense': 84, 'rebounding': 78},
+        'role': 'Scoring Threat', 'role2': 'Sharpshooter',
+        'reason': '데이본 리드 (tbd 임시 키 매핑).',
+    },
 }
 
 

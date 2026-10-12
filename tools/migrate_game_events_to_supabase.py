@@ -83,7 +83,10 @@ def build_roster_lookup(gmkey, home_tcode, away_tcode):
     starters = {home_tcode: [], away_tcode: []}
     for row in rows:
         p = row["player"]
-        name_to_pcode[(p["tcode"], p["pname"])] = p["pcode"]
+        pname = p.get("pname") or ""
+        name_to_pcode[(p["tcode"], pname)] = p["pcode"]
+        if " " in pname:
+            name_to_pcode.setdefault((p["tcode"], pname.split()[-1]), p["pcode"])
         if row.get("startFlag") == 1:
             starters[p["tcode"]].append(p["pcode"])
     return name_to_pcode, starters

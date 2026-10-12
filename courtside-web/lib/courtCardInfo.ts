@@ -107,8 +107,10 @@ export function buildCourtCardInfo(players: { pcode: string; name: string; tcode
     return [...votes].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   };
   for (const p of misses) {
+    const exact = tbd.filter((r) => r.name === p.name);
+    const cands = exact.length > 0 ? exact : tbd.filter((r) => r.name.endsWith(p.name) || p.name.endsWith(r.name));
     const rec = pickRecord(
-      tbd.filter((r) => r.name === p.name),
+      cands,
       seasonName,
       teamOf(p.tcode)
     );
