@@ -1,7 +1,9 @@
+import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SeasonNav } from "@/components/SeasonNav";
-import { TeamBadge } from "@/components/TeamBadge";
+import { DribbleBall } from "@/components/DribbleBall";
+import { TeamPlate } from "@/components/TeamPlate";
 import { getTeams, shortSeason, PRESEASON_SEASON } from "@/lib/preseason";
 import {
   LEADER_CATEGORIES,
@@ -13,6 +15,7 @@ import {
   type LeaderRow,
   type Leaderboard,
 } from "@/lib/seasonLeaders";
+import { teamBarStyle, teamInkStyle } from "@/lib/teamAccent";
 import styles from "./season-leaders.module.css";
 
 // 시즌 리더보드 - 요청("시즌별 리더보드 추가"), 참고 이미지는 Basketball-Reference의
@@ -66,14 +69,25 @@ function badgeFor(row: LeaderRow, logos: TeamLogos) {
   };
 }
 
-function CompactRow({ row, board, tied }: { row: LeaderRow; board: Leaderboard; tied: boolean }) {
+/** 1위 값 대비 비율(%) - 행 뒤 막대 길이. 1위가 0 이하면 막대를 그리지 않는다. */
+function barPct(row: LeaderRow, top: LeaderRow) {
+  return top.value > 0 ? Math.max(0, Math.min(100, (row.value / top.value) * 100)) : 0;
+}
+
+function CompactRow({ row, board, tied, logos }: { row: LeaderRow; board: Leaderboard; tied: boolean; logos: TeamLogos }) {
+  const badge = badgeFor(row, logos);
   return (
-    <Link href={row.href} className={styles.row}>
+    <Link
+      href={row.href}
+      className={styles.row}
+      style={{ ...teamBarStyle(row.teamColor), "--w": `${barPct(row, board.rows[0])}%` } as CSSProperties}
+    >
       <div className={styles.rank}>
         {/* 공동 순위는 숫자를 그대로 반복하고 앞에 =를 붙인다. 임의로 순서를 매겨 감추지 않는다. */}
         {tied && <span className={styles.tie}>=</span>}
         {row.rank}
       </div>
+      {badge ? <TeamPlate team={badge} size={20} /> : <span />}
       <div className={styles.rowBody}>
         <div className={styles.rowName}>{row.name}</div>
         <div className={styles.rowSub}>{subText(row)}</div>
@@ -83,7 +97,7 @@ function CompactRow({ row, board, tied }: { row: LeaderRow; board: Leaderboard; 
   );
 }
 
-function LeaderCard({ board, logos }: { board: Leaderboard; logos: TeamLogos }) {
+function LeaderCard({ board, logos, index }: { board: Leaderboard; logos: TeamLogos; index: number }) {
   const top = board.rows[0];
   if (!top) return null;
 
@@ -98,7 +112,10 @@ function LeaderCard({ board, logos }: { board: Leaderboard; logos: TeamLogos }) 
   const topBadge = badgeFor(top, logos);
 
   return (
-    <section className={styles.card}>
+    <section
+      className={styles.card}
+      style={{ ...teamBarStyle(top.teamColor), ...teamInkStyle(top.teamColor), "--i": Math.min(index, 8) } as CSSProperties}
+    >
       <header className={styles.cardHead}>
         <h3 className={styles.cardTitle}>{board.label}</h3>
         {board.unit && board.unit !== "%" && <span className={styles.cardUnit}>{board.unit}</span>}
@@ -116,7 +133,6 @@ function LeaderCard({ board, logos }: { board: Leaderboard; logos: TeamLogos }) 
             {top.name}
           </Link>
           <div className={styles.heroMeta}>
-            {topBadge && <TeamBadge team={topBadge} size={16} />}
             <span className={styles.heroTeam}>
               {[top.teamName, top.posLabel || null].filter(Boolean).join(" · ")}
             </span>
@@ -124,12 +140,13 @@ function LeaderCard({ board, logos }: { board: Leaderboard; logos: TeamLogos }) 
           </div>
           <div className={styles.heroSample}>{top.sample}</div>
         </div>
+        {topBadge && <TeamPlate team={topBadge} size={38} />}
       </div>
 
       {next.length > 0 && (
         <div className={styles.rows}>
           {next.map((r) => (
-            <CompactRow key={r.pcode} row={r} board={board} tied={tiedRank(r)} />
+            <CompactRow key={r.pcode} row={r} board={board} tied={tiedRank(r)} logos={logos} />
           ))}
         </div>
       )}
@@ -142,7 +159,7 @@ function LeaderCard({ board, logos }: { board: Leaderboard; logos: TeamLogos }) 
           </summary>
           <div className={styles.rows}>
             {more.map((r) => (
-              <CompactRow key={r.pcode} row={r} board={board} tied={tiedRank(r)} />
+              <CompactRow key={r.pcode} row={r} board={board} tied={tiedRank(r)} logos={logos} />
             ))}
           </div>
         </details>
@@ -235,6 +252,33 @@ export default async function SeasonLeadersPage({
         ))}
       </div>
 
+      {data?.qualify.relaxed && (
+        <aside className={styles.early} aria-label="시즌 초반 자격 기준">
+          <DribbleBall />
+          <div className={styles.earlyBody}>
+            <strong>시즌 초반이라 자격 기준을 낮춰 적용 중입니다</strong>
+            <p>
+              팀 {data.teamGames}경기 시점 · {data.qualify.gp}경기 이상 출전 + 누적 {data.qualify.min}분 이상이면 순위에 오릅니다.
+              경기가 쌓이면 기준이 자동으로 올라가 팀 {data.qualify.fullAt}경기부터 원래 기준({LEADER_QUALIFY.gp}경기 또는{" "}
+              {LEADER_QUALIFY.min}분)이 됩니다.
+            </p>
+            <div
+              className={styles.meter}
+              role="progressbar"
+              aria-label="원래 자격 기준 복귀까지"
+              aria-valuemin={0}
+              aria-valuemax={data.qualify.fullAt}
+              aria-valuenow={Math.min(data.teamGames, data.qualify.fullAt)}
+            >
+              <i style={{ width: `${Math.min(100, (data.teamGames / data.qualify.fullAt) * 100)}%` }} />
+            </div>
+            <small>
+              {data.teamGames} / {data.qualify.fullAt}경기
+            </small>
+          </div>
+        </aside>
+      )}
+
       {fellBack && (
         <div className={styles.fallback}>
           {fellBack} 시즌은 아직 종료된 정규시즌 경기가 없어 리더보드를 만들 수 없습니다
@@ -269,8 +313,8 @@ export default async function SeasonLeadersPage({
                   </div>
                   <p className={styles.lede}>{GROUP_BLURB[grp]}</p>
                   <div className={styles.grid}>
-                    {boards.map((b) => (
-                      <LeaderCard key={b.key} board={b} logos={logos} />
+                    {boards.map((b, i) => (
+                      <LeaderCard key={b.key} board={b} logos={logos} index={i} />
                     ))}
                     {grp === "고급" && (
                       // 옛 WPA 카드 자리. 선수 시즌 WPA 합계는 득점과 r=0.991이라 득점 카드와 같은 순위였다.
@@ -299,8 +343,16 @@ export default async function SeasonLeadersPage({
             </p>
             <p>
               <strong>자격</strong> 평균·성공률 부문은 {LEADER_QUALIFY.gp}경기 <em>또는</em>{" "}
-              {LEADER_QUALIFY.min}분 이상. 성공률은 여기에 최소 시도(팀 {data.teamGames}경기 기준)를
-              더 요구합니다. 누적 부문(3P 성공)에는 자격 기준이 없습니다.
+              {LEADER_QUALIFY.min}분 이상.
+              {data.qualify.relaxed && (
+                <>
+                  {" "}
+                  단 시즌 초반(팀 {data.qualify.fullAt - 1}경기까지)에는 팀 경기 수에 맞춰 완화합니다: 현재 팀 {data.teamGames}경기
+                  기준 <em>{data.qualify.gp}경기 이상 출전 + 누적 {data.qualify.min}분 이상</em>(경기만 채운 단시간 출전 제외).
+                </>
+              )}{" "}
+              성공률은 여기에 최소 시도(팀 {data.teamGames}경기 기준)를 더 요구합니다. 누적 부문(총량·3P 성공)에는 자격 기준이
+              없습니다.
             </p>
             <p>
               <strong>동률</strong> 순위는 반올림 전 원값으로 매깁니다. 화면의 소수 1자리가 같아

@@ -136,6 +136,8 @@ export type SeasonLeaderboards = {
   teamGamesText: string;
   /** 하한의 근거 문장. 일정이 고르지 않은 시즌은 최소 일정을 썼다는 사실까지 적는다. */
   teamGamesBasis: string;
+  /** 이 시점에 적용된 평균·성공률 부문 자격(시즌 초반이면 relaxed). */
+  qualify: QualifyRule;
   playersN: number;
   qualifiedN: number;
   topN: number;
@@ -271,9 +273,40 @@ export function aggregateSeasonPlayers(rows: PlayerGameRow[]): SeasonPlayerAgg[]
   });
 }
 
-/** 자격 판정 - 15경기 "또는" 300분(둘 중 하나만 넘으면 통과). */
-export function isQualified(a: { gp: number; minutes: number }): boolean {
-  return a.gp >= LEADER_QUALIFY.gp || a.minutes >= LEADER_QUALIFY.min;
+/**
+ * 시즌 초반 완화 자격. 15경기/300분은 54경기 시즌을 전제로 한 값이라 팀이 3~4경기만 치른 개막
+ * 직후에는 아무도 통과하지 못해 경기당·성공률·고급 부문이 통째로 비었다(2026-10-13 라이브 확인:
+ * 자격 통과 0명/111명). 그래서 팀 경기 수에 맞춰 자라는 기준을 "기존 기준에 더해" 둔다:
+ *   - 출전 경기 >= 팀 경기의 절반(최소 2, 최대 15)  **그리고**
+ *   - 누적 출전 >= 팀 경기당 8분(최대 300)
+ * 둘 다를 요구하는 이유(OR이 아닌): 2경기 × 3분짜리 벤치 선수가 PER·USG% 1위에 올라오는 걸 막는다
+ * (로컬 실측: 단순 OR 완화는 84명 중 경기당 8분 미만이 11명, 이 AND는 64명 중 6명).
+ * 기존 기준(15경기 또는 300분)과의 합집합이라, 팀 29경기부터는 완화 쪽이 기존 기준에 포함돼
+ * 결과가 이전과 완전히 같다 - 지난 시즌 리더보드는 바뀌지 않는다.
+ */
+export const QUALIFY_MIN_PER_TEAM_GAME = 8;
+export const QUALIFY_FLOOR_GP = 2;
+
+export type QualifyRule = {
+  /** 완화 기준의 최소 출전 경기 / 누적 분. relaxed가 false면 기존 기준과 같다. */
+  gp: number;
+  min: number;
+  relaxed: boolean;
+  /** 완화가 끝나는 팀 경기 수(이때부터 기존 15경기 또는 300분). */
+  fullAt: number;
+};
+
+export function qualifyRule(teamGames: number): QualifyRule {
+  const gp = Math.min(LEADER_QUALIFY.gp, Math.max(QUALIFY_FLOOR_GP, Math.ceil(teamGames / 2)));
+  const min = Math.min(LEADER_QUALIFY.min, teamGames * QUALIFY_MIN_PER_TEAM_GAME);
+  // gp가 15에 닿는 순간(= 팀 2×15−1경기) 완화 쪽은 기존 기준의 부분집합이 된다.
+  return { gp, min, relaxed: gp < LEADER_QUALIFY.gp, fullAt: 2 * LEADER_QUALIFY.gp - 1 };
+}
+
+/** 자격 판정 - 15경기 "또는" 300분. rule을 주면 시즌 초반 완화 기준(AND)도 통과로 친다. */
+export function isQualified(a: { gp: number; minutes: number }, rule?: QualifyRule): boolean {
+  if (a.gp >= LEADER_QUALIFY.gp || a.minutes >= LEADER_QUALIFY.min) return true;
+  return !!rule?.relaxed && a.gp >= rule.gp && a.minutes >= rule.min;
 }
 
 const fmt1 = (v: number) => v.toFixed(1);
@@ -356,7 +389,7 @@ export async function getSeasonLeaderboards(
   const catKey = opts?.categories?.length ? [...opts.categories].sort().join(",") : "all";
   return cached(
     () => computeSeasonLeaderboards(seasonName, opts),
-    ["seasonLeaderboards-v2", seasonName, String(opts?.topN ?? "d"), catKey], // v2: WPA 카드 제거
+    ["seasonLeaderboards-v3", seasonName, String(opts?.topN ?? "d"), catKey], // v3: 시즌 초반 완화 자격(qualify 필드 추가) / v2: WPA 카드 제거
     TTL.batchDaily,
     [TAG.batch, TAG.season(seasonName)]
   );
@@ -397,8 +430,14 @@ async function computeSeasonLeaderboards(
     for (const p of data ?? []) names.set(p.pcode as string, p.name as string);
   }
 
-  const qualifiedN = aggs.filter(isQualified).length;
-  const qualifyCaption = `비율·평균 지표 자격: ${LEADER_QUALIFY.gp}경기 또는 ${LEADER_QUALIFY.min}분 이상 (${seasonName} 정규시즌 ${qualifiedN}명 / 출전 ${aggs.length}명)`;
+  const rule = qualifyRule(teamGames);
+  const qualifiedN = aggs.filter((a) => isQualified(a, rule)).length;
+  const rateRuleText = rule.relaxed
+    ? `${rule.gp}경기 이상 출전 + 누적 ${rule.min}분 이상(시즌 초반 완화 · 팀 ${teamGames}경기 기준)`
+    : `${LEADER_QUALIFY.gp}경기 또는 ${LEADER_QUALIFY.min}분 이상`;
+  const qualifyCaption = rule.relaxed
+    ? `비율·평균 지표 자격(시즌 초반 완화): ${rateRuleText}. 팀 ${rule.fullAt}경기부터 원래 기준(${LEADER_QUALIFY.gp}경기 또는 ${LEADER_QUALIFY.min}분)으로 자동 복귀 (${seasonName} 정규시즌 ${qualifiedN}명 / 출전 ${aggs.length}명)`
+    : `비율·평균 지표 자격: ${rateRuleText} (${seasonName} 정규시즌 ${qualifiedN}명 / 출전 ${aggs.length}명)`;
 
   const boards: Leaderboard[] = [];
   for (const def of wanted) {
@@ -407,8 +446,8 @@ async function computeSeasonLeaderboards(
     let pool = aggs;
     const qualifyBits: string[] = [];
     if (def.rate) {
-      pool = pool.filter(isQualified);
-      qualifyBits.push(`${LEADER_QUALIFY.gp}경기 또는 ${LEADER_QUALIFY.min}분 이상`);
+      pool = pool.filter((a) => isQualified(a, rule));
+      qualifyBits.push(rateRuleText);
     }
     if (att) {
       pool = pool.filter((a) => att.of(a) >= att.need);
@@ -465,6 +504,7 @@ async function computeSeasonLeaderboards(
     teamGamesMax,
     teamGamesText,
     teamGamesBasis,
+    qualify: rule,
     playersN: aggs.length,
     qualifiedN,
     topN,

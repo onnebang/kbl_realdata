@@ -510,29 +510,6 @@
   font-size: 24px;
   line-height: 1;
 }
-/* 농구공 - 이 화면의 유일한 상시 모션(아래 dribble). 줄이기 설정이면 가만히 서 있는다. */
-.ball {
-  position: relative;
-  display: inline-flex;
-  align-items: flex-end;
-  width: 22px;
-  height: 27px;
-}
-.ball svg {
-  display: block;
-  transform-origin: 50% 100%;
-}
-.ball::after {
-  content: "";
-  position: absolute;
-  right: 3px;
-  bottom: 0;
-  left: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: rgba(var(--line-rgb), 0.22);
-}
-
 /* ── 경기 카드 ───────────────────────────────────────────────────────── */
 .day {
   margin-top: 16px;
@@ -841,12 +818,6 @@
     animation: chipPop 0.45s cubic-bezier(0.34, 1.8, 0.64, 1) backwards;
     animation-delay: calc(0.3s + var(--k, 0) * 70ms);
   }
-  .ball svg {
-    animation: dribble 0.95s infinite;
-  }
-  .ball::after {
-    animation: ballShadow 0.95s infinite;
-  }
 }
 
 @keyframes rise {
@@ -884,33 +855,6 @@
     transform: scale(0.3);
   }
 }
-/* 바닥에서 눌렸다가(squash) 솟고, 내려오며 가속 - 위로는 감속, 아래로는 가속 이징을 키프레임마다 건다. */
-@keyframes dribble {
-  0%,
-  100% {
-    transform: translateY(0) scale(1.14, 0.86);
-    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
-  }
-  50% {
-    transform: translateY(-4px) scale(1, 1);
-    animation-timing-function: cubic-bezier(0.7, 0, 0.8, 0.3);
-  }
-  100% {
-    transform: translateY(0) scale(1.14, 0.86);
-  }
-}
-@keyframes ballShadow {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scaleX(1.1);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scaleX(0.6);
-  }
-}
-
 @media (max-width: 899px) {
   /* 레일은 한 줄 가로 스크롤(스냅). 11개를 억지로 줄바꿈하면 마지막 줄만 남는다. */
   .rail {

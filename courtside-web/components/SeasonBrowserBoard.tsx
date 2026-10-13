@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties } from "react";
+import { DribbleBall } from "./DribbleBall";
 import { TeamPlate } from "./TeamPlate";
 import SeasonBrowserModal from "./SeasonBrowserModal";
 import type { SeasonGameRow } from "@/lib/seasonBrowser";
@@ -45,22 +46,6 @@ function heroVars(t: TeamRef): CSSProperties {
     "--chip": darkText ? "rgba(255,255,255,0.42)" : "rgba(0,0,0,0.24)",
     "--sl": darkText ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)",
   } as CSSProperties;
-}
-
-function Ball() {
-  return (
-    <span className={styles.ball} aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="22" height="22">
-        <circle cx="12" cy="12" r="10.5" fill="var(--home)" stroke="var(--ink)" strokeWidth="1.5" />
-        <path
-          d="M12 1.5v21M1.5 12h21M4.3 4.6c3.3 2.9 3.3 11.9 0 14.8M19.7 4.6c-3.3 2.9-3.3 11.9 0 14.8"
-          fill="none"
-          stroke="var(--ink)"
-          strokeWidth="1.4"
-        />
-      </svg>
-    </span>
-  );
 }
 
 /** 최근 경기 폼. 승=채움 / 패=속 빈 원이라 색을 못 봐도 구분된다. chips면 글자("승"/"패")를 단다. */
@@ -301,7 +286,7 @@ export default function SeasonBrowserBoard({ games }: { games: SeasonGameRow[] }
       </div>
 
       <div className={styles.countLine}>
-        <Ball />
+        <DribbleBall />
         <b>{rows.length}</b>경기{active ? ` · ${active.team.name}` : ""}
       </div>
 
