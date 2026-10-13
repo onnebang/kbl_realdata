@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties } from "react";
+import Link from "next/link";
 import { DribbleBall } from "./DribbleBall";
 import { TeamPlate } from "./TeamPlate";
 import SeasonBrowserModal from "./SeasonBrowserModal";
@@ -14,6 +15,7 @@ import {
   listTeams,
   orderCategories,
   perspective,
+  relayHref,
   type Result,
   type TeamLine,
   type TeamRef,
@@ -84,34 +86,55 @@ function Tags({ game }: { game: SeasonGameRow }) {
   );
 }
 
+/**
+ * 두 번째 보기 방식: 경기 페이지의 실시간 중계 탭. 카드 본문은 팝업(간단히 보기)을 여는 버튼이라 링크를
+ * 그 안에 넣을 수 없다(버튼 속 링크는 잘못된 HTML) - 카드 오른쪽에 형제로 둔다. 경기 페이지는 무거운
+ * 서버 렌더라 목록 수백 장이 뷰포트에 들어올 때 미리 받아 오지 않게 prefetch를 끈다.
+ */
+function RelayLink({ game }: { game: SeasonGameRow }) {
+  const names = `${game.home_team?.name ?? "홈"} 대 ${game.away_team?.name ?? "원정"}`;
+  return (
+    <Link href={relayHref(game.gmkey)} prefetch={false} className={styles.relay} aria-label={`${names} 중계로 보기`}>
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
+        <path d="M10 8.2v7.6L16.2 12z" fill="var(--home)" />
+      </svg>
+      <span>
+        중계<span className={styles.relayMore}>로 보기</span>
+      </span>
+    </Link>
+  );
+}
+
 /** 팀 선택 시: 그 팀 시선의 한 줄. 날짜 · 승패 · 홈/원정 · 상대 · 점수(우리 : 상대). */
 function FocusCard({ game, line, index, onOpen }: { game: SeasonGameRow; line: TeamLine; index: number; onOpen: () => void }) {
   const p = perspective(game, line.tcode);
   const opp = p.opp ?? UNKNOWN;
   return (
-    <button
-      type="button"
+    <div
       className={`${styles.card} ${styles.cardFocus} ${p.won ? styles.cardWin : styles.cardLoss}`}
       style={{ ...teamVars(line.team), "--i": index } as CSSProperties}
-      onClick={onOpen}
     >
-      <span className={styles.when}>
-        <b>{mmdd(game.game_date)}</b>
-        <small>{koDayOfWeek(game.game_date)}</small>
-      </span>
-      <span className={p.won ? styles.resW : styles.resL}>{p.won ? "승" : "패"}</span>
-      <span className={styles.opp}>
-        <span className={styles.ha}>{p.isHome ? "홈" : "원정"}</span>
-        <TeamPlate team={badge(opp)} size={30} />
-        <TeamName team={opp} />
-        <Tags game={game} />
-      </span>
-      <span className={styles.score}>
-        <b className={p.won ? styles.scoreWin : undefined}>{p.us}</b>
-        <i>:</i>
-        <b>{p.them}</b>
-      </span>
-    </button>
+      <button type="button" className={styles.cardMain} onClick={onOpen} title="박스스코어 간단히 보기">
+        <span className={styles.when}>
+          <b>{mmdd(game.game_date)}</b>
+          <small>{koDayOfWeek(game.game_date)}</small>
+        </span>
+        <span className={p.won ? styles.resW : styles.resL}>{p.won ? "승" : "패"}</span>
+        <span className={styles.opp}>
+          <span className={styles.ha}>{p.isHome ? "홈" : "원정"}</span>
+          <TeamPlate team={badge(opp)} size={30} />
+          <TeamName team={opp} />
+          <Tags game={game} />
+        </span>
+        <span className={styles.score}>
+          <b className={p.won ? styles.scoreWin : undefined}>{p.us}</b>
+          <i>:</i>
+          <b>{p.them}</b>
+        </span>
+      </button>
+      <RelayLink game={game} />
+    </div>
   );
 }
 
@@ -128,14 +151,17 @@ function VersusCard({ game, index, onOpen }: { game: SeasonGameRow; index: numbe
     </span>
   );
   return (
-    <button type="button" className={styles.card} style={{ "--i": index } as CSSProperties} onClick={onOpen}>
-      {side(h, game.home_score, hWin, false)}
-      <span className={styles.mid}>
-        <i>:</i>
-        <Tags game={game} />
-      </span>
-      {side(a, game.away_score, !hWin, true)}
-    </button>
+    <div className={styles.card} style={{ "--i": index } as CSSProperties}>
+      <button type="button" className={styles.cardMain} onClick={onOpen} title="박스스코어 간단히 보기">
+        {side(h, game.home_score, hWin, false)}
+        <span className={styles.mid}>
+          <i>:</i>
+          <Tags game={game} />
+        </span>
+        {side(a, game.away_score, !hWin, true)}
+      </button>
+      <RelayLink game={game} />
+    </div>
   );
 }
 
@@ -288,6 +314,7 @@ export default function SeasonBrowserBoard({ games }: { games: SeasonGameRow[] }
       <div className={styles.countLine}>
         <DribbleBall />
         <b>{rows.length}</b>경기{active ? ` · ${active.team.name}` : ""}
+        <span className={styles.hint}>카드 = 간단히 보기(팝업) · 중계 = 경기 중계 화면</span>
       </div>
 
       {rows.length === 0 ? (

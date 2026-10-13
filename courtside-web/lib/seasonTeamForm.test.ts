@@ -8,6 +8,7 @@ import {
   listTeams,
   orderCategories,
   perspective,
+  relayHref,
 } from "./seasonTeamForm";
 
 const A = { tcode: "01", name: "에이", abbr: "AAA", color: "#111111", logo_url: null };
@@ -70,6 +71,11 @@ describe("helpers", () => {
     expect(perspective(games[1], "01")).toMatchObject({ isHome: false, us: 90, them: 60, won: true });
     expect(perspective(games[1], "01").opp?.tcode).toBe("03");
     expect(involves(games[1], "02")).toBe(false);
+  });
+
+  it("relayHref: 경기 페이지의 실시간 중계 탭으로", () => {
+    expect(relayHref("S49G14N1")).toBe("/games/S49G14N1?tab=live");
+    expect(relayHref("a b")).toBe("/games/a%20b?tab=live");
   });
 
   it("koDayOfWeek / categoryTag / orderCategories", () => {

@@ -141,3 +141,12 @@ export function categoryTag(category: string): string | null {
   if (category === "OPEN MATCH DAY") return "OMD";
   return category;
 }
+
+/**
+ * 경기 중계 화면 주소 = 경기 페이지의 "실시간 중계" 탭(스코어보드·코트 위 선수·플레이바이플레이·슛차트
+ * 리플레이). 종료된 경기의 기본 탭은 AI 분석(post)이라 ?tab=live를 붙여야 중계가 바로 열린다.
+ * 팝업(간단히 보기)과 이 링크(중계)가 시즌 브라우저의 두 가지 보기 방식이다.
+ */
+export function relayHref(gmkey: string): string {
+  return `/games/${encodeURIComponent(gmkey)}?tab=live`;
+}

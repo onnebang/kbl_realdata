@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { TeamBadge } from "./TeamBadge";
 import type { SeasonGameRow } from "@/lib/seasonBrowser";
+import { relayHref } from "@/lib/seasonTeamForm";
 import styles from "@/app/season-browser/season-browser.module.css";
 
 // web/season_browser_template.html의 openBoxScore()/renderQuarterTable()/tsBarHtml()/
@@ -173,6 +175,12 @@ export default function SeasonBrowserModal({ game, onClose }: { game: SeasonGame
     };
   }, [game.gmkey, game.home_team?.tcode, game.away_team?.tcode]);
 
+  // 열리면 닫기 버튼으로 포커스(키보드·스크린리더가 팝업 안에서 시작하게). Esc 닫기는 아래에 이미 있다.
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -204,12 +212,17 @@ export default function SeasonBrowserModal({ game, onClose }: { game: SeasonGame
 
   return (
     <div className={styles.bsOverlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={styles.bsBox}>
+      <div
+        className={styles.bsBox}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${game.home_team?.name ?? "홈"} 대 ${game.away_team?.name ?? "원정"} 박스스코어`}
+      >
         <div className={styles.bsHead}>
           <div className={`${styles.bsMeta} ${styles.bsMetaLeft}`}>
             {fmtDate(game.game_date)} · {game.season_category}
           </div>
-          <button type="button" className={styles.bsClose} onClick={onClose} aria-label="닫기">
+          <button ref={closeRef} type="button" className={styles.bsClose} onClick={onClose} aria-label="닫기">
             &times;
           </button>
         </div>
@@ -230,6 +243,17 @@ export default function SeasonBrowserModal({ game, onClose }: { game: SeasonGame
             <TeamBadge team={away ? { ...away, logoUrl: away.logo_url } : null} size={44} />
             <div className={styles.bsTeamName}>{away?.name ?? "?"}</div>
           </div>
+        </div>
+
+        {/* 두 번째 보기 방식: 경기 페이지의 실시간 중계 탭(리플레이·플레이바이플레이·슛차트). */}
+        <div className={styles.bsActions}>
+          <Link href={relayHref(game.gmkey)} prefetch={false} className={styles.bsRelay}>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
+              <path d="M10 8.2v7.6L16.2 12z" fill="var(--home)" />
+            </svg>
+            중계로 보기
+          </Link>
         </div>
 
         {loadError && <div className={styles.modalLoading}>박스스코어를 불러오지 못했습니다.</div>}
