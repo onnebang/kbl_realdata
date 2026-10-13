@@ -101,16 +101,45 @@
   flex-direction: column;
 }
 
+/* 행 뒤에 팀 색 승률 막대(--w = 승률%)를 깐다. 팀 색 --tb는 teamBarStyle()이 내려준 --tb-l/--tb-d 중 테마에 맞는
+   쪽 - 테마 토글이 없고 다크는 prefers-color-scheme 하나뿐이라 아래 미디어쿼리 한 곳에서 고른다. */
 .standingRow {
+  --tb: var(--tb-l, var(--ink-faint));
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: 28px minmax(130px, 1fr) 48px 58px 48px;
   align-items: center;
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 14px;
   border-bottom: 1px solid rgba(var(--line-rgb), 0.08);
   color: inherit;
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .standingRow {
+    --tb: var(--tb-d, var(--ink-faint));
+  }
+}
+
+:root[data-theme="dark"] .standingRow {
+  --tb: var(--tb-d, var(--ink-faint));
+}
+
+.standingRow::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: -1;
+  width: var(--w, 0%);
+  border-radius: 0 8px 8px 0;
+  background: var(--tb);
+  opacity: 0.13;
+  transform-origin: left;
 }
 
 .standingRow:hover {
@@ -423,6 +452,37 @@
   font-family: "IBM Plex Mono", monospace;
   font-size: 8px;
   font-style: normal;
+}
+
+/* 순위 막대는 위에서부터 차례로 차오르고(오버슈트), 행에 마우스를 올리면 살짝 밀린다.
+   로고 플레이트의 흔들림은 TeamPlate.module.css가 담당. 줄이기 설정이면 정지. */
+@media (prefers-reduced-motion: no-preference) {
+  .standingRow {
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease;
+  }
+
+  .standingRow:hover {
+    transform: translateX(4px);
+  }
+
+  .standingRow::before {
+    animation: barGrow 0.8s cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 50ms);
+  }
+
+  .gameLine {
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease;
+  }
+
+  .gameLine:hover {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes barGrow {
+  from {
+    transform: scaleX(0);
+  }
 }
 
 @media (max-width: 900px) {

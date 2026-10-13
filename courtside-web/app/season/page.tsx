@@ -1,13 +1,15 @@
+import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SeasonNav } from "@/components/SeasonNav";
-import { TeamBadge } from "@/components/TeamBadge";
+import { TeamPlate } from "@/components/TeamPlate";
 import { getTeams, shortSeason } from "@/lib/preseason";
 import { getLeaderboardSeasons, getSeasonLeaderboards } from "@/lib/seasonLeaders";
 import { getStandingsAsOfCached } from "@/lib/teamPageData";
 import { getRoundAwards } from "@/lib/roundAwards";
 import { getSeasonSchedule, type SeasonScheduleRow, type SeasonTeamRef } from "@/lib/seasonBrowser";
 import { signed, signTone } from "@/lib/format";
+import { teamBarStyle } from "@/lib/teamAccent";
 import hub from "./season-hub.module.css";
 
 export const dynamic = "force-dynamic";
@@ -39,9 +41,9 @@ function GameLine({ game, mode }: { game: SeasonScheduleRow; mode: "upcoming" | 
         <span>{mode === "result" ? "종료" : game.game_start?.slice(0, 5) ?? "시간 미정"}</span>
       </div>
       <div className={hub.gameMatchup}>
-        <span><TeamBadge team={teamBadge(game.away_team)} size={20} />{game.away_team?.abbr ?? "원정"}</span>
+        <span><TeamPlate team={teamBadge(game.away_team)} size={20} />{game.away_team?.abbr ?? "원정"}</span>
         <b>{score ?? "vs"}</b>
-        <span>{game.home_team?.abbr ?? "홈"}<TeamBadge team={teamBadge(game.home_team)} size={20} /></span>
+        <span>{game.home_team?.abbr ?? "홈"}<TeamPlate team={teamBadge(game.home_team)} size={20} /></span>
       </div>
       <span className={hub.gameArrow}>→</span>
     </Link>
@@ -162,9 +164,14 @@ export default async function SeasonHubPage({
               const badge = team ? { name: team.name, abbr: team.abbr, color: team.color, logoUrl: team.logoUrl } : null;
               const played = row.wins + row.losses;
               return (
-                <Link key={row.tcode} href={`/teams/${row.tcode}`} className={hub.standingRow}>
+                <Link
+                  key={row.tcode}
+                  href={`/teams/${row.tcode}`}
+                  className={hub.standingRow}
+                  style={{ ...teamBarStyle(team?.color), "--w": `${(played ? row.pct : 0) * 100}%`, "--i": index } as CSSProperties}
+                >
                   <span className={`${hub.rank} ${index < 2 ? hub.rankDirect : index < 6 ? hub.rankPlayoff : ""}`}>{index + 1}</span>
-                  <span className={hub.teamName}><TeamBadge team={badge} size={22} />{team?.name ?? row.tcode}</span>
+                  <span className={hub.teamName}><TeamPlate team={badge} size={22} />{team?.name ?? row.tcode}</span>
                   <span className={hub.record}>{row.wins}-{row.losses}</span>
                   <strong>{played ? (row.pct * 100).toFixed(1) : "0.0"}%</strong>
                   <span className={diffClass(row.diff)}>{played ? signed(row.diff, 1) : "-"}</span>

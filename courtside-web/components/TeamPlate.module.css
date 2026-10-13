@@ -1,0 +1,41 @@
+/* 팀 로고 플레이트. 링 색(--tb)은 teamBarStyle()이 내려보낸 --tb-l/--tb-d 중 테마에 맞는 쪽 -
+   테마 토글이 없고 다크는 prefers-color-scheme 하나뿐이라 아래 미디어쿼리 한 곳에서 고른다
+   (OnCourtCards.module.css와 같은 규약). */
+.plate {
+  --tb: var(--tb-l, var(--ink-faint));
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 3px;
+  border-radius: 50%;
+  /* 플레이트는 테마와 무관하게 흰색 - 로고가 어두운 단색이어도 보이게 하는 게 목적이다. */
+  background: #fff;
+  box-shadow: 0 0 0 2px var(--tb);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .plate {
+    --tb: var(--tb-d, var(--ink-faint));
+  }
+}
+
+:root[data-theme="dark"] .plate {
+  --tb: var(--tb-d, var(--ink-faint));
+}
+
+/* TeamBadge의 로고판은 자체 배경·테두리·여백이 있다 - 플레이트 안에서는 플레이트가 대신한다. */
+.plate :global(.team-badge.has-logo) {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+/* 링크·버튼 위에 올리면 통통 튄다. 움직임을 줄이라는 설정이면 아무것도 하지 않는다. */
+@media (prefers-reduced-motion: no-preference) {
+  .plate {
+    transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  :global(a):hover .plate,
+  :global(button):hover:not(:disabled) .plate {
+    transform: rotate(-9deg) scale(1.14);
+  }
+}

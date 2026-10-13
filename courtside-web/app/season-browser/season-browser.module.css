@@ -129,121 +129,871 @@
   opacity: 0.9;
 }
 
-.filters {
-  display: flex;
-  gap: 8px;
-  margin: 16px 0;
-  flex-wrap: wrap;
+/* ── 팀 시선 시즌 브라우저 ──────────────────────────────────────────────────
+   팀 색은 두 쌍으로만 쓴다: --tb(막대·링·테두리 - 비텍스트 3:1) / --ti(글자 4.5:1). 둘 다 서버가
+   teamBarStyle/teamInkStyle로 --*-l/--*-d 한 쌍씩 내려보내고, 테마 토글이 없어 다크는
+   prefers-color-scheme 하나뿐이라 아래 한 곳에서 고른다(OnCourtCards.module.css와 같은 규약).
+   예외는 .hero: 팀 색을 배경 면(--tc)으로 칠하고 그 위 글자색(--on)을 대비로 고르는 자기완결 블록이다.
+   움직임은 맨 아래 한 블록(prefers-reduced-motion: no-preference)에만 있다 - 줄이기 설정이면 전부 정지. */
+
+.pageRoot {
+  --on-sem: #ffffff;
 }
-.filters input,
-.filters select {
-  font-family: "Pretendard", sans-serif;
-  font-size: 13px;
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid rgba(var(--line-rgb), 0.16);
-  border-radius: 9px;
-  padding: 9px 12px;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pageRoot {
+    --on-sem: #0b0d12;
+  }
 }
-.filters input {
-  flex: 1;
-  min-width: 140px;
+:root[data-theme="dark"] .pageRoot {
+  --on-sem: #0b0d12;
 }
 
-.panel {
+.tile,
+.card,
+.side,
+.hero {
+  --tb: var(--tb-l, var(--ink-faint));
+  --ti: var(--ti-l, var(--ink));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tile,
+  :root:not([data-theme="light"]) .card,
+  :root:not([data-theme="light"]) .side,
+  :root:not([data-theme="light"]) .hero {
+    --tb: var(--tb-d, var(--ink-faint));
+    --ti: var(--ti-d, var(--ink));
+  }
+}
+:root[data-theme="dark"] .tile,
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .side,
+:root[data-theme="dark"] .hero {
+  --tb: var(--tb-d, var(--ink-faint));
+  --ti: var(--ti-d, var(--ink));
+}
+
+/* 버튼·입력은 폰트를 상속하지 않는다. */
+.tile,
+.chip,
+.sort,
+.card,
+.tools input {
+  font: inherit;
+}
+
+/* ── 팀 레일 ─────────────────────────────────────────────────────────── */
+.rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+  /* 위·아래 여백: 호버로 떠오르는 타일과 선택 그림자가 잘리지 않게. */
+  margin: 14px 0 4px;
+  padding: 8px 3px 12px;
+}
+
+.tile {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 108px;
+  padding: 11px 4px 10px;
+  color: var(--ink);
   background: var(--surface);
   border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-top: 4px solid var(--tb);
   border-radius: var(--r-card);
-  overflow: hidden;
-}
-/* 행 전체가 버튼(박스스코어 모달을 연다)이라 손가락 표적 44px를 항상 지킨다. */
-.gameRow {
-  display: grid;
-  grid-template-columns: 78px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 10px 14px;
-  border-bottom: 1px solid rgba(var(--line-rgb), 0.08);
   cursor: pointer;
-  font-size: 13px;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border-left: none;
-  border-right: none;
-  border-top: none;
-  color: inherit;
 }
-.gameRow:last-child {
-  border-bottom: none;
+.tile:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
-.gameRow:hover {
-  background: var(--surface-soft);
+/* 선택된 타일: 팀 색 링 + 옅은 팀 색 면(::before는 isolation 안에서 내용물 뒤로). */
+.tileOn {
+  box-shadow: 0 0 0 2px var(--tb), 0 12px 20px -10px var(--tb);
 }
-/* 날짜(2025.03.14)와 "PO" 배지는 기계가 읽는 코드라 모노 유지. */
-.grDate {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 12.5px;
-  color: var(--ink-faint);
+.tileOn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--tb);
+  opacity: 0.15;
 }
-/* 배지는 데이터 조각이라 하드 엣지(--r-led). */
-.grCat {
-  display: inline-block;
-  font-family: "IBM Plex Mono", monospace;
+
+.tileAbbr {
+  font-family: "Big Shoulders Display", "Pretendard", sans-serif;
+  font-weight: 800;
+  font-size: 19px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+.tileRec {
+  color: var(--ink-soft);
   font-size: var(--fs-100);
-  color: var(--gold);
-  background: var(--gold-soft);
-  border-radius: var(--r-led);
-  padding: 1px 4px;
-  margin-top: 2px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
-.grMatchup {
+/* "전체 팀" 타일 - 한글이라 Pretendard, 로고 자리(플레이트 36px)와 같은 높이의 ALL 마크. */
+.tileAll .tileAbbr {
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+}
+.tileAllMark {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.grTeam {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.grVs {
-  color: var(--ink-faint);
-  font-size: 12.5px;
-}
-/* 경기 행의 주인공은 점수다 - 행 안에서 가장 큰 것(팀 이름 13px, 날짜 12.5px).
-   숫자와 "-"만 들어오는 자리라 한글 폴백 위험이 없다. */
-.grScore {
+  height: 36px;
   font-family: "Big Shoulders Display", sans-serif;
   font-weight: 800;
-  font-size: var(--fs-500);
-  line-height: var(--lh-tight);
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
+  font-size: 30px;
+  line-height: 1;
+}
+
+/* 최근 폼. 승=채운 점 / 패=속 빈 점(색을 못 봐도 구분). 히어로에서는 "승"/"패" 글자 칩. */
+.formDots {
+  display: inline-flex;
+  gap: 3px;
+  min-height: 8px;
+  margin-top: 2px;
+}
+.formDots i {
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.formDots .fW {
+  background: var(--positive);
+}
+.formDots .fL {
+  border: 2px solid var(--negative);
+}
+.formChips {
+  display: inline-flex;
+  gap: 6px;
+}
+.formChips i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 800;
+}
+.formChips .fW {
+  background: var(--on);
+  color: var(--tc);
+}
+.formChips .fL {
+  border: 2px solid var(--on);
+  color: var(--on);
+}
+
+/* ── 팀 히어로 ───────────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "main stats" "form stats";
+  align-items: center;
+  gap: 12px 24px;
+  margin: 10px 0 4px;
+  padding: 20px 24px;
+  color: var(--on);
+  background: linear-gradient(115deg, rgba(0, 0, 0, 0) 35%, rgba(0, 0, 0, 0.3) 100%), var(--tc);
+  border: 2px solid var(--tb);
+  border-radius: var(--r-card);
+}
+/* 사선 속도선 - 면에 질감만 준다. */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: repeating-linear-gradient(115deg, var(--sl, rgba(255, 255, 255, 0.1)) 0 12px, transparent 12px 32px);
+}
+.heroGhost {
+  position: absolute;
+  right: 16px;
+  bottom: -26px;
+  z-index: -1;
+  color: var(--on);
+  opacity: 0.08;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 160px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  pointer-events: none;
+  user-select: none;
+}
+@media (min-width: 1000px) {
+  .heroGhost {
+    right: 330px;
+    opacity: 0.1;
+  }
+}
+.heroMain {
+  grid-area: main;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.heroKicker {
+  display: block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: var(--fs-100);
+  letter-spacing: 0.04em;
+}
+.heroName {
+  margin: 2px 0 0;
+  font-family: "Pretendard", system-ui, sans-serif;
+  font-weight: 800;
+  font-size: clamp(26px, 4vw, 38px);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+.heroRec {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.heroRec b {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 32px;
+  line-height: 1;
+}
+.heroPct {
+  margin-left: 10px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--chip);
+  font-size: 13px;
+}
+.heroStats {
+  grid-area: stats;
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 8px;
+  margin: 0;
+}
+.heroStats div {
+  min-width: 88px;
+  padding: 8px 12px 9px;
+  border-radius: 12px;
+  background: var(--chip);
+}
+.heroStats dt {
+  font-size: var(--fs-100);
+  font-weight: 600;
+}
+.heroStats dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 800;
   white-space: nowrap;
 }
-.win {
-  color: var(--home);
+.heroStats dd b {
+  margin-right: 2px;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1;
 }
-.grEmpty {
-  padding: 30px;
-  text-align: center;
-  color: var(--ink-faint);
+.heroForm {
+  grid-area: form;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 13px;
+  font-weight: 700;
+}
+
+/* ── 도구줄 ──────────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  margin: 16px 0 8px;
+}
+.chips,
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.chip,
+.sort,
+.tools input {
+  min-height: 44px;
+  padding: 0 15px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1.5px solid rgba(var(--line-rgb), 0.2);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.chip,
+.sort {
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chip {
+  color: var(--ink-soft);
+}
+.chip small {
+  margin-left: 5px;
+  font-size: var(--fs-100);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.chipOn {
+  color: var(--bg);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.tools input {
+  min-width: 150px;
+  font-weight: 600;
+}
+.tools input::placeholder {
+  color: var(--ink-faint);
+}
+
+.tile:focus-visible,
+.chip:focus-visible,
+.sort:focus-visible,
+.card:focus-visible,
+.tools input:focus-visible {
+  outline: 3px solid var(--home);
+  outline-offset: 2px;
 }
 
 .countLine {
-  font-size: 12px;
-  color: var(--ink-faint);
-  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 6px 2px 10px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 600;
 }
+.countLine b {
+  color: var(--ink);
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 1;
+}
+/* 농구공 - 이 화면의 유일한 상시 모션(아래 dribble). 줄이기 설정이면 가만히 서 있는다. */
+.ball {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-end;
+  width: 22px;
+  height: 27px;
+}
+.ball svg {
+  display: block;
+  transform-origin: 50% 100%;
+}
+.ball::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 0;
+  left: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(var(--line-rgb), 0.22);
+}
+
+/* ── 경기 카드 ───────────────────────────────────────────────────────── */
+.day {
+  margin-top: 16px;
+}
+.dayHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+.dayHead b {
+  color: var(--ink);
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1;
+}
+.dayHead i {
+  flex: 1;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(var(--line-rgb), 0.1);
+}
+.dayHead small {
+  color: var(--ink-faint);
+  font-size: var(--fs-100);
+  font-weight: 600;
+}
+.dayGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.focusList {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid rgba(var(--line-rgb), 0.14);
+  border-radius: var(--r-card);
+  cursor: pointer;
+}
+.card:hover {
+  border-color: rgba(var(--line-rgb), 0.32);
+}
+
+/* 전체 보기 카드 - 양끝이 팀, 가운데가 점수. 바닥 5px 띠가 각 팀 색(진 쪽은 옅게). */
+.side {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 13px 14px 17px;
+}
+.side::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 5px;
+  background: var(--tb);
+}
+.sideLoss::after {
+  opacity: 0.3;
+}
+.sideRight {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+.name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nameAbbr {
+  display: none;
+}
+.sideWin .name {
+  font-weight: 800;
+}
+.sideLoss .name {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.sideScore {
+  margin-left: auto;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 34px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.sideRight .sideScore {
+  margin-right: auto;
+  margin-left: 0;
+}
+.sideWin .sideScore {
+  color: var(--ti);
+}
+.sideLoss .sideScore {
+  color: var(--ink-faint);
+  font-size: 28px;
+}
+.mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 70px;
+  padding-bottom: 5px;
+}
+.mid i {
+  color: var(--ink-faint);
+  font-family: "Big Shoulders Display", sans-serif;
+  font-style: normal;
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1;
+}
+.mid .tags {
+  flex-direction: column;
+}
+
+.tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tag,
+.close {
+  padding: 1px 6px;
+  border-radius: var(--r-led);
+  font-size: var(--fs-100);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.tag {
+  color: var(--gold);
+  background: var(--gold-soft);
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+}
+.close {
+  color: var(--home);
+  background: var(--home-soft);
+  font-weight: 800;
+}
+
+/* 팀 선택 시 카드 - 그 팀 시선. 왼쪽 6px 팀 색 띠, 승/패 칩이 가장 먼저 읽힌다. */
+.cardFocus {
+  grid-template-columns: 58px 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 62px;
+  padding: 9px 18px 9px 20px;
+}
+.cardFocus::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 6px;
+  background: var(--tb);
+}
+.when {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.when b {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+}
+.when small {
+  color: var(--ink-faint);
+  font-size: var(--fs-100);
+  font-weight: 600;
+}
+.resW,
+.resL {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--on-sem);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 800;
+}
+.resW {
+  background: var(--positive);
+}
+.resL {
+  background: var(--negative);
+}
+.opp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.ha {
+  flex: none;
+  padding: 2px 7px;
+  color: var(--ink-soft);
+  background: var(--surface-soft);
+  border-radius: var(--r-led);
+  font-size: var(--fs-100);
+  font-weight: 700;
+}
+.cardFocus .name {
+  font-weight: 700;
+}
+.score {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--ink-faint);
+  font-family: "Big Shoulders Display", sans-serif;
+  font-weight: 800;
+  font-size: 30px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.score i {
+  font-style: normal;
+  font-size: 20px;
+}
+.scoreWin {
+  color: var(--ti);
+}
+
+.grEmpty {
+  padding: 30px;
+  color: var(--ink-faint);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* 모션 - 전부 transform/opacity만. 통통 튀는 느낌은 오버슈트 이징(cubic-bezier .34,1.56,.64,1). */
+@media (prefers-reduced-motion: no-preference) {
+  .tile,
+  .chip,
+  .sort,
+  .card {
+    transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .tile:hover:not(:disabled) {
+    transform: translateY(-4px) rotate(-1.5deg);
+  }
+  .tileOn,
+  .tileOn:hover:not(:disabled) {
+    transform: translateY(-4px);
+    animation: popTile 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .tile:active:not(:disabled),
+  .chip:active,
+  .sort:active {
+    transform: scale(0.94);
+  }
+  .chip:hover {
+    transform: translateY(-2px);
+  }
+  .card {
+    animation: rise 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 32ms);
+  }
+  .card:hover {
+    transform: translateY(-3px) scale(1.012);
+    box-shadow: 0 12px 18px -14px rgba(var(--line-rgb), 0.6);
+  }
+  .card:active {
+    transform: scale(0.985);
+  }
+  .hero {
+    animation: heroIn 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
+  }
+  .heroMain > :first-child {
+    animation: logoPop 0.75s 0.12s cubic-bezier(0.34, 1.8, 0.64, 1) backwards;
+  }
+  .formChips i {
+    animation: chipPop 0.45s cubic-bezier(0.34, 1.8, 0.64, 1) backwards;
+    animation-delay: calc(0.3s + var(--k, 0) * 70ms);
+  }
+  .ball svg {
+    animation: dribble 0.95s infinite;
+  }
+  .ball::after {
+    animation: ballShadow 0.95s infinite;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+}
+@keyframes popTile {
+  0% {
+    transform: translateY(0) scale(0.88);
+  }
+  55% {
+    transform: translateY(-10px) scale(1.07);
+  }
+  100% {
+    transform: translateY(-4px) scale(1);
+  }
+}
+@keyframes heroIn {
+  from {
+    opacity: 0;
+    transform: translateX(-16px) scale(0.97);
+  }
+}
+@keyframes logoPop {
+  from {
+    opacity: 0;
+    transform: rotate(-24deg) scale(0.3);
+  }
+}
+@keyframes chipPop {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
+/* 바닥에서 눌렸다가(squash) 솟고, 내려오며 가속 - 위로는 감속, 아래로는 가속 이징을 키프레임마다 건다. */
+@keyframes dribble {
+  0%,
+  100% {
+    transform: translateY(0) scale(1.14, 0.86);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  50% {
+    transform: translateY(-4px) scale(1, 1);
+    animation-timing-function: cubic-bezier(0.7, 0, 0.8, 0.3);
+  }
+  100% {
+    transform: translateY(0) scale(1.14, 0.86);
+  }
+}
+@keyframes ballShadow {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scaleX(1.1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scaleX(0.6);
+  }
+}
+
+@media (max-width: 899px) {
+  /* 레일은 한 줄 가로 스크롤(스냅). 11개를 억지로 줄바꿈하면 마지막 줄만 남는다. */
+  .rail {
+    grid-auto-columns: 94px;
+    margin-right: -12px;
+    margin-left: -12px;
+    padding-right: 12px;
+    padding-left: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+  .rail::-webkit-scrollbar {
+    display: none;
+  }
+  .tile {
+    scroll-snap-align: start;
+  }
+  .dayGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .nameFull {
+    display: none;
+  }
+  .nameAbbr {
+    display: inline;
+    font-weight: 800;
+  }
+  .side {
+    gap: 7px;
+    padding: 12px 10px 16px;
+  }
+  .sideScore {
+    font-size: 28px;
+  }
+  .sideLoss .sideScore {
+    font-size: 24px;
+  }
+  .mid {
+    width: 50px;
+  }
+  .hero {
+    grid-template-columns: 1fr;
+    grid-template-areas: "main" "stats" "form";
+    padding: 16px;
+  }
+  .heroGhost {
+    font-size: 110px;
+  }
+  .heroStats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .heroStats div {
+    min-width: 0;
+    padding: 7px 9px 8px;
+  }
+  .cardFocus {
+    grid-template-columns: 50px 34px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px 12px 8px 16px;
+  }
+  .opp {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .cardFocus .tags {
+    flex-basis: 100%;
+  }
+  .score {
+    font-size: 26px;
+  }
+  .tools {
+    width: 100%;
+  }
+  .tools input {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 
 /* 박스스코어 모달 */
 .bsOverlay {
