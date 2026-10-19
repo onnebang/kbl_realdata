@@ -7,7 +7,7 @@ import { attachDerivedFields, buildPostgameReport, recordChanceList, type GameEv
 import { DataSectionBody } from "@/components/report/DataSectionBody";
 import { HtmlSectionRenderer } from "@/components/report/HtmlSectionRenderer";
 import { HighlightReel } from "@/components/report/HighlightReel";
-import { TeamSplitBar, awayFillBackground, isColorSimilar } from "@/components/report/TeamSplitBar";
+import { TeamPctBar, TeamSplitBar, awayFillBackground, isColorSimilar } from "@/components/report/TeamSplitBar";
 import { teamInkStyle } from "@/lib/teamAccent";
 import { pregameInsightItems, type PregameFeatures } from "@/lib/pregameInsights";
 import { getGameRarity } from "@/lib/rarity";
@@ -409,40 +409,9 @@ function tsBarRow(
 ) {
   return <TeamSplitBar key={label} label={label} hVal={hVal} aVal={aVal} hDisp={hDisp} aDisp={aDisp} hColor={hColor} aColor={aColor} />;
 }
-// 요청: "같은 40%라도 3점 10개 들어간 40%랑 3개 들어간 40%는 다른 느낌을 주도록" - 예전엔
-// 성공률(%) 값 자체를 45:38처럼 나눠서, 시도 수가 아무리 달라도 같은 %면 항상 반반으로
-// 보였음. 이제 막대 "길이"는 두 팀의 시도(attempts) 합계 대비 비중으로 나누고, 그 안에서
-// "채워진 정도"만 성공률을 나타내도록 이중 구조로 변경 - 시도가 많은 쪽은 막대 자체가 길어져
-// 볼륨 차이가 먼저 눈에 들어오고, 그 안의 채움 비율로 효율을 따로 읽음.
+// 성공률 막대(길이 = 시도 비중, 채움 = 성공률)는 실시간 '팀 스탯'과 같이 쓰려고 TeamSplitBar.tsx의 TeamPctBar로 옮겼다.
 function tsPctRow(label: string, hMade: number, hAtt: number, aMade: number, aAtt: number, hColor: string, aColor: string) {
-  const hPct = fgPct(hMade, hAtt);
-  const aPct = fgPct(aMade, aAtt);
-  const totalAtt = hAtt + aAtt;
-  const hShare = totalAtt > 0 ? (hAtt / totalAtt) * 100 : 50;
-  return (
-    <div className="ts-row" key={label}>
-      <div className="ts-nums">
-        <span className="ts-home team-ink" style={teamInkStyle(hColor)}>
-          {hPct}% <span className="ts-raw">{hMade}-{hAtt}</span>
-        </span>
-        <span className="ts-label">{label}</span>
-        <span className="ts-away team-ink" style={teamInkStyle(aColor)}>
-          <span className="ts-raw">{aMade}-{aAtt}</span> {aPct}%
-        </span>
-      </div>
-      <div className="ts-bar">
-        <div className="ts-bar-seg" style={{ width: `${hShare}%` }}>
-          <div className="ts-bar-seg-fill" style={{ width: `${hPct}%`, right: 0, background: hColor }} />
-        </div>
-        <div className="ts-bar-seg" style={{ width: `${100 - hShare}%` }}>
-          <div
-            className="ts-bar-seg-fill"
-            style={{ width: `${aPct}%`, left: 0, background: awayFillBackground(hColor, aColor) }}
-          />
-        </div>
-      </div>
-    </div>
-  );
+  return <TeamPctBar key={label} label={label} hMade={hMade} hAtt={hAtt} aMade={aMade} aAtt={aAtt} hColor={hColor} aColor={aColor} />;
 }
 function tsCountRow(label: string, hVal: number, aVal: number, hColor: string, aColor: string) {
   return tsBarRow(label, hVal, aVal, hVal, aVal, hColor, aColor);
@@ -451,11 +420,6 @@ function tsCountRow(label: string, hVal: number, aVal: number, hColor: string, a
 // 시즌 평균은 소수 1자리라 tsCountRow처럼 정수 그대로 쓰지 않고 toFixed(1) 문자열로 표시.
 function tsAvgRow(label: string, hVal: number, aVal: number, hColor: string, aColor: string) {
   return tsBarRow(label, hVal, aVal, hVal.toFixed(1), aVal.toFixed(1), hColor, aColor);
-}
-function fgPct(m: number | null | undefined, a: number | null | undefined) {
-  const mm = m ?? 0,
-    aa = a ?? 0;
-  return aa > 0 ? Math.round((mm / aa) * 100) : 0;
 }
 
 /**
@@ -632,7 +596,8 @@ export default async function GamePage({
         getHeadToHead(game.home_team.tcode, game.away_team.tcode, game.game_date),
         null
       ),
-      soft("standings", getStandingsAsOf(game.season_name, game.game_date), []),
+      // 이 경기는 뺀다 - 종료 경기면 날짜 기준만으로는 이 경기 결과가 이미 들어가 "이 경기 시점 기준" 표와 실시간 순위표(결과를 직접 더한다)가 틀어진다.
+      soft("standings", getStandingsAsOf(game.season_name, game.game_date, gmkey), []),
       soft(
         "allTeams",
         // PostgREST 빌더는 PromiseLike(then만 있고 catch가 없다) - Promise로 감싸야 폴백이 붙는다.
@@ -727,6 +692,13 @@ export default async function GamePage({
   const teamMetaByTcode = new Map(
     allTeams.map((t) => [t.tcode, { ...t, name: displayTeamName(t.tcode, t.name, game.season_name) }])
   );
+  // 실시간 리그 순위표(GameReplay -> components/LiveStandings.tsx) 재료 - 정규시즌 경기만(플레이오프는 순위가 이미 끝났다).
+  // 투영에 필요한 칸만 보낸다(연승·최근10 등은 안 쓴다).
+  const liveStandings =
+    game.season_category === "정규시즌" && standings.length > 0 ? standings.map(({ tcode, wins, losses, pct, diff }) => ({ tcode, wins, losses, pct, diff })) : undefined;
+  const standingTeams = liveStandings
+    ? Object.fromEntries([...teamMetaByTcode].map(([tcode, t]) => [tcode, { name: t.name, abbr: t.abbr, color: t.color, logoUrl: t.logo_url }]))
+    : undefined;
 
   // 요청: "선수 기록과 인터랙티브 리플레이의 선수기록이 중복" - 독립 선수기록 패널을
   // 없애고 GameReplay의 boxTable로 흡수시키면서, 그쪽에서도 선발/벤치 구분선을 그리려면
@@ -1285,6 +1257,8 @@ export default async function GamePage({
             milestones={milestones}
             records={records}
             streaks={streaks}
+            standings={liveStandings}
+            standingTeams={standingTeams}
             live={status === "live"}
             /* action_codes 33행 맵(약 800B). 예전엔 라이브 경기에만 보냈지만, 행마다 라벨
                문자열을 박는 것(14,060B)보다 압도적으로 싸서 이제 항상 보낸다. 복원 규칙은
@@ -1376,7 +1350,10 @@ export default async function GamePage({
           <div className="panel-title">팀 스탯</div>
           {homeTeam && awayTeam ? (
             <>
-              {tsPctRow("FG%", homeTeam.fgm ?? 0, homeTeam.fga ?? 0, awayTeam.fgm ?? 0, awayTeam.fga ?? 0, hColor, aColor)}
+              {/* game_team_stats의 fgm/fga는 2점 전용이다(lib/report/fourFactors.ts 주석) - 전체 야투는 3점을 더한다. 예전엔 2점 성공률이
+                  "FG%"로 나갔다(실측 2026-10-19: 이번 시즌 56팀-경기 전부 fgm = 2점 성공 수). */}
+              {tsPctRow("FG%", (homeTeam.fgm ?? 0) + (homeTeam.tpm ?? 0), (homeTeam.fga ?? 0) + (homeTeam.tpa ?? 0), (awayTeam.fgm ?? 0) + (awayTeam.tpm ?? 0), (awayTeam.fga ?? 0) + (awayTeam.tpa ?? 0), hColor, aColor)}
+              {tsPctRow("2PT%", homeTeam.fgm ?? 0, homeTeam.fga ?? 0, awayTeam.fgm ?? 0, awayTeam.fga ?? 0, hColor, aColor)}
               {tsPctRow("3PT%", homeTeam.tpm ?? 0, homeTeam.tpa ?? 0, awayTeam.tpm ?? 0, awayTeam.tpa ?? 0, hColor, aColor)}
               {tsPctRow("FT%", homeTeam.ftm ?? 0, homeTeam.fta ?? 0, awayTeam.ftm ?? 0, awayTeam.fta ?? 0, hColor, aColor)}
               {tsCountRow("턴오버", homeTeam.turnovers ?? 0, awayTeam.turnovers ?? 0, hColor, aColor)}

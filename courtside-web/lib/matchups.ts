@@ -3,6 +3,7 @@ import { displayTeamName } from "./teamNames";
 import { deriveGameStatus, type GameStatus } from "./gameStatus";
 import { PRESEASON_SEASON, isRealGmkey } from "./preseason";
 import { cachedFn, TTL } from "./cachePolicy";
+import { gamesBehind, standingsOrder } from "./liveStandings";
 
 // courtside_template.html의 renderMatchups()/renderStandings()가 쓰던 pregameDetail(h2h/
 // seasonStats/schedule/standings)을 courtside-web에도 - 그쪽은 Python 빌드타임에 미리
@@ -324,20 +325,16 @@ export function computeStandings(games: StandingsGameRow[]): StandingsRow[] {
       diff: results.reduce((sum, r) => sum + r.diff, 0) / results.length,
     };
   });
-  rows.sort((a, b) => b.pct - a.pct || b.diff - a.diff);
-  const leader = rows[0];
-  for (const r of rows) {
-    // 표시 순서는 승률(동률이면 득실마진)로 정하지만, 게임차 공식((승수차+패수차)/2)은
-    // 경기 수가 다르면 "2승0패"가 "1승0패"보다 공식상 반게임 앞서는 역전이 생길 수 있다
-    // (둘 다 승률 100%인데 그렇게 됨) - 그 경우 음수 게임차가 나오므로 0으로 바닥을 깐다.
-    r.gb = leader ? Math.max(0, (leader.wins - r.wins + (r.losses - leader.losses)) / 2) : 0;
-  }
+  // 정렬(승률 -> 평균 득실마진)과 게임차는 실시간 순위표(lib/liveStandings.ts)와 같은 함수 - 두 표가 다른 순서를 말하지 않게.
+  rows.sort(standingsOrder);
+  for (const r of rows) r.gb = gamesBehind(rows[0], r);
   return rows;
 }
 
-// 리그 순위 - 이 시즌 정규시즌 경기 중 이 날짜 이전 것만으로 승/패 집계(리크프리).
-export async function getStandingsAsOf(seasonName: string, beforeDate: string): Promise<StandingsRow[]> {
-  const { data } = await supabase
+// 리그 순위 - 이 시즌 정규시즌 경기 중 이 날짜까지 끝난 것으로 승/패 집계(리크프리). excludeGmkey는 경기 페이지가 "이 경기 전" 순위를
+// 만들 때 쓴다 - 날짜 기준만으로는 이미 끝난 이 경기 자체가 들어가서 "이 경기 시점 기준" 표에 결과가 미리 반영됐다.
+export async function getStandingsAsOf(seasonName: string, beforeDate: string, excludeGmkey?: string): Promise<StandingsRow[]> {
+  let q = supabase
     .from("games")
     .select("home_tcode, away_tcode, home_score, away_score, game_date, game_start")
     .eq("season_name", seasonName)
@@ -345,6 +342,8 @@ export async function getStandingsAsOf(seasonName: string, beforeDate: string): 
     .eq("is_ended", true)
     .lte("game_date", beforeDate)
     .not("home_score", "is", null);
+  if (excludeGmkey) q = q.neq("gmkey", excludeGmkey);
+  const { data } = await q;
   return computeStandings((data ?? []) as StandingsGameRow[]);
 }
 

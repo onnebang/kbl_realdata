@@ -147,8 +147,9 @@ export async function GET(req: NextRequest) {
       stl: p.stl ?? 0,
       bs: p.blk ?? 0,
       to: p.turnovers ?? 0,
-      fg: p.fgm ?? 0,
-      fgA: p.fga ?? 0,
+      // game_player_stats·game_team_stats의 fgm/fga는 2점 전용이다 - 전체 야투(FG)는 3점을 더한다(실측 2026-10-19: 이번 시즌 590선수-경기 전부).
+      fg: (p.fgm ?? 0) + (p.tpm ?? 0),
+      fgA: (p.fga ?? 0) + (p.tpa ?? 0),
       threep: p.tpm ?? 0,
       threepA: p.tpa ?? 0,
       ft: p.ftm ?? 0,
@@ -169,8 +170,8 @@ export async function GET(req: NextRequest) {
   function teamStatsOut(tcode: string) {
     const t = teamStatsByTcode.get(tcode);
     return {
-      fg: t?.fgm ?? 0,
-      fgA: t?.fga ?? 0,
+      fg: (t?.fgm ?? 0) + (t?.tpm ?? 0), // 2점 전용 fgm + 3점(위 playerRow 주석)
+      fgA: (t?.fga ?? 0) + (t?.tpa ?? 0),
       threep: t?.tpm ?? 0,
       threepA: t?.tpa ?? 0,
       ft: t?.ftm ?? 0,

@@ -54,3 +54,54 @@ export function TeamSplitBar({
     </div>
   );
 }
+
+const pctOf = (made: number, att: number) => (att > 0 ? Math.round((made / att) * 100) : 0);
+
+/**
+ * 성공률 막대 - 요청: "같은 40%라도 3점 10개 들어간 40%랑 3개 들어간 40%는 다른 느낌을 주도록". 막대 "길이"는 두 팀 시도 합 대비
+ * 비중이고(볼륨 차이가 먼저 보인다), 그 안의 "채움"만 성공률이다. 경기 후 '팀 스탯'(app/games/[gmkey]/page.tsx)과 실시간
+ * '팀 스탯'(components/LiveTeamStats.tsx)이 같이 쓴다 - 두 벌이면 한쪽만 손봐 같은 경기 화면의 막대가 서로 달라진다.
+ */
+export function TeamPctBar({
+  label,
+  hMade,
+  hAtt,
+  aMade,
+  aAtt,
+  hColor,
+  aColor,
+}: {
+  label: string;
+  hMade: number;
+  hAtt: number;
+  aMade: number;
+  aAtt: number;
+  hColor: string;
+  aColor: string;
+}) {
+  const hPct = pctOf(hMade, hAtt);
+  const aPct = pctOf(aMade, aAtt);
+  const totalAtt = hAtt + aAtt;
+  const hShare = totalAtt > 0 ? (hAtt / totalAtt) * 100 : 50;
+  return (
+    <div className="ts-row">
+      <div className="ts-nums">
+        <span className="ts-home team-ink" style={teamInkStyle(hColor)}>
+          {hPct}% <span className="ts-raw">{hMade}-{hAtt}</span>
+        </span>
+        <span className="ts-label">{label}</span>
+        <span className="ts-away team-ink" style={teamInkStyle(aColor)}>
+          <span className="ts-raw">{aMade}-{aAtt}</span> {aPct}%
+        </span>
+      </div>
+      <div className="ts-bar">
+        <div className="ts-bar-seg" style={{ width: `${hShare}%` }}>
+          <div className="ts-bar-seg-fill" style={{ width: `${hPct}%`, right: 0, background: hColor }} />
+        </div>
+        <div className="ts-bar-seg" style={{ width: `${100 - hShare}%` }}>
+          <div className="ts-bar-seg-fill" style={{ width: `${aPct}%`, left: 0, background: awayFillBackground(hColor, aColor) }} />
+        </div>
+      </div>
+    </div>
+  );
+}

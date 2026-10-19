@@ -46,6 +46,10 @@ import type { LineupRating, PlayerOnOff } from "@/lib/lineupNetRating";
 import { OnCourtCards } from "./OnCourtCards";
 import { applyBoxEvent, emptyBoxLine, type BoxLine } from "@/lib/boxEvents";
 import { MilestoneWatch } from "./MilestoneWatch";
+import { LiveTeamStats } from "./LiveTeamStats";
+import { LiveStandings } from "./LiveStandings";
+import { teamLine } from "@/lib/liveTeamStats";
+import type { BaseStanding } from "@/lib/liveStandings";
 import { buildMilestoneTimeline, type MilestoneContext, type MilestoneMoment } from "@/lib/milestones";
 import { recordToast, type RecordContext, type RecordMoment } from "@/lib/records";
 import { buildAllRecordMoments } from "@/lib/recordsMoments";
@@ -593,6 +597,8 @@ export default function GameReplay({
   milestones,
   records,
   streaks,
+  standings,
+  standingTeams,
   boxOnly = false,
 }: {
   // 파생 필드(elapsed/runHome/runAway/surge = 실측 34,382B)와 action_label/player_name까지
@@ -637,6 +643,9 @@ export default function GameReplay({
   records?: RecordContext | null;
   // 연속 기록(연속 출장·경기 간 연속 슛) - page.tsx가 lib/recordStreaks.ts로 "이 경기 직전" 상태와 보드를 만들어 내려준다. 없으면 연속 줄만 없다.
   streaks?: StreakContext | null;
+  // 실시간 리그 순위표 - page.tsx가 이 경기를 뺀 "이 경기 전" 순위(정규시즌만)와 팀 이름·색·로고를 내려준다. 없으면 순위표를 안 그린다.
+  standings?: BaseStanding[];
+  standingTeams?: Record<string, Omit<TeamMeta, "tcode">>;
   // true면 "코트 위" 박스스코어 패널만 그린다(경기 후 AI 분석 탭의 최종 스탯창). 이벤트로 최종 기록을 다시 계산하므로 live=false(종료 경기)에서만 쓴다.
   boxOnly?: boolean;
 }) {
@@ -958,6 +967,9 @@ export default function GameReplay({
 
   const row = events[idx];
   const box = useMemo(() => computeBoxScore(events, idx, players), [events, idx, players]);
+  // 실시간 '팀 스탯' - 위 박스(스크럽 시점)를 팀별로 더한 값(lib/liveTeamStats.ts).
+  const homeLine = useMemo(() => teamLine(box, players, homeTeam.tcode), [box, players, homeTeam.tcode]);
+  const awayLine = useMemo(() => teamLine(box, players, awayTeam.tcode), [box, players, awayTeam.tcode]);
   const { homeByQ, awayByQ } = useMemo(
     () => computeQuarterScores(events, idx, quarterOrder, lastIdxByQuarter),
     [events, idx, quarterOrder, lastIdxByQuarter]
@@ -2245,6 +2257,20 @@ export default function GameReplay({
             </span>
           ))}
         </div>
+      )}
+
+      {/* 요청 2026-10-19: "팀 전체가 3점을 몇 개 쐈고, 지금 경기가 어느 부분에서 밀리는지" - 선수 박스를 팀별로 더한 비교 막대 + 밀리는 곳. */}
+      <LiveTeamStats home={homeTeam} away={awayTeam} h={homeLine} a={awayLine} />
+      {/* 요청 2026-10-19: "두 팀이 몇 등이고, 지금 결과면 몇 등까지 가는지" - 이 경기 전 순위 + 스크럽 시점 스코어를 결과로 더한 표. */}
+      {standings && standings.length > 0 && (
+        <LiveStandings
+          base={standings}
+          teams={standingTeams ?? {}}
+          home={homeTeam.tcode}
+          away={awayTeam.tcode}
+          margin={row.home_score - row.away_score}
+          mode={live ? "live" : idx >= lastIdx ? "final" : "replay"}
+        />
       )}
 
       <div className="replay-leaders">
