@@ -28,6 +28,8 @@
   line-height: var(--lh-prose);
   color: var(--ink-soft);
   margin: 8px 0 0;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 .seasonForm {
   display: flex;
@@ -362,6 +364,23 @@ a.row:hover {
 }
 a.row:hover .rowName {
   color: var(--gold);
+}
+/* 설명이 긴 행(역전승·장면 문구)과 320px대 폭의 1위 카드는 말줄임 대신 줄바꿈해 글자가 잘리지 않게 한다. 한글은
+   단어(공백) 단위로만 끊고, 공백 없는 긴 토큰만 강제로 끊는다. 점수("82-81")처럼 쪼개면 안 되는 덩어리는 .nowrap.
+   라운드 어워드가 쓴다. */
+.rowWrap .rowName,
+.rowWrap .rowSub,
+.heroWrap .heroName,
+.heroWrap .heroTeam,
+.heroWrap .heroSample {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+.nowrap {
+  white-space: nowrap;
 }
 /* "SK · 가드 · 50경기 · 1,685분" - 한글 표본 문구. */
 .rowSub {

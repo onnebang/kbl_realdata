@@ -195,7 +195,7 @@ export async function fetchSeasonPlayerGameRows(
  * 그래서 하한은 모든 팀이 실제로 치른 최소 일정(min)으로 잡고 분포(min~max)를 따로 실어 보낸다.
  * 나머지 14시즌은 10팀 모두 54경기라 하한 값이 지금과 똑같다.
  */
-export function teamGameCounts(games: SeasonGameRow[]): {
+export function teamGameCounts(games: Pick<SeasonGameRow, "homeTcode" | "awayTcode">[]): {
   byTcode: Map<string, number>;
   min: number;
   max: number;

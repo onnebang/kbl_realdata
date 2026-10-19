@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildAllStarTeams, buildPositionBestBoards, buildRoundMvpBoards, ROUND_QUALIFY, type PlayerDirectoryInfo } from "./roundAwards";
+import {
+  buildAllStarTeams,
+  buildPositionBestBoards,
+  buildRoundMvpBoards,
+  qualifyRoundAggs,
+  type PlayerDirectoryInfo,
+} from "./roundAwards";
 import type { SeasonPlayerAgg } from "./seasonLeaders";
 import type { TeamInfo } from "./preseason";
 
@@ -36,6 +42,36 @@ function info(entries: [string, PlayerDirectoryInfo][]) {
   return new Map(entries);
 }
 
+describe("qualifyRoundAggs", () => {
+  // 라운드 중간: A팀은 6경기, B팀은 2경기를 치른 상태. 기준은 시즌 리더보드의 시즌 초반 기준과 같다
+  // (소속팀 경기의 절반 이상·최소 2경기 출전 AND 누적 팀 경기당 8분 이상).
+  const TEAM_GAMES = new Map([
+    ["A", 6],
+    ["B", 2],
+  ]);
+  const keep = (aggs: SeasonPlayerAgg[]) => qualifyRoundAggs(aggs, TEAM_GAMES).map((a) => a.pcode);
+
+  it("1~2분씩 3번 뛴 벤치는 경기 수만 채워도 제외한다(예전 '3경기 또는 50분'이 통과시키던 구멍)", () => {
+    expect(keep([agg("bench", "A", { gp: 3, minutes: 4.5, perW: 42.2 })])).toEqual([]);
+  });
+
+  it("소속팀 경기의 절반 이상 출전하고 팀 경기당 8분 이상이면 통과한다(A팀 6경기 → 3경기·48분)", () => {
+    expect(keep([agg("ok", "A", { gp: 3, minutes: 48 })])).toEqual(["ok"]);
+    expect(keep([agg("fewMin", "A", { gp: 3, minutes: 47.9 })])).toEqual([]);
+    expect(keep([agg("fewGp", "A", { gp: 2, minutes: 90 })])).toEqual([]);
+  });
+
+  it("라운드 초반(소속팀 2경기)엔 기준도 낮다 - 2경기·16분", () => {
+    expect(keep([agg("early", "B", { gp: 2, minutes: 16 })])).toEqual(["early"]);
+    expect(keep([agg("oneGame", "B", { gp: 1, minutes: 38 })])).toEqual([]);
+  });
+
+  it("팀 경기 수를 모르는 tcode는 가장 많이 치른 팀 기준으로 본다(느슨하게 통과시키지 않는다)", () => {
+    expect(keep([agg("lost", "ZZZ", { gp: 3, minutes: 20 })])).toEqual([]);
+    expect(keep([agg("lostOk", "ZZZ", { gp: 3, minutes: 48 })])).toEqual(["lostOk"]);
+  });
+});
+
 describe("buildRoundMvpBoards", () => {
   it("role이 없으면(null) 국내로, '외국인'이 들어있으면 용병으로, '아시아'면 아시아쿼터로 분류한다", () => {
     const boards = buildRoundMvpBoards(
@@ -52,27 +88,23 @@ describe("buildRoundMvpBoards", () => {
     expect(boards.find((b) => b.role === "asiaQuota")!.rows.map((r) => r.pcode)).toEqual(["p3"]);
   });
 
-  it(`자격 미달(${ROUND_QUALIFY.gp}경기 미만 그리고 ${ROUND_QUALIFY.minutes}분 미만)은 제외한다`, () => {
+  it("회귀: 1~2분짜리 3경기로 경기 PER이 부풀려진 벤치(가중 PER 42.2)가 있어도 MVP는 실제 주전이다", () => {
+    // 2026-27 1라운드 실측: 최강민 3경기 4.5분, 한 경기(0.98분)에서 3점 하나로 경기 PER 193.3.
+    const qualified = qualifyRoundAggs(
+      [agg("bench", "A", { gp: 3, minutes: 4.5, perW: 42.2 }), agg("starter", "A", { gp: 5, minutes: 120, perW: 14.1 })],
+      new Map([["A", 6]])
+    );
     const boards = buildRoundMvpBoards(
-      [agg("ok", "A", { gp: ROUND_QUALIFY.gp, minutes: 10 }), agg("short", "A", { gp: 1, minutes: 10 })],
+      qualified,
       info([
-        ["ok", { role: null, name: "출전만족", photoUrl: null }],
-        ["short", { role: null, name: "미달", photoUrl: null }],
+        ["bench", { role: null, name: "벤치", photoUrl: null }],
+        ["starter", { role: null, name: "주전", photoUrl: null }],
       ]),
       TEAMS
     );
     const domestic = boards.find((b) => b.role === "domestic")!;
-    expect(domestic.rows.map((r) => r.pcode)).toEqual(["ok"]);
+    expect(domestic.rows.map((r) => r.pcode)).toEqual(["starter"]);
     expect(domestic.poolN).toBe(1);
-  });
-
-  it("경기 수가 모자라도 출전시간이 기준을 넘으면 통과한다(둘 중 하나만)", () => {
-    const boards = buildRoundMvpBoards(
-      [agg("minutesOnly", "A", { gp: 1, minutes: ROUND_QUALIFY.minutes })],
-      info([["minutesOnly", { role: null, name: "장시간", photoUrl: null }]]),
-      TEAMS
-    );
-    expect(boards.find((b) => b.role === "domestic")!.rows.map((r) => r.pcode)).toEqual(["minutesOnly"]);
   });
 
   it("PER 가중 평균 내림차순, 동률이면 출전시간 많은 쪽이 위", () => {
@@ -131,20 +163,6 @@ describe("buildPositionBestBoards", () => {
     expect(boards.find((b) => b.pos === "F")!.rows.map((r) => r.pcode)).toEqual(["f1"]);
     expect(boards.find((b) => b.pos === "C")!.rows.map((r) => r.pcode)).toEqual(["c1"]);
     expect(boards.every((b) => b.rows.every((r) => r.pcode !== "unk"))).toBe(true);
-  });
-
-  it("MVP와 같은 자격 기준을 쓴다(라운드 내 3경기 또는 50분 미달은 제외)", () => {
-    const boards = buildPositionBestBoards(
-      [agg("ok", "A", { pos: "G", gp: ROUND_QUALIFY.gp, minutes: 10 }), agg("short", "A", { pos: "G", gp: 1, minutes: 10 })],
-      info([
-        ["ok", { role: null, name: "출전만족", photoUrl: null }],
-        ["short", { role: null, name: "미달", photoUrl: null }],
-      ]),
-      TEAMS
-    );
-    const g = boards.find((b) => b.pos === "G")!;
-    expect(g.rows.map((r) => r.pcode)).toEqual(["ok"]);
-    expect(g.poolN).toBe(1);
   });
 
   it("기본 topN은 3이다(1~3위)", () => {

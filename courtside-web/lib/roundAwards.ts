@@ -2,7 +2,15 @@ import { supabaseServer as supabase } from "./supabaseServer";
 import { fetchAllPagesBounded } from "./scoringExplorer";
 import { getRoundGames } from "./homeGames";
 import { getSeasonDirectory, getTeams, type TeamInfo } from "./preseason";
-import { aggregateSeasonPlayers, PLAYER_SELECT, type PlayerGameRow, type SeasonPlayerAgg } from "./seasonLeaders";
+import {
+  aggregateSeasonPlayers,
+  isQualified,
+  PLAYER_SELECT,
+  qualifyRule,
+  teamGameCounts,
+  type PlayerGameRow,
+  type SeasonPlayerAgg,
+} from "./seasonLeaders";
 import { normalizePos, posLabel } from "./teamSeasonStats";
 import { getRoundWinMoments, type BigPlay, type Comeback } from "./winMoments";
 
@@ -36,9 +44,12 @@ export const POSITION_LABEL: Record<PositionKey, string> = {
   C: "센터",
 };
 
-/** 시즌 리더보드 자격(15경기 또는 300분, lib/seasonLeaders.ts LEADER_QUALIFY)을 라운드 최대
- * 경기 수(10팀 기준 라운드당 9경기)에 맞춰 스케일: 15/54*9≈2.5→3경기, 300/54*9≈50분. */
-export const ROUND_QUALIFY = { gp: 3, minutes: 50 } as const;
+/** 라운드 자격 = 시즌 리더보드의 시즌 초반 기준(lib/seasonLeaders.ts qualifyRule/isQualified)을 소속팀이 이
+ * 라운드에서 치른 경기 수에 적용한다: 팀 경기의 절반 이상(최소 2경기) 출전 AND 누적 팀 경기당 8분 이상
+ * (팀 6경기면 3경기·48분). 예전 "3경기 또는 50분"은 OR라서 1~2분씩 3번 뛴 벤치가 통과했다 - 경기 PER은
+ * 분당 비율이라 0.98분에 3점 하나로 193.3이 나오고, 총 4.5분이라 출전시간 가중 평균도 못 눌러 2026-27 1라운드
+ * 국내 MVP 1위가 PER 42.2(3경기 1.7점)였다. 시즌 리더보드가 같은 이유로 이미 AND로 바꿔 둔 기준이라 새 숫자를
+ * 만들지 않았다. */
 
 export type RoundAwardRow = {
   pcode: string;
@@ -91,7 +102,8 @@ export type RoundAwardsResult = {
   roundCount: number;
   gamesTotal: number;
   gamesEnded: number;
-  qualify: typeof ROUND_QUALIFY;
+  /** 자격 기준 예시 - 이 라운드에서 가장 많이 치른 팀 기준(실제로는 팀마다 자기 경기 수로 적용). teamGames 0 = 아직 없음. */
+  qualify: { teamGames: number; gp: number; minutes: number };
   mvpBoards: RoundMvpBoard[];
   positionBoards: PositionBestBoard[];
   allStarTeams: AllStarTeam[];
@@ -108,9 +120,17 @@ function roleKey(role: string | null): RoundRoleKey {
   return role.includes("아시아") ? "asiaQuota" : "import";
 }
 
-/** 자격 통과(라운드 내 3경기 또는 50분 이상)한 선수만. 두 어워드가 같은 기준을 쓴다. */
-function qualifiedAggs(aggs: SeasonPlayerAgg[]): SeasonPlayerAgg[] {
-  return aggs.filter((a) => a.gp >= ROUND_QUALIFY.gp || a.minutes >= ROUND_QUALIFY.minutes);
+/** 자격 통과 선수만(위 ROUND 자격 설명). MVP·포지션 베스트·올스타가 같은 목록을 쓰도록 getRoundAwards가 한 번만
+ * 거르고, 아래 build*는 이미 거른 목록을 받는다. 팀 경기 수를 모르는 tcode는 가장 많이 치른 팀 기준으로
+ * 본다 - 모르면 느슨하게 통과시키지 않는다. */
+export function qualifyRoundAggs(aggs: SeasonPlayerAgg[], teamGames: ReadonlyMap<string, number>): SeasonPlayerAgg[] {
+  const most = Math.max(0, ...teamGames.values());
+  return aggs.filter((a) => isQualified(a, qualifyRule(teamGames.get(a.tcode) ?? most)));
+}
+
+function qualifyInfo(teamGames: number): RoundAwardsResult["qualify"] {
+  const rule = qualifyRule(teamGames);
+  return { teamGames, gp: rule.gp, minutes: rule.min };
 }
 
 function toRow(a: SeasonPlayerAgg, infoByPcode: Map<string, PlayerDirectoryInfo>, teams: Map<string, TeamInfo>): RoundAwardRow {
@@ -138,7 +158,7 @@ function toRow(a: SeasonPlayerAgg, infoByPcode: Map<string, PlayerDirectoryInfo>
 
 const byPerThenMinutes = (a: SeasonPlayerAgg, b: SeasonPlayerAgg) => b.perW - a.perW || b.minutes - a.minutes;
 
-/** 순수 버킷팅/정렬부 - Supabase 없이 단위 테스트 가능(lib/roundAwards.test.ts). */
+/** 순수 버킷팅/정렬부 - Supabase 없이 단위 테스트 가능(lib/roundAwards.test.ts). aggs는 qualifyRoundAggs를 거친 목록. */
 export function buildRoundMvpBoards(
   aggs: SeasonPlayerAgg[],
   infoByPcode: Map<string, PlayerDirectoryInfo>,
@@ -146,7 +166,7 @@ export function buildRoundMvpBoards(
   topN = 5
 ): RoundMvpBoard[] {
   const buckets: Record<RoundRoleKey, SeasonPlayerAgg[]> = { domestic: [], import: [], asiaQuota: [] };
-  for (const a of qualifiedAggs(aggs)) {
+  for (const a of aggs) {
     buckets[roleKey(infoByPcode.get(a.pcode)?.role ?? null)].push(a);
   }
   return (["domestic", "import", "asiaQuota"] as const).map((role) => {
@@ -169,7 +189,7 @@ export function buildPositionBestBoards(
   topN = 3
 ): PositionBestBoard[] {
   const buckets: Record<PositionKey, SeasonPlayerAgg[]> = { G: [], F: [], C: [] };
-  for (const a of qualifiedAggs(aggs)) {
+  for (const a of aggs) {
     const pos = normalizePos(a.pos);
     if (pos) buckets[pos].push(a);
   }
@@ -218,7 +238,7 @@ export async function getRoundAwards(seasonName: string, round?: number): Promis
       roundCount,
       gamesTotal: games.length,
       gamesEnded: 0,
-      qualify: ROUND_QUALIFY,
+      qualify: qualifyInfo(0),
       mvpBoards: [],
       positionBoards: [],
       allStarTeams: [],
@@ -234,7 +254,10 @@ export async function getRoundAwards(seasonName: string, round?: number): Promis
     ),
     getRoundWinMoments(seasonName, gmkeys),
   ]);
-  const aggs = aggregateSeasonPlayers(rows).filter((a) => a.gp > 0);
+  const { byTcode: teamGames, max: mostTeamGames } = teamGameCounts(
+    ended.map((g) => ({ homeTcode: g.home_team?.tcode ?? "", awayTcode: g.away_team?.tcode ?? "" }))
+  );
+  const aggs = qualifyRoundAggs(aggregateSeasonPlayers(rows).filter((a) => a.gp > 0), teamGames);
 
   const [directory, teams] = await Promise.all([getSeasonDirectory(seasonName), getTeams(seasonName)]);
   const infoByPcode = new Map<string, PlayerDirectoryInfo>();
@@ -250,7 +273,7 @@ export async function getRoundAwards(seasonName: string, round?: number): Promis
     roundCount,
     gamesTotal: games.length,
     gamesEnded: ended.length,
-    qualify: ROUND_QUALIFY,
+    qualify: qualifyInfo(mostTeamGames),
     mvpBoards: buildRoundMvpBoards(aggs, infoByPcode, teams, 5),
     positionBoards: buildPositionBestBoards(aggs, infoByPcode, teams, 3),
     allStarTeams: buildAllStarTeams(aggs, infoByPcode, teams),

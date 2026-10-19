@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
+import { TeamPlate } from "@/components/TeamPlate";
 import { getLeaderboardSeasons } from "@/lib/seasonLeaders";
 import { getRoundAwards, type AllStarTeam, type RoundAwardRow } from "@/lib/roundAwards";
 import type { BigPlay, Comeback } from "@/lib/winMoments";
@@ -19,6 +20,10 @@ export const dynamic = "force-dynamic";
 
 type Board = { label: string; poolN: number; rows: RoundAwardRow[] };
 
+// .row는 [순위/포지션 | 팀 로고 | 본문 | 값] 4열 격자다(시즌 리더보드와 공유). 로고 열을 빼먹으면 본문이 26px짜리
+// 로고 열로 들어가 이름이 한 글자만 남고 잘린다. 이 페이지 행은 설명이 길어(역전승·장면 문구) 말줄임 대신 줄바꿈한다.
+const ROW = `${styles.row} ${styles.rowWrap}`;
+
 function ppg(r: RoundAwardRow) {
   return r.gp ? (r.pts / r.gp).toFixed(1) : "0.0";
 }
@@ -32,7 +37,7 @@ function apg(r: RoundAwardRow) {
 function HeroCard({ r }: { r: RoundAwardRow }) {
   const badge = r.team ? { name: r.team.name, abbr: r.team.abbr, color: r.team.color, logoUrl: r.team.logoUrl } : null;
   return (
-    <div className={styles.hero}>
+    <div className={`${styles.hero} ${styles.heroWrap}`}>
       <div className={styles.heroValue}>
         {r.perW.toFixed(1)}
         <span className={styles.heroUnit}>PER</span>
@@ -57,8 +62,9 @@ function HeroCard({ r }: { r: RoundAwardRow }) {
 
 function CompactRow({ r, rank }: { r: RoundAwardRow; rank: number }) {
   return (
-    <Link href={`/players/${r.pcode}`} className={styles.row}>
+    <Link href={`/players/${r.pcode}`} className={ROW}>
       <div className={styles.rank}>{rank}</div>
+      {r.team ? <TeamPlate team={r.team} size={20} /> : <span />}
       <div className={styles.rowBody}>
         <div className={styles.rowName}>{r.name}</div>
         <div className={styles.rowSub}>
@@ -100,8 +106,9 @@ function BoardCard({ board, titleSuffix }: { board: Board; titleSuffix: string }
 /** 올스타팀 한 팀(5명) - 순위가 아니라 포지션 배정이라 번호 대신 포지션을 왼쪽에 쓴다. */
 function AllStarRow({ r }: { r: RoundAwardRow }) {
   return (
-    <Link href={`/players/${r.pcode}`} className={styles.row}>
+    <Link href={`/players/${r.pcode}`} className={ROW}>
       <div className={styles.rank}>{r.pos ?? "-"}</div>
+      {r.team ? <TeamPlate team={r.team} size={20} /> : <span />}
       <div className={styles.rowBody}>
         <div className={styles.rowName}>{r.name}</div>
         <div className={styles.rowSub}>{[r.team?.abbr, `${r.gp}경기`].filter(Boolean).join(" · ")}</div>
@@ -134,11 +141,12 @@ function AllStarCard({ team }: { team: AllStarTeam }) {
 function MomentRow({ c, rank }: { c: Comeback; rank: number }) {
   const winnerBadge = { name: c.winner.name, abbr: c.winner.abbr, color: c.winner.color ?? "#888888", logoUrl: c.winner.logoUrl };
   return (
-    <Link href={`/games/${c.gmkey}`} className={styles.row}>
+    <Link href={`/games/${c.gmkey}`} className={ROW}>
       <div className={styles.rank}>{rank}</div>
+      <TeamPlate team={winnerBadge} size={20} />
       <div className={styles.rowBody}>
         <div className={styles.rowName}>
-          <TeamBadge team={winnerBadge} size={16} /> {c.winner.name} {c.finalWinner}-{c.finalLoser} {c.loser.name}
+          {c.winner.name} <span className={styles.nowrap}>{c.finalWinner}-{c.finalLoser}</span> {c.loser.name}
         </div>
         <div className={styles.rowSub}>
           {c.period} {c.clock} 승률 {(c.minProb * 100).toFixed(1)}%까지 떨어졌다가 역전승
@@ -152,14 +160,16 @@ function MomentRow({ c, rank }: { c: Comeback; rank: number }) {
 function ImpactRow({ p, rank }: { p: BigPlay; rank: number }) {
   const badge = { name: p.team.name, abbr: p.team.abbr, color: p.team.color ?? "#888888", logoUrl: p.team.logoUrl };
   return (
-    <Link href={`/players/${p.pcode}`} className={styles.row}>
+    <Link href={`/players/${p.pcode}`} className={ROW}>
       <div className={styles.rank}>{rank}</div>
+      <TeamPlate team={badge} size={20} />
       <div className={styles.rowBody}>
-        <div className={styles.rowName}>
-          <TeamBadge team={badge} size={16} /> {p.playerName}
-        </div>
+        <div className={styles.rowName}>{p.playerName}</div>
         <div className={styles.rowSub}>
-          {p.team.abbr} {p.period} {p.clock} {p.shot} vs {p.opp.abbr} · {p.teamScore}-{p.oppScore}
+          {p.team.abbr} {p.period} {p.clock} {p.shot}{" "}
+          <span className={styles.nowrap}>
+            vs {p.opp.abbr} · {p.teamScore}-{p.oppScore}
+          </span>
         </div>
       </div>
       <div className={styles.rowValue}>+{(p.wpa * 100).toFixed(1)}%p</div>
@@ -192,6 +202,8 @@ export default async function RoundAwardsPage({
 
   const linkTo = (opts: { season?: string; round?: number }) =>
     `/awards/round?season=${encodeURIComponent(opts.season ?? activeSeason)}&round=${opts.round ?? result.round}`;
+  const q = result.qualify;
+  const qualifyNow = q.teamGames > 0 ? ` (지금은 최다 ${q.teamGames}경기 팀 기준 ${q.gp}경기·${q.minutes}분)` : "";
 
   return (
     <div className="wrap">
@@ -223,8 +235,9 @@ export default async function RoundAwardsPage({
 
       <p className={styles.lede}>
         그 라운드 종료 경기의 출전시간 가중 PER 평균 기준입니다(팀 성적·서사는 반영하지 않습니다).
-        자격: {result.qualify.gp}경기 또는 {result.qualify.minutes}분 이상 - 시즌 리더보드 자격(15경기 또는
-        300분)을 라운드 최대 경기 수에 맞춰 스케일했습니다.
+        자격: 소속팀이 이 라운드에서 치른 경기의 절반 이상(최소 2경기) 출전 + 누적 출전시간 팀 경기당 8분 이상
+        {qualifyNow}. 시즌 리더보드의 시즌 초반 기준과 같아, 1~2분만 뛴 선수의 PER이 부풀려져 순위에 오르지
+        않습니다.
       </p>
 
       {fellBack && (
