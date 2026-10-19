@@ -232,7 +232,7 @@ export function useLiveGame({ gmkey, enabled, initialLastOrder }: UseLiveGameArg
     const tick = async () => {
       if (cancelled) return;
       // 탭이 안 보이면 폴링하지 않는다 - 시청자가 다른 탭에 가 있는 동안 DB를 때릴 이유가 없다
-      // (홈의 HomeLiveRefresher는 이미 같은 게이트를 갖고 있는데 여기만 없었다).
+      // (홈의 HomeLiveGame 전송 계층도 같은 가시성 게이트를 쓴다).
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       if (Date.now() - lastRealtimeAtRef.current < REALTIME_FRESH_MS) {
         stats.pollsSkipped += 1;

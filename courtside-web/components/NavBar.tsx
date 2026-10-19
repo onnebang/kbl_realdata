@@ -64,7 +64,7 @@ export function NavBar() {
       <div className="nav-bar-inner">
         <div className="nav-main">
           {MAIN_LINKS.map((l) => (
-            <Link key={l.href} href={l.href} className="nav-link">
+            <Link key={l.href} href={l.href} className="nav-link" prefetch={false}>
               {l.label}
             </Link>
           ))}
@@ -80,7 +80,7 @@ export function NavBar() {
               <summary className="nav-more-summary">{g.label}</summary>
               <div className="nav-analysis">
                 {g.links.map((l) => (
-                  <Link key={l.href} href={l.href} className="nav-link">
+                  <Link key={l.href} href={l.href} className="nav-link" prefetch={false}>
                     {l.label}
                   </Link>
                 ))}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Fragment, type CSSProperties } from "react";
+import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { CourtsideHero } from "@/components/CourtsideHero";
 import { TeamBadge } from "@/components/TeamBadge";
 import { teamBarStyle, teamInkStyle } from "@/lib/teamAccent";
@@ -22,7 +22,7 @@ import {
 } from "@/lib/homeGames";
 import { deriveGameStatus } from "@/lib/gameStatus";
 import { absenceText } from "@/lib/lineupText";
-import HomeLiveRefresher from "@/components/HomeLiveRefresher";
+import HomeLiveProvider, { HomeLiveProbability, HomeLiveScore } from "@/components/HomeLiveGame";
 import { PreseasonBanner } from "@/components/PreseasonBanner";
 import HomeCalendar, { shiftMonth } from "@/components/HomeCalendar";
 
@@ -32,6 +32,36 @@ import HomeCalendar, { shiftMonth } from "@/components/HomeCalendar";
 // 그래도 Vercel 기본 서버리스 제한을 넘기지 않도록 leaderboards/scoring-explorer와 같은
 // 안전장치는 그대로 둠).
 export const maxDuration = 60;
+
+// 라이브 카드에만 클라이언트 Provider를 만든다. 종료/예정 카드 30개를 불필요하게 하이드레이션
+// 하지 않고, 라이브가 없는 날에는 HomeLiveGame과 Supabase 청크가 브라우저에 실리지 않는다.
+function HomeLiveBoundary({
+  live,
+  gmkey,
+  initialHome,
+  initialAway,
+  initialHomeWinProb,
+  children,
+}: {
+  live: boolean;
+  gmkey: string;
+  initialHome: number | null;
+  initialAway: number | null;
+  initialHomeWinProb?: number;
+  children: ReactNode;
+}) {
+  if (!live) return <>{children}</>;
+  return (
+    <HomeLiveProvider
+      gmkey={gmkey}
+      initialHome={initialHome}
+      initialAway={initialAway}
+      initialHomeWinProb={initialHomeWinProb}
+    >
+      {children}
+    </HomeLiveProvider>
+  );
+}
 
 function fmtDate(d: string) {
   const [y, m, day] = d.split("-");
@@ -51,7 +81,7 @@ function fmtDateHeader(d: string) {
 }
 
 // 보조 조회 전용 soft 폴백(감사 지적: MVP·태그·승률 중 하나만 실패해도 랜딩 전체가 error.tsx가
-// 되고, 라이브 중엔 HomeLiveRefresher가 30초마다 그 오류 화면을 다시 만든다). 카드 장식이
+// 된다). 카드 장식이
 // 빠진 채로라도 일정은 보여야 하므로 여기서만 삼키되, 조용히 삼키지는 않는다 - 반드시
 // console.error로 남긴다. 본체(getSeasons / getTeamsForSeason / getGames)는 이 헬퍼로 감싸지
 // 않는다: 그쪽 실패는 그대로 throw → app/error.tsx.
@@ -313,6 +343,13 @@ export default async function HomePage({
                 </div>
               )}
               <div className="game-card">
+              <HomeLiveBoundary
+                live={status === "live"}
+                gmkey={g.gmkey}
+                initialHome={g.home_score}
+                initialAway={g.away_score}
+                initialHomeWinProb={liveProb}
+              >
               <div className="game-card-row">
                 <span className="game-card-date">{fmtDate(g.game_date)}</span>
 
@@ -326,6 +363,7 @@ export default async function HomePage({
                 <Link
                   href={`/teams/${g.home_team?.tcode}?season=${activeSeason}`}
                   className={`team-name home ${homeWon ? "win" : ""}`}
+                  prefetch={false}
                   // --ti-* = 글자색(안 쓰지만 .team-ink 규약 공유), --tb-* = 이름 옆 3px 팀 색 바.
                   // 막대는 글자가 아니라 표식이라 3:1 기준(teamBarPair)이다 - 4.5:1로 보정하면
                   // 원색에서 필요 이상으로 멀어지고, accentFor를 쓰면 라이트 테마에서 밝은 팀 색이
@@ -334,7 +372,7 @@ export default async function HomePage({
                 >
                   {g.home_team?.name ?? g.gmkey}
                 </Link>
-                <Link href={`/teams/${g.home_team?.tcode}?season=${activeSeason}`}>
+                <Link href={`/teams/${g.home_team?.tcode}?season=${activeSeason}`} prefetch={false}>
                   <TeamBadge
                     team={g.home_team ? { name: g.home_team.name, abbr: g.home_team.abbr, color: g.home_team.color, logoUrl: g.home_team.logo_url } : null}
                   />
@@ -342,18 +380,20 @@ export default async function HomePage({
 
                 {status === "scheduled" ? (
                   // 예정 - 스코어 대신 "예정"(0-0처럼 빈 스코어로 보이는 것 방지)
-                  <Link href={`/games/${g.gmkey}`} className="game-card-score">
+                  <Link href={`/games/${g.gmkey}`} className="game-card-score" prefetch={false}>
                     <span className="status-chip status-scheduled">예정</span>
                   </Link>
+                ) : status === "live" ? (
+                  <HomeLiveScore href={`/games/${g.gmkey}`} />
                 ) : (
-                  <Link href={`/games/${g.gmkey}`} className="game-card-score">
+                  <Link href={`/games/${g.gmkey}`} className="game-card-score" prefetch={false}>
                     <span className={status === "final" ? (homeWon ? "win" : "lose") : undefined}>{g.home_score}</span>
                     <span className="score-sep">-</span>
                     <span className={status === "final" ? (!homeWon ? "win" : "lose") : undefined}>{g.away_score}</span>
                   </Link>
                 )}
 
-                <Link href={`/teams/${g.away_team?.tcode}?season=${activeSeason}`}>
+                <Link href={`/teams/${g.away_team?.tcode}?season=${activeSeason}`} prefetch={false}>
                   <TeamBadge
                     team={g.away_team ? { name: g.away_team.name, abbr: g.away_team.abbr, color: g.away_team.color, logoUrl: g.away_team.logo_url } : null}
                   />
@@ -361,6 +401,7 @@ export default async function HomePage({
                 <Link
                   href={`/teams/${g.away_team?.tcode}?season=${activeSeason}`}
                   className={`team-name away ${status === "final" && !homeWon ? "win" : ""}`}
+                  prefetch={false}
                   style={{ ...teamInkStyle(g.away_team?.color), ...teamBarStyle(g.away_team?.color) } as CSSProperties}
                 >
                   {g.away_team?.name ?? ""}
@@ -380,7 +421,7 @@ export default async function HomePage({
                       LIVE
                     </span>
                   )}
-                  <Link href={`/games/${g.gmkey}`} className="game-card-category">
+                  <Link href={`/games/${g.gmkey}`} className="game-card-category" prefetch={false}>
                     {g.season_category}
                   </Link>
                   {tag && <span className={`ai-tag ai-tag-${tag.key}`}>{tag.label}</span>}
@@ -426,12 +467,7 @@ export default async function HomePage({
                     )}
                   </span>
                 )}
-                {liveProb != null && (
-                  <span className="game-card-meta-item live-prob">
-                    실시간 예측 승률 {g.home_team?.abbr} {Math.round(liveProb * 100)}% ·{" "}
-                    {g.away_team?.abbr} {100 - Math.round(liveProb * 100)}%
-                  </span>
-                )}
+                {status === "live" && <HomeLiveProbability homeAbbr={g.home_team?.abbr} awayAbbr={g.away_team?.abbr} />}
 
                 {(homeWinPct || awayWinPct) && (
                   <span className="game-card-meta-item">
@@ -439,29 +475,30 @@ export default async function HomePage({
                     {g.away_team?.abbr} {awayWinPct ? `${Math.round(awayWinPct.pct * 100)}%` : "-"}
                   </span>
                 )}
-                <Link href={`/games/${g.gmkey}`} className="game-card-detail-btn">
+                <Link href={`/games/${g.gmkey}`} className="game-card-detail-btn" prefetch={false}>
                   {detailLabel}
                 </Link>
                 {(mvp?.winnerTop || mvp?.loserTop || mvp?.sixthMan) && (
                   <span className="game-card-meta-item game-card-meta-mvps">
                     {mvp?.winnerTop && (
-                      <Link href={`/players/${mvp.winnerTop.pcode}`} className="game-card-mvp game-card-mvp-winner">
+                      <Link href={`/players/${mvp.winnerTop.pcode}`} className="game-card-mvp game-card-mvp-winner" prefetch={false}>
                         MVP {mvp.winnerTop.name} {mvp.winnerTop.pts}점
                       </Link>
                     )}
                     {mvp?.loserTop && (
-                      <Link href={`/players/${mvp.loserTop.pcode}`} className="game-card-mvp game-card-mvp-loser">
+                      <Link href={`/players/${mvp.loserTop.pcode}`} className="game-card-mvp game-card-mvp-loser" prefetch={false}>
                         분전 {mvp.loserTop.name} {mvp.loserTop.pts}점
                       </Link>
                     )}
                     {mvp?.sixthMan && (
-                      <Link href={`/players/${mvp.sixthMan.pcode}`} className="game-card-mvp game-card-mvp-sixthman">
+                      <Link href={`/players/${mvp.sixthMan.pcode}`} className="game-card-mvp game-card-mvp-sixthman" prefetch={false}>
                         🔋 {mvp.sixthMan.name} {mvp.sixthMan.pts}점
                       </Link>
                     )}
                   </span>
                 )}
               </div>
+              </HomeLiveBoundary>
               </div>
             </Fragment>
           );
@@ -499,12 +536,6 @@ export default async function HomePage({
           )}
         </nav>
       )}
-
-      {/* D. 진행중 경기가 하나라도 있을 때만 자동 갱신 타이머를 붙인다 - 없으면 이
-          컴포넌트 자체가 렌더되지 않아 타이머도, 네트워크 요청도 0이다. liveGmkeys는
-          **지금 보고 있는 페이지**의 라이브 경기라, 라이브가 없는 2페이지 이후에서는
-          30초마다 아무것도 오가지 않는다. */}
-      {liveGmkeys.length > 0 && <HomeLiveRefresher />}
 
       {/* 요청: "경기 목록에 시즌 브라우저와 시즌 리더를 노출시켜서 자연스럽게 유도" - 목록을
           다 보고 난 자리(페이지네이션 바로 다음)에 다음 볼거리 세 장을 둔다. 시즌을 유지해서

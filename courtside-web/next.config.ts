@@ -1,16 +1,59 @@
 import type { NextConfig } from "next";
 
-// ── CDN 캐시 헤더는 여기서 만들지 않는다 (2026-09-06, 두 번의 실패 뒤 결론) ─────────────
-// 1차: 이 자리에 headers()로 Cache-Control을 붙였다 -> 배포해서 curl로 재보니 x-courtside-cdn:1은
-// 붙는데 Cache-Control은 여전히 private였다. force-dynamic 라우트는 렌더 막바지에 프레임워크가
-// Cache-Control을 강제로 다시 쓰는데, next.config.ts의 headers()가 그보다 먼저 적용되는 설정이라
-// 그 시점에 덮인다.
-// 2차: proxy.ts(NextResponse.next().headers.set())로 옮겼다 -> 그런데도 여전히 x-courtside-cdn:1
-// (proxy가 쓰려던 "2"가 아니라)이 나왔다. 원인을 좁혀 보니 **origin(이 파일의 headers()가 낸
-// 값)이 그 헤더 이름을 이미 갖고 있으면, 단순 패스스루(NextResponse.next())로는 proxy 쪽 값이
-// 못 이긴다** - 같은 이름을 origin이 안 내야 proxy가 유일한 소스가 되어 이긴다.
-// 그래서 이 headers() 블록을 통째로 지웠다. Cache-Control/x-courtside-cdn은 이제 proxy.ts가
-// 유일하게 만든다(그 파일의 CDN_CACHEABLE_PATHS 주석에 대상 라우트·근거가 그대로 있다).
+// Next가 동적 페이지에 쓰는 `Cache-Control: private, no-store`는 next.config의 일반
+// Cache-Control보다 나중에 만들어져 일반 헤더로는 덮을 수 없다. Vercel 전용 헤더는 우선순위가
+// 다르다. `Vercel-CDN-Cache-Control`은 Function의 일반 Cache-Control보다 우선하고 CDN에서
+// 소비되어 브라우저로는 나가지 않는다. 이 헤더를 쓰면 모든 페이지 앞에서 proxy.ts를 실행하지
+// 않아도 되므로, 한 요청이 Proxy + Function 두 Compute 구간을 지나며 Fast Origin Transfer가
+// 이중으로 생기는 구조도 없어진다.
+const CDN_CACHEABLE_PATHS = [
+  "/players",
+  "/players/:pcode",
+  "/teams",
+  "/teams/:tcode",
+  "/coaches",
+  "/coaches/:coachId",
+  "/leaderboards/:path*",
+  "/season-browser",
+  "/preseason",
+  "/season",
+  "/rankings/:path*",
+  "/lineups",
+  "/awards/round",
+  "/trailer",
+  "/sitemap.xml",
+] as const;
+
+const CDN_HEADERS = [
+  { key: "Vercel-CDN-Cache-Control", value: "public, s-maxage=300, stale-while-revalidate=3600" },
+  { key: "x-courtside-cdn", value: "3" },
+] as const;
+
+// 정적 청크와 이미지 최적화 응답에는 Next/Vercel의 해시 기반 장기 캐시가 이미 있다. 아래 보안
+// 헤더를 그 자산들까지 반복해서 붙이면 요청 수만큼 전송 바이트만 늘어나므로 문서/Route Handler
+// 응답에만 적용한다. 개발 중 Fast Refresh는 eval/ws가 필요해 CSP를 프로덕션 빌드에만 넣는다.
+const SECURITY_HEADERS = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+  {
+    key: "Content-Security-Policy",
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+      "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com",
+      "img-src 'self' data: blob: https://kbl.or.kr https://www.kbl.or.kr https://*.supabase.co",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; "),
+  },
+] as const;
+
 const nextConfig: NextConfig = {
   // 공유 미리보기 태그(og:title/og:image)를 모든 요청에서 <head>에 넣는다. 기본값은 목록에 있는
   // 봇에만 그러고 나머지는 본문 뒤에 흘려 보내는데(스트리밍 메타데이터), 카카오톡 스크래퍼
@@ -32,6 +75,15 @@ const nextConfig: NextConfig = {
     imageSizes: [16, 24, 32, 48, 64, 96],
     deviceSizes: [640, 828, 1080],
     minimumCacheTTL: 60 * 60 * 24 * 30,
+  },
+  async headers() {
+    const security = process.env.NODE_ENV === "production"
+      ? [{ source: "/((?!_next/static|_next/image|favicon.ico).*)", headers: [...SECURITY_HEADERS] }]
+      : [];
+    return [
+      ...security,
+      ...CDN_CACHEABLE_PATHS.map((source) => ({ source, headers: [...CDN_HEADERS] })),
+    ];
   },
 };
 

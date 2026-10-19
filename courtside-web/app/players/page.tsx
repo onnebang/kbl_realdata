@@ -73,7 +73,7 @@ function PlayerRow({ p, prev, ovr, ovrDiff }: { p: DirectoryPlayer; prev: string
     </>
   );
   return p.pcode ? (
-    <Link href={`/players/${p.pcode}`} className={styles.playerRow}>
+    <Link href={`/players/${p.pcode}`} className={styles.playerRow} prefetch={false}>
       {inner}
     </Link>
   ) : (

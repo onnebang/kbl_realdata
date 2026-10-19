@@ -1,6 +1,8 @@
 "use server";
 
+import { headers } from "next/headers";
 import { getEntitySeasonGrids, type Dimension, type EntitySeasonGrids } from "./scoringExplorer";
+import { rateLimit } from "./rateLimit";
 
 // components/ScoringExplorerClient.tsx가 팀/선수/코치/리그 드롭다운에서 엔티티를 고를 때마다
 // 부르는 Server Action - 최초 데이터 로딩은 서버(app/leaderboards/scoring-explorer/page.tsx)에서
@@ -18,5 +20,12 @@ const ALLOWED_DIMS: readonly Dimension[] = ["coach", "league"];
 export async function fetchEntitySeasonGridsAction(dim: Dimension, entityId: string): Promise<EntitySeasonGrids> {
   if (!ALLOWED_DIMS.includes(dim)) throw new Error("bad request");
   if (typeof entityId !== "string" || !/^[A-Za-z0-9_-]{1,32}$/.test(entityId)) throw new Error("bad request");
+  // 이 Action 하나 때문에 모든 페이지 요청을 Proxy에 통과시키지 않는다. Next 16의 headers()는
+  // async이므로 실제 POST 안에서 IP를 읽고, 헤더가 없는 로컬/프리뷰 환경은 fail-open한다.
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (ip) {
+    const { allowed, retryAfterSec } = rateLimit(`scoring-action:${ip}`, 20);
+    if (!allowed) throw new Error(`too many requests; retry in ${retryAfterSec}s`);
+  }
   return getEntitySeasonGrids(dim, entityId);
 }

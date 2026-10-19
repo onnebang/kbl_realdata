@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cached, TTL, TAG } from "@/lib/cachePolicy";
 import { supabaseServer as supabase } from "@/lib/supabaseServer";
+import { rateLimit } from "@/lib/rateLimit";
 
 // 시즌 브라우저 박스스코어 모달(components/SeasonBrowserModal.tsx)이 여는 시점에만 부르는
 // 엔드포인트 - web/season_browser_template.html의 openBoxScore()가 미리 구운
@@ -47,6 +48,18 @@ type PlayerStatRow = {
 };
 
 export async function GET(req: NextRequest) {
+  // 전역 Proxy에서 하던 제한을 실제로 비싼 Handler 안으로 옮긴다. Proxy + Function 두 실행
+  // 구간을 만들지 않으면서도 단일 IP가 모든 경기 박스스코어를 순회하는 단순 수집은 막는다.
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (ip) {
+    const { allowed, retryAfterSec } = rateLimit(`box-score:${ip}`, 60);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: `Too Many Requests - ${retryAfterSec}초 뒤에 다시 시도해 주세요.` },
+        { status: 429, headers: { "Retry-After": String(retryAfterSec), "Cache-Control": "no-store" } }
+      );
+    }
+  }
   const gmkey = req.nextUrl.searchParams.get("gmkey");
   const homeTcode = req.nextUrl.searchParams.get("home");
   const awayTcode = req.nextUrl.searchParams.get("away");
