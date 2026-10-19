@@ -2259,20 +2259,6 @@ export default function GameReplay({
         </div>
       )}
 
-      {/* 요청 2026-10-19: "팀 전체가 3점을 몇 개 쐈고, 지금 경기가 어느 부분에서 밀리는지" - 선수 박스를 팀별로 더한 비교 막대 + 밀리는 곳. */}
-      <LiveTeamStats home={homeTeam} away={awayTeam} h={homeLine} a={awayLine} />
-      {/* 요청 2026-10-19: "두 팀이 몇 등이고, 지금 결과면 몇 등까지 가는지" - 이 경기 전 순위 + 스크럽 시점 스코어를 결과로 더한 표. */}
-      {standings && standings.length > 0 && (
-        <LiveStandings
-          base={standings}
-          teams={standingTeams ?? {}}
-          home={homeTeam.tcode}
-          away={awayTeam.tcode}
-          margin={row.home_score - row.away_score}
-          mode={live ? "live" : idx >= lastIdx ? "final" : "replay"}
-        />
-      )}
-
       <div className="replay-leaders">
         <div className="panel-title">GAME LEADERS</div>
         <div className="replay-leaders-teams">
@@ -2435,6 +2421,22 @@ export default function GameReplay({
             <div className="empty-note">조건에 맞는 슛이 아직 없음</div>
           )}
         </div>
+      )}
+
+      {/* 경기 흐름·선수·라인업·플레이·슛 차트를 먼저 읽고, 팀 전체 요약과 리그 표를
+          실시간 중계 탭의 최하단에서 확인하도록 배치한다. */}
+      {/* 요청 2026-10-19: "팀 전체가 3점을 몇 개 쐈고, 지금 경기가 어느 부분에서 밀리는지" - 선수 박스를 팀별로 더한 비교 막대 + 밀리는 곳. */}
+      <LiveTeamStats home={homeTeam} away={awayTeam} h={homeLine} a={awayLine} />
+      {/* 요청 2026-10-19: "두 팀이 몇 등이고, 지금 결과면 몇 등까지 가는지" - 이 경기 전 순위 + 스크럽 시점 스코어를 결과로 더한 표. */}
+      {standings && standings.length > 0 && (
+        <LiveStandings
+          base={standings}
+          teams={standingTeams ?? {}}
+          home={homeTeam.tcode}
+          away={awayTeam.tcode}
+          margin={row.home_score - row.away_score}
+          mode={live ? "live" : idx >= lastIdx ? "final" : "replay"}
+        />
       )}
     </div>
   );
