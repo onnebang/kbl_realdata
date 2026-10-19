@@ -44,13 +44,6 @@ export const POSITION_LABEL: Record<PositionKey, string> = {
   C: "센터",
 };
 
-/** 라운드 자격 = 시즌 리더보드의 시즌 초반 기준(lib/seasonLeaders.ts qualifyRule/isQualified)을 소속팀이 이
- * 라운드에서 치른 경기 수에 적용한다: 팀 경기의 절반 이상(최소 2경기) 출전 AND 누적 팀 경기당 8분 이상
- * (팀 6경기면 3경기·48분). 예전 "3경기 또는 50분"은 OR라서 1~2분씩 3번 뛴 벤치가 통과했다 - 경기 PER은
- * 분당 비율이라 0.98분에 3점 하나로 193.3이 나오고, 총 4.5분이라 출전시간 가중 평균도 못 눌러 2026-27 1라운드
- * 국내 MVP 1위가 PER 42.2(3경기 1.7점)였다. 시즌 리더보드가 같은 이유로 이미 AND로 바꿔 둔 기준이라 새 숫자를
- * 만들지 않았다. */
-
 export type RoundAwardRow = {
   pcode: string;
   name: string;
@@ -59,6 +52,8 @@ export type RoundAwardRow = {
   photoUrl: string | null;
   pos: PositionKey | null;
   posLabel: string;
+  /** 국내 / 용병 / 아시아쿼터(season_roster.note 기준). 올스타팀 한도 판정과 화면 표기에 쓴다. */
+  role: RoundRoleKey;
   gp: number;
   minutes: number;
   perW: number;
@@ -120,9 +115,15 @@ function roleKey(role: string | null): RoundRoleKey {
   return role.includes("아시아") ? "asiaQuota" : "import";
 }
 
-/** 자격 통과 선수만(위 ROUND 자격 설명). MVP·포지션 베스트·올스타가 같은 목록을 쓰도록 getRoundAwards가 한 번만
- * 거르고, 아래 build*는 이미 거른 목록을 받는다. 팀 경기 수를 모르는 tcode는 가장 많이 치른 팀 기준으로
- * 본다 - 모르면 느슨하게 통과시키지 않는다. */
+/** 라운드 자격 = 시즌 리더보드의 시즌 초반 기준(lib/seasonLeaders.ts qualifyRule/isQualified)을 소속팀이 이
+ * 라운드에서 치른 경기 수에 적용한다: 팀 경기의 절반 이상(최소 2경기) 출전 AND 누적 팀 경기당 8분 이상
+ * (팀 6경기면 3경기·48분). 예전 "3경기 또는 50분"은 OR라서 1~2분씩 3번 뛴 벤치가 통과했다 - 경기 PER은
+ * 분당 비율이라 0.98분에 3점 하나로 193.3이 나오고, 총 4.5분이라 출전시간 가중 평균도 못 눌러 2026-27 1라운드
+ * 국내 MVP 1위가 PER 42.2(3경기 1.7점)였다. 시즌 리더보드가 같은 이유로 이미 AND로 바꿔 둔 기준이라 새 숫자를
+ * 만들지 않았다.
+ *
+ * MVP·포지션 베스트·올스타가 같은 목록을 쓰도록 getRoundAwards가 한 번만 거르고, 아래 build*는 이미 거른 목록을
+ * 받는다. 팀 경기 수를 모르는 tcode는 가장 많이 치른 팀 기준으로 본다 - 모르면 느슨하게 통과시키지 않는다. */
 export function qualifyRoundAggs(aggs: SeasonPlayerAgg[], teamGames: ReadonlyMap<string, number>): SeasonPlayerAgg[] {
   const most = Math.max(0, ...teamGames.values());
   return aggs.filter((a) => isQualified(a, qualifyRule(teamGames.get(a.tcode) ?? most)));
@@ -144,6 +145,7 @@ function toRow(a: SeasonPlayerAgg, infoByPcode: Map<string, PlayerDirectoryInfo>
     photoUrl: info?.photoUrl ?? null,
     pos,
     posLabel: posLabel(pos),
+    role: roleKey(info?.role ?? null),
     gp: a.gp,
     minutes: a.minutes,
     perW: a.perW,
@@ -204,28 +206,51 @@ export function buildPositionBestBoards(
   });
 }
 
-/** 올스타팀 퍼스트/세컨드/써드(사용자 요청) - NBA 올-리그 팀과 같은 2가드+2포워드+1센터
- * 구성. 새 순위를 만들지 않고 buildPositionBestBoards를 포지션당 6명(가드·포워드는 팀당 2명
- * × 3팀, 센터는 팀당 1명 × 3팀 = 3명이면 충분하지만 가드·포워드 커트라인에 맞춰 6명 통일)으로
- * 넉넉히 뽑은 뒤 2/2/1씩 세 팀에 나눠 담는다. */
+/** 올스타 한 팀의 자리(2가드+2포워드+1센터)와 국적 한도(사용자 요청 2026-10-20: 용병 최대 2명, 아시아쿼터 최대 1명 -
+ * 나머지는 국내). 한도는 "최대"라서 국내 선수만으로 채운 팀도 유효하다. */
+const ALL_STAR_SLOTS: Record<PositionKey, number> = { G: 2, F: 2, C: 1 };
+const ALL_STAR_FOREIGN_MAX = { import: 2, asiaQuota: 1 } as const;
+
+/** 올스타팀 퍼스트/세컨드/써드(사용자 요청) - NBA 올-리그 팀과 같은 2가드+2포워드+1센터 구성에 위 국적 한도를 건다.
+ * 새 순위를 만들지 않는다: 포지션이 확인된 선수를 PER 높은 순(같으면 출전시간 많은 쪽)으로 훑으며, 그 포지션 자리가
+ * 남아 있고 용병·아시아쿼터 한도가 안 찼으면 이번 팀에 넣는다. 한도 때문에 못 들어간 선수(예: 셋째 용병)는 다음 팀
+ * 후보로 남고, 퍼스트 → 세컨드 → 써드 순으로 남은 선수에게 같은 일을 반복한다. 조건에 맞는 선수가 모자라면 그 자리는
+ * 비운다(억지로 채우지 않음). 팀 안 표시 순서는 가드 → 포워드 → 센터, 같은 포지션끼리는 PER 순. */
 export function buildAllStarTeams(
   aggs: SeasonPlayerAgg[],
   infoByPcode: Map<string, PlayerDirectoryInfo>,
   teams: Map<string, TeamInfo>
 ): AllStarTeam[] {
-  const posBoards = buildPositionBestBoards(aggs, infoByPcode, teams, 6);
-  const guards = posBoards.find((b) => b.pos === "G")?.rows ?? [];
-  const forwards = posBoards.find((b) => b.pos === "F")?.rows ?? [];
-  const centers = posBoards.find((b) => b.pos === "C")?.rows ?? [];
-  return ([1, 2, 3] as const).map((tier) => ({
-    tier,
-    label: ALL_STAR_TIER_LABEL[tier],
-    players: [
-      ...guards.slice((tier - 1) * 2, tier * 2),
-      ...forwards.slice((tier - 1) * 2, tier * 2),
-      ...centers.slice(tier - 1, tier),
-    ],
-  }));
+  type Cand = { a: SeasonPlayerAgg; pos: PositionKey; role: RoundRoleKey };
+  let pool: Cand[] = [];
+  for (const a of aggs) {
+    const pos = normalizePos(a.pos);
+    if (pos) pool.push({ a, pos, role: roleKey(infoByPcode.get(a.pcode)?.role ?? null) });
+  }
+  pool.sort((x, y) => byPerThenMinutes(x.a, y.a));
+
+  const out: AllStarTeam[] = [];
+  for (const tier of [1, 2, 3] as const) {
+    const open = { ...ALL_STAR_SLOTS };
+    const used: Record<RoundRoleKey, number> = { domestic: 0, import: 0, asiaQuota: 0 };
+    const picked: Cand[] = [];
+    for (const c of pool) {
+      if (open[c.pos] === 0) continue;
+      if (c.role !== "domestic" && used[c.role] >= ALL_STAR_FOREIGN_MAX[c.role]) continue;
+      open[c.pos] -= 1;
+      used[c.role] += 1;
+      picked.push(c);
+    }
+    pool = pool.filter((c) => !picked.includes(c));
+    out.push({
+      tier,
+      label: ALL_STAR_TIER_LABEL[tier],
+      players: (["G", "F", "C"] as const)
+        .flatMap((pos) => picked.filter((c) => c.pos === pos))
+        .map((c) => toRow(c.a, infoByPcode, teams)),
+    });
+  }
+  return out;
 }
 
 export async function getRoundAwards(seasonName: string, round?: number): Promise<RoundAwardsResult> {

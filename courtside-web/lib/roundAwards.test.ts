@@ -199,4 +199,53 @@ describe("buildAllStarTeams", () => {
     expect(teamsOut[1].players).toEqual([]);
     expect(teamsOut[2].players).toEqual([]);
   });
+
+  // [pcode, 포지션, 역할 note(null=국내), 가중 PER]
+  type Spec = [string, "G" | "F" | "C", string | null, number];
+  const IMP = "외국인 1옵션";
+  const AQ = "아시아쿼터";
+  function teamsOf(spec: Spec[]) {
+    const aggs = spec.map(([pcode, pos, , perW]) => agg(pcode, "A", { pos, perW }));
+    const infos = info(spec.map(([pcode, , role]) => [pcode, { role, name: pcode, photoUrl: null } as PlayerDirectoryInfo]));
+    return buildAllStarTeams(aggs, infos, TEAMS);
+  }
+  const ids = (t: { players: { pcode: string }[] }) => t.players.map((r) => r.pcode);
+
+  it("팀마다 용병 최대 2명·아시아쿼터 최대 1명 - 한도에 막힌 선수는 다음 팀 후보로 남는다", () => {
+    // 용병 포워드 5명·센터 2명이 PER 상위를 휩쓰는 실제 1라운드와 같은 모양(용병 3명이 한 팀에 몰리던 문제).
+    const teamsOut = teamsOf([
+      ["g1", "G", null, 10.0], ["g2", "G", null, 9.0], ["g3", "G", AQ, 8.5], ["g4", "G", AQ, 8.4],
+      ["g5", "G", null, 8.0], ["g6", "G", null, 7.0], ["g7", "G", null, 6.0],
+      ["f1", "F", IMP, 14.0], ["f2", "F", IMP, 13.0], ["f3", "F", IMP, 12.0], ["f4", "F", IMP, 11.0], ["f5", "F", IMP, 10.5],
+      ["f6", "F", null, 7.5], ["f7", "F", null, 6.5], ["f8", "F", null, 5.5], ["f9", "F", null, 4.5], ["f10", "F", null, 3.5],
+      ["c1", "C", IMP, 13.5], ["c2", "C", IMP, 12.5], ["c3", "C", null, 6.8], ["c4", "C", null, 5.8], ["c5", "C", null, 4.8],
+    ]);
+    // 퍼스트: 용병 f1·c1이 PER 순으로 먼저 들어가 한도가 차므로 f2(13.0)는 못 들어가고 포워드 둘째 자리는 국내 f6.
+    expect(ids(teamsOut[0])).toEqual(["g1", "g2", "f1", "f6", "c1"]);
+    // 세컨드: 용병 f2·c2, 아시아쿼터 g3(g4는 한도 때문에 건너뜀).
+    expect(ids(teamsOut[1])).toEqual(["g3", "g5", "f2", "f7", "c2"]);
+    expect(ids(teamsOut[2])).toEqual(["g4", "g6", "f3", "f4", "c3"]);
+    for (const t of teamsOut) {
+      expect(t.players.filter((p) => p.role === "import").length).toBeLessThanOrEqual(2);
+      expect(t.players.filter((p) => p.role === "asiaQuota").length).toBeLessThanOrEqual(1);
+      expect(t.players).toHaveLength(5);
+    }
+  });
+
+  it("한도 때문에 채울 선수가 없으면 그 자리는 비운다(용병·아시아쿼터로 한도를 넘겨 채우지 않음)", () => {
+    const teamsOut = teamsOf([
+      ["g1", "G", null, 10], ["g2", "G", null, 9],
+      ["f1", "F", IMP, 8], ["f2", "F", IMP, 7],
+      ["c1", "C", IMP, 6], ["c2", "C", IMP, 5],
+    ]);
+    expect(ids(teamsOut[0])).toEqual(["g1", "g2", "f1", "f2"]); // 센터 후보는 용병뿐인데 한도가 찼다
+    expect(ids(teamsOut[1])).toEqual(["c1"]);
+    expect(ids(teamsOut[2])).toEqual(["c2"]);
+  });
+
+  it("행에 국내/용병/아시아쿼터 구분이 실린다", () => {
+    const teamsOut = teamsOf([["g1", "G", null, 3], ["g2", "G", IMP, 2], ["g3", "G", AQ, 1]]);
+    expect(teamsOut[0].players.map((r) => r.role)).toEqual(["domestic", "import"]);
+    expect(teamsOut[1].players.map((r) => r.role)).toEqual(["asiaQuota"]);
+  });
 });

@@ -3,12 +3,12 @@ import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
 import { TeamPlate } from "@/components/TeamPlate";
 import { getLeaderboardSeasons } from "@/lib/seasonLeaders";
-import { getRoundAwards, type AllStarTeam, type RoundAwardRow } from "@/lib/roundAwards";
+import { getRoundAwards, ROUND_ROLE_LABEL, type AllStarTeam, type RoundAwardRow } from "@/lib/roundAwards";
 import type { BigPlay, Comeback } from "@/lib/winMoments";
 import styles from "@/app/leaderboards/season/season-leaders.module.css";
 
 // 라운드 어워드 - MVP(국내/용병/아시아쿼터) + 포지션별 베스트(G/F/C 1~3위) + 코트사이드
-// 올스타팀(퍼스트/세컨드/써드, 2가드+2포워드+1센터) + 최고의 순간(역전승 top5) + 가장
+// 올스타팀(퍼스트/세컨드/써드, 2가드+2포워드+1센터, 팀당 용병 최대 2·아시아쿼터 최대 1) + 최고의 순간(역전승 top5) + 가장
 // 임팩트있는 장면(개인 플레이 top10, 2026-10-06 사용자 요청). 올스타팀까지는 기존 시즌
 // 리더보드와 같은 카드 뼈대(hero + 압축 행)를 그대로 쓴다. 계산은 lib/roundAwards.ts:
 // 라운드 경기들의 game_player_stats를 aggregateSeasonPlayers(시즌 리더보드와 같은 함수)로
@@ -111,7 +111,7 @@ function AllStarRow({ r }: { r: RoundAwardRow }) {
       {r.team ? <TeamPlate team={r.team} size={20} /> : <span />}
       <div className={styles.rowBody}>
         <div className={styles.rowName}>{r.name}</div>
-        <div className={styles.rowSub}>{[r.team?.abbr, `${r.gp}경기`].filter(Boolean).join(" · ")}</div>
+        <div className={styles.rowSub}>{[r.team?.abbr, ROUND_ROLE_LABEL[r.role], `${r.gp}경기`].filter(Boolean).join(" · ")}</div>
       </div>
       <div className={styles.rowValue}>{r.perW.toFixed(1)}</div>
     </Link>
@@ -280,7 +280,9 @@ export default async function RoundAwardsPage({
 
           <div className={styles.groupHead}>
             <h2 className={styles.groupName}>코트사이드 올스타팀</h2>
-            <span className={styles.groupMeta}>퍼스트 · 세컨드 · 써드, 가드 2 · 포워드 2 · 센터 1</span>
+            <span className={styles.groupMeta}>
+              퍼스트 · 세컨드 · 써드, 가드 2 · 포워드 2 · 센터 1, 팀당 용병 최대 2 · 아시아쿼터 최대 1
+            </span>
           </div>
           <div className={styles.grid}>
             {result.allStarTeams.map((t) => (
