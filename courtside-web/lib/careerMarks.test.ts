@@ -66,6 +66,28 @@ describe("buildMilestoneContext - 통산 평균 순위(avg)", () => {
     const ctx = buildMilestoneContext({ snapshot: snap, games: [], gameDate: "2026-10-07", split: "regular", players: [{ pcode: "M", name: "나" }] });
     expect((ctx.players.M?.targets ?? []).filter((t) => t.kind === "avg")).toEqual([]);     // M(22.4)이 A(22.0)보다도 앞, Z는 299경기라 순위표에 없다
   });
+  it("순위표(300경기)에 이미 있는 선수가 경기 전부터 앞선 rival은 목표가 아니다 - 오늘 뛰면 경기 수가 늘어 적게 하면 밀릴 뿐 추월이 아니다", () => {
+    // 실데이터 2026-10-17 S49G01N25 양홍석: 388경기 2,208리바(5.69)로 이미 강상재(403경기 2,288리바, 5.68) 위인데 "오늘 1개면 넘는다"는
+    // 목표가 생겨 첫 리바운드에 "통산 평균 리바운드 5.68개로 올라 올타임 14위 진입"이 나갔다(평균은 오히려 내려갔다). 위의 에이(5.70)만 진짜 목표.
+    const snap: Snapshot = {
+      asOf: "2026-10-06",
+      recentFrom: "2026-09-15",
+      recentGmkeys: [],
+      players: {
+        Y: { n: "양홍석", a: 1, reg: [0, 2208, 0, 0, 0, 0, 388], po: [0, 0, 0, 0, 0, 0, 0], hi: null },
+        K: { n: "강상재", a: 1, reg: [0, 2288, 0, 0, 0, 0, 403], po: [0, 0, 0, 0, 0, 0, 0], hi: null },
+        A: { n: "에이", a: 0, reg: [0, 2280, 0, 0, 0, 0, 400], po: [0, 0, 0, 0, 0, 0, 0], hi: null },
+      },
+    };
+    const ctx = buildMilestoneContext({ snapshot: snap, games: [], gameDate: "2026-10-17", split: "regular", players: [{ pcode: "Y", name: "양홍석" }] });
+    const reb = (ctx.players.Y?.targets ?? []).filter((t) => t.kind === "avg" && t.cat === "reb");
+    expect(reb.map((t) => (t.kind === "avg" ? t.rival.pcode : ""))).toEqual(["A"]);
+    expect(reb[0]).toMatchObject({ need: 10, rank: 1 }); // (2,208 + 10)/389 = 5.702 > 5.70
+  });
+  it("이 경기로 300경기를 처음 채우는 선수는 순위표 첫 진입이라, 경기 전 평균이 rival보다 높아도 목표로 남는다", () => {
+    // 299경기 5,690점(19.03) - 오늘 0점이면 5,690/300 = 18.97로 C(19.0) 아래, 11점이면 5,701/300 = 19.003으로 C를 넘어 3위로 첫 진입.
+    expect(avgTargets(avgCtx({ total: 5690, gp: 299 }))[0]).toMatchObject({ need: 11, rank: 3, rival: { pcode: "C" } });
+  });
 });
 
 describe("buildMilestoneContext - 경기 수", () => {

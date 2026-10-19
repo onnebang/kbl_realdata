@@ -130,7 +130,9 @@ function describe(c: Check, p: MilestonePlayer, g: GameStats, phase: "done" | "n
     if (phase === "done") {
       const after = (p.before[c.cat] + g[c.cat]) / ((p.gp ?? 0) + 1);
       const by = cat.unit === "점" ? "으로" : "로";
-      return { text: `통산 평균 ${cat.name} ${after.toFixed(2)}${cat.unit}${by} 올라 ${scope} ${t.rank}위 진입${active}`, detail: `${rival} 추월 · 오늘 ${g[c.cat]}${cat.unit}` };
+      // 평균은 오늘 기록이 경기 전 평균보다 많을 때만 오른다(x > before/gp). 300경기를 이 경기로 채우는 첫 진입은 평균이 내려가며 순위표에 들 수 있다.
+      const rose = g[c.cat] * (p.gp ?? 0) > p.before[c.cat];
+      return { text: `통산 평균 ${cat.name} ${after.toFixed(2)}${cat.unit}${by}${rose ? " 올라" : ""} ${scope} ${t.rank}위 진입${active}`, detail: `${rival} 추월 · 오늘 ${g[c.cat]}${cat.unit}` };
     }
     return { text: `${remaining}${cat.unit}만 더 ${cat.verb} 통산 평균 ${cat.name} ${scope} ${t.rank}위${active}`, detail: `${rival} · ${today}` };
   }

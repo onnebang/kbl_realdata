@@ -47,6 +47,17 @@ describe("통산 평균 순위(avg) 목표", () => {
     const near = m.find((x) => x.phase === "near");
     expect(near?.text).toBe("9점만 더 넣으면 통산 평균 득점 올타임 3위 · 현역 1위");        // 임박 구간(남은 10점 이내)에 처음 든 순간은 32점째 - 남은 9점
   });
+  it("평균이 실제로 오를 때만 '올라' - 300경기 첫 진입처럼 평균이 내려가며 순위표에 드는 경우는 '…으로 N위 진입'", () => {
+    // 299경기 5,690점(19.03)이 오늘 11점이면 5,701/300 = 19.00 - 순위표 첫 진입(3위)이지만 평균은 내려갔다(오늘 11점 < 경기 전 평균 19.03).
+    const entry: MilestoneContext = {
+      split: "regular",
+      asOf: "2026-10-06",
+      players: { P: { ...avgPlayer(), before: { pts: 5690, reb: 0, ast: 0, stl: 0, blk: 0, threep: 0 }, targets: [{ kind: "avg", cat: "pts", scope: "all", rank: 3, need: 11, rival: { pcode: "C", name: "씨", avg: 19 }, activeRank: 1 }] } },
+    };
+    const events = [...Array.from({ length: 5 }, (_, i) => ({ pcode: "P", action_code: "201", quarter: "Q4", clock_min: 9, clock_sec: 50 - i })), { pcode: "P", action_code: "203", quarter: "Q4", clock_min: 9, clock_sec: 40 }];
+    const done = buildMilestoneTimeline(entry, events).filter((x) => x.phase === "done");
+    expect(done.map((x) => x.text)).toEqual(["통산 평균 득점 19.00점으로 올타임 3위 진입 · 현역 1위"]);
+  });
   it("경기 전 '기록 도전': 41점은 평균 18.9 x 1.7 = 32 > 30(cap)이라 닿지 않고, need가 작으면 문장으로", () => {
     expect(buildRecordChances(avgCtx)).toEqual([]);
     const near: MilestoneContext = { ...avgCtx, players: { P: { ...avgPlayer(), targets: [{ kind: "avg", cat: "pts", scope: "all", rank: 3, need: 12, rival: { pcode: "C", name: "씨", avg: 19 } }] } } };

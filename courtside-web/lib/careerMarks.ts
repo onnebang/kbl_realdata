@@ -66,17 +66,22 @@ type Adjusted = {
 
 type AvgEntry = { pcode: string; name: string; total: number; gp: number; active: boolean };
 /** a의 평균이 b의 평균보다 큰 정도의 부호 - total/gp를 나누지 않는 교차곱(정수)이라 동률 판정이 정확하다. */
-const avgCmp = (a: AvgEntry, b: AvgEntry) => a.total * b.gp - b.total * a.gp;
+const avgCmp = (a: { total: number; gp: number }, b: { total: number; gp: number }) => a.total * b.gp - b.total * a.gp;
 
 /**
  * 한 부문의 통산 평균 순위 돌파 목표. me는 오늘 뛰면 (total + x)/(gp + 1)이 되는 선수 - 앞선 선수(rival)를 엄밀히 넘는 가장 작은 x(need)와
  * 넘은 뒤 순위(rival보다 평균이 엄밀히 큰 다른 선수 수 + 1)를 낸다. 오늘 0을 기록해도 이미 넘는 rival(need <= 0)은 건너뛰고,
  * need가 한 경기 현실 한도(MAX_GAIN)를 넘으면 거기서 멈춘다.
+ * 이미 순위표(AVG_MIN_GP 이상)에 있는 me가 경기 전부터 앞선 rival도 건너뛴다 - 오늘 뛰면 분모가 1 늘어 적게 하면 그 rival에게 밀릴 뿐이라
+ * 그때의 need는 "자리 지키기" 기준이지 추월이 아니다(그대로 두면 평균이 내려가는데 "올라 N위 진입"이 나간다 - 실측 2026-10-19: 이번 시즌
+ * 평균 알림 23건 중 17건). 이 경기로 AVG_MIN_GP를 처음 채우는 me는 순위표에 없으므로 rival 전부가 첫 진입 목표로 남는다.
  */
 function avgTargetsFor(cat: MilestoneCat, me: { pcode: string; total: number; gp: number }, entries: AvgEntry[], scope: "all" | "active"): Extract<MilestoneTarget, { kind: "avg" }>[] {
   const others = entries.filter((e) => e.pcode !== me.pcode && (scope === "all" || e.active)).sort((x, y) => avgCmp(x, y));
+  const onBoard = me.gp >= AVG_MIN_GP;
   const found: Extract<MilestoneTarget, { kind: "avg" }>[] = [];
   for (const q of others) {
+    if (onBoard && avgCmp(me, q) > 0) continue; // 이미 앞선 rival - 추월이 아니다(위 주석)
     const num = q.total * (me.gp + 1);
     const need = (num - (num % q.gp)) / q.gp - me.total + 1; // floor(q.total*(gp+1)/q.gp) - total + 1 - 정수 나눗셈
     if (need <= 0) continue; // 오늘 0을 기록해도 이미 넘는다(그 rival은 한참 아래) - 목표가 아니다
