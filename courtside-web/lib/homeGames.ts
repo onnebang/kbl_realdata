@@ -94,7 +94,7 @@ export const getTeamsForSeason = cachedFn(
   { name: "homeGames:teamsForSeason", ttl: TTL.reference, tags: (seasonName) => [TAG.season(seasonName)] }
 );
 
-const GAME_SELECT = `gmkey, game_date, game_start, home_score, away_score, is_ended, season_category, season_name,
+export const GAME_SELECT = `gmkey, game_date, game_start, home_score, away_score, is_ended, season_category, season_name,
        home_team:teams!games_home_tcode_fkey(tcode, name, abbr, color, logo_url),
        away_team:teams!games_away_tcode_fkey(tcode, name, abbr, color, logo_url)`;
 
