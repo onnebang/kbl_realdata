@@ -126402,49 +126402,20 @@
   },
   {
     "pcode": "291888",
-    "name": "Unknown",
-    "season": "2026-2027",
-    "team": "Unknown",
-    "position": "Unknown",
-    "OVR": 87,
-    "OFF": 88,
-    "DEF": 86,
-    "attributes": {
-      "outside": 84,
-      "inside": 83,
-      "playmaking": 80,
-      "athletic": 85,
-      "defense": 85,
-      "rebounding": 82
-    },
-    "role": "Scoring Threat",
-    "archetype": "스코어링 스렛",
-    "role2": "Sharpshooter",
-    "archetype2": "샤프슈터",
-    "badges": {
-      "finishing": 0,
-      "shooting": 0,
-      "playmaking": 0,
-      "defense": 0
-    },
-    "projected": true
-  },
-  {
-    "pcode": "291890",
     "name": "데이본 리드",
     "season": "2026-2027",
     "team": "안양 정관장",
     "position": "Unknown",
-    "OVR": 86,
-    "OFF": 87,
+    "OVR": 85,
+    "OFF": 86,
     "DEF": 84,
     "attributes": {
-      "outside": 88,
-      "inside": 80,
+      "outside": 87,
+      "inside": 79,
       "playmaking": 76,
       "athletic": 83,
       "defense": 84,
-      "rebounding": 78
+      "rebounding": 77
     },
     "role": "Scoring Threat",
     "archetype": "스코어링 스렛",

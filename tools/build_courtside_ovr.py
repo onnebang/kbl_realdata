@@ -261,13 +261,10 @@ SCOUTED_ROOKIE_PROFILES = {
         'role': 'Slasher', 'role2': 'Scoring Threat',
         'reason': '아치 굿윈. NBA 출신 폭발적인 슬래셔.',
     },
+    # 데이본 리드의 KBL 공식 pcode는 291888이다(경기 기록·kbl.or.kr 선수사진). 10-12 영입 때 수동으로 넣은 임시 pcode 291890이
+    # 로스터에 남아 이 표·OVR 랭킹에 "Unknown"/"데이본 리드"가 따로 떴다 - 2026-10-20 season_roster를 291888로 맞추며 키도 옮겼다.
+    # 이 자리에 있던 '루이스 킹' 항목은 진짜 pcode(291884) 항목과 중복인 옛 추측 키라 지웠다(git 이력에 남아 있다).
     '291888': {
-        'OVR': 88, 'OFF': 89, 'DEF': 86,
-        'attributes': {'outside': 85, 'inside': 84, 'playmaking': 80, 'athletic': 86, 'defense': 85, 'rebounding': 83},
-        'role': 'Scoring Threat', 'role2': 'Sharpshooter',  # 예전 'Shot Creator'는 표준 스타일 목록에 없어 가장 가까운 것으로 정규화
-        'reason': '루이스 킹. NBA 출신 다재다능한 스코어러.',
-    },
-    '291890': {
         'OVR': 86, 'OFF': 87, 'DEF': 84,
         'attributes': {'outside': 88, 'inside': 80, 'playmaking': 76, 'athletic': 83, 'defense': 84, 'rebounding': 78},
         'role': 'Scoring Threat', 'role2': 'Sharpshooter',
