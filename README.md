@@ -236,18 +236,19 @@ python live_collector.py --max-runtime 21600 --stall-timeout 5400
                                              # 무인 운용 안전장치(기본 12시간 / 2시간)
 ```
 
-**무인 실행(운영):** Supabase 쓰기 자격증명을 공개 저장소와 분리하기 위해 라이브 수집과
-일일 복구 workflow는 별도 비공개 저장소 `onnebang/kbl_realdata_scheduler`에서 실행한다.
-이 공개 저장소에는 수집기 소스만 있고, 예약 실행 workflow와 운영 Secrets는 두지 않는다.
+**무인 실행(운영):** 라이브 수집과 일일 복구 workflow는 별도 공개 저장소
+`onnebang/kbl_realdata_scheduler`에서 실행한다. 두 저장소에는 자격증명 값을 커밋하지 않으며,
+Supabase 쓰기 자격증명은 scheduler 저장소의 암호화된 GitHub Actions Secrets에만 둔다.
+이 저장소에는 수집기 소스만 있고 예약 실행 workflow나 운영 Secrets는 두지 않는다.
 
 | 실행 위치 | 실행 주기 | 하는 일 |
 |---|---|---|
-| 비공개 GitHub Actions `KBL Live Collector` | 매일 13:00 | 그날 예정/진행중 경기를 실시간 추적하고 종료 정산까지 자동 처리 |
-| 비공개 GitHub Actions `KBL Daily Batch` | 매일 06:00 | 전날 놓친/실패한 경기를 정본으로 재수집·재계산(라이브가 못 돌았을 때의 복구 경로) |
+| 공개 scheduler의 GitHub Actions `KBL Live Collector` | 매일 13:00 | 그날 예정/진행중 경기를 실시간 추적하고 종료 정산까지 자동 처리 |
+| 공개 scheduler의 GitHub Actions `KBL Daily Batch` | 매일 06:00 | 전날 놓친/실패한 경기를 정본으로 재수집·재계산(라이브가 못 돌았을 때의 복구 경로) |
 | 로컬 `KBL_LineupRecalc` | 매일 13:00부터 8분마다 | 라인업 승률 재계산(`recalc_lineup_winprob.py --today`) |
 | 로컬 `KBL_WeeklyTrain` | 매주 월요일 06:20 (2026-10-06 등록) | `weekly_retrain.py` - SQLite 재적재 → 신선도 확인 → OVR 재계산 → OVR 가드 → 학습테이블 재생성 → 경기전 승률모델 재학습(승격 게이트) → 올타임 리더스·통산 스냅샷(`career_marks.json`) 재계산 → 깨끗한 임시 worktree에서 git commit+push. 로그: `raw/weekly_retrain.log` |
 
-비공개 scheduler는 이 저장소의 검토 완료 커밋 SHA를 고정해 실행한다. `live_collector.py`나
+별도 scheduler는 이 저장소의 검토 완료 커밋 SHA를 고정해 실행한다. `live_collector.py`나
 `daily_batch.py`를 고친 뒤에는 scheduler의 `SOURCE_REF`도 새 SHA로 올려야 다음 실행에 반영된다.
 이동 브랜치 `main`을 자격증명과 함께 곧바로 실행하지 않는 것은 공개 PR이나 공급망 변경이 운영
 Secrets에 닿는 범위를 줄이기 위한 안전장치다.
@@ -334,7 +335,7 @@ Q2/Q3 용병 2인 규정 첫 시즌) 학습테이블 표본이 `SAMPLE_THRESHOLD
 보고 있다가 멈추면 Discord로 알림(🔴 응답 없음 / 🟠 문자중계 멈춤 / 🟢 해제). 지금 걸린 문제 보기:
 `select * from live_collector_problems();` (Supabase SQL 편집기).
 
-운영 수집의 1차 경로는 비공개 GitHub Actions이고 노트북은 로컬 전용 재학습과 장애 복구를 맡는다.
+운영 수집의 1차 경로는 별도 공개 scheduler의 GitHub Actions이고 노트북은 로컬 전용 재학습과 장애 복구를 맡는다.
 로컬 수집기로 전환한 날에는 PC가 꺼지거나 잠들지 않도록 전원·덮개 설정을 확인하고, 클라우드
 workflow는 중복 실행되지 않게 먼저 끈다.
 

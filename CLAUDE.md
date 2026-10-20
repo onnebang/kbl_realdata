@@ -15,7 +15,7 @@ KBL(한국프로농구) 정규리그 문자중계/박스스코어를 수집해 �
 | 경로 | 설명 |
 |---|---|
 | `courtside-web/` | **실제 배포되는 Next.js 웹앱**(Vercel, 활발히 개발 중). 자체 `CLAUDE.md`/`DEPLOY.md` 참고. |
-| `tools/` | 데이터 수집·적재·학습 파이썬 파이프라인(스크립트 90여 개, 평면 구조). 운영 `KBL Live Collector`와 `KBL Daily Batch` 예약 workflow·Supabase 쓰기 Secrets는 별도 비공개 저장소 `onnebang/kbl_realdata_scheduler`에 있고, 이 공개 저장소에는 실행 소스만 둔다. Windows 동명 태스크는 클라우드 장애 때의 로컬 복구 경로. 상세 명령어·감시·복구 절차는 `README.md`의 "운영 런북" 참고. |
+| `tools/` | 데이터 수집·적재·학습 파이썬 파이프라인(스크립트 90여 개, 평면 구조). 운영 `KBL Live Collector`와 `KBL Daily Batch` 예약 workflow는 별도 공개 저장소 `onnebang/kbl_realdata_scheduler`에 있고, Supabase 쓰기 자격증명은 그 저장소의 암호화된 Actions Secrets에만 둔다. 이 공개 저장소에는 실행 소스만 둔다. Windows 동명 태스크는 클라우드 장애 때의 로컬 복구 경로. 상세 명령어·감시·복구 절차는 `README.md`의 "운영 런북" 참고. |
 | `raw/` | 로컬 SQLite(`kbl_realdata.db`) + 수집 원본/로그. `.gitignore` 대상, 800MB+. |
 | `web/` | 구버전 정적 HTML 템플릿. `courtside-web`와는 별개로 `tools/build_courtside_page.py` 등 일부 스크립트가 여전히 참조 중(정적 리포트 `reports/daily_report.html` 생성 경로). `courtside-web`와 혼동 주의. |
 | `.agents/skills/`, `.claude/skills/` | 후자는 전자로의 심볼릭 링크(`npx skills add`로 설치된 supabase 스킬 2종). 정상 상태, 손댈 필요 없음. |
