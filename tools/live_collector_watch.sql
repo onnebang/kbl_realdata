@@ -118,7 +118,7 @@ begin
         r.away, r.home, to_char(r.tipoff at time zone 'Asia/Seoul', 'HH24:MI'),
         floor(extract(epoch from now() - coalesce(r.last_event_at, r.tipoff)) / 60)::int, r.events);
     end if;
-    perform public.send_live_alert(v_msg || E'\nhttps://courtside-web-ten.vercel.app/games/' || r.gmkey);
+    perform public.send_live_alert(v_msg || E'\nhttps://courtside.ai.kr/games/' || r.gmkey);
     insert into public.live_alert_log as a (gmkey, kind) values (r.gmkey, r.kind)
       on conflict on constraint live_alert_log_pkey do update set kind = excluded.kind, sent_at = now();
     gmkey := r.gmkey; kind := r.kind; action := 'alert'; return next;

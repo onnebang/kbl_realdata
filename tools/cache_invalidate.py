@@ -28,7 +28,7 @@ import os
 import urllib.error
 import urllib.request
 
-SITE_URL = os.environ.get("REVALIDATE_SITE_URL", "https://courtside-web-ten.vercel.app")
+SITE_URL = os.environ.get("REVALIDATE_SITE_URL", "https://courtside.ai.kr")
 TIMEOUT_SEC = 5
 _ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env.supabase")
 

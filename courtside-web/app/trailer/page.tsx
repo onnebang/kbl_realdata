@@ -83,7 +83,7 @@ const SCENES: Scene[] = [
     wm: "270",
     basis: "26-27 정규시즌 일정 270경기 기준",
     cta: "경기 목록 열기",
-    shot: { src: "/trailer/home-dark.jpg", path: "courtside-web-ten.vercel.app", alt: "경기 목록 화면 - 26-27 시즌 예정 경기와 예상 승률" },
+    shot: { src: "/trailer/home-dark.jpg", path: "https://courtside.ai.kr", alt: "경기 목록 화면 - 26-27 시즌 예정 경기와 예상 승률" },
   },
   {
     id: "s3",
