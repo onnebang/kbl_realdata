@@ -35,6 +35,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   preconnect("https://kbl.or.kr");
   return (
     <html lang="ko">
+      <head>
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2317136039386785"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body>
         <a href="#main" className="skip-link">
           본문으로 건너뛰기
