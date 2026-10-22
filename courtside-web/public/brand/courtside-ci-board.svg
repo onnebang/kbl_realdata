@@ -1,46 +1,44 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" fill="none" role="img" aria-labelledby="title desc">
-  <title id="title">코트사이드 CI 보드</title>
-  <desc id="desc">코트사이드 심볼, 로고 조합, 색상과 서체 규정</desc>
-  <rect width="1200" height="900" fill="#ECEEF3"/>
-  <text x="64" y="72" fill="#0F1115" font-family="'IBM Plex Mono', Consolas, monospace" font-size="20" font-weight="600" letter-spacing="3">COURTSIDE IDENTITY · 2026</text>
-  <text x="64" y="124" fill="#0F1115" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="32" font-weight="800">경기의 속도, 데이터의 판단</text>
+  <title id="title">코트사이드 시그널 볼 CI 보드</title>
+  <desc id="desc">농구, 데이터 분석, 실시간 중계를 하나로 결합한 코트사이드 로고와 색상 규정</desc>
+  <rect width="1200" height="900" fill="#ECEDEE"/>
+  <text x="64" y="70" fill="#15171B" font-family="'IBM Plex Mono', Consolas, monospace" font-size="19" font-weight="600" letter-spacing="3">COURTSIDE IDENTITY · SIGNAL BALL</text>
+  <text x="64" y="118" fill="#15171B" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="32" font-weight="800" letter-spacing="-1">공 하나, 데이터 한 줄, 라이브 신호.</text>
 
-  <!-- Primary (Light Background) -->
-  <rect x="48" y="164" width="536" height="300" rx="22" fill="#FFFFFF"/>
-  <g transform="translate(106 226) scale(2.4)">
-    <path d="M38 13H19C13.48 13 9 17.48 9 23V41C9 46.52 13.48 51 19 51H38" stroke="#0F1115" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M47 23V41" stroke="#FF5500" stroke-width="6.5" stroke-linecap="round"/>
-    <path d="M12 43L23 30L31 36L48 16" stroke="#0284C7" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M37 16H48V27" stroke="#0284C7" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="48" y="156" width="536" height="306" rx="18" fill="#FFFFFF"/>
+  <g transform="translate(92 212) scale(2.55)">
+    <circle cx="23" cy="32" r="18.5" fill="#F26522"/>
+    <path d="M18.5 14.2C24.4 20.4 28.5 27.5 29.2 34.5C29.8 40.8 27.8 46.1 24.5 50.3" stroke="#15171B" stroke-width="2.7" stroke-linecap="round"/>
+    <path d="M9.5 39L18.2 30.8L25 35L37.2 21.5" stroke="#15171B" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M43.5 23C50 27.5 50 36.5 43.5 41M48.5 16.5C61 24.5 61 39.5 48.5 47.5" stroke="#15171B" stroke-width="4.4" stroke-linecap="round"/>
   </g>
-  <text x="290" y="317" fill="#0F1115" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="48" font-weight="800" letter-spacing="-2">코트사이드</text>
-  <text x="293" y="355" fill="#676C7B" font-family="'IBM Plex Mono', Consolas, monospace" font-size="14" font-weight="600" letter-spacing="2.3">COURTSIDE.AI.KR</text>
-  <text x="80" y="430" fill="#676C7B" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="17" font-weight="600">PRIMARY · 밝은 배경</text>
+  <text x="292" y="314" fill="#15171B" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="48" font-weight="800" letter-spacing="-2">코트사이드</text>
+  <text x="295" y="351" fill="#656A74" font-family="'IBM Plex Mono', Consolas, monospace" font-size="13" font-weight="600" letter-spacing="2.2">COURTSIDE.AI.KR</text>
+  <text x="80" y="428" fill="#656A74" font-family="'IBM Plex Mono', Consolas, monospace" font-size="14" font-weight="600" letter-spacing="1.8">PRIMARY / LIGHT</text>
 
-  <!-- Reverse (Dark Background) -->
-  <rect x="616" y="164" width="536" height="300" rx="22" fill="#0F1115"/>
-  <g transform="translate(674 226) scale(2.4)">
-    <path d="M38 13H19C13.48 13 9 17.48 9 23V41C9 46.52 13.48 51 19 51H38" stroke="#FFFFFF" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M47 23V41" stroke="#FF5500" stroke-width="6.5" stroke-linecap="round"/>
-    <path d="M12 43L23 30L31 36L48 16" stroke="#00E5FF" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M37 16H48V27" stroke="#00E5FF" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="616" y="156" width="536" height="306" rx="18" fill="#15171B"/>
+  <g transform="translate(660 212) scale(2.55)">
+    <circle cx="23" cy="32" r="18.5" fill="#F26522"/>
+    <path d="M18.5 14.2C24.4 20.4 28.5 27.5 29.2 34.5C29.8 40.8 27.8 46.1 24.5 50.3" stroke="#FFFFFF" stroke-width="2.7" stroke-linecap="round"/>
+    <path d="M9.5 39L18.2 30.8L25 35L37.2 21.5" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M43.5 23C50 27.5 50 36.5 43.5 41M48.5 16.5C61 24.5 61 39.5 48.5 47.5" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round"/>
   </g>
-  <text x="858" y="317" fill="#F4F5F8" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="48" font-weight="800" letter-spacing="-2">코트사이드</text>
-  <text x="861" y="355" fill="#A8AEBE" font-family="'IBM Plex Mono', Consolas, monospace" font-size="14" font-weight="600" letter-spacing="2.3">COURTSIDE.AI.KR</text>
-  <text x="648" y="430" fill="#A8AEBE" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="17" font-weight="600">REVERSE · 어두운 배경</text>
+  <text x="860" y="314" fill="#F7F7F5" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="48" font-weight="800" letter-spacing="-2">코트사이드</text>
+  <text x="863" y="351" fill="#B2B5BC" font-family="'IBM Plex Mono', Consolas, monospace" font-size="13" font-weight="600" letter-spacing="2.2">COURTSIDE.AI.KR</text>
+  <text x="648" y="428" fill="#B2B5BC" font-family="'IBM Plex Mono', Consolas, monospace" font-size="14" font-weight="600" letter-spacing="1.8">REVERSE / DARK</text>
 
-  <!-- Color Palette -->
-  <text x="64" y="532" fill="#0F1115" font-family="'IBM Plex Mono', Consolas, monospace" font-size="18" font-weight="600" letter-spacing="2">COLOR</text>
+  <text x="64" y="528" fill="#15171B" font-family="'IBM Plex Mono', Consolas, monospace" font-size="17" font-weight="600" letter-spacing="2">CORE COLOR</text>
   <g font-family="'IBM Plex Mono', Consolas, monospace" font-size="14" font-weight="600">
-    <rect x="64" y="560" width="200" height="112" rx="14" fill="#0F1115"/><text x="80" y="646" fill="#F4F5F8">GRAPHITE · #0F1115</text>
-    <rect x="282" y="560" width="200" height="112" rx="14" fill="#FF5500"/><text x="298" y="646" fill="#FFFFFF">COURT · #FF5500</text>
-    <rect x="500" y="560" width="200" height="112" rx="14" fill="#00E5FF"/><text x="516" y="646" fill="#0F1115">ANALYTICS · #00E5FF</text>
-    <rect x="718" y="560" width="200" height="112" rx="14" fill="#FFD166"/><text x="734" y="646" fill="#0F1115">DATA · #FFD166</text>
-    <rect x="936" y="560" width="200" height="112" rx="14" fill="#F4F5F8" stroke="#D8DAE0"/><text x="952" y="646" fill="#0F1115">CHALK · #F4F5F8</text>
+    <rect x="64" y="554" width="336" height="116" rx="12" fill="#15171B"/>
+    <text x="84" y="642" fill="#F7F7F5">INK / #15171B</text>
+    <rect x="432" y="554" width="336" height="116" rx="12" fill="#F26522"/>
+    <text x="452" y="642" fill="#15171B">COURT / #F26522</text>
+    <rect x="800" y="554" width="336" height="116" rx="12" fill="#F7F7F5" stroke="#D8DADD"/>
+    <text x="820" y="642" fill="#15171B">PAPER / #F7F7F5</text>
   </g>
 
-  <!-- Typography -->
-  <text x="64" y="740" fill="#0F1115" font-family="'IBM Plex Mono', Consolas, monospace" font-size="18" font-weight="600" letter-spacing="2">TYPE</text>
-  <text x="64" y="803" fill="#0F1115" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="42" font-weight="800" letter-spacing="-1.5">코트사이드 · Pretendard 800</text>
-  <text x="64" y="852" fill="#676C7B" font-family="'IBM Plex Mono', Consolas, monospace" font-size="23" font-weight="600" letter-spacing="2">LIVE 04:32 · 61% — 39% · IBM PLEX MONO</text>
+  <text x="64" y="738" fill="#15171B" font-family="'IBM Plex Mono', Consolas, monospace" font-size="17" font-weight="600" letter-spacing="2">TYPE &amp; USE</text>
+  <text x="64" y="794" fill="#15171B" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="40" font-weight="800" letter-spacing="-1.5">코트사이드 · Pretendard 800</text>
+  <text x="64" y="840" fill="#656A74" font-family="'IBM Plex Mono', Consolas, monospace" font-size="20" font-weight="600" letter-spacing="1.6">LIVE 04:32  /  61%—39%  ·  IBM PLEX MONO 600</text>
+  <text x="1136" y="842" text-anchor="end" fill="#656A74" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="15" font-weight="600">최소 20px · 효과/왜곡/임의 색상 금지</text>
 </svg>

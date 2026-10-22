@@ -1,43 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none" role="img" aria-labelledby="title desc">
   <title id="title">코트사이드 소셜 브랜드 카드</title>
-  <desc id="desc">코트사이드 로고와 KBL 실시간 승률·데이터 분석 설명</desc>
-  <rect width="1200" height="630" fill="#0F1115"/>
-  <!-- Left Brand Accent Line (Court Orange to Analytics Cyan Gradient) -->
-  <defs>
-    <linearGradient id="edgeGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#FF5500"/>
-      <stop offset="100%" stop-color="#00E5FF"/>
-    </linearGradient>
-  </defs>
-  <rect width="10" height="630" fill="url(#edgeGrad)"/>
-  
-  <!-- Subtle Background Court Geometry -->
-  <g opacity=".08" fill="none" stroke="#F4F5F8" stroke-width="2">
-    <circle cx="1030" cy="315" r="230"/>
-    <circle cx="1030" cy="315" r="72"/>
-    <path d="M1030 85V545M800 315H1200"/>
+  <desc id="desc">코트사이드 시그널 볼 로고와 KBL 실시간 데이터 중계 설명</desc>
+  <rect width="1200" height="630" fill="#15171B"/>
+  <rect width="12" height="630" fill="#F26522"/>
+
+  <g opacity=".07" fill="none" stroke="#FFFFFF" stroke-width="3">
+    <circle cx="1050" cy="315" r="245"/>
+    <circle cx="1050" cy="315" r="76"/>
+    <path d="M1050 70V560M805 315H1200"/>
   </g>
 
-  <!-- New Courtside Apex Analytics Symbol -->
-  <g transform="translate(72 72) scale(2.2)">
-    <path d="M38 13H19C13.48 13 9 17.48 9 23V41C9 46.52 13.48 51 19 51H38" stroke="#FFFFFF" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M47 23V41" stroke="#FF5500" stroke-width="6.5" stroke-linecap="round"/>
-    <path d="M12 43L23 30L31 36L48 16" stroke="#00E5FF" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M37 16H48V27" stroke="#00E5FF" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="translate(68 54) scale(2.5)">
+    <circle cx="23" cy="32" r="18.5" fill="#F26522"/>
+    <path d="M18.5 14.2C24.4 20.4 28.5 27.5 29.2 34.5C29.8 40.8 27.8 46.1 24.5 50.3" stroke="#FFFFFF" stroke-width="2.7" stroke-linecap="round"/>
+    <path d="M9.5 39L18.2 30.8L25 35L37.2 21.5" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M43.5 23C50 27.5 50 36.5 43.5 41M48.5 16.5C61 24.5 61 39.5 48.5 47.5" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round"/>
   </g>
 
-  <text x="72" y="324" fill="#F4F5F8" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="92" font-weight="800" letter-spacing="-4">코트사이드</text>
-  <text x="78" y="385" fill="#A8AEBE" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="30" font-weight="600">KBL 실시간 승률 · 데이터 분석</text>
+  <text x="72" y="314" fill="#F7F7F5" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="92" font-weight="800" letter-spacing="-4">코트사이드</text>
+  <text x="78" y="378" fill="#B2B5BC" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', sans-serif" font-size="30" font-weight="600">농구의 흐름을 읽는 실시간 데이터 중계</text>
 
-  <g transform="translate(78 458)" font-family="'IBM Plex Mono', Consolas, monospace" font-size="20" font-weight="600" letter-spacing="1.5">
-    <text fill="#FF5500">LIVE</text>
-    <text x="84" fill="#676C7B">·</text>
-    <text x="112" fill="#F4F5F8">MATCHUP</text>
-    <text x="245" fill="#676C7B">·</text>
-    <text x="273" fill="#F4F5F8">PLAYER</text>
-    <text x="385" fill="#676C7B">·</text>
-    <text x="413" fill="#00E5FF">SEASON</text>
+  <g transform="translate(78 462)" font-family="'IBM Plex Mono', Consolas, monospace" font-size="20" font-weight="600" letter-spacing="1.5">
+    <circle cx="8" cy="-7" r="7" fill="#F26522"/>
+    <text x="30" fill="#F26522">LIVE</text>
+    <text x="112" fill="#696E78">/</text>
+    <text x="142" fill="#F7F7F5">GAME</text>
+    <text x="225" fill="#696E78">/</text>
+    <text x="255" fill="#F7F7F5">DATA</text>
+    <text x="338" fill="#696E78">/</text>
+    <text x="368" fill="#F7F7F5">INSIGHT</text>
   </g>
 
-  <text x="78" y="554" fill="#00E5FF" font-family="'IBM Plex Mono', Consolas, monospace" font-size="24" font-weight="600" letter-spacing="3">COURTSIDE.AI.KR</text>
+  <text x="78" y="552" fill="#F26522" font-family="'IBM Plex Mono', Consolas, monospace" font-size="24" font-weight="600" letter-spacing="3">COURTSIDE.AI.KR</text>
 </svg>

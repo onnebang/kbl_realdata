@@ -12,6 +12,7 @@
   --surface-soft: #eceef3;
   --ink: #14161c;
   --ink-soft: #4a4f5c;
+  --brand: #f26522;
   /* 실측(WCAG 2.x, 이 파일의 세 배경 전부): #6c7180은 --surface-soft에서 4.20,
      --bg에서 4.47로 미달이었다. #676c7b는 #ffffff 5.24 / #eceef3 4.51 / #f4f5f8 4.81로
      세 배경 모두 통과한다. 다크(#8d93a3)는 5.49/4.87/6.15로 이미 통과라 그대로 둔다. */
@@ -61,6 +62,7 @@
     --surface-soft: #23272f;
     --ink: #f2f3f7;
     --ink-soft: #a8aebe;
+    --brand: #f26522;
     --ink-faint: #8d93a3;
     --home: #ff8a3d;
     --home-soft: #ff8a3d26;
@@ -160,7 +162,7 @@ a {
   line-height: 1;
 }
 .nav-brand:hover .nav-brand-wordmark {
-  color: var(--home);
+  color: var(--brand);
 }
 .nav-link {
   font-size: var(--fs-200);
@@ -173,7 +175,7 @@ a {
 }
 .nav-link:hover {
   color: var(--ink);
-  border-bottom-color: var(--home);
+  border-bottom-color: var(--brand);
 }
 /* 주요 탭. 좁은 화면에서 그래도 넘치면 오른쪽 끝 마스크가 "더 있다"를 보여준다
    (스크롤바를 숨긴 대신 잘림을 페이드로 알린다). */

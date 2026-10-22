@@ -7,10 +7,10 @@ type BrandMarkProps = {
 };
 
 /**
- * 코트사이드 (Courtside) CI 심볼 — Apex Analytics C
+ * 코트사이드 CI 심볼 — Signal Ball
  *
- * 기하학적 'C' 모노그램(화이트/다크), 우측 코트 액센트 바(코트 오렌지 #FF5500),
- * 그리고 실시간 승률 변화 및 클러치 모멘텀을 상징하는 우상향 데이터 화살표(일렉트릭 사이언 #00E5FF)로 구성됩니다.
+ * 농구공 안의 상승선은 경기 데이터의 흐름을, 오른쪽의 두 호는 실시간 중계 신호를 뜻한다.
+ * 기본형은 코트 오렌지와 현재 글자색 두 가지만 사용하며 16px에서도 형태가 유지된다.
  */
 export function BrandMark({
   size = 32,
@@ -19,10 +19,8 @@ export function BrandMark({
   courtColor = "currentColor",
   monochrome = false,
 }: BrandMarkProps) {
-  const isLight = courtColor === "#0f1115" || courtColor === "#000000";
-  const frameColor = monochrome ? courtColor : isLight ? "#0f1115" : "#FFFFFF";
-  const accentColor = monochrome ? courtColor : "#FF5500";
-  const pulseColor = monochrome ? courtColor : isLight ? "#0284C7" : "#00E5FF";
+  const ballFill = monochrome ? "none" : "#F26522";
+  const ballStroke = monochrome ? courtColor : "none";
 
   return (
     <svg
@@ -38,35 +36,25 @@ export function BrandMark({
       xmlns="http://www.w3.org/2000/svg"
     >
       {title ? <title>{title}</title> : null}
-      {/* C Outer Frame */}
+      <circle cx="23" cy="32" r="18.5" fill={ballFill} stroke={ballStroke} strokeWidth="4" />
       <path
-        d="M38 13H19C13.48 13 9 17.48 9 23V41C9 46.52 13.48 51 19 51H38"
-        stroke={frameColor}
-        strokeWidth="6.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* Right Court Accent Bar */}
-      <path
-        d="M47 23V41"
-        stroke={accentColor}
-        strokeWidth="6.5"
+        d="M18.5 14.2C24.4 20.4 28.5 27.5 29.2 34.5C29.8 40.8 27.8 46.1 24.5 50.3"
+        stroke={courtColor}
+        strokeWidth="2.7"
         strokeLinecap="round"
       />
-      {/* Real-time Win Probability Vector & Arrow */}
       <path
-        d="M12 43L23 30L31 36L48 16"
-        stroke={pulseColor}
-        strokeWidth="4.8"
+        d="M9.5 39L18.2 30.8L25 35L37.2 21.5"
+        stroke={courtColor}
+        strokeWidth="4.4"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
-        d="M37 16H48V27"
-        stroke={pulseColor}
-        strokeWidth="4.8"
+        d="M43.5 23C50 27.5 50 36.5 43.5 41M48.5 16.5C61 24.5 61 39.5 48.5 47.5"
+        stroke={courtColor}
+        strokeWidth="4.4"
         strokeLinecap="round"
-        strokeLinejoin="round"
       />
     </svg>
   );
