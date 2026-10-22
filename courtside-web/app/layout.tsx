@@ -9,6 +9,7 @@ import { SITE_URL } from "@/lib/site";
 // app/opengraph-image.tsx(기본)와 경기·선수·팀·감독 폴더의 opengraph-image.tsx.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
+  applicationName: "코트사이드",
   title: { default: "코트사이드 | KBL 실시간 승률·데이터 분석", template: "%s | 코트사이드" },
   description: "KBL 경기 중 승률 흐름, 선수·팀·감독 프로필, 시즌 전망을 데이터로 봅니다.",
   openGraph: { siteName: "코트사이드", locale: "ko_KR", type: "website" },

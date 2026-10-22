@@ -140,6 +140,28 @@ a {
   display: flex;
   flex-direction: column;
 }
+.nav-brand {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  padding: 9px 8px 7px 0;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.nav-brand-mark {
+  display: block;
+  flex: none;
+}
+.nav-brand-wordmark {
+  font-size: var(--fs-300);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.nav-brand:hover .nav-brand-wordmark {
+  color: var(--home);
+}
 .nav-link {
   font-size: var(--fs-200);
   font-weight: 600;
@@ -220,6 +242,11 @@ a {
     flex-wrap: wrap;
     align-items: center;
     gap: 4px 4px;
+  }
+  .nav-brand {
+    align-self: center;
+    margin-right: 8px;
+    padding-block: 8px;
   }
   .nav-main,
   .nav-secondary {

@@ -333,6 +333,23 @@ a.scene:focus-visible {
   padding-top: clamp(48px, 8vw, 96px);
   padding-bottom: clamp(56px, 9vw, 110px);
 }
+.brandLockup,
+.endLockup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 2vw, 24px);
+}
+.brandLockup > svg {
+  width: clamp(54px, 7vw, 88px);
+  height: auto;
+  flex: none;
+}
+.endLockup > svg {
+  width: clamp(38px, 4.2vw, 54px);
+  height: auto;
+  flex: none;
+}
 .wordmark {
   font-size: clamp(40px, 7.4vw, 96px);
   font-weight: 800;

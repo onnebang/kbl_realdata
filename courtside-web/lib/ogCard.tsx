@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { BrandMark } from "@/components/BrandMark";
 
 // 공유 카드(카톡·인스타·디스코드 링크 미리보기) 1200x630 - 2026-09-14.
 // 예전엔 모든 페이지가 제목 "코트사이드" 하나에 og 태그가 없어서, 선수·경기 링크를 보내도 이름도
@@ -115,7 +116,10 @@ export async function ogCard({ kicker, title, sub, accent = GOLD, matchup }: OgC
           <div style={{ fontSize: 34, fontWeight: 600, color: INK_SOFT }}>{kicker}</div>
           {body}
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ display: "flex", background: GOLD, color: BG, fontSize: 30, fontWeight: 800, padding: "6px 22px" }}>코트사이드</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, color: INK }}>
+              <BrandMark size={44} courtColor={INK} />
+              <div style={{ display: "flex", color: INK, fontSize: 30, fontWeight: 800 }}>코트사이드</div>
+            </div>
             <div style={{ fontSize: 28, fontWeight: 600, color: INK_SOFT }}>KBL 실시간 승률·데이터 분석</div>
           </div>
         </div>

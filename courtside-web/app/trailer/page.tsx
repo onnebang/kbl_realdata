@@ -2,6 +2,7 @@
    next/image로 바꾸면 deviceSizes 상한(1080) 때문에 1280px 캡처가 오히려 흐려진다(next.config.ts images). */
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BrandMark } from "@/components/BrandMark";
 import { TrailerScroll } from "@/components/TrailerScroll";
 import { daysUntilKst } from "@/lib/preseason";
 import { COURT_X, HOOP_RIGHT, drawCourtMarkings } from "@/lib/zoneCompare";
@@ -218,13 +219,16 @@ export default function TrailerPage() {
           {/* 1. 첫 절 */}
           <section id="s1" data-scene className={`${styles.scene} ${styles.center} ${styles.opener}`}>
             <svg className={styles.court} viewBox="375 27 345 357" preserveAspectRatio="xMidYMid meet" aria-hidden="true" dangerouslySetInnerHTML={{ __html: COURT_SVG }} />
-            <h1 className={styles.wordmark} aria-label="코트사이드">
-              {["코", "트", "사", "이", "드"].map((c, i) => (
-                <span key={i} data-char aria-hidden="true">
-                  {c}
-                </span>
-              ))}
-            </h1>
+            <div className={styles.brandLockup}>
+              <BrandMark size={88} courtColor="#f2f3f7" />
+              <h1 className={styles.wordmark} aria-label="코트사이드">
+                {["코", "트", "사", "이", "드"].map((c, i) => (
+                  <span key={i} data-char aria-hidden="true">
+                    {c}
+                  </span>
+                ))}
+              </h1>
+            </div>
             <div className={styles.tag} data-rise>
               KBL PLAY-BY-PLAY ANALYTICS
             </div>
@@ -303,8 +307,11 @@ export default function TrailerPage() {
 
           {/* 8. 마지막 */}
           <section id="s8" data-scene className={`${styles.scene} ${styles.center}`}>
-            <div className={styles.wordmark} style={{ fontSize: "clamp(var(--fs-600), 4.2vw, var(--fs-800))" }} data-rise>
-              코트사이드
+            <div className={styles.endLockup} data-rise>
+              <BrandMark size={54} courtColor="#f2f3f7" />
+              <div className={styles.wordmark} style={{ fontSize: "clamp(var(--fs-600), 4.2vw, var(--fs-800))" }}>
+                코트사이드
+              </div>
             </div>
             <div className={styles.tag} data-rise>
               15 SEASONS · 3,993 GAMES · ONE TIMELINE

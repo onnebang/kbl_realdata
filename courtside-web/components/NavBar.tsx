@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { BrandMark } from "./BrandMark";
 import { NavAutoClose } from "./NavAutoClose";
 
 // 사용자 요청("선수프로필/득점분포탐색기/승리기여도 리더보드/폼지수 리더보드/코트사이드까지
@@ -62,6 +63,10 @@ export function NavBar() {
         <NavAutoClose />
       </Suspense>
       <div className="nav-bar-inner">
+        <Link href="/" className="nav-brand" aria-label="코트사이드 홈" prefetch={false}>
+          <BrandMark size={27} className="nav-brand-mark" />
+          <span className="nav-brand-wordmark">코트사이드</span>
+        </Link>
         <div className="nav-main">
           {MAIN_LINKS.map((l) => (
             <Link key={l.href} href={l.href} className="nav-link" prefetch={false}>

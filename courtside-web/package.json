@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "brand:export": "bun scripts/export-brand-assets.ts",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run"

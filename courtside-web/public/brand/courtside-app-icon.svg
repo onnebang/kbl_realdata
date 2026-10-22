@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-labelledby="title">
+  <title id="title">코트사이드 앱 아이콘</title>
+  <rect width="512" height="512" rx="112" fill="#0F1115"/>
+  <g transform="translate(96 96) scale(5)">
+    <!-- White C Outer Frame -->
+    <path d="M38 13H19C13.48 13 9 17.48 9 23V41C9 46.52 13.48 51 19 51H38" stroke="#FFFFFF" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Right Court Accent Bar -->
+    <path d="M47 23V41" stroke="#FF5500" stroke-width="6.5" stroke-linecap="round"/>
+    <!-- Real-time Win Probability Vector & Arrow -->
+    <path d="M12 43L23 30L31 36L48 16" stroke="#00E5FF" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M37 16H48V27" stroke="#00E5FF" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
