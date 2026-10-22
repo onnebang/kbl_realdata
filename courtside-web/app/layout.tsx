@@ -14,6 +14,11 @@ export const metadata: Metadata = {
   description: "KBL 경기 중 승률 흐름, 선수·팀·감독 프로필, 시즌 전망을 데이터로 봅니다.",
   openGraph: { siteName: "코트사이드", locale: "ko_KR", type: "website" },
   twitter: { card: "summary_large_image" },
+  verification: {
+    other: {
+      "naver-site-verification": "10e751c73b772f42d77a4f72f565188d7078105c",
+    },
+  },
 };
 
 // 브라우저 UI(주소창 등) 색을 페이지 배경(--bg)과 맞춘다 - 다크 테마는 globals.css의 미디어쿼리 하나뿐이라
